@@ -1,0 +1,68 @@
+configuration:
+  shares:
+    name: NFS shares
+    description: List of NFS shares to export (`/etc/exports` entries).
+  shares_path:
+    name: Path
+    description: Absolute path to the directory to share. Must be located underneath `/share/` or `/media/`.
+  shares_network:
+    name: Network
+    description: |
+      Allowed network clients.
+      
+      Examples:
+      - Single IP: 192.168.1.100
+      - IP range: 192.168.1.0/24
+      - Hostname: client.example.com
+      - Wildcard: *.example.com
+      - All clients: *
+  shares_options:
+    name: Options
+    description: |
+      NFS export options (comma-separated).
+
+      Examples:
+      - ro: Allow only read requests (default).
+      - rw: Allow both read and write requests.
+      - sync: Synchronous writes (default).
+      - async: Asynchronous writes.
+      - root_squash: Map requests from uid/gid `0` (root) to the anonymous uid/gid (default).
+      - all_squash: Map all requests to the anonymous uid/gid.
+      - no_root_squash: Turn off root squashing.
+      - anonuid: User ID for the anonymous user when `root_squash` or `all_squash` are set (defaults to `65534`).
+      - anongid: Group ID for the anonymous user when `root_squash` or `all_squash` are set (defaults to `65534`).
+      - subtree_check: Enable subtree checking, which can have mild security benefits, but can decrease reliability in some circumstances.
+      - no_subtree_check: Disable subtree checking (default).
+      - pnfs: Enable the pNFS (Parallel NFS) extension if the filesystem supports pNFS exports.
+      - no_pnfs: Disable the pNFS (Parallel NFS) extension (default).
+
+      See the `exports(5)` manpage for details: https://man7.org/linux/man-pages/man5/exports.5.html
+  default_uid:
+    name: Default User ID
+    description: |
+      User ID for newly created NFS shares.
+
+      Examples: 0 (root), 1000 (first regular user)
+  default_gid:
+    name: Default Group ID
+    description: |
+      Group ID for newly created NFS shares.
+
+      Examples: 0 (root), 1000 (first regular group)
+  default_permissions:
+    name: Default Permissions
+    description: |
+      Permissions for newly created NFS shares (octal format).
+
+      Examples: 750 (rwxr-x---), 755 (rwxr-xr-x), 777 (rwxrwxrwx)
+  n_threads:
+    name: Number of NFS server process threads
+    description: The optimal figure depends on the number of and the work load created by the NFS clients, but a useful starting point is eight threads. See `nfsd(8)` manpage for details: https://man7.org/linux/man-pages/man8/nfsd.8.html
+  lease_time:
+    name: NFS server lease-time (seconds)
+    description: This corresponds to how often clients need to confirm their state with the server. Valid range is from 10 to 3600.
+  grace_time:
+    name: NFS server grace-time (seconds)
+    description: If set, new file open requests will not be allowed until after this time has passed to allow clients to recover state. Must be >= `lease_time`.
+network:
+  2049/TCP: nfsd

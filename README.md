@@ -1,21 +1,34 @@
-# Example Home Assistant app repository
+# Salim B's Home Assistant app repository
 
-This repository can be used as a "blueprint" for app development to help you get started.
+This repository holds [@salim-b](https://github.com/salim-b)'s [Home Assistant apps](https://www.home-assistant.io/getting-started/concepts-terminology/#apps).
 
-Apps documentation: <https://developers.home-assistant.io/docs/apps>
-
-[![Open your Home Assistant instance and show the app store with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_store.svg)](https://my.home-assistant.io/redirect/supervisor_store/?repository_url=https%3A%2F%2Fgithub.com%2Fhome-assistant%2Fapps-example)
+[![Open your Home Assistant instance and show the <kbd>Add app repository?</kbd> dialog with Salim B's repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fsalim-b%2Fhome-assistant-apps-salim)
 
 ## Apps
 
-This repository contains the following apps
-
-### [Example app](./example)
+### [NFS Server](./nfs-server)
 
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]
 
-_Example app to use as a blueprint for new apps._
+Turn your Home Assistant instance into a [Network File System (NFS)](https://en.wikipedia.org/wiki/Network_File_System) server.
+
+## Development
+
+The structure of all apps in this repository follows Home Assistant's [best practices](https://developers.home-assistant.io/docs/apps) as much as possible.
+
+To test an app locally on your Home Assistant server, stop a possibly running instance of that app and copy the app's subfolder in this repository to the `/local_apps/` directory of Home Assistant, e.g. via SSH. To test the `nfs-server` app for example, run:
+
+```sh
+# remove possibly existing obsolete app files
+ssh root@homeassistant.local 'rm -rf /local_apps/nfs-server'
+
+# copy the latest app files
+scp -r nfs-server root@homeassistant.local:/local_apps/
+
+# reload app metadata, rebuild app container and restart app
+ssh root@homeassistant.local 'ha store reload && ha apps rebuild local_nfs && ha apps restart local_nfs'
+```
 
 <!--
 
@@ -35,7 +48,6 @@ Notes to developers after forking or using the github template feature:
   - The 'slug' key in 'example/config.yaml' should match the directory name.
 - Adjust all keys/urls that point to 'home-assistant' to now point to your user/fork.
 - Share your repository on the forums https://community.home-assistant.io/c/projects/9
-- Do awesome stuff!
  -->
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg

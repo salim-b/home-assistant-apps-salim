@@ -1,0 +1,45 @@
+# https://developers.home-assistant.io/docs/apps/configuration#app-configuration
+name: NFS Server
+version: "0.1.0"
+slug: nfs
+description: Network File System (NFS) server for Home Assistant
+#image: "ghcr.io/salim-b/{arch}-app-nfs-server"
+url: "https://github.com/salim-b/home-assistant-apps-salim/tree/main/nfs-server"
+panel_icon: mdi:nas
+arch:
+  - armhf
+  - armv7
+  - aarch64
+  - amd64
+  - i386
+startup: services
+init: false
+full_access: true
+apparmor: false
+map:
+  - media:rw
+  - share:rw
+ports:
+  2049/tcp: 2049
+watchdog: tcp://[HOST]:2049
+options:
+  shares:
+    - path: "/share/nfs"
+      network: "192.168.1.0/24"
+      options: "rw,async,anonuid=1000,anongid=1000,pnfs"
+  default_uid: 1000
+  default_gid: 1000
+  default_permissions: "755"
+  n_threads: 8
+  lease_time: 300
+schema:
+  shares:
+    - path: str
+      network: str
+      options: str
+  default_uid: "int(0,)"
+  default_gid: "int(0,)"
+  default_permissions: "match(^[0-7]{3,4}$)"
+  n_threads: "int(1,)"
+  lease_time: "int(10,3600)"
+  grace_time: "int(10,)?"

@@ -1,0 +1,62 @@
+#include <tunables/global>
+
+profile nfs-server flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # Capabilities
+  file,
+  signal (send) set=(kill,term,int,hup,cont),
+
+  # S6-Overlay
+  /init rix,
+  /bin/** ix,
+  /usr/bin/** ix,
+  /etc/s6/** rix,
+  /run/s6/** rwix,
+  /etc/services.d/** rwix,
+  /etc/cont-init.d/** rwix,
+  /etc/cont-finish.d/** rwix,
+  /run/** rwk,
+
+  # Bashio
+  /usr/lib/bashio/** ix,
+  /tmp/** rwk,
+
+  # Access to options.json and other files within your app
+  /data/** rw,
+
+  # Start new profile for exportfs
+  /usr/sbin/exportfs cx -> exportfs,
+
+  profile exportfs flags=(attach_disconnected,mediate_deleted) {
+    #include <abstractions/base>
+    
+    /etc/exports r,
+    /usr/sbin/rpc.nfsd rm,
+  }
+
+  # Start new profile for nfsd
+  /usr/sbin/rpc.nfsd cx -> nfsd,
+
+  profile nfsd flags=(attach_disconnected,mediate_deleted) {
+    #include <abstractions/base>
+    #include <abstractions/nameservice>
+
+    signal receive,
+
+    capability net_bind_service,
+    capability setgid,
+    capability setuid,
+    capability dac_override,
+    network inet raw,
+    network inet6 raw,
+
+    /usr/sbin/exportfs rm,
+
+    /etc/nfs.conf rw,
+    /run/*nfsd*.pid w,
+    /run/nfsd/** rw,
+    /tmp/* rw,
+    /proc/* r,
+  }
+}
