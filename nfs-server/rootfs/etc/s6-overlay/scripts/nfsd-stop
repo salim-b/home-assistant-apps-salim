@@ -1,0 +1,11 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+# Best-effort cleanup at app shutdown: failures must not block the container
+# from stopping, hence no `set -e` here.
+set -uo pipefail
+
+bashio::log.info "Unexporting NFS shares..."
+exportfs -au || true
+
+bashio::log.info "Stopping nfsd kernel threads..."
+rpc.nfsd 0 || true

@@ -1,0 +1,39 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+bashio::log.info "Updating NFS exports table..."
+exportfs -a
+
+bashio::log.info "Starting nfsd service..."
+# NOTE: we accept NFS requests only on the app's IP address (for security hardening)
+APP_IP=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
+# NOTE: NFSv2 is not supported anymore by nfsd, so we mustn't specify
+# `--no-nfs-version 2` (errors with: '2: Unsupported version'); it is disabled
+# at kernel level in /etc/cont-init.d/config.sh instead.
+# NOTE: `--no-nfs-version 3` is required to keep the NFSv4-only setup: without
+# it, rpc.nfsd would write its default version set (NFSv3 and NFSv4) to the
+# kernel and thus re-enable NFSv3.
+NFSD_CMD="rpc.nfsd \
+  --no-nfs-version 3 \
+  --no-udp \
+  --host ${APP_IP} \
+  --lease-time $(bashio::config 'lease_time') \
+  $(bashio::config 'n_threads')"
+
+# Add optional flags
+if bashio::config.has_value 'grace_time'; then
+  NFSD_CMD="${NFSD_CMD} --grace-time $(bashio::config 'grace_time')"
+fi
+
+bashio::log.info "Executing nfsd with: ${NFSD_CMD}"
+# shellcheck disable=SC2086
+if ${NFSD_CMD}; then
+  # rpc.nfsd is not a daemon: it only sets up the NFS server in the kernel
+  # (kernel threads) and then exits, which is why this is an s6-rc `oneshot`.
+  bashio::log.info "NFS server started (kernel threads running)."
+else
+  bashio::log.fatal "Starting the NFS server failed!"
+  bashio::log.fatal "Please check the app configuration (share paths/options, thread count, ...) and the log messages above."
+  exit 1
+fi
