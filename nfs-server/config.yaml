@@ -14,7 +14,14 @@ arch:
   - i386
 startup: services
 init: false
-full_access: true
+# Map the host's kernel modules into the app (read-only) and grant the
+# SYS_MODULE capability so the `nfsd` kernel module can be loaded from within
+# the app (see rootfs/etc/cont-init.d/config.sh).
+kernel_modules: true
+# SYS_ADMIN is required to mount the kernel's nfsd filesystem (see
+# rootfs/etc/cont-init.d/config.sh).
+privileged:
+  - SYS_ADMIN
 apparmor: false
 map:
   - media:rw

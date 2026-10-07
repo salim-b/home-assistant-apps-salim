@@ -2,9 +2,36 @@
 # shellcheck shell=bash
 set -euo pipefail
 
+## Make the kernel's nfsd control filesystem available at /proc/fs/nfsd.
+##
+## /proc/fs/nfsd is just an (empty) mountpoint which the kernel provides in
+## every procfs instance; the actual control files (e.g. `versions`, `threads`)
+## only exist once the `nfsd` filesystem is mounted there. Mounting it also
+## autoloads the `nfsd` kernel module on hosts that ship it (Home Assistant OS
+## provides the module on some boards, e.g. Rockchip-based ones like the
+## ODROID-M1). For hosts without module autoload, we try to load the module
+## explicitly first (host kernel modules are mapped into the app read-only).
+if [ ! -e /proc/fs/nfsd/versions ]; then
+  if command -v modprobe >/dev/null 2>&1; then
+    bashio::log.info "Loading nfsd kernel module (if available)..."
+    modprobe nfsd 2>/dev/null || true
+  fi
+  bashio::log.info "Mounting nfsd filesystem..."
+  if ! mount -t nfsd nfsd /proc/fs/nfsd; then
+    bashio::log.fatal "Unable to mount the nfsd filesystem: the host's kernel probably lacks NFS server support."
+    bashio::log.fatal "Note: Home Assistant OS only ships the nfsd kernel module on some boards"
+    bashio::log.fatal "(currently the Rockchip-based ones, e.g. ODROID-M1/M1S and Home Assistant Green)."
+    bashio::exit.nok
+  fi
+fi
+
 bashio::log.info "Disabling NFSv2 and NFSv3 support at kernel level..."
-echo "-2 -3" >/proc/fs/nfsd/versions
-bashio::log.info "Enabled NFS versions: $(cat /proc/fs/nfsd/versions | grep -o '+[0-9.]*' | sed 's/^+/v/' | paste -sd ', ' -)"
+# NOTE: NFSv2 support is not compiled into recent kernels anymore, in which
+# case the kernel silently ignores the request to disable it.
+if ! echo "-2 -3" >/proc/fs/nfsd/versions; then
+  bashio::log.warning "Unable to set NFS versions at kernel level (is nfsd already running?)"
+fi
+bashio::log.info "Enabled NFS versions: $(</proc/fs/nfsd/versions)"
 
 # Generate /etc/exports from config
 bashio::log.info "Configuring NFS shares..."
@@ -48,7 +75,7 @@ while IFS= read -r share; do
   path=$(bashio::jq "$share" '.path')
   network=$(bashio::jq "$share" '.network')
   options=$(bashio::jq "$share" '.options')
-  
+
   bashio::log.info "Exporting NFS share ${path} for ${network} with options ${options}"
   echo "${path} ${network}(${options})" >>/etc/exports
 
