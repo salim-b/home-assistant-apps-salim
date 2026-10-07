@@ -1,7 +1,7 @@
 configuration:
   shares:
     name: NFS shares
-    description: List of NFS shares to export (`/etc/exports` entries).
+    description: Configure the directories to share via NFS (`/etc/exports` entries).
   shares_path:
     name: Path
     description: Absolute path to the directory to share. Must be located underneath `/share/` or `/media/`.
