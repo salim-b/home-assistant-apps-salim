@@ -1,5 +1,10 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.2.3
+
+- Removed the redundant kernel-level NFS version configuration from the startup script: `rpc.nfsd` configures the kernel's version set itself (and the shell's `echo`/`printf` in the app image can't write to `/proc/fs/nfsd` files anyway, as they issue a `writev(2)` which those files reject with `EINVAL` – that's what the misleading "Invalid argument" error was about)
+- The NFS versions now get verified and logged after server start
+
 ## 0.2.2
 
 - The app image is now built and published to `ghcr.io/salim-b/app-nfs-server` on CI: installing the app from the repository uses the prebuilt image instead of building it locally (local apps under `/local_apps/` are still always built locally)

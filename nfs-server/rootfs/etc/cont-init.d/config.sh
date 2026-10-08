@@ -25,26 +25,12 @@ if [ ! -e /proc/fs/nfsd/versions ]; then
   fi
 fi
 
-## Make sure only NFSv4 is offered at kernel level.
-##
-## NOTE: NFSv2 server support is not compiled into current kernels anymore
-## (CONFIG_NFSD_V2 defaults to off), hence we only disable versions that the
-## kernel actually offers: kernels may reject version writes that reference
-## non-available versions with EINVAL instead of ignoring them.
-NFS_VERSIONS="$(</proc/fs/nfsd/versions)"
-DISABLE_VERSIONS="-3"
-if grep -q '+2' <<<"${NFS_VERSIONS}"; then
-  DISABLE_VERSIONS="-2 ${DISABLE_VERSIONS}"
-fi
-bashio::log.info "Disabling kernel-level NFS versions: ${DISABLE_VERSIONS}"
-if ! echo "${DISABLE_VERSIONS}" >/proc/fs/nfsd/versions; then
-  bashio::log.warning "Unable to set NFS versions at kernel level (is nfsd already running?)"
-fi
-NFS_VERSIONS="$(</proc/fs/nfsd/versions)"
-bashio::log.info "Enabled NFS versions: ${NFS_VERSIONS}"
-if grep -qE '\+(2|3)( |$)' <<<"${NFS_VERSIONS}"; then
-  bashio::log.warning "NFSv2 or NFSv3 is still enabled at kernel level despite the request to disable it."
-fi
+## NOTE: We deliberately do NOT disable NFSv2/v3 via
+## /proc/fs/nfsd/versions here: rpc.nfsd configures the kernel's version set
+## itself (see /etc/s6-overlay/scripts/nfsd-start), and the shell's echo/
+## printf builtins in this image issue writev(2) (text and trailing newline
+## as separate iovecs), which the kernel's nfsd control files - old-style
+## .write only, no .write_iter - reject with EINVAL.
 
 # Generate /etc/exports from config
 bashio::log.info "Configuring NFS shares..."

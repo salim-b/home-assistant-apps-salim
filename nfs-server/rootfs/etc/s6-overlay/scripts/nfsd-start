@@ -32,6 +32,13 @@ if ${NFSD_CMD}; then
   # rpc.nfsd is not a daemon: it only sets up the NFS server in the kernel
   # (kernel threads) and then exits, which is why this is an s6-rc `oneshot`.
   bashio::log.info "NFS server started (kernel threads running)."
+  # rpc.nfsd configured the kernel's NFS version set itself (see the
+  # --no-nfs-version 3 flag above): verify and log the outcome.
+  NFS_VERSIONS="$(</proc/fs/nfsd/versions)"
+  bashio::log.info "Enabled NFS versions: ${NFS_VERSIONS}"
+  if grep -qE '\+(2|3)( |$)' <<<"${NFS_VERSIONS}"; then
+    bashio::log.warning "NFSv2 or NFSv3 is still enabled at kernel level despite the request to disable it."
+  fi
 else
   bashio::log.fatal "Starting the NFS server failed!"
   bashio::log.fatal "Please check the app configuration (share paths/options, thread count, ...) and the log messages above."
