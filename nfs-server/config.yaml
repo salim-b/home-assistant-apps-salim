@@ -7,11 +7,8 @@ description: Network File System (NFS) server for Home Assistant
 url: "https://github.com/salim-b/home-assistant-apps-salim/tree/main/nfs-server"
 panel_icon: mdi:nas
 arch:
-  - armhf
-  - armv7
   - aarch64
   - amd64
-  - i386
 startup: services
 init: false
 # Map the host's kernel modules into the app (read-only) and grant the
