@@ -32,7 +32,7 @@ options:
   shares:
     - path: "/share/nfs"
       network: "192.168.1.0/24"
-      options: "rw,async,anonuid=1000,anongid=1000,pnfs"
+      options: "rw,async,anonuid=1000,anongid=1000,no_subtree_check,pnfs"
   default_uid: 1000
   default_gid: 1000
   default_permissions: "755"
