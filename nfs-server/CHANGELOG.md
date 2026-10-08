@@ -1,5 +1,9 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.2.4
+
+- Fixed the CI image build: the Dockerfile no longer relies on the `BUILD_FROM` build argument being provided by the builder actions (it isn't anymore), instead the base image (`ghcr.io/home-assistant/base`, multi-arch manifest) is pinned in the Dockerfile; the deprecated `build.yaml` was removed (base image, build arguments and labels now live in the Dockerfile, architectures are taken from `arch` in `config.yaml`)
+
 ## 0.2.3
 
 - Removed the redundant kernel-level NFS version configuration from the startup script: `rpc.nfsd` configures the kernel's version set itself (and the shell's `echo`/`printf` in the app image can't write to `/proc/fs/nfsd` files anyway, as they issue a `writev(2)` which those files reject with `EINVAL` – that's what the misleading "Invalid argument" error was about)

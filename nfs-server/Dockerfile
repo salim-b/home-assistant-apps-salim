@@ -1,13 +1,23 @@
 # syntax=docker/dockerfile:1
 
 # https://developers.home-assistant.io/docs/apps/configuration#app-dockerfile
-ARG BUILD_FROM
-FROM $BUILD_FROM
+ARG BUILD_FROM=ghcr.io/home-assistant/base:3.24
+FROM ${BUILD_FROM}
 
 # Execute during the build of the image
-ARG TEMPIO_VERSION BUILD_ARCH
-RUN curl -sSLf -o /usr/bin/tempio \
-  "https://github.com/home-assistant/tempio/releases/download/${TEMPIO_VERSION}/tempio_${BUILD_ARCH}"
+ARG TEMPIO_VERSION=2026.07.0
+ARG TARGETARCH
+RUN \
+    if [ -z "${TARGETARCH}" ]; then \
+        echo "TARGETARCH is not set, please use Docker BuildKit for the build." && exit 1; \
+    fi \
+    && case "${TARGETARCH}" in \
+        amd64) tempio_arch="amd64" ;; \
+        arm64) tempio_arch="aarch64" ;; \
+        *) echo "Unsupported TARGETARCH: ${TARGETARCH}" && exit 1 ;; \
+    esac \
+    && curl -sSLf -o /usr/bin/tempio \
+        "https://github.com/home-assistant/tempio/releases/download/${TEMPIO_VERSION}/tempio_${tempio_arch}"
 
 # Install requirements for app
 RUN apk add --no-cache \
@@ -18,6 +28,12 @@ RUN mkdir -p /var/lib/nfs
 
 # Copy root filesystem
 COPY --link rootfs /
+
+LABEL \
+    org.opencontainers.image.title="Home Assistant app: NFS Server" \
+    org.opencontainers.image.description="Network File System (NFS) server for Home Assistant." \
+    org.opencontainers.image.source="https://github.com/salim-b/home-assistant-apps-salim" \
+    org.opencontainers.image.licenses="Apache License 2.0"
 
 # Health check: rpc.nfsd only starts the NFS server in the kernel and then
 # exits, hence probe the kernel's NFS listener on TCP port 2049 (see
