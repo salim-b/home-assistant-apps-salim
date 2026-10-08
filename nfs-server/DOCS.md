@@ -1,8 +1,18 @@
 # Home Assistant app: NFS Server
 
-## How to use
+## Configuration
 
-TODO
+NFS shares are configured in the app's options: each **NFS shares** entry exports one directory of the Home Assistant host to a set of allowed clients. An entry consists of the directory's **Path**, the allowed client **Network** and the NFS export **Options** – see the field descriptions in the configuration dialog for details and examples.
+
+Saving the options restarts the app, which then exports the configured shares.
+
+## Mounting a share
+
+The server only provides NFSv4.x, so mount with `-t nfs4`, using the share's **Path** as the export path. For the default share:
+
+```
+mount -t nfs4 homeassistant.local:/share/nfs /mnt/nfs
+```
 
 ## Requirements
 
@@ -12,6 +22,6 @@ The NFS server runs in the host's kernel: it requires the host kernel to provide
 
 The NFS server requires appropriate filesystem permissions on shared directories.
 
-- For new directories: The app will create new directories with default permissions (`755`, `root:root`). These can be adjusted in the app's configuration.
+- For new directories: The app will create new directories with the default ownership and permissions configured in the app's options.
 
 - For existing directories: The app will not modify existing permissions, hence users must ensure the NFS server (running as `root`) has read and execute permissions (plus write permission for `rw` shares) to the paths to be shared via NFS.
