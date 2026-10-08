@@ -1,5 +1,10 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.2.6
+
+- Share paths are now validated at startup: paths outside of `/share/` or `/media/` abort the app with an explanatory error (unmapped paths can never work and nonexistent ones would silently be created in the app's ephemeral filesystem)
+- Removed pointless in-container permission checks on shared directories (the container runs as root, so they could never fire) – see `DOCS.md` for the permissions that actually matter (the client-side ones)
+
 ## 0.2.5
 
 - Fixed the configuration option labels/descriptions in the UI: the translations file did not parse as YAML at all (a `: ` inside a plain scalar string), the port label key used the wrong case (`2049/TCP` instead of `2049/tcp`) and the `shares` sub-option labels were nested at the wrong level (they must live under the option's `fields` key)
