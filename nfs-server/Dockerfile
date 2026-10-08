@@ -20,11 +20,15 @@ RUN \
         "https://github.com/home-assistant/tempio/releases/download/${TEMPIO_VERSION}/tempio_${tempio_arch}"
 
 # Install requirements for app
+# NOTE: nfs-utils is unpinned deliberately: Alpine minor releases repoint
+# package versions, and the app image is rebuilt regularly.
+# hadolint ignore=DL3018
 RUN apk add --no-cache \
   nfs-utils
 
-# Create necessary system directories (exportfs keeps its export table
-# state in /var/lib/nfs)
+# Create necessary system directories (exportfs keeps its export table state
+# in /var/lib/nfs)
+# hadolint ignore=DL3059
 RUN mkdir -p /var/lib/nfs
 
 # Copy root filesystem

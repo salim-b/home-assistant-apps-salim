@@ -1,0 +1,11 @@
+extends: default
+
+rules:
+  # app config descriptions and translations use long lines intentionally
+  line-length:
+    max: 120
+    level: warning
+  # HA app files don't use a leading '---'
+  document-start: {present: false}
+  comments: {min-spaces-from-content: 1}
+  truthy: {check-keys: false}

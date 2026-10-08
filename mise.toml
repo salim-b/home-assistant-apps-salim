@@ -1,0 +1,26 @@
+# Dev-ops framework: https://mise.jdx.dev
+# Task docs: https://mise.jdx.dev/tasks/ - file tasks live in mise-tasks/
+[tools]
+# lint
+shellcheck = "0.11.0"
+actionlint = "1.7.12"
+hadolint = "2.15.1"
+yamllint = "1.38.0"
+# validate (python harness runs via uv)
+uv = "0.12.23"
+python = "3.14.8"
+# json/yaml plumbing (jq also ships in the HA app base images)
+jq = "1.8.2"
+yq = "4.54.1"
+
+[env]
+DOCKER_BUILDKIT = "1"
+
+[vars]
+# supervisor ref the validate task fetches schemas from (single source of
+# the pin; bump deliberately and review the diff like a dependency update)
+supervisor_ref = "2026.10.1"
+
+[tasks.check]
+description = "Run all pre-commit checks (lint + validate)"
+depends = ["lint", "validate"]

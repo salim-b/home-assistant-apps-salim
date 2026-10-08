@@ -43,6 +43,7 @@ jobs:
 
           # If the workflow file itself changed, rebuild all apps
           if [[ "${CHANGED_FILES}" =~ \.github/workflows/(builder|build-app)\.yaml ]]; then
+            # shellcheck disable=SC2206  # APPS is a space-separated list
             changed_apps=(${APPS})
           else
             for app in ${APPS}; do

@@ -4,6 +4,25 @@ Dev tooling & agent workflow plan for the whole repository. App-specific work
 lives in the apps' own files (`nfs-server/TODO.md` etc.). New top-level work
 items go here.
 
+## Status
+
+Phases 1–4 are **implemented** (mise foundation, tasks, `AGENTS.md`, CI +
+devcontainer); deviations from the plan as written:
+
+- Added lint config files: `.yamllint` (HA-style: no `---` document starts,
+  long lines are warnings) and hadolint inline ignores in the app Dockerfile
+  (unpinned `nfs-utils` is deliberate).
+- The app Dockerfile/translations/workflow got small lint-accommodation
+  commits alongside the tooling introduction.
+- CI runs only `mise run check` (lint + validate): `build`/`lab` need
+  privileged docker + host kernel modules and duplicate what the
+  `builder`/`build-app` workflow does better for publishing; revisit if CI
+  runners prove out the lab.
+- Devcontainer gets mise via the `ghcr.io/acesyde/mise-devcontainer-feature`
+  feature (jdx's own feature is not published on ghcr) and runs
+  `mise trust && mise install --locked` on create.
+- Phase 5 (daemons) remains skipped per the decision record below.
+
 ## Where we stand
 
 - App development diligence is currently hand-crafted per session (as done
@@ -16,9 +35,7 @@ items go here.
 - Existing automation: CI (lint via `frenck/action-addon-linter`, image
   build+publish via `builder`/`build-app`, Renovate), the HA devcontainer
   for supervisor-integrated testing, `.editorconfig`, `.vscode/tasks.json`.
-- Dev machines have mise (2026.10.x, current docs at <https://mise.jdx.dev> —
-  consult them before implementing; the tool evolves fast). The repository
-  has no `mise.toml`/`AGENTS.md` yet.
+- Dev machines have mise (2026.10.x).
 
 ## Goals
 
