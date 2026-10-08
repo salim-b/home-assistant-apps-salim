@@ -25,7 +25,6 @@ map:
   - share:rw
 ports:
   2049/tcp: 2049
-watchdog: tcp://[HOST]:2049
 options:
   shares:
     - path: "/share/nfs"

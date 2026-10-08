@@ -18,3 +18,9 @@ RUN mkdir -p /var/lib/nfs
 
 # Copy root filesystem
 COPY --link rootfs /
+
+# Health check: rpc.nfsd only starts the NFS server in the kernel and then
+# exits, hence probe the kernel's NFS listener on TCP port 2049 (see
+# rootfs/usr/bin/nfsd-healthcheck).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["/usr/bin/nfsd-healthcheck"]

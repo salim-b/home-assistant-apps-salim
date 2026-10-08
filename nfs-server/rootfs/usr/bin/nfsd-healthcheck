@@ -1,0 +1,12 @@
+#!/bin/bash
+# Docker HEALTHCHECK probe for the NFS Server app.
+#
+# rpc.nfsd only starts the NFS server in the kernel and then exits, so there
+# is no server process whose presence could be checked. Instead, probe the
+# kernel's NFS listener on TCP port 2049: the daemon binds it to the app's
+# own IP address (see /etc/s6-overlay/scripts/nfsd-start), hence we connect
+# to that rather than to localhost.
+set -euo pipefail
+
+APP_IP=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
+exec 3<>"/dev/tcp/${APP_IP}/2049"
