@@ -24,4 +24,4 @@ The NFS server requires appropriate filesystem permissions on shared directories
 
 - For new directories: The app will create new directories with the default ownership and permissions configured in the app's options.
 
-- For existing directories: The app will not modify existing permissions, hence users must ensure the NFS server (running as `root`) has read and execute permissions (plus write permission for `rw` shares) to the paths to be shared via NFS.
+- For existing directories: The app will not modify existing permissions. Note that export options like `rw` do not override file permissions: NFS requests are evaluated with the client's effective user/group (after `root_squash` / `all_squash` squashing to `anonuid`/`anongid`), so the shared directory must be readable/writable for those identities (e.g. a directory owned by `root:root` will not be writable by clients squashed to uid/gid `1000`).
