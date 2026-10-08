@@ -1,4 +1,4 @@
-# Salim B's Home Assistant app repository
+# Salim B's Home Assistant apps
 
 This repository holds [@salim-b](https://github.com/salim-b)'s [Home Assistant apps](https://www.home-assistant.io/getting-started/concepts-terminology/#apps).
 

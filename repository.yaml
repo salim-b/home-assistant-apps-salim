@@ -1,4 +1,4 @@
 # https://developers.home-assistant.io/docs/apps/repository#repository-configuration
-name: Salim B's Home Assistant app repository 
+name: Salim B's Home Assistant apps
 url: 'https://github.com/salim-b/home-assistant-apps-salim'
 maintainer: Salim B <ha@salim.space>
