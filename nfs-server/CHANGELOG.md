@@ -1,5 +1,9 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.3.1
+
+- Migrated to the current s6-overlay layout: the user bundle is now declared in `/etc/s6-overlay/user-bundles.d/user/contents.d/` (service definitions stay in `/etc/s6-overlay/s6-rc.d/`), removing the "defining user bundles in /etc/s6-overlay/s6-rc.d is deprecated" startup warning
+
 ## 0.3.0
 
 - Fixed NFSv4 client mounts hanging forever: the kernel's nfsd resolves NFSv4 paths via export-cache upcalls that are serviced by `rpc.mountd` – the app now runs a `mountd` service (no network ports, legacy MOUNT protocol disabled)
