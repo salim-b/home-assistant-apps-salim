@@ -43,25 +43,9 @@ ssh root@homeassistant.local 'ha apps restart local_nfs'
 ssh root@homeassistant.local 'ha apps logs --follow local_nfs'
 ```
 
-<!--
+## CI
 
-Notes to developers after forking or using the github template feature:
-- While developing comment out the 'image' key from 'example/config.yaml' to make the supervisor build the app locally.
-  - Remember to put this back when pushing up your changes.
-- When you merge to the 'main' branch of your repository a new build will be triggered.
-  - Make sure you adjust the 'version' key in 'example/config.yaml' when you do that.
-  - Make sure you update 'example/CHANGELOG.md' when you do that.
-  - The first time this runs you might need to adjust the image configuration on github container registry to make it public.
-  - You may also need to adjust the GitHub Actions configuration (Settings > Actions > General > Workflow > Read & Write).
-- Update the repository check in '.github/workflows/build-app.yaml' to match your repository name
-  (the 'github.repository' condition in the 'prepare' job).
-- Adjust the 'image' key in 'example/config.yaml' so it points to your username instead of 'home-assistant'
-  (e.g., 'ghcr.io/my-username/my-app').
-- Rename the example directory.
-  - The 'slug' key in 'example/config.yaml' should match the directory name.
-- Adjust all keys/urls that point to 'home-assistant' to now point to your user/fork.
-- Share your repository on the forums https://community.home-assistant.io/c/projects/9
- -->
+On every push to `main`, the [Builder](./.github/workflows/builder.yaml) workflow builds each app whose relevant files changed and publishes its container images to GHCR via the [Build app](./.github/workflows/build-app.yaml) workflow: per-arch images (e.g. `ghcr.io/salim-b/amd64-app-nfs-server`) plus a multi-arch manifest (e.g. `ghcr.io/salim-b/app-nfs-server`), tagged with the app's `version` and `latest`. Pull requests only build without publishing.
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg
