@@ -1,5 +1,9 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.2.7
+
+- No functional changes: comment cleanup, app design notes moved to the repository's `KNOWLEDGE.md`
+
 ## 0.2.6
 
 - Share paths are now validated at startup: paths outside of `/share/` or `/media/` abort the app with an explanatory error (unmapped paths can never work and nonexistent ones would silently be created in the app's ephemeral filesystem)

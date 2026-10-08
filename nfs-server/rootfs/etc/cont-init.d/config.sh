@@ -7,10 +7,9 @@ set -euo pipefail
 ## /proc/fs/nfsd is just an (empty) mountpoint which the kernel provides in
 ## every procfs instance; the actual control files (e.g. `versions`, `threads`)
 ## only exist once the `nfsd` filesystem is mounted there. Mounting it also
-## autoloads the `nfsd` kernel module on hosts that ship it (Home Assistant OS
-## provides the module on some boards, e.g. Rockchip-based ones like the
-## ODROID-M1). For hosts without module autoload, we try to load the module
-## explicitly first (host kernel modules are mapped into the app read-only).
+## autoloads the `nfsd` kernel module on hosts that ship it. For hosts without
+## module autoload, we try to load the module explicitly first (host kernel
+## modules are mapped into the app read-only).
 if [ ! -e /proc/fs/nfsd/versions ]; then
   if command -v modprobe >/dev/null 2>&1; then
     bashio::log.info "Loading nfsd kernel module (if available)..."
@@ -25,12 +24,9 @@ if [ ! -e /proc/fs/nfsd/versions ]; then
   fi
 fi
 
-## NOTE: We deliberately do NOT disable NFSv2/v3 via
-## /proc/fs/nfsd/versions here: rpc.nfsd configures the kernel's version set
-## itself (see /etc/s6-overlay/scripts/nfsd-start), and the shell's echo/
-## printf builtins in this image issue writev(2) (text and trailing newline
-## as separate iovecs), which the kernel's nfsd control files - old-style
-## .write only, no .write_iter - reject with EINVAL.
+## NOTE: rpc.nfsd configures the kernel's NFS version set itself at server
+## start (see /etc/s6-overlay/scripts/nfsd-start and KNOWLEDGE.md in the app's
+## source repository for why direct writes to /proc/fs/nfsd/* don't work).
 
 ## Validate each share configuration and generate /etc/exports from it
 bashio::log.info "Configuring NFS shares..."

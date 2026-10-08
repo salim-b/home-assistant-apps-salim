@@ -8,12 +8,9 @@ exportfs -a
 bashio::log.info "Starting nfsd service..."
 # NOTE: we accept NFS requests only on the app's IP address (for security hardening)
 APP_IP=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
-# NOTE: NFSv2 is not supported anymore by nfsd, so we mustn't specify
-# `--no-nfs-version 2` (errors with: '2: Unsupported version'); it is disabled
-# at kernel level in /etc/cont-init.d/config.sh instead.
-# NOTE: `--no-nfs-version 3` is required to keep the NFSv4-only setup: without
-# it, rpc.nfsd would write its default version set (NFSv3 and NFSv4) to the
-# kernel and thus re-enable NFSv3.
+# NOTE: rpc.nfsd writes its default version set (NFSv3+NFSv4) to the kernel,
+# hence `--no-nfs-version 3` is what keeps this setup NFSv4-only (see
+# KNOWLEDGE.md in the app's source repository).
 NFSD_CMD="rpc.nfsd \
   --no-nfs-version 3 \
   --no-udp \
@@ -29,11 +26,10 @@ fi
 bashio::log.info "Executing nfsd with: ${NFSD_CMD}"
 # shellcheck disable=SC2086
 if ${NFSD_CMD}; then
-  # rpc.nfsd is not a daemon: it only sets up the NFS server in the kernel
-  # (kernel threads) and then exits, which is why this is an s6-rc `oneshot`.
+  # rpc.nfsd exits after configuring the in-kernel server - hence the
+  # s6-rc `oneshot` (see KNOWLEDGE.md in the app's source repository).
   bashio::log.info "NFS server started (kernel threads running)."
-  # rpc.nfsd configured the kernel's NFS version set itself (see the
-  # --no-nfs-version 3 flag above): verify and log the outcome.
+  # Verify and log the version set rpc.nfsd configured.
   NFS_VERSIONS="$(</proc/fs/nfsd/versions)"
   bashio::log.info "Enabled NFS versions: ${NFS_VERSIONS}"
   if grep -qE '\+(2|3)( |$)' <<<"${NFS_VERSIONS}"; then
