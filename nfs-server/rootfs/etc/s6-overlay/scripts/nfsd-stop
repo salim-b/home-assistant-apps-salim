@@ -4,8 +4,27 @@
 # from stopping, hence no `set -e` here.
 set -uo pipefail
 
+bashio::log.info "Stopping nfsd kernel threads..."
+rpc.nfsd 0 || true
+
 bashio::log.info "Unexporting NFS shares..."
 exportfs -au || true
 
-bashio::log.info "Stopping nfsd kernel threads..."
-rpc.nfsd 0 || true
+## Tear down the pseudo file system root bind mounts (per-share mirrors;
+## deepest paths first, mirrors may nest)
+PSEUDO_ROOT="/data/pseudo_root"
+bashio::log.info "Unmounting NFS pseudo file system root..."
+SHARES=$(bashio::config 'shares' || true)
+if bashio::var.has_value "${SHARES}"; then
+  PATHS=""
+  while IFS= read -r share; do
+    path=$(bashio::jq "$share" '.path' || true)
+    [ -n "${path}" ] || continue
+    PATHS+="${path}\n"
+  done < <(echo "${SHARES}")
+  # deepest paths first: mirrors may nest (e.g. /media and /media/usb)
+  printf '%b' "${PATHS}" | awk '{print length, $0}' | sort -rn | cut -d' ' -f2- |
+    while IFS= read -r path; do
+      umount "${PSEUDO_ROOT}${path}" 2>/dev/null || true
+    done
+fi

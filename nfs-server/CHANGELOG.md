@@ -1,5 +1,14 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.3.0
+
+- Fixed NFSv4 client mounts hanging forever: the kernel's nfsd resolves NFSv4 paths via export-cache upcalls that are serviced by `rpc.mountd` – the app now runs a `mountd` service (no network ports, legacy MOUNT protocol disabled)
+- Fixed NFSv4 path resolution: the pseudo file system root now lives on the app's persistent `/data` volume (`/data/pseudo_root`, per-share bind mounts), as the container's root filesystem cannot be exported; client paths are unchanged (`host:/share/nfs`, …) and per-share options are now actually enforced
+- Shares are exported with distinct numeric `fsid`s to keep the filehandle mapping unambiguous across the bind-mounted exports; the pseudo file system root itself is exported read-only without `crossmnt` (an NFSv3-only flag)
+- Shares must be clean absolute directories (no empty path components); whitespace in share path/network/options is rejected with an explanatory error
+- The default share options no longer enable `pnfs` (no benefit with a single server)
+- Note: NFSv4 client state recovery after server restarts is not available for the containerized server (the kernel refuses the legacy/upcall-helper tracking outside the host's network namespace; see `KNOWLEDGE.md`) – fresh mounts and writes are unaffected
+
 ## 0.2.7
 
 - No functional changes: comment cleanup, app design notes moved to the repository's `KNOWLEDGE.md`

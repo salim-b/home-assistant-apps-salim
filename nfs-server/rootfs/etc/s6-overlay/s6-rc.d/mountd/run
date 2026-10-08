@@ -1,0 +1,11 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+# NOTE: NFSv4 clients never talk to mountd (the MOUNT protocol is v2/v3
+# only); the kernel's nfsd however resolves NFSv4 paths via export-cache
+# upcalls, which rpc.mountd services. Hence a foreground mountd with both
+# legacy protocol listeners disabled: it binds no network ports at all and
+# only services the kernel's upcalls (see KNOWLEDGE.md in the app's source
+# repository).
+exec rpc.mountd -F -N 2 -N 3

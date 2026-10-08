@@ -23,7 +23,8 @@ RUN \
 RUN apk add --no-cache \
   nfs-utils
 
-# Create necessary system directories
+# Create necessary system directories (exportfs keeps its export table
+# state in /var/lib/nfs)
 RUN mkdir -p /var/lib/nfs
 
 # Copy root filesystem

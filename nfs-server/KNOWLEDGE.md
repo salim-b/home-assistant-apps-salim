@@ -3,6 +3,76 @@
 Non-obvious facts and gotchas learned while developing this app, collected
 here so they don't have to be re-learned the hard way.
 
+## NFSv4 needs `rpc.mountd` and an exportable pseudo file system root
+
+The kernel's nfsd resolves NFSv4 paths via export-cache upcalls that are
+serviced by `rpc.mountd` – without a running mountd, client mounts hang
+forever (NULL RPC is answered fine, which makes this hard to diagnose). v4
+clients never use the MOUNT protocol, so the app runs
+`rpc.mountd -F -N 2 -N 3` (foreground, both legacy listeners disabled → it
+binds no network ports and only services upcalls).
+
+Terminology: RFC 8881 §7.3 (and RFC 7530 §7.5) call the mechanism the
+"(Server) Pseudo File System"; "pseudo-root" is the common informal name for
+its root. It is an NFSv4-family mechanism – NFSv2/3 have no server-side
+namespace assembly (clients mount each export via the MOUNT protocol, flat).
+
+The pseudo file system root must be exportable: mountd auto-creates it from
+the export paths rooted at `/`, but the app container's overlayfs root cannot
+be exported. Hence the app builds its own one on `/data` (the app's
+persistent, host-ext4 volume): bind mounts of `/share` and `/media` at
+`/data/pseudo_root/{share,media}`, shares exported from their mirrored paths
+(`/data/pseudo_root<share-path>`) with **distinct numeric `fsid=`** and their
+own client networks (the pseudo file system root gets read-only walk access
+for the union of all networks). Client paths stay unchanged. Consequences:
+
+- Per-share options (`rw`/`ro`, squashing, …) are enforced at the export
+  boundary – verified end-to-end including nested shares and multiple
+  networks.
+- Numeric fsids are essential: mountd's synthesized intermediate pseudo root
+  entries carry the filesystem's UUID, and filehandles keyed by that UUID
+  are ambiguous once multiple exports share one filesystem (binds of the
+  same fs) – they resolve back to the wrong export (observed: mounts land
+  on the ro pseudo root → `EROFS` on write).
+- The pseudo root itself needs no `crossmnt` (an NFSv3-era flag for seeing
+  mounts beneath an export point): NFSv4 clients switch the export at
+  mountpoint crossings regardless (`nfsd_cross_mnt` consults the export
+  cache for any v4 client), and the pseudo entries mountd synthesizes for
+  the path components carry `crossmnt` anyway.
+- Every restart cycle of the kernel server (`rpc.nfsd 0` + start) starts a
+  grace period (default 90 s) during which clients' write opens get
+  `NFS4ERR_GRACE` and retry – writes appear to stall. When nothing is to be
+  reclaimed (no client recovery records, as in this app), the grace period
+  ends early.
+
+## NFSv4 client state recovery does not work in-container (yet)
+
+NFSv4 is stateful: after a *server* restart, still-connected clients must
+reclaim their state (opens, locks, delegations) during the grace period.
+For that, the server needs a persistent store of client identities – the
+"client recovery tracking". The kernel provides three mechanisms
+(`fs/nfsd/nfs4recover.c`):
+
+1. **cld tracker**: upcalls to a `nfsdcld` daemon over rpc_pipefs; the
+   daemon keeps its own (sqlite) store.
+2. **UMH helper**: spawns `/sbin/nfsdcltrack` via the usermode helper.
+3. **legacy**: filesystem store in a recovery directory.
+
+Modes 2 and 3 are compiled in on HAOS but **explicitly refuse non-init
+network namespaces** (`/* The legacy code won't work in a container */
+if (net != &init_net) … -EINVAL`) – our server runs in the container's
+netns, so the host log line "Unable to initialize client recovery tracking!
+(-2)" is expected. Mode 1 needs `nfsdcld` (not shipped) and a working
+rpc_pipefs upcall channel in the container (per-netns rpc_pipefs mount) –
+worth investigating (see TODO.md): it would give real recovery state
+across app restarts, stored on the app's persistent `/data`.
+
+Facts for mode 3, should it ever matter: the default recovery dir is
+hardcoded as `/var/lib/nfs/v4recovery` (`user_recovery_dirname`); it can be
+relocated at runtime via the `/proc/fs/nfsd/nfsv4recoverydir` control file
+(must be set before the server starts). The app does *not* create that dir:
+for the containerized server it would be inert.
+
 ## `echo`/`printf` cannot write to `/proc/fs/nfsd/*` (`EINVAL`)
 
 The app base image's bash (5.3.9) implements the output of its `echo` and

@@ -111,7 +111,9 @@ Ground truth from supervisor sources (`utils/apparmor.py`, `apps/app.py`,
     the cont-init script reads them)
   - `/etc/exports rw`, `/var/lib/nfs/** rw` (export table, v4 recovery dir)
   - `/lib/modules/** r` (modprobe), execute access for `mount`, `ip`,
-    `exportfs`, `rpc.nfsd` (the latter two via `cx` sub-profiles)
+    `exportfs`, `rpc.nfsd`, `rpc.mountd` (the latter two via `cx`
+    sub-profiles); `r`/`w` on the pseudo-root tree `/data/pseudo_root/**`
+    (bind mounts + `/etc/exports` generation live there)
   - capabilities per complain-mode analysis (expect `dac_override`; the old
     profile's `net_bind_service`/`setuid`/`setgid`/raw-network entries are
     probably unnecessary for an NFSv4-only setup — verify, don't carry over)
@@ -138,9 +140,9 @@ Ground truth from supervisor sources (`utils/apparmor.py`, `apps/app.py`,
   interfaces by docker (not just the LAN the user intends) → recommend
   read-only exports and a trusted network; explain squashing (see the
   existing client-side permissions note).
-- Default share options: add `no_subtree_check` (silences the `exportfs`
-  notice); reconsider `async` (faster, but data loss on crash — `sync` is
-  the `exports(5)` default).
+- Default share options: `no_subtree_check` added and `pnfs` dropped (no benefit with a single server); `async` still to reconsider (faster, but data loss on crash — `sync` is the `exports(5)` default).
+
+- Investigate real NFSv4 client recovery tracking in the container (see `KNOWLEDGE.md`): ship `nfsdcld` (cld tracker), mount rpc_pipefs per-netns in the container, keep its sqlite store on `/data` – gives clients state reclaim across app restarts. Verify the per-netns rpc_pipefs upcall channel works in a privileged container first.
 - After the first successful CI publish, verify images are cosign-signed
   (signed → +1 rating).
 
