@@ -1,5 +1,9 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.2.5
+
+- Fixed the configuration option labels/descriptions in the UI: the translations file did not parse as YAML at all (a `: ` inside a plain scalar string), the port label key used the wrong case (`2049/TCP` instead of `2049/tcp`) and the `shares` sub-option labels were nested at the wrong level (they must live under the option's `fields` key)
+
 ## 0.2.4
 
 - Fixed the CI image build: the Dockerfile no longer relies on the `BUILD_FROM` build argument being provided by the builder actions (it isn't anymore), instead the base image (`ghcr.io/home-assistant/base`, multi-arch manifest) is pinned in the Dockerfile; the deprecated `build.yaml` was removed (base image, build arguments and labels now live in the Dockerfile, architectures are taken from `arch` in `config.yaml`)
