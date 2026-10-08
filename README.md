@@ -15,9 +15,11 @@ Turn your Home Assistant instance into a [Network File System (NFS)](https://en.
 
 ## Development
 
-The structure of all apps in this repository follows Home Assistant's [best practices](https://developers.home-assistant.io/docs/apps) as much as possible.
+The structure of all apps in this repository follows Home Assistant's [best practices](https://developers.home-assistant.io/docs/apps) as far as possible.
 
-To test an app locally on your Home Assistant server, stop a possibly running instance of that app and copy the app's subfolder in this repository to the `/local_apps/` directory of Home Assistant, e.g. via SSH. To test the `nfs-server` app for example, run:
+To test an app locally on your Home Assistant server, stop a possibly running instance of that app and copy the app's subfolder in this repository to the `/local_apps/` directory of Home Assistant, e.g. via SSH. Then, either update the app (if you bumped its version) or otherwise trigger an app rebuild.
+
+To test the `nfs-server` app for example, run:
 
 ```sh
 # remove possibly existing obsolete app files
@@ -26,8 +28,16 @@ ssh root@homeassistant.local 'rm -rf /local_apps/nfs-server'
 # copy the latest app files
 scp -r nfs-server root@homeassistant.local:/local_apps/
 
-# reload app metadata, rebuild app container and restart app
-ssh root@homeassistant.local 'ha store reload && ha apps rebuild local_nfs && ha apps restart local_nfs'
+# reload app metadata
+ssh root@homeassistant.local 'ha store reload'
+
+# IF VERSION IS INCREASED: update app
+ssh root@homeassistant.local 'ha apps update local_nfs'
+# OTHERWISE: rebuild app container
+ssh root@homeassistant.local 'ha apps rebuild local_nfs'
+
+# restart app
+ssh root@homeassistant.local 'ha apps restart local_nfs'
 ```
 
 <!--
