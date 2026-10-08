@@ -38,6 +38,9 @@ ssh root@homeassistant.local 'ha apps rebuild local_nfs'
 
 # restart app
 ssh root@homeassistant.local 'ha apps restart local_nfs'
+
+# get app logs (`--follow` continuously prints new log entries until you abort)
+ssh root@homeassistant.local 'ha apps logs --follow local_nfs'
 ```
 
 <!--
