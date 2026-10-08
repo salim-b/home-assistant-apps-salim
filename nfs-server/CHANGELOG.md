@@ -1,5 +1,9 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.2.2
+
+- The app image is now built and published to `ghcr.io/salim-b/app-nfs-server` on CI: installing the app from the repository uses the prebuilt image instead of building it locally (local apps under `/local_apps/` are still always built locally)
+
 ## 0.2.1
 
 - Fixed the kernel-level NFS version configuration: kernels may reject version writes that reference non-available versions with `EINVAL` instead of ignoring them; only the versions the kernel actually offers are disabled now, and the outcome is verified

@@ -1,9 +1,12 @@
 # https://developers.home-assistant.io/docs/apps/configuration#app-configuration
 name: NFS Server
-version: "0.2.1"
+version: "0.2.2"
 slug: nfs
 description: Network File System (NFS) server for Home Assistant
-#image: "ghcr.io/salim-b/{arch}-app-nfs-server"
+# Generic (multi-arch) image name; CI builds & publishes per-arch images
+# (`ghcr.io/salim-b/{amd64,aarch64}-app-nfs-server`) and a multi-arch manifest
+# under this name on pushes to main.
+image: "ghcr.io/salim-b/app-nfs-server"
 url: "https://github.com/salim-b/home-assistant-apps-salim/tree/main/nfs-server"
 panel_icon: mdi:nas
 arch:
