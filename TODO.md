@@ -53,6 +53,17 @@ TOML tasks in `mise.toml` for short commands; executable file tasks in
 editor highlighting/linting; wire with `depends`; `sources`/`outputs` on
 tasks whose inputs/outputs allow caching; bare `mise run` shows the picker.
 
+**Task arguments: always fully documented and typed via usage specs** — any
+task accepting arguments defines them in a [usage
+spec](https://mise.jdx.dev/tasks/task-arguments.html): the `usage` field for
+TOML tasks, `#USAGE` comment headers for file tasks (`#MISE` for properties,
+`#USAGE` for the spec; both also understood as `# [USAGE]`-style bracketed
+markers). No bare positional/`$1`-style argument handling, except tasks
+explicitly marked `raw_args = true`. This gives, for free and from one
+declaration: pre-run validation (invalid/missing args fail before the script
+starts), generated `--help`, shell completions, `usage_*` env vars in the
+script, and Markdown docs via `mise generate task-docs`.
+
 Task inventory, mapped 1:1 from the hand-crafted diligence list:
 
 - `lint`: shellcheck all `rootfs/` scripts (set `sources` to the globs →
@@ -64,9 +75,12 @@ Task inventory, mapped 1:1 from the hand-crafted diligence list:
   translations against `SCHEMA_APP_TRANSLATIONS` (incl. `fields` nesting,
   lowercase `network` port keys), `config.yaml` against the app schema, and
   the apparmor profile-name regex from supervisor's `utils/apparmor.py`.
-  Copy the schemas from a **pinned supervisor ref** (cite the ref in a
-  comment); this complements the CI linter (which validates HA-side
-  expectations) with supervisor-side semantics at a known version.
+  Schemas are **fetched at runtime** from the supervisor repo at a ref
+  pinned in exactly one place (`[vars] SUPERVISOR_REF` in `mise.toml`,
+  with a local cache): no schema copies drift in-repo, and bumping the pin
+  is a one-line change reviewed like a dependency update. This complements
+  the CI linter (HA-side expectations) with supervisor-side semantics at a
+  known version.
 - `build`: `docker buildx build` each app for `linux/amd64` and
   `linux/arm64` (no build args needed since the `BUILD_FROM` fix); assert
   the OCI labels and `HEALTHCHECK` in the built image.
@@ -78,12 +92,13 @@ Task inventory, mapped 1:1 from the hand-crafted diligence list:
   host bind dir, ro enforcement) → graceful stop (down-script teardown).
   Run for every runtime-affecting change; it caught the
   mountd/pseudo-root class of bugs.
+  - Args (usage-spec'd): `--app <app>` (default: all apps with a lab
+    fixture), `--keep` (keep containers for debugging).
 - `check` (default entry): `depends = ["lint", "validate"]` — "always run
   before finishing a change".
 - Optional: `watch` (mise watch lint over script sources), `release` (assert
   `config.yaml` version == newest `CHANGELOG.md` entry, with `confirm`),
   `docs` (`mise generate task-docs` → committed task reference).
-- Task arguments via usage specs only where they earn their keep.
 
 ## Phase 3 — `AGENTS.md` (+ pointer docs)
 
@@ -133,14 +148,31 @@ markdown, a "README for agents", free-form sections. Content plan:
   devcontainer image — check) and runs `mise install --locked` on
   postCreate; keep `.vscode/tasks.json` (supervisor workflows) as-is.
 
-## Phase 5 — daemons (optional, experimental)
+## Phase 5 — daemons: evaluated, not adopted (decision record)
 
-- Only if desired: make the fake supervisor API a mise daemon
-  (`[daemons.supervisor]`, `run = "…python3 …"`, `ready_port = 8000`) and
-  `tasks.lab` with `daemons = "supervisor"`. Requires `[settings]
-  experimental = true` and pitchfork ≥ 2.25 (auto-installed). The phase 2
-  file-task fallback (background process inside the task) already works —
-  don't adopt experimental daemons for this alone.
+Evaluated making the fake supervisor API a mise daemon (`[daemons]`,
+`ready_port` readiness gating, `daemons = "supervisor"` on `tasks.lab`;
+`experimental = true` is acceptable for us). **Verdict: no real advantage
+for this repository — skipping.** Reasons:
+
+- The lab is container-orchestrated: the fake API must be reachable from
+  the app container's docker network (today: an `alpine` API container with
+  a network alias, started/destroyed within the task). A host daemon would
+  need host-gateway plumbing into the container env instead — more moving
+  parts for the same result.
+- Daemon persistence (keeps running between commands) is a *drawback* for
+  the lab: stale API state, lingering port bindings, extra stop/cleanup
+  steps after every run. The lab should be self-contained and ephemeral.
+- The one genuine daemon benefit — declarative readiness gating — is
+  achievable in-task with a short retry loop (curl until the API answers),
+  which also works identically in CI (where daemons would need explicit
+  start/stop around jobs anyway).
+- No other long-running dev services exist in this repo (no dev servers,
+  no databases) that would benefit from cross-command persistence.
+
+Revisit trigger: if a future feature needs a host-level dev service that
+humans interact with across commands (e.g. a local registry or a watching
+build server), adopt daemons then, following the then-current docs.
 
 ## Non-goals
 
@@ -149,10 +181,18 @@ markdown, a "README for agents", free-form sections. Content plan:
   testing; both coexist (devcontainer = interactive supervisor testing,
   `lab` = scripted regression checks).
 
-## Open questions
+## Decisions (resolving the former open questions)
 
-- Pin strategy for the supervisor schemas in `validate` (fixed ref vs. a
-  regularly Renovate-bumped ref).
-- Wire the mise MCP server (`mise mcp`: agents call `run_task` directly)
-  into the devcontainer for goose agents — nice-to-have, evaluate after
-  phases 1–3.
+- **Supervisor-schema pin strategy**: pin via a single `[vars]
+  SUPERVISOR_REF` in `mise.toml`; `validate` fetches the schemas from
+  supervisor's GitHub raw at that ref (locally cached). Elegant: zero
+  schema copies in-repo, one-line bumps, deliberate review cadence. No
+  Renovate automation for the ref (churn for slowly-changing schemas).
+- **mise MCP server in the devcontainer: skipped.** `mise mcp` exposes
+  `run_task`/`install_tool` to MCP clients, but agents here (goose) drive
+  `mise run` through the shell already — with streaming output, stdin, and
+  full flexibility the MCP tools lack (non-streamed output, no stdin).
+  Task discovery for agents is solved better by `AGENTS.md` +
+  `mise tasks ls` (one shell call). Revisit only if we adopt agent tooling
+  that cannot run shell commands at all.
+
