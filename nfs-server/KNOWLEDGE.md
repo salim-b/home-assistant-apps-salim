@@ -189,3 +189,14 @@ and with it the network namespace – is recreated.
   profile on `ha apps update`, but `App.rebuild()` does **not** call
   `install_apparmor()` – every profile change needs a `config.yaml` version
   bump so the deploy task takes the update path.
+- **Network mediation is opt-in per class**: a profile without any `network`
+  rules has networking *entirely unmediated* (everything allowed) – "no
+  rules" is not "no networking". Adding any network rule (allow or deny)
+  enables mediation, and everything not matched by an allow rule is then
+  denied. Device-verified allowlist (parser 5.0.2 does not support
+  domain/type tuples – write individual rules):
+  `network inet stream/dgram` + `network inet6 stream/dgram` (bashio
+  supervisor-API HTTP, DNS, the HEALTHCHECK `/dev/tcp` probe) and
+  `network netlink raw` (busybox `ip`'s rtnetlink address detection – easy
+  to miss); `deny network,` denies a class outright (used for rpc.nfsd,
+  which configures the kernel via procfs and creates no sockets).
