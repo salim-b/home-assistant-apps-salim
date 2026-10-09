@@ -95,7 +95,7 @@ Goal: eliminate `SYS_ADMIN` (and `modprobe`/`SYS_MODULE`) entirely.
   operating-system and a discussion/PR on supervisor with the netns
   analysis; implement the app-side switch only if welcomed upstream.
 
-### 3. Local: AppArmor profile *(independent of upstream)* — **implemented, device-enforcement-verified (0.4.0–0.4.5)**
+### 3. Local: AppArmor profile *(independent of upstream)* — **implemented, device-enforcement-verified (October 2026)**
 
 Ground truth from supervisor sources (`utils/apparmor.py`, `apps/app.py`,
 `docker/app.py`, `apps/model.py`):
@@ -136,7 +136,7 @@ paths covered). Validated locally: `apparmor_parser -K -T -S` passes,
 supervisor's one-top-level-profile regex passes, static rule-coverage
 check over every path the scripts touch passes. `apparmor: true` set.
 
-**State:** implemented and device-enforcement-verified through 0.4.5 (October
+**State:** implemented and device-enforcement-verified on-device (October
 2026). The planned complain-mode iteration turned out impossible: HAOS's
 kernel produces no AppArmor audit/denial messages in the host journal at all
 (no usable audit plumbing), so denials are silent. Iteration instead ran in
@@ -155,7 +155,7 @@ containers never hit this). See `KNOWLEDGE.md` for the full gotcha list.
 (verified live: NFS client roundtrips — write/read/delete on the default
 share, read-only export rejection, pseudo-root browse — via the
 `test:live` task), including after a fresh device **reboot**. The
-module-loading question is resolved by *removal* (0.4.8): the kernel's
+module-loading question is resolved by *removal*: the kernel's
 mount-time autoload loads nfsd in kernel context, outside the AppArmor
 label, so the app carries no `modprobe`/`sys_module`/`/lib/modules`
 access at all (device-verified by rebooting with the module unloaded;

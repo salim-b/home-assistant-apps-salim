@@ -74,7 +74,7 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   # path; scope by filesystem type instead. The per-share mirrors are
   # mount --bind (fstype = the underlying fs), and the down script umounts
   # them again.
-  # Device-iteration finding (v0.4.2 diagnostic): the mount mediation was
+  # Device-iteration finding (diagnostic round): the mount mediation was
   # NOT the blocker - AppArmor also mediates capable(CAP_SYS_ADMIN) during
   # the mount syscall, and the profile lacked the capability grant (Docker's
   # default profile carries a blanket 'capability,', plain Docker containers

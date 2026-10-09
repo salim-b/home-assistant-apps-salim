@@ -1,74 +1,31 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
-## 0.4.8
-
-- Drop the module-loading machinery: the kernel's mount-time autoload loads
-  the nfsd module itself (`request_module` runs in kernel context, outside
-  the AppArmor label — verified by rebooting the device with the module
-  unloaded). The app no longer runs `modprobe` (removed from the startup
-  script), the AppArmor profile no longer grants `sys_module`/`modprobe`
-  exec/`/lib/modules` access, and the app config no longer sets
-  `kernel_modules: true` (the read-only `/lib/modules` mapping and the
-  `SYS_MODULE` capability were inert under the denying profile).
-## 0.4.7
-
-- AppArmor experiment: dropped the module-loading permissions (`sys_module`
-  capability, `modprobe` exec, `/lib/modules/**` read). Loading the module is
-  left to the kernel's mount-time autoload, which runs in kernel context
-  (outside the profile). Verified by rebooting the device with the module
-  unloaded.
-## 0.4.6
-
-- AppArmor network mediation: a profile's network class is only mediated when
-  it contains network rules - without any, networking was entirely unmediated.
-  The profile now closes that gap: `deny network,` in the rpc.nfsd
-  sub-profile (it configures the kernel server via procfs and creates no
-  sockets), scoped allowlists (inet/inet6 stream+dgram) for the top profile
-  (plus `network netlink raw` for busybox `ip`'s rtnetlink address detection),
-  rpc.mountd and exportfs; anything not listed is now denied.
-## 0.4.5
-
-- AppArmor refinement round 2 (device-verified): scope sub-profile signal
-  receive to the app's own top profile (`signal (receive) peer=*_nfs`),
-  following the official dev-docs AppArmor template; document the researched
-  conventions in the profile header (upstream `file,` blanket kept
-  deliberately — HAOS has no AppArmor audit logging, see KNOWLEDGE.md).
-
-## 0.4.4
-
-- AppArmor refinement round (device-verified): tighten the nfsd mount rule to
-  the exact source string and target (`mount fstype=(nfsd) nfsd ->
-  /proc/fs/nfsd/`); follow the upstream dnsmasq app profile convention of a
-  bare `signal,` rule (send *and* receive) instead of send-only; remove the
-  temporary diagnostic logging from the startup script.
-
-## 0.4.3
-
-- Fix the AppArmor profile's capability mediation: grant `sys_admin` (mount/
-  umount of the nfsd filesystem and the per-share bind mirrors) and
-  `sys_module` (module autoload on fresh boots). Device diagnosis: the mount
-  rules themselves were fine - AppArmor also mediates `capable(CAP_SYS_ADMIN)`
-  during the mount syscall, which Docker's default profile allows with a
-  blanket `capability,` rule. Removes the 0.4.2 diagnostic blanket `mount`
-  rule; the confinement/capability log lines stay one more release.
-
-## 0.4.2
-
-- Temporary diagnostic release (AppArmor iteration): blanket `mount` rule plus
-  confinement/capability logging around the nfsd mount, to pinpoint which
-  layer denies the mount. Will be tightened in the next release.
-
-## 0.4.1
-
-- Fix the AppArmor profile so the app can start again: allow mounting the nfsd
-  filesystem (the device string `nfsd` is the mount source, so the rule is
-  scoped by filesystem type), the per-share `mount --bind` mirrors and their
-  unmount; drop unproven raw-network rules from the rpc.nfsd sub-profile.
-
 ## 0.4.0
 
-- AppArmor support: ships a custom, much tightened AppArmor profile (per-app sub-profiles for `exportfs`, `rpc.nfsd` and `rpc.mountd`; mount restricted to the `nfsd` filesystem type; no more blanket `full` rules) – the app now runs with `apparmor: true` instead of AppArmor disabled
-- ⚠️ Note for this release: the profile is new and was validated statically (parser + rule-coverage analysis) but not yet enforced on a device; if the app fails to start with permission denials, please report the log output
+- AppArmor support: ships a custom, tightened AppArmor profile (`apparmor: true`
+  instead of disabled) - single top-level profile with per-binary sub-profiles
+  for `exportfs`, `rpc.nfsd` and `rpc.mountd`, modeled on the official dev-docs
+  template and the shipped dnsmasq app's profile:
+  - the nfsd filesystem mount is restricted to the `nfsd` filesystem type
+    (exact source string and mountpoint); the per-share bind-mount mirrors and
+    their unmount are scoped accordingly
+  - capabilities are granted explicitly and minimally (`sys_admin` for the
+    mounts; `net_bind_service`/`setgid`/`setuid`/`dac_override` in the daemon
+    sub-profiles) - note that AppArmor mediates capabilities even when the
+    corresponding operation rule (e.g. the mount rule) already passes
+  - network access is mediated (a profile without any network rules would
+    leave it unmediated entirely): allowlists for inet/inet6 stream+dgram
+    (supervisor API, DNS, the healthcheck probe, RPC sockets) plus
+    `netlink raw` for address detection; `rpc.nfsd` gets a blanket network
+    deny (it only configures the kernel via procfs and creates no sockets)
+  - verified on-device in enforcing mode: full boot, NFS client roundtrips
+    (writable / read-only / pseudo-root exports) and a fresh reboot with the
+    nfsd kernel module unloaded
+- Drop the app-level module loading: the kernel's mount-time autoload loads
+  the nfsd module itself (in kernel context, outside the AppArmor label -
+  device-verified by rebooting with the module unloaded). The app no longer
+  runs `modprobe`, and the configuration no longer maps `/lib/modules` into
+  the app or grants the `SYS_MODULE` capability (`kernel_modules` removed).
 
 ## 0.3.3
 

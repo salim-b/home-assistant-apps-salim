@@ -98,9 +98,15 @@ global tasks from your mise user config); the essentials:
 - **Commits**: Conventional Commits (`fix:`/`feat:`/`docs:`/`chore:`/…);
   scope app changes (`fix(nfs-server): …`); one commit per logical unit;
   final trailer line `Assisted-by: Goose:<model-slug>`.
-- **App releases**: bump `version` in `config.yaml` + add a CHANGELOG entry
-  for every functional change; user-visible behavior changes belong in the
-  changelog.
+- **App releases**: a working branch starting from `main` bumps
+  `version` in `config.yaml to a *single* next version (major, minor or
+  patch according to semantic versioning — the branch ships one version,
+  not one per commit) and continuously expands that version's
+  `CHANGELOG.md` entry until the branch lands on `main`. Transitory extra
+  versions within the branch are fine where testing demands a version bump
+  (AppArmor profile changes are only re-applied on app *update*, never on
+  rebuild) — squash them back into the single version (config + one merged
+  changelog entry) before merging.
 - **CI/CD is the source of truth for what gets published**: pushes to `main`
   build and publish images (see `.github/workflows/builder.yaml`). If CI
   fails, fix the repo, not CI config, unless the CI config itself is wrong.
