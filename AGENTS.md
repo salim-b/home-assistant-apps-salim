@@ -64,6 +64,11 @@ global tasks from your mise user config); the essentials:
     (app-relative python file defining `lab_adapt_fixture(options)`, with
     `LABNETWORK` as subnet placeholder), and define `lab_runtime_check`.
     See `mise-tasks/lab/nfs-server.sh` as the reference.
+- `mise run deploy <app> <host>` — deploy an app to a real device for testing:
+  copies it to the device's `/local_apps` (removing the old copy), reloads the
+  store, then installs/updates/rebuilds depending on installed vs. local
+  version, and ensures it runs. Comments out the top-level `image:` key in the
+  *device copy* so the Supervisor builds locally instead of pulling from GHCR.
 
 ## Workflow rules
 
