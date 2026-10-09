@@ -42,7 +42,8 @@ not the lab.
 
 ## Commands
 
-Run `mise tasks ls` for the task list; the essentials:
+Run `mise tasks ls --local` for the task list (the `--local` flag excludes
+global tasks from your mise user config); the essentials:
 
 - `mise run check` — lint + validate; **always run before finishing a change**.
 - `mise run build` — build app images (native arch + cross-check) and assert
