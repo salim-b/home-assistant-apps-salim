@@ -11,8 +11,28 @@ cd "$MISE_PROJECT_ROOT"
 apps=("${usage_app:-$(git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1 | sort -u)}")
 
 net="nfslab-$$"
+ts() { echo "[t+${1}s] $2"; }
+subnet="172.31.0.0/16"
 tmpdir=$(mktemp -d /tmp/nfslab-XXXXXX)
 fails=0
+
+## Lab convenience images (built once, reused across runs): python3+yaml for
+## the fake API, nfs-utils for the client
+api_image="local/nfslab-api:alpine3.24"
+client_image="local/nfslab-client:alpine3.24"
+if ! docker image inspect "$api_image" >/dev/null 2>&1; then
+  echo "-- building lab images (first run only)"
+  docker build -q -t "$api_image" -f - . <<'EOF'
+FROM alpine:3.24
+RUN apk add --no-cache python3 py3-yaml
+EOF
+fi
+if ! docker image inspect "$client_image" >/dev/null 2>&1; then
+  docker build -q -t "$client_image" -f - . <<'EOF'
+FROM alpine:3.24
+RUN apk add --no-cache nfs-utils
+EOF
+fi
 
 cleanup() {
   if [ "${usage_keep:-false}" != "true" ]; then
@@ -20,7 +40,7 @@ cleanup() {
     docker network rm "$net" >/dev/null 2>&1 || true
     # root-owned leftovers in the temp dirs (created by the container) need
     # container-root privileges to remove
-    docker run --rm -v "$tmpdir":/lab alpine:3.24 sh -c 'rm -rf /lab/*' >/dev/null 2>&1 || true
+    docker run --rm -v "$tmpdir":/lab "$client_image" sh -c 'rm -rf /lab/*' >/dev/null 2>&1 || true
     rmdir "$tmpdir" 2>/dev/null || true
   else
     echo "KEEP: lab containers prefixed '$net-', dir $tmpdir"
@@ -28,19 +48,20 @@ cleanup() {
 }
 trap cleanup EXIT
 
-subnet="172.31.0.0/16"
-docker network create --subnet "$subnet" "$net" >/dev/null 2>&1 || docker network create "$net" >/dev/null
+docker network create "$net" >/dev/null
+# fixture adaptation target: the actual subnet of the created network (no
+# hardcoded subnet: docker's pool may be occupied, docker picks freely)
+subnet=$(docker network inspect "$net" --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}')
 
 for app in "${apps[@]}"; do
   version=$(yq -r '.version' "$app/config.yaml")
   echo "== lab for $app $version =="
 
-  echo "-- fake supervisor API (serving $app/config.yaml options)"
+  ts "$SECONDS" "-- fake supervisor API (serving $app/config.yaml options)"
   docker rm -f "$net-fakesup" >/dev/null 2>&1 || true
   docker run -d --name "$net-fakesup" --network "$net" \
     -v "$PWD/$app/config.yaml:/src/config.yaml:ro" \
-    -e LAB_NETWORK="$subnet" alpine:3.24 sh -c '
-      apk add -q python3 py3-yaml >/dev/null 2>&1
+    -e LAB_NETWORK="$subnet" "$api_image" sh -c '
       python3 - <<PYEOF
 import http.server, json, os, yaml
 config = yaml.safe_load(open("/src/config.yaml"))
@@ -65,15 +86,15 @@ class H(http.server.BaseHTTPRequestHandler):
 http.server.HTTPServer(("0.0.0.0", 8000), H).serve_forever()
 PYEOF' >/dev/null
 
-  echo "-- waiting for the fake API to be ready"
+  ts "$SECONDS" "-- waiting for the fake API to be ready"
   api_ok=0
-  for _ in $(seq 1 60); do
+  for _ in $(seq 1 120); do
     if docker exec "$net-fakesup" sh -c 'wget -q -O- http://127.0.0.1:8000 >/dev/null 2>&1'; then api_ok=1; break; fi
-    sleep 2
+    sleep 0.5
   done
   [ "$api_ok" = 1 ] || { echo "LAB FAILED ($app): fake API never became ready"; fails=$((fails + 1)); continue; }
 
-  echo "-- booting the app container (full s6-rc tree, config via API)"
+  ts "$SECONDS" "-- booting the app container (full s6-rc tree, config via API)"
   docker rm -f "$net-app" >/dev/null 2>&1 || true
   docker run -d --privileged --name "$net-app" --network "$net" \
     -v /lib/modules:/lib/modules:ro \
@@ -81,12 +102,12 @@ PYEOF' >/dev/null
     -e SUPERVISOR_TOKEN=fake -e SUPERVISOR_API="http://$net-fakesup:8000" \
     "local/$app:$version" >/dev/null
 
-  echo "-- waiting for boot"
+  ts "$SECONDS" "-- waiting for boot"
   boot_ok=0
-  for _ in $(seq 1 60); do
+  for _ in $(seq 1 240); do
     if docker logs "$net-app" 2>&1 | grep -q "legacy-services successfully started"; then boot_ok=1; break; fi
     if docker inspect "$net-app" --format '{{.State.Status}}' | grep -q exited; then break; fi
-    sleep 2
+    sleep 0.5
   done
   if [ "$boot_ok" != 1 ]; then
     echo "LAB FAILED ($app): boot did not complete"; docker logs "$net-app" 2>&1 | tail -15; fails=$((fails + 1)); continue
@@ -95,7 +116,7 @@ PYEOF' >/dev/null
     echo "LAB FAILED ($app): deprecation/error/fatal in boot log:"; docker logs "$net-app" 2>&1 | grep -iE "deprecated|error|fatal"; fails=$((fails + 1)); continue
   fi
 
-  echo "-- client mount roundtrip"
+  ts "$SECONDS" "-- client mount roundtrip"
   echo "host-file-$$" > "$tmpdir/share/nfs/hostfile.txt" 2>/dev/null \
     || { mkdir -p "$tmpdir/share/nfs" && echo "host-file-$$" > "$tmpdir/share/nfs/hostfile.txt"; }
   sip=$(docker inspect "$net-app" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
@@ -112,7 +133,7 @@ PYEOF' >/dev/null
   grep -q "client-write" "$tmpdir/share/nfs/client.txt" \
     || { echo "LAB FAILED ($app): client write did not reach the host filesystem"; fails=$((fails + 1)); continue; }
 
-  echo "-- graceful stop"
+  ts "$SECONDS" "-- graceful stop"
   docker stop -t 60 "$net-app" >/dev/null \
     || { echo "LAB FAILED ($app): graceful stop failed"; fails=$((fails + 1)); continue; }
   exit_code=$(docker inspect "$net-app" --format '{{.State.ExitCode}}')

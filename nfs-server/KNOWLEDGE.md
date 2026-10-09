@@ -45,6 +45,34 @@ for the union of all networks). Client paths stay unchanged. Consequences:
   reclaimed (no client recovery records, as in this app), the grace period
   ends early.
 
+## The grace period stalls clients' first writes after every (re)start
+
+Measured in the lab: after an app (re)start, mounts are instant, but the
+**first write open waits out the full default 90-second grace period**
+(`NFS4ERR_GRACE`, client retries; ~104 s wall time with backoff). The grace
+period exists to let still-connected clients reclaim their state after a
+server restart – but this server has no client recovery state at all
+(client tracking does not work in a network namespace, see above), so the
+wait is pure dead time.
+
+The kernel *would* skip the grace on its own when there are no clients to
+reclaim – but that fast path needs reclaim-complete tracking
+(`track_reclaim_completes`, only the cld-v2 tracker sets it; see
+`nfs4_state_start_net`'s `skip_grace`), which is exactly what can't work
+in-container. Likewise, `/proc/fs/nfsd/v4_end_grace` refuses with `EBUSY`
+when `client_tracking_ops` is NULL (`nfsd4_force_end_grace` returns false
+without a tracker) – it is *not* a usable workaround here.
+
+The working lever is the **grace duration itself**: `rpc.nfsd
+--grace-time N` writes the kernel's `nfsv4gracetime` control file *before*
+the server threads start (see nfs-utils `utils/nfsd/nfsd.c`), so the server
+starts with an N-second grace; the laundromat (queued at grace end) then
+ends it. The app therefore always passes `--grace-time`: the user's
+`grace_time` option when set, otherwise the schema minimum (10 s) – the
+first write after a restart stalls ≤ ~10 s instead of ~104 s. With the
+planned `nfsdcld`-based tracking (TODO), the kernel's own skip path makes
+this zero; keep the explicit `--grace-time` anyway as a safety net.
+
 ## NFSv4 client state recovery does not work in-container (yet)
 
 NFSv4 is stateful: after a *server* restart, still-connected clients must

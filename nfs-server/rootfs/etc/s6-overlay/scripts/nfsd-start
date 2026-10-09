@@ -11,17 +11,17 @@ APP_IP=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | 
 # NOTE: rpc.nfsd writes its default version set (NFSv3+NFSv4) to the kernel,
 # hence `--no-nfs-version 3` is what keeps this setup NFSv4-only (see
 # KNOWLEDGE.md in the app's source repository).
+# NOTE: the NFSv4 grace period defaults to 90 seconds; with the in-container
+# server having no client recovery state (client tracking does not work in a
+# network namespace), that grace would only stall clients' first write opens
+# - hence a short default, still honoring a user-configured `grace_time`.
 NFSD_CMD="rpc.nfsd \
   --no-nfs-version 3 \
   --no-udp \
   --host ${APP_IP} \
   --lease-time $(bashio::config 'lease_time') \
+  --grace-time $(bashio::config 'grace_time' 10) \
   $(bashio::config 'n_threads')"
-
-# Add optional flags
-if bashio::config.has_value 'grace_time'; then
-  NFSD_CMD="${NFSD_CMD} --grace-time $(bashio::config 'grace_time')"
-fi
 
 bashio::log.info "Executing nfsd with: ${NFSD_CMD}"
 # shellcheck disable=SC2086
@@ -29,6 +29,7 @@ if ${NFSD_CMD}; then
   # rpc.nfsd exits after configuring the in-kernel server - hence the
   # s6-rc `oneshot` (see KNOWLEDGE.md in the app's source repository).
   bashio::log.info "NFS server started (kernel threads running)."
+
   # Verify and log the version set rpc.nfsd configured.
   NFS_VERSIONS="$(</proc/fs/nfsd/versions)"
   bashio::log.info "Enabled NFS versions: ${NFS_VERSIONS}"

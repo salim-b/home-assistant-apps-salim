@@ -6,6 +6,8 @@ NFS shares are configured in the app's options: each **NFS shares** entry export
 
 Saving the options restarts the app, which then exports the configured shares.
 
+The app keeps no NFS client state across app restarts: after a (re)start the server runs a short grace period (10 seconds by default, configurable via the `grace_time` option) instead of the kernel's 90-second default, so clients' first write attempt after a restart is delayed only briefly.
+
 ## Mounting a share
 
 The server only provides NFSv4.x, so mount with `-t nfs4`, using the share's **Path** as the export path. For the default share:

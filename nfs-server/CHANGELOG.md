@@ -1,5 +1,9 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.3.2
+
+- Fixed clients' first write attempt after an app (re)start stalling for ~90 seconds: the server now always starts with a short grace period (10 seconds by default instead of the kernel's 90; configurable via the `grace_time` option) – the full-length grace only protects client state recovery, which the containerized server cannot provide (see the app's source repository knowledge file for details)
+
 ## 0.3.1
 
 - Migrated to the current s6-overlay layout: the user bundle is now declared in `/etc/s6-overlay/user-bundles.d/user/contents.d/` (service definitions stay in `/etc/s6-overlay/s6-rc.d/`), removing the "defining user bundles in /etc/s6-overlay/s6-rc.d is deprecated" startup warning
