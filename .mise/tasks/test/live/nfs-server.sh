@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2029  # remote/docker commands intentionally embed client-side values
+#MISE hide=true
+#MISE description="⚠️ internal helper script"
 # App-specific live-test hook for nfs-server, sourced by the generic
 # .mise/tasks/test/live.sh harness (same split as the lab tasks). Uses the
 # harness contract variables (LIVE_*); defines:

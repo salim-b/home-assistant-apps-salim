@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+#MISE hide=true
+#MISE description="⚠️ internal helper script"
 # App hook for .mise/tasks/lab.sh (nfs-server specifics).
 #
 # Contract: this file may set
