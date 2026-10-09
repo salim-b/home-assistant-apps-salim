@@ -7,7 +7,7 @@
   "postStartCommand": "bash devcontainer_bootstrap",
   "postCreateCommand": "mise trust && mise install --locked",
   "features": {
-    "ghcr.io/acesyde/mise-devcontainer-feature/mise:latest": {}
+    "ghcr.io/devcontainers-extra/features/mise:latest": {}
   },
   "runArgs": ["-e", "GIT_EDITOR=code --wait", "--privileged"],
   "workspaceFolder": "/mnt/supervisor/apps/local/${localWorkspaceFolderBasename}",

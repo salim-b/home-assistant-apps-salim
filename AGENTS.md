@@ -85,10 +85,11 @@ Run `mise tasks ls` for the task list; the essentials:
 
 ## Tool notes
 
-- mise tasks: file tasks in `mise-tasks/` with `#MISE`/`#USAGE` headers.
-  Task arguments must be documented and typed via usage specs (never bare
-  `$1` handling unless `raw_args = true`).
-- `mise-tasks/validate` fetches supervisor schemas from the ref pinned in
+- mise tasks: file tasks in `mise-tasks/` with proper suffixes (`.sh`,
+  `.py`, … — mise resolves the short names, e.g. `mise run lint`) and
+  `#MISE`/`#USAGE` headers. Task arguments must be documented and typed via
+  usage specs (never bare `$1` handling unless `raw_args = true`).
+- `mise-tasks/validate.py` fetches supervisor schemas from the ref pinned in
   `mise.toml` `[vars].supervisor_ref` (cached under `~/.cache/`). Bump the
   pin deliberately; review schema-related failures against the ref.
 - The HA base image's bash emits `echo`/`printf` as `writev(2)` — it cannot

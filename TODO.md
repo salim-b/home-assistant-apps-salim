@@ -18,9 +18,8 @@ devcontainer); deviations from the plan as written:
   privileged docker + host kernel modules and duplicate what the
   `builder`/`build-app` workflow does better for publishing; revisit if CI
   runners prove out the lab.
-- Devcontainer gets mise via the `ghcr.io/acesyde/mise-devcontainer-feature`
-  feature (jdx's own feature is not published on ghcr) and runs
-  `mise trust && mise install --locked` on create.
+- Devcontainer gets mise via the `ghcr.io/devcontainers-extra/features/mise`
+  feature and runs `mise trust && mise install --locked` on create.
 - Phase 5 (daemons) remains skipped per the decision record below.
 
 ## Where we stand
