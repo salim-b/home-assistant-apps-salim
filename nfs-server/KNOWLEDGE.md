@@ -25,6 +25,45 @@ published-port +2 branch never applies (NFS needs its port), so **5 is the
 design's ceiling**; dropping `SYS_ADMIN` via a host-side nfsd mount (TODO
 item 2, upstream) would reach 6.
 
+## Supervisor option schema `match()` quirks
+
+`match(...)` regexes in `config.yaml` schema fields use voluptuous `Match`
+(*search* semantics, not fullmatch) – always anchor with explicit `^…$`.
+Also, the supervisor's schema-element parser breaks on literal `\t`/`\n`
+inside YAML double-quoted scalars (they become real control characters) –
+express whitespace classes via `\\s` instead. Verified against the
+supervisor `AppOptions` validation code at the pinned ref (see
+`.mise/tasks/validate.py`).
+
+## Security hardening — posture and what is left
+
+Current posture (0.4.0): a root container whose only high-risk capability
+is `SYS_ADMIN`, needed solely to mount the nfsd control filesystem in the
+app's own procfs/network namespace (the nfsd kernel module itself is loaded
+by the kernel's mount-time autoload, outside the app). A custom AppArmor
+profile (`apparmor.txt`) enforces the mounts and the binary capabilities –
+there is no blanket `capability,` grant. No `full_access`/`docker_api`/
+`host_pid`, so **protection mode can stay enabled**: the `privileged`
+capability list applies regardless of protection mode; only those three
+keys are gated by it (supervisor `docker/app.py`).
+
+Rating ceiling: **5 today** (see the rating section above). The only
+remaining lever is dropping `SYS_ADMIN` (→ 6), and with the current
+supervisor feature set that is only possible via the **host-side nfsd
+mount + supervisor bind-mount road** (the TODO task "Upstream: host-side
+nfsd mount"): the app needs the nfsd control filesystem mounted *in its own
+network namespace* – the filesystem is instantiated per netns, so a mere
+HAOS-side automount does not help a bridge-network app (its bind-mount
+would carry the host-netns instance, mismatching the container's nfsd).
+That is why supervisor support (bind the host's `/proc/fs/nfsd` into apps
+on demand) plus `host_network: true` would be required. Tradeoff, and the
+reason this is exploratory upstream work rather than a local change: the
+rating math cancels out (−1 host_network replaces −1 privileged) – the real
+win is zero capabilities, the real cost is weaker network isolation.
+Everything else in the formula is either incompatible with the app (the
+no-ports +2 requires zero published ports) or unreachable for any app (the
+signed +1: `AppModel.signed` is a stub).
+
 ## NFSv4 needs `rpc.mountd` and an exportable pseudo file system root
 
 The kernel's nfsd resolves NFSv4 paths via export-cache upcalls that are
@@ -224,6 +263,14 @@ read-only assertions).
   profile on `ha apps update`, but `App.rebuild()` does **not** call
   `install_apparmor()` – every profile change needs a `config.yaml` version
   bump so the deploy task takes the update path.
+- **Supervisor profile mechanics**: the profile is installed from the app
+  folder's `apparmor.txt` on install/update and **renamed to the installed
+  slug** (`local_nfs` while testing, `<hash>_<slug>` when installed from a
+  repository) – the declared profile name is otherwise arbitrary.
+  Requirements: exactly one top-level (non-indented) `profile` declaration
+  (the supervisor's profile-name regex rejects more than one), nested
+  sub-profiles must be indented so `^profile` doesn't match them. Sources:
+  supervisor `utils/apparmor.py`, `apps/app.py`.
 - **The kernel's mount-time module autoload makes app-level modprobe
   unnecessary** (device-verified by rebooting with the module unloaded):
   `mount -t nfsd …` makes the kernel `request_module("fs-nfsd")`, which runs
