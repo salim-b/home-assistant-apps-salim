@@ -65,11 +65,15 @@ live_runtime_check() {
 
     if [ "$MODE" = rw ]; then
       # The server refuses writes during its post-restart grace period
-      # (~10s); retry until writes settle (max ~30s).
+      # (~10s; client-side manifestation: "Interrupted system call") -
+      # retry until writes settle (max ~30s). The attempt runs in a
+      # subshell: a failed redirection is diagnosed by the shell itself
+      # and would bypass the per-command 2>/dev/null; this way the
+      # message is captured and only shown if the retries never succeed.
       i=0
-      until echo live-test-ok > "/mnt/test/$TESTFILE" 2>/dev/null; do
+      until out=$( (echo live-test-ok > "/mnt/test/$TESTFILE") 2>&1); do
         i=$((i + 1))
-        [ $i -lt 30 ] || { echo "FAIL: write kept failing for 30s"; exit 1; }
+        [ $i -lt 30 ] || { echo "FAIL: write kept failing for 30s (last error: $out)"; exit 1; }
         sleep 1
       done
       grep -q live-test-ok "/mnt/test/$TESTFILE" || { echo "FAIL: read-back mismatch"; exit 1; }
@@ -78,7 +82,9 @@ live_runtime_check() {
       echo "   PASS: delete via NFS"
     else
       sleep 12 # outlast the (max 10s) grace period so the denial is final
-      if echo x > "/mnt/test/$TESTFILE" 2>/dev/null; then
+      # subshell: a failed redirection is diagnosed by the shell itself
+      # and would bypass the per-command 2>/dev/null (see above)
+      if (echo x > "/mnt/test/$TESTFILE") 2>/dev/null; then
         rm -f "/mnt/test/$TESTFILE" 2>/dev/null
         echo "FAIL: read-only share accepted a write"; exit 1
       fi
@@ -144,7 +150,9 @@ sys.exit(0 if ipaddress.ip_address('$LIVE_HOST_IP') in ipaddress.ip_network('$sn
   echo "   -- pseudo-root listing:"; ls /mnt/root
   ls /mnt/root | grep -q share || { echo "FAIL: pseudo-root does not list the share tree"; exit 1; }
   echo "   PASS: pseudo-root (fsid=0) export browsable"
-  if echo x > /mnt/root/probe 2>/dev/null; then
+  # subshell: a failed redirection is diagnosed by the shell itself and
+  # would bypass the per-command 2>/dev/null (same as in test_share)
+  if (echo x > /mnt/root/probe) 2>/dev/null; then
     rm -f /mnt/root/probe
     echo "FAIL: pseudo-root accepted a write"; exit 1
   fi

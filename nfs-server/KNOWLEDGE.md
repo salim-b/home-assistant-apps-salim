@@ -53,7 +53,10 @@ Measured in the lab: after an app (re)start, mounts are instant, but the
 period exists to let still-connected clients reclaim their state after a
 server restart – but this server has no client recovery state at all
 (client tracking does not work in a network namespace, see above), so the
-wait is pure dead time.
+wait is pure dead time. Client-side manifestation of a write attempt during
+the grace window (observed on the device with the short grace): the open
+fails with `EINTR` – busybox ash prints it as `can't create …: Interrupted
+system call`.
 
 The kernel *would* skip the grace on its own when there are no clients to
 reclaim – but that fast path needs reclaim-complete tracking
@@ -153,6 +156,16 @@ Within a running container the version set lives in the kernel's network
 namespace: it survives s6 service restarts and is only reset to the kernel
 defaults (everything compiled-in: `+3 +4 +4.1 +4.2`) when the container –
 and with it the network namespace – is recreated.
+
+## Shell: failed redirections bypass the command's `2>/dev/null`
+
+A failed redirection is diagnosed **by the shell itself, before the
+command's own redirections are in effect** – `echo x > /some/ro/path
+2>/dev/null` still prints `sh: can't create /some/ro/path: …`. To suppress
+(or capture) the shell's diagnostic, run the attempt in a subshell:
+`out=$( (echo x > /some/ro/path) 2>&1 )` captures message *and* exit code
+(used by the `test:live` client script for the grace-period retry and the
+read-only assertions).
 
 ## AppArmor mediation gotchas (device-verified 2026-10, HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7)
 
