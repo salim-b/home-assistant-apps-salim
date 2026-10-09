@@ -33,10 +33,12 @@ reference it from everywhere else:
 ## Environment setup
 
 ```sh
+mise trust               # first use: mise config files are untrusted until then
 mise install --locked    # pinned tools from mise.toml/mise.lock
 ```
 
-`docker` is required for the `build` and `lab` tasks. For interactive
+`docker` is required for the `build`, `lab`, `deploy` and `test:live` tasks
+(image builds and the NFS client container). For interactive
 supervisor-integrated testing use the devcontainer (`.devcontainer.json`),
 not the lab.
 
@@ -99,7 +101,7 @@ global tasks from your mise user config); the essentials:
   scope app changes (`fix(nfs-server): …`); one commit per logical unit;
   final trailer line `Assisted-by: Goose:<model-slug>`.
 - **App releases**: a working branch starting from `main` bumps
-  `version` in `config.yaml to a *single* next version (major, minor or
+  `version` in `config.yaml` to a *single* next version (major, minor or
   patch according to semantic versioning — the branch ships one version,
   not one per commit) and continuously expands that version's
   `CHANGELOG.md` entry until the branch lands on `main`. Transitory extra

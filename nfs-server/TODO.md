@@ -20,16 +20,17 @@ bottom. Underlying technical facts and root causes live in `KNOWLEDGE.md`.
 Where the app stands security-wise, and why:
 
 - Runs as root in its own container. Requires `SYS_ADMIN` (to mount the nfsd
-  filesystem in the app's own procfs/network namespace) and `SYS_MODULE` (via
-  `kernel_modules`, for `modprobe` on hosts without module autoload).
-- `apparmor: false` for now (hardening item 3); no `full_access`, no
-  `docker_api`, no `host_pid` → **protection mode can stay enabled**: the
-  `privileged` capability list and `kernel_modules` apply regardless of
-  protection mode; only `full_access`/`docker_api`/`host_pid` are gated by it
-  (none of which we use).
-- Supervisor security rating today: 4 (base 5, −1 AppArmor disabled, −1 for
-  `SYS_ADMIN`/`SYS_MODULE`, +1 once CI-signed images are published). With a
-  working custom AppArmor profile: 6.
+  filesystem in the app's own procfs/network namespace; the nfsd kernel module
+  itself is loaded by the kernel's mount-time autoload, outside the app —
+  device-verified, see `KNOWLEDGE.md`).
+- `apparmor: true` with a custom profile (`apparmor.txt`, hardening item 3,
+  device-enforcement-verified); no `full_access`, no `docker_api`, no
+  `host_pid` → **protection mode can stay enabled**: the `privileged`
+  capability list applies regardless of protection mode; only
+  `full_access`/`docker_api`/`host_pid` are gated by it (none of which we
+  use).
+- Supervisor security rating today: 6 (base 5, −1 for `SYS_ADMIN`,
+  +2 for the custom AppArmor profile; +1 once CI-signed images are published).
 
 ### 1. Upstream: `CONFIG_NFSD=m` in all HAOS board kernels *(do first)*
 
@@ -66,7 +67,8 @@ the module at all — every other HAOS board can't run the app.
 
 ### 2. Upstream: host-side nfsd mount + supervisor bind-mount *(exploratory)*
 
-Goal: eliminate `SYS_ADMIN` (and `modprobe`/`SYS_MODULE`) entirely.
+Goal: eliminate `SYS_ADMIN` entirely (the app-side module loading is already
+gone — the kernel's mount-time autoload loads nfsd itself).
 
 - Key insight (see `KNOWLEDGE.md`): the nfsd filesystem is instantiated per
   network namespace — mounted by whom, for whose netns. The app runs nfsd in
@@ -128,15 +130,8 @@ Ground truth from supervisor sources (`utils/apparmor.py`, `apps/app.py`,
 - Acceptance: app starts, exports and serves files with `apparmor: true` +
   loaded profile; app linter passes.
 
-**State:** `apparmor.txt` rewritten accordingly (top-level profile + `cx`
-sub-profiles for `exportfs`/`rpc.nfsd`/`rpc.mountd`; busybox-applet rules
-for `modprobe`/`ip`; `nfs.conf`/dead-layout paths dropped; `file,` + narrow
-signals; `/proc/fs/nfsd` mount restricted to `fstype=nfsd`; export/state
-paths covered). Validated locally: `apparmor_parser -K -T -S` passes,
-supervisor's one-top-level-profile regex passes, static rule-coverage
-check over every path the scripts touch passes. `apparmor: true` set.
-
-**State:** implemented and device-enforcement-verified on-device (October
+**State (original plan above; several parts were overturned — see the
+findings):** implemented and device-enforcement-verified on-device (October
 2026). The planned complain-mode iteration turned out impossible: HAOS's
 kernel produces no AppArmor audit/denial messages in the host journal at all
 (no usable audit plumbing), so denials are silent. Iteration instead ran in

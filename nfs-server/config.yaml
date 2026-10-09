@@ -20,8 +20,9 @@ init: false
 # AppArmor label) - no kernel_modules mapping or SYS_MODULE capability needed.
 privileged:
   - SYS_ADMIN
-# AppArmor: custom profile (apparmor.txt) - with complain-mode iteration
-# notes in nfs-server/TODO.md (hardening item 3)
+# AppArmor: custom profile (apparmor.txt) — device-enforcement-verified; the
+# on-device gotchas live in nfs-server/KNOWLEDGE.md, the hardening context in
+# nfs-server/TODO.md (item 3)
 apparmor: true
 map:
   - media:rw
