@@ -1,5 +1,11 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.4.1
+
+- Fix the AppArmor profile so the app can start again: allow mounting the nfsd
+  filesystem (the device string `nfsd` is the mount source, so the rule is
+  scoped by filesystem type), the per-share `mount --bind` mirrors and their
+  unmount; drop unproven raw-network rules from the rpc.nfsd sub-profile.
 ## 0.4.0
 
 - AppArmor support: ships a custom, much tightened AppArmor profile (per-app sub-profiles for `exportfs`, `rpc.nfsd` and `rpc.mountd`; mount restricted to the `nfsd` filesystem type; no more blanket `full` rules) – the app now runs with `apparmor: true` instead of AppArmor disabled

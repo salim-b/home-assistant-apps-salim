@@ -34,8 +34,17 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   /sbin/ip rix,
   /bin/busybox ix,
 
-  # Mount the nfsd filesystem (SYS_ADMIN) - the app's core operation
-  mount fstype=(nfsd) /proc/fs/nfsd/ -> /proc/fs/nfsd/,
+  # Mount the nfsd filesystem (SYS_ADMIN) - the app's core operation.
+  # busybox `mount -t nfsd nfsd /proc/fs/nfsd` passes the device string
+  # "nfsd" as the mount source, so the source cannot be constrained to a
+  # path; scope by filesystem type instead. The per-share mirrors are
+  # mount --bind (fstype = the underlying fs), and the down script umounts
+  # them again.
+  mount fstype=(nfsd),
+  # NOTE: fstype matching only applies to new mounts (not bind/remount),
+  # so bind mirrors are conditioned on the bind flag instead.
+  mount options=(bind) /{share,media}{,/**} -> /data/pseudo_root{,/**},
+  umount /data/pseudo_root{,/**},
   /proc/fs/nfsd/ r,
   /proc/fs/nfsd/** rw,
 
@@ -95,10 +104,10 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     capability setuid,
     capability dac_override,
 
-    # kernel nfsd handshake (svc_xprt setup; raw not needed for TCP-only
-    # v4, but keep until complain-mode on a device proves otherwise)
-    network inet raw,
-    network inet6 raw,
+    # NOTE: no explicit network rules - AppArmor allows networking when a
+    # profile has none, and rpc.nfsd itself only talks to the kernel
+    # (the actual NFS sockets belong to the kernel threads, not this
+    # short-lived process).
 
     /usr/sbin/rpc.nfsd rm,
     /lib/** mr,
