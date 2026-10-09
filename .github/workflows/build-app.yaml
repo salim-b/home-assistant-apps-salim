@@ -76,6 +76,18 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Pre-pull the buildkit driver image (Docker Hub flake hardening)
+        # docker/setup-buildx-action (used internally by the builder) pulls
+        # the buildkit driver from Docker Hub; transient auth.docker.io
+        # outages fail the whole build job — pre-pull with retries so the
+        # driver setup finds the image locally
+        uses: nick-fields/retry@v4.0.0
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 30
+          timeout_seconds: 300
+          command: docker pull moby/buildkit:buildx-stable-1
+
       - name: Build image
         uses: home-assistant/builder/actions/build-image@2026.09.0
         with:
