@@ -3,13 +3,13 @@
 #USAGE arg "[app]" help="App to deploy (default: all apps)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
-#USAGE arg "[host]" help="SSH target of the Home Assistant OS device, e.g. root@192.168.1.11"
+#USAGE arg "<host>" help="SSH target of the Home Assistant OS device, e.g. root@192.168.1.11"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 
 # shellcheck disable=SC2124
 apps=("${usage_app:-$(git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1 | sort -u)}")
-host="${usage_host:?Usage: mise run deploy [app] <host> — the SSH target of the device is required}"
+host="${usage_host?}"
 SSH_OPTS=(-o ConnectTimeout=10)
 
 for app in "${apps[@]}"; do

@@ -105,6 +105,10 @@ global tasks from your mise user config); the essentials:
   `.py`, … — mise resolves the short names, e.g. `mise run lint`) and
   `#MISE`/`#USAGE` headers. Task arguments must be documented and typed via
   usage specs (never bare `$1` handling unless `raw_args = true`).
+  Required args are declared `arg "<name>"` (mise errors before the task
+  starts when missing — no manual checks); read them with `${usage_name?}`,
+  optional ones with `${usage_name:-…}` defaults, boolean flags with
+  `${usage_name:-false}` (mise docs, "Read argument values").
 - `mise-tasks/validate.py` fetches supervisor schemas from the ref pinned in
   `mise.toml` `[vars].supervisor_ref` (cached under `~/.cache/`). Bump the
   pin deliberately; review schema-related failures against the ref.
