@@ -10,7 +10,7 @@
 #USAGE arg "<app>" help="App to test (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
-#USAGE arg "<host>" help="SSH target of the Home Assistant OS device, e.g. root@192.168.1.11"
+#USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to root), e.g. root@192.168.1.11 or just 192.168.1.11"
 #USAGE flag "--replace" help="Forwarded to deploy: uninstall an existing repository-installed copy first"
 #USAGE flag "--test-options" help="Apply the app's test options (.mise/tasks/test/live/<app>.yaml) to the device app for the run (backup kept, restored on exit)"
 set -euo pipefail
