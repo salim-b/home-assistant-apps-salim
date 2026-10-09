@@ -51,7 +51,13 @@ jobs:
         run: python3 -m pip install --no-cache-dir --prefer-binary -r linter/src/requirements.txt
 
       - name: 🚀 Run Home Assistant App Lint
-        run: python3 linter/src/lint.py "./${{ matrix.path }}"
+        # lint.py reads its configuration from the GitHub action-input env
+        # convention (INPUT_*); `path` is the app directory, `community`
+        # stays false (same as the action's default)
+        run: |
+          INPUT_PATH="./${{ matrix.path }}" \
+            INPUT_COMMUNITY="false" \
+            python3 linter/src/lint.py
 
   check:
     name: Mise check (lint + validate)
