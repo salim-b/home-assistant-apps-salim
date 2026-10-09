@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2029  # remote commands intentionally embed client-side values ($local_slug)
 #MISE description="Deploy app(s) to a real HAOS device: copy to /local_apps, install/update/rebuild as needed, ensure running"
 #USAGE arg "[app]" help="App to deploy (default: all apps)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
