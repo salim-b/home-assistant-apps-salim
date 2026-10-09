@@ -1,5 +1,14 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.4.6
+
+- AppArmor network mediation: a profile's network class is only mediated when
+  it contains network rules - without any, networking was entirely unmediated.
+  The profile now closes that gap: `deny network,` in the rpc.nfsd
+  sub-profile (it configures the kernel server via procfs and creates no
+  sockets), scoped allowlists (inet/inet6 stream+dgram) for the top profile
+  (plus `network netlink raw` for busybox `ip`'s rtnetlink address detection),
+  rpc.mountd and exportfs; anything not listed is now denied.
 ## 0.4.5
 
 - AppArmor refinement round 2 (device-verified): scope sub-profile signal

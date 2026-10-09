@@ -29,6 +29,20 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   file,
   signal,
 
+  # Network mediation is enabled by the PRESENCE of any network rule; a
+  # profile without network rules has networking entirely unmediated. Once
+  # enabled, anything not explicitly allowed is denied - so this is a
+  # close allowlist of what the supervised stack actually needs:
+  # - inet/inet6 stream+dgram: bashio (supervisor API over HTTP), DNS
+  #   resolution, and the Docker HEALTHCHECK's /dev/tcp probe
+  # - netlink raw: busybox `ip` (rtnetlink address detection in
+  #   nfsd-start / nfsd-healthcheck)
+  network inet stream,
+  network inet dgram,
+  network inet6 stream,
+  network inet6 dgram,
+  network netlink raw,
+
   # S6-Overlay
   /init rix,
   /bin/** ix,
@@ -113,6 +127,14 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     # local_nfs — the *_nfs glob covers repo installs too).
     signal (receive) peer=*_nfs,
 
+    # inet/inet6 stream+dgram: in case exportfs attempts RPC-based cache
+    # flushes toward mountd/rpcbind; everything else (raw etc.) is denied
+    # by the mediation-enabled allowlist model.
+    network inet stream,
+    network inet dgram,
+    network inet6 stream,
+    network inet6 dgram,
+
     /usr/sbin/exportfs rm,
     /lib/** mr,
     /etc/exports rw,
@@ -143,10 +165,13 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     capability setuid,
     capability dac_override,
 
-    # NOTE: no explicit network rules - AppArmor allows networking when a
-    # profile has none, and rpc.nfsd itself only talks to the kernel
-    # (the actual NFS sockets belong to the kernel threads, not this
-    # short-lived process).
+    # Network: rpc.nfsd creates NO sockets itself - it configures the kernel
+    # server via /proc/fs/nfsd/* (the kernel threads own the actual NFS
+    # listeners); explicitly deny all networking.
+    # NOTE: AppArmor enables a mediation class by the PRESENCE of any rule;
+    # a deny-only class denies everything in it. (An empty network class
+    # would be entirely UNMEDIATED, i.e. allow all - not what we want.)
+    deny network,
 
     /usr/sbin/rpc.nfsd rm,
     /lib/** mr,
@@ -177,6 +202,15 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     capability setgid,
     capability setuid,
     capability dac_override,
+
+    # inet/inet6 stream+dgram: rpc.mountd is an actual RPC server - it
+    # creates its MNT service sockets (TCP/UDP, v4+v6) and attempts rpcbind
+    # registration (fails harmlessly without rpcbind, same as unmediated);
+    # everything else (raw etc.) is denied by the allowlist model.
+    network inet stream,
+    network inet dgram,
+    network inet6 stream,
+    network inet6 dgram,
 
     /usr/sbin/rpc.mountd rm,
     /lib/** mr,
