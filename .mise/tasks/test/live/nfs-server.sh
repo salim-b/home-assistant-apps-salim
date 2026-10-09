@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2029  # remote/docker commands intentionally embed client-side values
 # App-specific live-test hook for nfs-server, sourced by the generic
-# mise-tasks/test/live.sh harness (same split as the lab tasks). Uses the
+# .mise/tasks/test/live.sh harness (same split as the lab tasks). Uses the
 # harness contract variables (LIVE_*); defines:
 #   - live_prepare()       create the share directories the test options
 #                          reference (the app validates that they exist) and

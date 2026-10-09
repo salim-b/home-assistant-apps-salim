@@ -12,7 +12,7 @@
 #USAGE }
 #USAGE arg "<host>" help="SSH target of the Home Assistant OS device, e.g. root@192.168.1.11"
 #USAGE flag "--replace" help="Forwarded to deploy: uninstall an existing repository-installed copy first"
-#USAGE flag "--test-options" help="Apply the app's test options (mise-tasks/test/live/<app>.yaml) to the device app for the run (backup kept, restored on exit)"
+#USAGE flag "--test-options" help="Apply the app's test options (.mise/tasks/test/live/<app>.yaml) to the device app for the run (backup kept, restored on exit)"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 
@@ -28,7 +28,7 @@ mise run deploy "$app" "$host" "${forward[@]}"
 
 # --------------------------------------------------------------------------
 # Generic live-test harness. App-specific checks live in the per-app hook
-# (mise-tasks/test/live/<app>.sh), analogous to the lab hooks:
+# (.mise/tasks/test/live/<app>.sh), analogous to the lab hooks:
 #   - live_prepare()      optional; runs after deploy but before the app is
 #                         restarted with the test options applied (e.g. create
 #                         directories the options reference)
@@ -76,12 +76,12 @@ LIVE_APP="$app" \
   LIVE_DEVICE_IP="$device_ip" \
   LIVE_HOST_IP="$host_ip" \
   LIVE_CLIENT_IMAGE="$CLIENT_IMAGE" \
-  LIVE_TEST_OPTIONS_FILE="$MISE_PROJECT_ROOT/mise-tasks/test/live/$app.yaml" \
+  LIVE_TEST_OPTIONS_FILE="$MISE_PROJECT_ROOT/.mise/tasks/test/live/$app.yaml" \
   LIVE_SHARES=""
 export LIVE_APP LIVE_LOCAL_SLUG LIVE_HOST LIVE_DEVICE_IP LIVE_HOST_IP \
   LIVE_CLIENT_IMAGE LIVE_TEST_OPTIONS_FILE LIVE_SHARES
 
-hook="mise-tasks/test/live/$app.sh"
+hook=".mise/tasks/test/live/$app.sh"
 if [ -f "$hook" ]; then
   # shellcheck source=/dev/null
   source "$hook" # sets live_prepare/live_runtime_check (optional)

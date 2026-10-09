@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# App hook for mise-tasks/lab.sh (nfs-server specifics).
+# App hook for .mise/tasks/lab.sh (nfs-server specifics).
 #
 # Contract: this file may set
 # - lab_docker_args   : APPEND to this array (lab_docker_args+=(...)) for the

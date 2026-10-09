@@ -1,5 +1,5 @@
 # Dev-ops framework: https://mise.jdx.dev
-# Task docs: https://mise.jdx.dev/tasks/ - file tasks live in mise-tasks/
+# Task docs: https://mise.jdx.dev/tasks/ - file tasks live in .mise/tasks/
 [tools]
 # lint
 shellcheck = "0.11.0"

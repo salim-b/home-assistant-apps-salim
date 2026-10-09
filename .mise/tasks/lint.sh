@@ -12,7 +12,7 @@ while IFS= read -r f; do
     *bash*|*"/sh") scripts+=("$f") ;;
   esac
 done < <(git ls-files | while read -r f; do
-  [[ "$f" == *.sh || "$f" == */cont-init.d/* || "$f" == */s6-overlay/scripts/* || "$f" == */s6-rc.d/*/run || "$f" == */s6-rc.d/*/finish || "$f" == mise-tasks/* ]] && echo "$f"
+  [[ "$f" == *.sh || "$f" == */cont-init.d/* || "$f" == */s6-overlay/scripts/* || "$f" == */s6-rc.d/*/run || "$f" == */s6-rc.d/*/finish || "$f" == .mise/tasks/* ]] && echo "$f"
 done)
 
 echo "== shellcheck / bash -n (${#scripts[@]} scripts) =="

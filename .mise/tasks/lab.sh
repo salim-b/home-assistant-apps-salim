@@ -6,7 +6,7 @@
 #USAGE flag "--keep" help="Keep lab containers/dirs for debugging"
 #
 # Per-app specifics (docker args, fixture adaptation, a runtime roundtrip)
-# live in mise-tasks/lab/<app>.sh - see AGENTS.md. Apps without a hook get a
+# live in .mise/tasks/lab/<app>.sh - see AGENTS.md. Apps without a hook get a
 # boot-only lab (config fetch via fake API, full s6-rc boot, graceful stop).
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
@@ -58,7 +58,7 @@ subnet=$(docker network inspect "$net" --format '{{range .IPAM.Config}}{{.Subnet
 
 for app in "${apps[@]}"; do
   version=$(yq -r '.version' "$app/config.yaml")
-  hook="mise-tasks/lab/$app.sh"
+  hook=".mise/tasks/lab/$app.sh"
   echo "== lab for $app $version $([ -f "$hook" ] && echo "(hook: $hook)" || echo "(boot-only, no hook)") =="
 
   ts "$SECONDS" "-- fake supervisor API (serving $app/config.yaml options)"

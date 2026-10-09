@@ -54,16 +54,16 @@ global tasks from your mise user config); the essentials:
   stop. **Run for every runtime-affecting change**; it caught the
   mountd/pseudo-root class of bugs. `mise run lab --keep` keeps
   containers/dirs for debugging.
-  - Apps without a `mise-tasks/lab/<app>.sh` hook get a *boot-only* lab
+  - Apps without a `.mise/tasks/lab/<app>.sh` hook get a *boot-only* lab
     (config fetch, full boot, graceful stop, exit code 0) — zero ceremony
     for new apps.
-  - Hook contract (`mise-tasks/lab/<app>.sh`, sourced by the harness; env:
+  - Hook contract (`.mise/tasks/lab/<app>.sh`, sourced by the harness; env:
     `LAB_NET_NAME`, `LAB_TMPDIR`, `LAB_APP_IP`, `LAB_SUBNET`): append to
     `lab_docker_args` (`lab_docker_args+=(…)` — do **not** overwrite it, the
     harness pre-seeds the `/data` volume), optionally set `lab_fixture_py`
     (app-relative python file defining `lab_adapt_fixture(options)`, with
     `LABNETWORK` as subnet placeholder), and define `lab_runtime_check`.
-    See `mise-tasks/lab/nfs-server.sh` as the reference.
+    See `.mise/tasks/lab/nfs-server.sh` as the reference.
 - `mise run deploy <app> <host>` — deploy an app to a real device for testing:
   copies it to the device's `/local_apps` (removing the old copy), reloads the
   store, then installs/updates/rebuilds depending on installed vs. local
@@ -75,11 +75,11 @@ global tasks from your mise user config); the essentials:
 - `mise run test:live <app> <host>` — deploy (forwarding `--replace`) plus
   live checks: per-share NFS client roundtrips from this machine (rw
   roundtrip / ro assertion / pseudo-root browse). `--test-options` applies
-  the app's test options (`mise-tasks/test/live/<app>.yaml`, top-level key
+  the app's test options (`.mise/tasks/test/live/<app>.yaml`, top-level key
   override) to the device app for the run — options are user data and are
   NOT refreshed from config.yaml defaults on update/rebuild — with an
   options backup restored on exit. App-specific checks live in the per-app
-  hook `mise-tasks/test/live/<app>.sh` (contract: `live_prepare`,
+  hook `.mise/tasks/test/live/<app>.sh` (contract: `live_prepare`,
   `live_runtime_check`, `LIVE_*` vars — analogous to the lab hooks); apps
   without a hook get deploy + state-wait only. Restriction: native mise
   depends-arg forwarding is not implemented in any released mise (docs
@@ -123,7 +123,7 @@ global tasks from your mise user config); the essentials:
 
 ## Tool notes
 
-- mise tasks: file tasks in `mise-tasks/` with proper suffixes (`.sh`,
+- mise tasks: file tasks in `.mise/tasks/` with proper suffixes (`.sh`,
   `.py`, … — mise resolves the short names, e.g. `mise run lint`) and
   `#MISE`/`#USAGE` headers. Task arguments must be documented and typed via
   usage specs (never bare `$1` handling unless `raw_args = true`).
@@ -131,7 +131,7 @@ global tasks from your mise user config); the essentials:
   starts when missing — no manual checks); read them with `${usage_name?}`,
   optional ones with `${usage_name:-…}` defaults, boolean flags with
   `${usage_name:-false}` (mise docs, "Read argument values").
-- `mise-tasks/validate.py` fetches supervisor schemas from the ref pinned in
+- `.mise/tasks/validate.py` fetches supervisor schemas from the ref pinned in
   `mise.toml` `[vars].supervisor_ref` (cached under `~/.cache/`). Bump the
   pin deliberately; review schema-related failures against the ref.
 - The HA base image's bash emits `echo`/`printf` as `writev(2)` — it cannot
