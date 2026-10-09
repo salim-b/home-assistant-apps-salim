@@ -40,6 +40,10 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   # path; scope by filesystem type instead. The per-share mirrors are
   # mount --bind (fstype = the underlying fs), and the down script umounts
   # them again.
+  # R1 DIAGNOSTIC (temporary): blanket mount to split the problem space;
+  # the scoped fstype=(nfsd) rule is loaded but the mount is still denied,
+  # so the culprit may not be the rule at all. Remove once confirmed.
+  mount,
   mount fstype=(nfsd),
   # NOTE: fstype matching only applies to new mounts (not bind/remount),
   # so bind mirrors are conditioned on the bind flag instead.

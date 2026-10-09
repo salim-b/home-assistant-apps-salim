@@ -16,6 +16,11 @@ if [ ! -e /proc/fs/nfsd/versions ]; then
     modprobe nfsd 2>/dev/null || true
   fi
   bashio::log.info "Mounting nfsd filesystem..."
+  # R1 diagnostics (temporary): report confinement, capabilities and the
+  # mountpoint state to pinpoint which layer denies the mount.
+  bashio::log.info "DIA confinement: $(cat /proc/self/attr/current 2>&1 || true)"
+  bashio::log.info "DIA CapEff: $(grep CapEff /proc/self/status 2>/dev/null || true)"
+  bashio::log.info "DIA euid: $(id -u 2>/dev/null || true), /proc/fs: $(ls /proc/fs/ 2>&1 | tr '\n' ' ' || true)"
   if ! mount -t nfsd nfsd /proc/fs/nfsd; then
     bashio::log.fatal "Unable to mount the nfsd filesystem: the host's kernel probably lacks NFS server support."
     bashio::log.fatal "Note: Home Assistant OS only ships the nfsd kernel module on some boards"

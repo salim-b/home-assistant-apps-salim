@@ -1,5 +1,10 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.4.2
+
+- Temporary diagnostic release (AppArmor iteration): blanket `mount` rule plus
+  confinement/capability logging around the nfsd mount, to pinpoint which
+  layer denies the mount. Will be tightened in the next release.
 ## 0.4.1
 
 - Fix the AppArmor profile so the app can start again: allow mounting the nfsd
