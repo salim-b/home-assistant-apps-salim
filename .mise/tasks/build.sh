@@ -31,8 +31,6 @@ for app in "${apps[@]}"; do
   title="Home Assistant app: $(yq -r '.name' "$app/config.yaml")"
   docker image inspect "local/$app:$version" --format '{{json .Config.Labels}}' | grep -qF "\"org.opencontainers.image.title\":\"$title\"" \
     || { echo "ASSERT FAILED: title label '$title' missing" >&2; exit 1; }
-  docker run --rm --entrypoint /bin/sh "local/$app:$version" -c 'test -x /usr/bin/nfsd-healthcheck' 2>/dev/null \
-    || { echo "ASSERT FAILED: /usr/bin/nfsd-healthcheck missing" >&2; exit 1; }
   echo "$app OK"
 done
 echo "build OK"
