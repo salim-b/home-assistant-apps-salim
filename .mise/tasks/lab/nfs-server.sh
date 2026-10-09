@@ -17,10 +17,9 @@
 #
 # shellcheck disable=SC2034  # contract variables are consumed by the harness
 
-## The app needs host kernel modules and privileged mounts; share/media
+## Privileged mounts (nfsd filesystem, per-share bind mirrors); share/media
 ## stand-ins like on a real device
 lab_docker_args+=(
-  -v /lib/modules:/lib/modules:ro
   -v "$LAB_TMPDIR/share:/share"
   -v "$LAB_TMPDIR/media:/media"
 )
