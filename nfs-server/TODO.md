@@ -93,7 +93,7 @@ Goal: eliminate `SYS_ADMIN` (and `modprobe`/`SYS_MODULE`) entirely.
   operating-system and a discussion/PR on supervisor with the netns
   analysis; implement the app-side switch only if welcomed upstream.
 
-### 3. Local: AppArmor profile *(independent of upstream)*
+### 3. Local: AppArmor profile *(independent of upstream)* — **implemented (0.4.0), device iteration pending**
 
 Ground truth from supervisor sources (`utils/apparmor.py`, `apps/app.py`,
 `docker/app.py`, `apps/model.py`):
@@ -125,6 +125,24 @@ Ground truth from supervisor sources (`utils/apparmor.py`, `apps/app.py`,
   (supervisor logs the denials), tighten until clean, then enforce.
 - Acceptance: app starts, exports and serves files with `apparmor: true` +
   loaded profile; app linter passes.
+
+**State:** `apparmor.txt` rewritten accordingly (top-level profile + `cx`
+sub-profiles for `exportfs`/`rpc.nfsd`/`rpc.mountd`; busybox-applet rules
+for `modprobe`/`ip`; `nfs.conf`/dead-layout paths dropped; `file,` + narrow
+signals; `/proc/fs/nfsd` mount restricted to `fstype=nfsd`; export/state
+paths covered). Validated locally: `apparmor_parser -K -T -S` passes,
+supervisor's one-top-level-profile regex passes, static rule-coverage
+check over every path the scripts touch passes. `apparmor: true` set.
+
+**Next (needs the device):** the supervisor *renames* the profile to the
+installed slug and loads it at app install/restart — complain-mode
+iteration happens by loading the same profile text in complain mode,
+running the app, and reading the denials from the host journal
+(`journalctl -k | grep -i apparmor="DENIED"`), tightening rules until the
+boot + roundtrip is denial-free, then loading in enforce mode. Hand the
+user the command sequence (per the device-access rule) when they are ready;
+also watch for the OS Agent 1.14 parser being stricter than local parser
+versions.
 
 ### 4. Local: validate share inputs in the schema *(cheap hardening)* — **done in 0.3.3**
 

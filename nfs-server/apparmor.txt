@@ -3,7 +3,7 @@
 profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   #include <abstractions/base>
 
-  # Capabilities
+  # Generic file access, signals (s6 supervision, bash job control)
   file,
   signal (send) set=(kill,term,int,hup,cont),
 
@@ -11,52 +11,129 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   /init rix,
   /bin/** ix,
   /usr/bin/** ix,
-  /etc/s6/** rix,
-  /run/s6/** rwix,
-  /etc/services.d/** rwix,
-  /etc/cont-init.d/** rwix,
-  /etc/cont-finish.d/** rwix,
-  /run/** rwk,
+  /run/{s6,s6-rc*,service}/** rwix,
+  /package/** ix,
+  /command/** ix,
+  /etc/s6-overlay/** rix,
+  /run/{,**} rwk,
 
   # Bashio
   /usr/lib/bashio/** ix,
   /tmp/** rwk,
 
-  # Access to options.json and other files within your app
+  # Access to options.json and other files within the app's data dir
   /data/** rw,
 
-  # Start new profile for exportfs
+  # AppArmor status reporting (s6 sets this up; harmless otherwise)
+  /sys/kernel/security/apparmor/** r,
+
+  # Kernel module loading (kernel_modules: true maps /lib/modules in;
+  # modprobe and ip are busybox applets, hence the /bin/busybox ix)
+  /lib/modules/** r,
+  /sbin/modprobe rix,
+  /sbin/ip rix,
+  /bin/busybox ix,
+
+  # Mount the nfsd filesystem (SYS_ADMIN) - the app's core operation
+  mount fstype=(nfsd) /proc/fs/nfsd/ -> /proc/fs/nfsd/,
+  /proc/fs/nfsd/ r,
+  /proc/fs/nfsd/** rw,
+
+  # Export tables and NFSv4 state
+  /etc/exports rw,
+  /var/lib/nfs/** rw,
+  /proc/net/rpc/** rw,
+
+  # Network inspection (APP_IP detection) and kernel NFS state
+  /proc/net/{,tcp,tcp6,if_inet6,dev} r,
+  /proc/net/dev_mcast r,
+
+  # Process introspection (ps/grep for checks)
+  /proc/[0-9]*/{,cmdline,mounts} r,
+  /proc/[0-9]*/stat r,
+
+  # Runtime check scripts
+  /etc/cont-init.d/config.sh rix,
+  /etc/s6-overlay/scripts/* rix,
+
+  ## Sub-profiles: the privileged NFS binaries run under their own tighter
+  ## profiles (cx = change profile on execute). They still need the
+  ## procfs/exports access listed above, hence re-granted here.
+
+  # exportfs (runs twice: config.sh + nfsd-start/stop)
   /usr/sbin/exportfs cx -> exportfs,
 
   profile exportfs flags=(attach_disconnected,mediate_deleted) {
     #include <abstractions/base>
-    
-    /etc/exports r,
-    /usr/sbin/rpc.nfsd rm,
+
+    file,
+    signal (send) set=(kill,term,int,hup,cont),
+
+    /usr/sbin/exportfs rm,
+    /lib/** mr,
+    /etc/exports rw,
+    /var/lib/nfs/** rw,
+    /proc/net/rpc/** rw,
+    /proc/fs/nfsd/** rw,
+    /proc/[0-9]*/{,cmdline,mounts} r,
+    /tmp/** rwk,
+    /data/** r,
   }
 
-  # Start new profile for nfsd
+  # rpc.nfsd (nfsd-start: start threads; nfsd-stop: rpc.nfsd 0)
   /usr/sbin/rpc.nfsd cx -> nfsd,
 
   profile nfsd flags=(attach_disconnected,mediate_deleted) {
     #include <abstractions/base>
     #include <abstractions/nameservice>
 
+    file,
+    signal (send) set=(kill,term,int,hup,cont),
+
+    capability net_bind_service,
+    capability setgid,
+    capability setuid,
+    capability dac_override,
+
+    # kernel nfsd handshake (svc_xprt setup; raw not needed for TCP-only
+    # v4, but keep until complain-mode on a device proves otherwise)
+    network inet raw,
+    network inet6 raw,
+
+    /usr/sbin/rpc.nfsd rm,
+    /lib/** mr,
+    /etc/exports rw,
+    /var/lib/nfs/** rw,
+    /proc/net/rpc/** rw,
+    /proc/fs/nfsd/** rw,
+    /proc/[0-9]*/{,cmdline,mounts} r,
+    /tmp/** rwk,
+    /data/** r,
+  }
+
+  # rpc.mountd (mountd service; services the kernel's export-cache upcalls)
+  /usr/sbin/rpc.mountd cx -> mountd,
+
+  profile mountd flags=(attach_disconnected,mediate_deleted) {
+    #include <abstractions/base>
+    #include <abstractions/nameservice>
+
+    file,
+    signal (send) set=(kill,term,int,hup,cont),
     signal receive,
 
     capability net_bind_service,
     capability setgid,
     capability setuid,
     capability dac_override,
-    network inet raw,
-    network inet6 raw,
 
-    /usr/sbin/exportfs rm,
-
-    /etc/nfs.conf rw,
-    /run/*nfsd*.pid w,
-    /run/nfsd/** rw,
-    /tmp/* rw,
-    /proc/* r,
+    /usr/sbin/rpc.mountd rm,
+    /lib/** mr,
+    /etc/exports rw,
+    /var/lib/nfs/** rw,
+    /proc/net/rpc/** rw,
+    /proc/[0-9]*/{,cmdline,mounts} r,
+    /tmp/** rwk,
+    /data/** r,
   }
 }

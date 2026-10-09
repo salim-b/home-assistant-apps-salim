@@ -1,5 +1,10 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.4.0
+
+- AppArmor support: ships a custom, much tightened AppArmor profile (per-app sub-profiles for `exportfs`, `rpc.nfsd` and `rpc.mountd`; mount restricted to the `nfsd` filesystem type; no more blanket `full` rules) – the app now runs with `apparmor: true` instead of AppArmor disabled
+- ⚠️ Note for this release: the profile is new and was validated statically (parser + rule-coverage analysis) but not yet enforced on a device; if the app fails to start with permission denials, please report the log output
+
 ## 0.3.3
 
 - Share configuration is now validated in the UI with regex constraints: share paths must be clean absolute paths under `/share` or `/media`, and the client network and export options must not contain whitespace or parentheses (defense in depth against malformed `/etc/exports` entries; see the option descriptions in the configuration dialog)
