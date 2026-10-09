@@ -27,7 +27,7 @@ reference it from everywhere else:
   container design facts, gotchas (e.g. the writev/EINVAL issue). Write a
   new entry whenever you learn something non-obvious that outlives the
   current change.
-- `<app>/TODO.md` and `TODO.md` — open work items and plans.
+- `<app>/TODO.md` — open work items and plans.
 - `AGENTS.md` (this file) — agent-specific process and commands only.
 
 ## Environment setup
