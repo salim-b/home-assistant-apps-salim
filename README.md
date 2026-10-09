@@ -21,6 +21,8 @@ To test an app on your Home Assistant server (device), use the `deploy` mise tas
 
 Note that the task comments out the top-level `image:` key in the *device-side* copy of `config.yaml` (your repository copy is untouched): with an `image` key set, the Supervisor would pull that image from GHCR instead of building locally from your working tree — see the [dev docs](https://developers.home-assistant.io/docs/add-ons/testing/#remote-development).
 
+If the app is already installed on the device **from an app repository** (i.e. not as a local app — such installs have a hashed store slug like `f8b2d53d_nfs`), the task refuses: a second installation would conflict on the app's published port. Uninstall that copy first (the error message shows the exact command) or pass `--replace` to have the task uninstall it automatically.
+
 To deploy the `nfs-server` app, for example, run:
 
 ```sh

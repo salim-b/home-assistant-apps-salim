@@ -69,6 +69,9 @@ global tasks from your mise user config); the essentials:
   store, then installs/updates/rebuilds depending on installed vs. local
   version, and ensures it runs. Comments out the top-level `image:` key in the
   *device copy* so the Supervisor builds locally instead of pulling from GHCR.
+  Refuses when the app is already installed from an app repository (hashed
+  store slug, e.g. `f8b2d53d_nfs` — port conflict); `--replace` uninstalls
+  that copy first.
 
 ## Workflow rules
 

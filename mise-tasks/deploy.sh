@@ -4,7 +4,8 @@
 #USAGE arg "<app>" help="App to deploy (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
-#USAGE arg "<host>" help="SSH target of the Home Assistant OS device, e.g. root@192.168.1.1"
+#USAGE arg "<host>" help="SSH target of the Home Assistant OS device, e.g. root@192.168.1.11"
+#USAGE flag "--replace" help="Uninstall an existing repository-installed copy of this app before deploying"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 
@@ -18,6 +19,32 @@ slug=$(yq -r '.slug' "$app/config.yaml")
 local_slug="local_${slug}"
 
 echo "== deploying $app v$version to $host (store slug: $local_slug) =="
+
+# Apps installed from app repositories get the slug '<repo-hash>_<app-slug>'
+# (repo hash = first 8 hex chars of the sha1 over the lowercased repository
+# URL, supervisor store/utils.py get_hash_from_repository — f8b2d53d_nfs for
+# this repo). A second installation alongside the local one would conflict on
+# the published port, so refuse (or --replace) when one exists. Matching by
+# slug suffix instead of reproducing the hash keeps working when the app
+# moves between repositories.
+store_apps=$(ssh "${SSH_OPTS[@]}" "$host" 'ha store apps --raw-json' 2>/dev/null || true)
+repo_installs=$(echo "$store_apps" | jq -c --arg slug "$slug" --arg local "$local_slug" \
+  '[.data.addons[] | select(.installed == true and .slug != $local and ((.slug | split("_")) | last) == $slug)]' 2>/dev/null || true)
+if [ -n "$repo_installs" ] && [ "$repo_installs" != "[]" ]; then
+  mapfile -t repo_slugs < <(echo "$repo_installs" | jq -r '.[].slug')
+  echo "ERROR: '$app' is already installed on $host from an app repository:" >&2
+  echo "$repo_installs" | jq -r '.[] | "  - \(.slug) (installed version \(.version))"' >&2
+  if [ "${usage_replace:-false}" = "true" ]; then
+    echo "-- --replace given: uninstalling the repository-installed copy first"
+    for repo_slug in "${repo_slugs[@]}"; do
+      ssh "${SSH_OPTS[@]}" "$host" "ha apps uninstall $repo_slug"
+    done
+  else
+    echo "       Two installations would conflict on the app's published port. Uninstall it first, e.g." >&2
+    echo "       ssh $host 'ha apps uninstall ${repo_slugs[0]}' — or re-run with --replace." >&2
+    exit 1
+  fi
+fi
 
 echo "-- copying app folder to /local_apps (removing existing copy first)"
 ssh "${SSH_OPTS[@]}" "$host" 'mkdir -p /local_apps'
