@@ -3,6 +3,28 @@
 Non-obvious facts and gotchas learned while developing this app, collected
 here so they don't have to be re-learned the hard way.
 
+## Supervisor security rating: formula and our ceiling
+
+`supervisor/apps/utils.py::rating_security` (read at supervisor 2026.09.3,
+re-verify before relying on it) starts at **5** (1–8 clamp) and adjusts:
+
+- AppArmor: disabled −1 / custom profile **+1** (not +2 — easy to miscount)
+- Ingress +2; *else* no host network **and no mapped ports** +2; *else*
+  supervisor-auth-API access +1
+- signed +1 — **unreachable**: `AppModel.signed` is a hardcoded `False`
+  stub ("Currently no signing support"; verified in 2026.09.3 and
+  2026.10.1). Our images *are* cosign-signed (workflow keyless signing;
+  `cosign verify` passes), but supervisor cannot credit it yet.
+- High-risk capabilities (`SYS_ADMIN`, `SYS_MODULE`, …) or
+  `kernel_modules` −1 (single deduction for the whole branch)
+- `hassio_role` manager/admin −1/−2; host networks −1 (net) / −2 (pid) /
+  −1 (uts+SYS_ADMIN); docker-API or full access → forced to 1
+
+For this app (0.4.0): 5 + 1 (profile) − 1 (`SYS_ADMIN`) = **5** — the
+published-port +2 branch never applies (NFS needs its port), so **5 is the
+design's ceiling**; dropping `SYS_ADMIN` via a host-side nfsd mount (TODO
+item 2, upstream) would reach 6.
+
 ## NFSv4 needs `rpc.mountd` and an exportable pseudo file system root
 
 The kernel's nfsd resolves NFSv4 paths via export-cache upcalls that are

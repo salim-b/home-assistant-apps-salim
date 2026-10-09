@@ -11,7 +11,14 @@ bottom. Underlying technical facts and root causes live in `KNOWLEDGE.md`.
 
 - Work through the security hardening plan below (items 1–3 remain; 4–5 are done).
 
-- After the first successful CI publish, verify images are cosign-signed (signed → +1 security rating).
+- ~~After the first successful CI publish, verify images are cosign-signed (signed → +1 security rating).~~
+
+  **Resolved as a dead end:** images may well be signed, but it cannot *raise
+  the rating*: supervisor's `AppModel.signed` is a hardcoded `False` stub
+  ("Currently no signing support", verified in 2026.09.3 and 2026.10.1) —
+  the +1 branch of `rating_security` is unreachable for every app. Keep
+  signing as supply-chain hygiene (worth having when upstream ships
+  verification).
 
 - Investigate real NFSv4 client recovery tracking in the container (see `KNOWLEDGE.md`): ship `nfsdcld` (cld tracker), mount rpc_pipefs per-netns in the container, keep its sqlite store on `/data` – gives clients state reclaim across app restarts (and enables the kernel's own grace-period skip path). Verify the per-netns rpc_pipefs upcall channel works in a privileged container first.
 
@@ -29,8 +36,18 @@ Where the app stands security-wise, and why:
   capability list applies regardless of protection mode; only
   `full_access`/`docker_api`/`host_pid` are gated by it (none of which we
   use).
-- Supervisor security rating today: 6 (base 5, −1 for `SYS_ADMIN`,
-  +2 for the custom AppArmor profile; +1 once CI-signed images are published).
+- Supervisor security rating today: **5**, device-verified (the UI shows the
+  same). Decomposition from the actual formula
+  (`supervisor/apps/utils.py::rating_security` at
+  https://github.com/home-assistant/supervisor/blob/2026.09.3/supervisor/apps/utils.py):
+  base 5, +1 for the AppArmor profile, −1 for the `SYS_ADMIN` capability, and
+  **no further contributions**: the "no exposed ports" +2 branch is
+  incompatible with the app (NFS needs the published 2049/tcp), the `signed`
+  +1 is dead code in current supervisors (`AppModel.signed` is a stub
+  returning `False` for all apps, "Currently no signing support" — verified
+  in 2026.09.3 and 2026.10.1), and we use no role/host-namespace knobs.
+  Ceiling with the current design: 5. Ceiling via upstream item 2 (drop
+  `SYS_ADMIN` through a host-side nfsd mount): 6.
 
 ### 1. Upstream: `CONFIG_NFSD=m` in all HAOS board kernels *(do first)*
 
