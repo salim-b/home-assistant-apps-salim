@@ -32,15 +32,15 @@ repo_installs=$(echo "$store_apps" | jq -c --arg slug "$slug" --arg local "$loca
   '[.data.addons[] | select(.installed == true and .slug != $local and ((.slug | split("_")) | last) == $slug)]' 2>/dev/null || true)
 if [ -n "$repo_installs" ] && [ "$repo_installs" != "[]" ]; then
   mapfile -t repo_slugs < <(echo "$repo_installs" | jq -r '.[].slug')
-  echo "ERROR: '$app' is already installed on $host from an app repository:" >&2
-  echo "$repo_installs" | jq -r '.[] | "  - \(.slug) (installed version \(.version))"' >&2
+  echo "-- repository-installed copy of '$app' found on $host:"
+  echo "$repo_installs" | jq -r '.[] | "  - \(.slug) (installed version \(.version))"'
   if [ "${usage_replace:-false}" = "true" ]; then
     echo "-- --replace given: uninstalling the repository-installed copy first"
     for repo_slug in "${repo_slugs[@]}"; do
       ssh "${SSH_OPTS[@]}" "$host" "ha apps uninstall $repo_slug"
     done
   else
-    echo "       Two installations would conflict on the app's published port. Uninstall it first, e.g." >&2
+    echo "ERROR: two installations would conflict on the app's published port. Uninstall it first, e.g." >&2
     echo "       ssh $host 'ha apps uninstall ${repo_slugs[0]}' — or re-run with --replace." >&2
     exit 1
   fi
