@@ -1,5 +1,11 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.3.3
+
+- Share configuration is now validated in the UI with regex constraints: share paths must be clean absolute paths under `/share` or `/media`, and the client network and export options must not contain whitespace or parentheses (defense in depth against malformed `/etc/exports` entries; see the option descriptions in the configuration dialog)
+- Default share options no longer enable `async` (synchronous writes are the `exports(5)` default and much safer against data loss on crash; `async` remains available per share)
+- New "Security notes" section in the documentation (authentication, access control, read-only defaults, identity mapping)
+
 ## 0.3.2
 
 - Fixed clients' first write attempt after an app (re)start stalling for ~90 seconds: the server now always starts with a short grace period (10 seconds by default instead of the kernel's 90; configurable via the `grace_time` option) – the full-length grace only protects client state recovery, which the containerized server cannot provide (see the app's source repository knowledge file for details)

@@ -7,7 +7,11 @@ bottom. Underlying technical facts and root causes live in `KNOWLEDGE.md`.
 
 - Create upstream PR in HA to render app configuration labels in the UI as Markdown blocks instead of the current single-line plain text.
 
-- Work through the security hardening plan below (items 1–5, upstream-first).
+- Work through the security hardening plan below (items 1–3 remain; 4–5 are done).
+
+- After the first successful CI publish, verify images are cosign-signed (signed → +1 security rating).
+
+- Investigate real NFSv4 client recovery tracking in the container (see `KNOWLEDGE.md`): ship `nfsdcld` (cld tracker), mount rpc_pipefs per-netns in the container, keep its sqlite store on `/data` – gives clients state reclaim across app restarts (and enables the kernel's own grace-period skip path). Verify the per-netns rpc_pipefs upcall channel works in a privileged container first.
 
 ## Security hardening plan
 
@@ -122,29 +126,32 @@ Ground truth from supervisor sources (`utils/apparmor.py`, `apps/app.py`,
 - Acceptance: app starts, exports and serves files with `apparmor: true` +
   loaded profile; app linter passes.
 
-### 4. Local: validate share inputs in the schema *(cheap hardening)*
+### 4. Local: validate share inputs in the schema *(cheap hardening)* — **done in 0.3.3**
 
-- `path`/`network`/`options` are user strings written verbatim into
-  `/etc/exports` (newline injection = extra export lines; mostly
-  self-inflicted, but `exportfs` parses that file as root). Add `match()`
-  regexes to the schema (`path: ^/(share|media)(/.+)?$`, sane charsets for
-  network and options) as defense in depth + better frontend errors.
-- Keep the `config.sh` fatal check for unmapped paths (works regardless of
-  schema support).
+- Implemented: `match()` regexes on all three share fields (path: clean
+  absolute path under `/share`/`/media`; network/options: no whitespace,
+  no parentheses, non-empty comma-separated option tokens) — defense in
+  depth against malformed `/etc/exports` entries (newline injection =
+  extra export lines parsed as root). Note: supervisor's `match()` uses
+  `vol.Match` (search semantics), hence the explicit `^…$` anchors; and
+  the regex strings must not contain literal `\t`/`\n` escapes (YAML
+  double-quoted scalars would turn them into real control characters,
+  breaking the schema-element parse) — express via `\\s` instead.
+- Verified against the real supervisor `AppOptions` validation code (fetched
+  from the pinned ref): defaults accepted, all malformed variants rejected
+  with the regex message the UI will show.
 
-### 5. Local: user-facing security notes & defaults
+### 5. Local: user-facing security notes & defaults — **done in 0.3.3**
 
-- `DOCS.md` security section: NFSv4 with `sec=sys`/`AUTH_SYS` has no
-  cryptographic authentication (identity = uid, LAN trust); the `network`
-  option is the access control; port 2049 is published on **all** host
-  interfaces by docker (not just the LAN the user intends) → recommend
-  read-only exports and a trusted network; explain squashing (see the
-  existing client-side permissions note).
-- Default share options: `no_subtree_check` added and `pnfs` dropped (no benefit with a single server); `async` still to reconsider (faster, but data loss on crash — `sync` is the `exports(5)` default).
-
-- Investigate real NFSv4 client recovery tracking in the container (see `KNOWLEDGE.md`): ship `nfsdcld` (cld tracker), mount rpc_pipefs per-netns in the container, keep its sqlite store on `/data` – gives clients state reclaim across app restarts. Verify the per-netns rpc_pipefs upcall channel works in a privileged container first.
-- After the first successful CI publish, verify images are cosign-signed
-  (signed → +1 rating).
+- Implemented: "Security notes" section in `DOCS.md` (no cryptographic
+  authentication with `sec=sys`; the share's `network` option is the access
+  control while the published port listens on all host interfaces;
+  read-only-by-default exports; root squashing) and the default share
+  options no longer enable `async` (`sync` is the `exports(5)` default;
+  `async` remains user-selectable per share).
+- Remaining: after the first successful CI publish, verify images are
+  cosign-signed (signed → +1 rating) — moved to the Tasks list since it is
+  a one-off check, not hardening work.
 
 ## Resolved
 

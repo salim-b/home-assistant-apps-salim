@@ -1,6 +1,6 @@
 # https://developers.home-assistant.io/docs/apps/configuration#app-configuration
 name: NFS Server
-version: "0.3.2"
+version: "0.3.3"
 slug: nfs
 description: Network File System (NFS) server for Home Assistant
 # Generic (multi-arch) image name; CI builds & publishes per-arch images
@@ -32,7 +32,7 @@ options:
   shares:
     - path: "/share/nfs"
       network: "192.168.1.0/24"
-      options: "rw,async,anonuid=1000,anongid=1000,no_subtree_check"
+      options: "rw,anonuid=1000,anongid=1000,no_subtree_check"
   default_uid: 1000
   default_gid: 1000
   default_permissions: "755"
@@ -40,9 +40,19 @@ options:
   lease_time: 300
 schema:
   shares:
-    - path: str
-      network: str
-      options: str
+    # NOTE: these regexes are defense in depth (the scripts validate the
+    # runtime semantics); the constraints they enforce beyond that:
+    # - no whitespace anywhere: /etc/exports entries are whitespace-separated
+    #   (a newline would inject an extra export line, parsed as root)
+    # - path: mapped roots only, no empty path components (see DOCS.md)
+    # - network: charset of the machine-name formats from exports(5) (single
+    #   host, IP(+prefix/netmask), wildcards, netgroups, '*')
+    # - options: comma-separated export-option tokens (exports(5)), i.e.
+    #   word characters plus =:.@/+*-; no parentheses (would close the
+    #   client qualifier early)
+    - path: "match(^/(share|media)(/[^\\s/]+)*$)"
+      network: "match(^[^\\s()]+$)"
+      options: "match(^[^\\s(),]+(,[^\\s(),]+)*$)"
   default_uid: "int(0,)"
   default_gid: "int(0,)"
   default_permissions: "match(^[0-7]{3,4}$)"

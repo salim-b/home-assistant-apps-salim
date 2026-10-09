@@ -16,6 +16,13 @@ The server only provides NFSv4.x, so mount with `-t nfs4`, using the share's **P
 mount -t nfs4 homeassistant.local:/share/nfs /mnt/nfs
 ```
 
+## Security notes
+
+- **Authentication**: NFSv4 with `sec=sys` (the default here) has no cryptographic authentication – a client's claimed user ID is taken at face value. Anyone on an allowed network can connect as any user ID; treat only trusted networks as allowed clients.
+- **Access control**: the `network` option of each share is the only access control (plus the port being published on **all** host interfaces by the container runtime – restricting reachability to the intended LAN is a router/firewall concern). Prefer listing specific networks over `*` (all clients).
+- **Read-only by default**: exports without `rw` in their options are read-only. For shares that only need to be read (e.g. media), omit `rw`.
+- **User identity mapping**: by default, requests from user ID `0` (root) are squashed to the anonymous user (`anonuid`/`anongid`, here `1000`) – see the option descriptions in the configuration dialog.
+
 ## Requirements
 
 The NFS server runs in the host's kernel: it requires the host kernel to provide the `nfsd` kernel module (`CONFIG_NFSD`). [Home Assistant OS](https://github.com/home-assistant/operating-system) ships this module on Rockchip-based boards (e.g. ODROID-M1/M1S, Home Assistant Green); on other boards the app fails to start with an explanatory error message.
