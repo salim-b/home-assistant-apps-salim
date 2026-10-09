@@ -23,6 +23,16 @@ Note that the task comments out the top-level `image:` key in the *device-side* 
 
 If the app is already installed on the device **from an app repository** (i.e. not as a local app — such installs have a hashed store slug like `f8b2d53d_nfs`), the task refuses: a second installation would conflict on the app's published port. Uninstall that copy first (the error message shows the exact command) or pass `--replace` to have the task uninstall it automatically.
 
+With `--test-shares`, the task applies the app's test shares from `mise-tasks/test/shares/<app>.yaml` to the device app's options instead (backing up your current options for the live task to restore) — a minimal set exercising the whole export surface: the default share, a read-only share, a `/media` share, a nested path, and a second client network.
+
+For a full end-to-end test including an NFS client roundtrip against the running app, run:
+
+```sh
+mise run test:live nfs-server root@192.168.1.11
+```
+
+It deploys (forwarding `--replace`/`--test-shares`) and then mounts each configured share from this machine — write + read-back + delete on writable shares, a read-only assertion on `ro` shares, and a pseudo-root browse check — cleaning up after itself.
+
 To deploy the `nfs-server` app, for example, run:
 
 ```sh

@@ -149,10 +149,14 @@ profiles need explicit `capability` rules even when the mount rule passes
 (Docker's default profile carries a blanket `capability,`, plain Docker
 containers never hit this). See `KNOWLEDGE.md` for the full gotcha list.
 
-**Acceptance status:** app boots and serves (mountd + rpc.nfsd up, `-3 +4
-+4.1 +4.2`) with the profile enforcing. Remaining verification: an NFS client
-roundtrip against the enforced app (device-access rule — user-side), and a
-fresh-device-boot check that `modprobe`/`sys_module` works from scratch.
+**Acceptance status:** app boots and serves with the profile enforcing
+(verified live: NFS client roundtrips — write/read/delete on the default
+share, read-only export rejection, pseudo-root browse — via the
+`test:live` task), including after a fresh device **reboot** (the nfsd
+module gets loaded from scratch under the enforcing profile; whether the
+app's `modprobe` or the kernel's mount-time autoload does the load is not
+distinguishable without audit logs, but the `sys_module` grant makes the
+app's own path possible and the boot works either way).
 
 ### 4. Local: validate share inputs in the schema *(cheap hardening)* — **done in 0.3.3**
 

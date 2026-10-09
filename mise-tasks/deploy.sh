@@ -119,11 +119,16 @@ if [ "${usage_test_shares:-false}" = "true" ]; then
 
   # Back up the original options next to the app folder for the test:live
   # restore step; the next deploy wipes it together with the app folder.
-  printf '%s' "$current" | ssh "${SSH_OPTS[@]}" "$host" \
-    "cat > /local_apps/$app/.test-shares-original.json"
+  # Keep a pre-existing backup intact: re-running --test-shares must not
+  # turn the (already active) test options into the "original".
+  if ! ssh "${SSH_OPTS[@]}" "$host" "test -f /local_apps/$app/.test-shares-original.json"; then
+    printf '%s' "$current" | ssh "${SSH_OPTS[@]}" "$host" \
+      "cat > /local_apps/$app/.test-shares-original.json"
+  fi
 
   test_shares=$(yq -o json '.shares' "$shares_file")
-  new_options=$(jq -c --argjson shares "$test_shares" '.shares = $shares' <<<"$current")
+  # POST body shape: {"options": {...}} (supervisor SCHEMA_OPTIONS wrapper)
+  new_options=$(jq -c --argjson shares "$test_shares" '{options: (. | .shares = $shares)}' <<<"$current")
   result=$(printf '%s' "$new_options" | ssh "${SSH_OPTS[@]}" "$host" \
     "curl -s -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" -H 'Content-Type: application/json' \
        -X POST --data-binary @- http://supervisor/addons/$local_slug/options")
@@ -137,12 +142,13 @@ if [ "${usage_test_shares:-false}" = "true" ]; then
   # (default_uid 1000) so the roundtrip can write into them.
   while IFS=$'\t' read -r spath sopts; do
     [ -n "$spath" ] || continue
+    # -n: keep the loop's stdin (the yq stream) away from ssh
     case ",$sopts," in
       *,rw,*)
-        ssh "${SSH_OPTS[@]}" "$host" "mkdir -p '$spath' && chown 1000:1000 '$spath'"
+        ssh -n "${SSH_OPTS[@]}" "$host" "mkdir -p '$spath' && chown 1000:1000 '$spath'"
         ;;
       *)
-        ssh "${SSH_OPTS[@]}" "$host" "mkdir -p '$spath'"
+        ssh -n "${SSH_OPTS[@]}" "$host" "mkdir -p '$spath'"
         ;;
     esac
   done < <(yq -r '.shares[] | [.path, .options] | @tsv' "$shares_file")
