@@ -26,6 +26,8 @@
   device-verified by rebooting with the module unloaded). The app no longer
   runs `modprobe`, and the configuration no longer maps `/lib/modules` into
   the app or grants the `SYS_MODULE` capability (`kernel_modules` removed).
+- Slim the image: drop the unused tempio download (the app's rootfs contains
+  no templates for it to render).
 
 ## 0.3.3
 
