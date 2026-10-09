@@ -71,15 +71,20 @@ global tasks from your mise user config); the essentials:
   *device copy* so the Supervisor builds locally instead of pulling from GHCR.
   Refuses when the app is already installed from an app repository (hashed
   store slug, e.g. `f8b2d53d_nfs` — port conflict); `--replace` uninstalls
-  that copy first. `--test-shares` applies the app's test shares
-  (`mise-tasks/test/shares/<app>.yaml`) to the device options (backup kept for
-  restore).
-- `mise run test:live <app> <host>` — deploy (forwarding the shared flags)
-  plus an NFS client roundtrip from this machine against every configured
-  share (rw roundtrip / ro assertion / pseudo-root browse). Restriction:
-  native mise depends-arg forwarding is not implemented in any released mise
-  (docs describe it; verified up to 2026.10.6) — the task forwards via its
-  run script instead.
+  that copy first.
+- `mise run test:live <app> <host>` — deploy (forwarding `--replace`) plus
+  live checks: per-share NFS client roundtrips from this machine (rw
+  roundtrip / ro assertion / pseudo-root browse). `--test-options` applies
+  the app's test options (`mise-tasks/test/live/<app>.yaml`, top-level key
+  override) to the device app for the run — options are user data and are
+  NOT refreshed from config.yaml defaults on update/rebuild — with an
+  options backup restored on exit. App-specific checks live in the per-app
+  hook `mise-tasks/test/live/<app>.sh` (contract: `live_prepare`,
+  `live_runtime_check`, `LIVE_*` vars — analogous to the lab hooks); apps
+  without a hook get deploy + state-wait only. Restriction: native mise
+  depends-arg forwarding is not implemented in any released mise (docs
+  describe it; verified up to 2026.10.6) — the task forwards via its run
+  script instead.
 
 ## Workflow rules
 

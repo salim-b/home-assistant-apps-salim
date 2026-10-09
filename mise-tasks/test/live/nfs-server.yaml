@@ -1,7 +1,7 @@
-# Test shares for the `test:live` task: `mise run test:live <app> <host> --test-shares`
-# makes the deploy task apply these to the device app's options (and creates the
-# missing share directories), then the live task tests them and restores the
-# original options afterwards.
+# Test OPTIONS for the nfs-server app, applied to the device app's options by
+# `mise run test:live <app> <host> --test-options` (backing up the previous
+# options for the live task to restore afterwards). Top-level keys override
+# the current options; keys not present here are kept.
 #
 # Coverage rationale (whole AppArmor profile surface + export-generation paths):
 # - /share/nfs          the default share; the r/w roundtrip target

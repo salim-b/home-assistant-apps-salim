@@ -6,7 +6,6 @@
 #USAGE }
 #USAGE arg "<host>" help="SSH target of the Home Assistant OS device, e.g. root@192.168.1.11"
 #USAGE flag "--replace" help="Uninstall an existing repository-installed copy of this app before deploying"
-#USAGE flag "--test-shares" help="Apply the app's test shares (mise-tasks/test/shares/<app>.yaml) to the device app options; test:live restores them afterwards"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 
@@ -102,59 +101,4 @@ state=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/de
 
 echo "-- $action $local_slug v$version (state: $state)"
 
-# --test-shares: apply the app's test shares (mise-tasks/test/shares/<app>.yaml)
-# to the app's options on the device, so the test:live roundtrip can exercise
-# the full export surface. This goes through the supervisor options API on
-# purpose: an installed app's options are user data and are NOT refreshed from
-# config.yaml defaults by update/rebuild, so editing the device copy of
-# config.yaml would be a no-op.
-if [ "${usage_test_shares:-false}" = "true" ]; then
-  shares_file="mise-tasks/test/shares/$app.yaml"
-  [ -f "$shares_file" ] || { echo "ERROR: no test shares file '$shares_file'" >&2; exit 1; }
-  echo "-- applying test shares ($shares_file) to the app options"
-
-  current=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \
-    | jq -c '.data.options // empty')
-  [ -n "$current" ] || { echo "ERROR: could not read the app's current options on $host" >&2; exit 1; }
-
-  # Back up the original options next to the app folder for the test:live
-  # restore step; the next deploy wipes it together with the app folder.
-  # Keep a pre-existing backup intact: re-running --test-shares must not
-  # turn the (already active) test options into the "original".
-  if ! ssh "${SSH_OPTS[@]}" "$host" "test -f /local_apps/$app/.test-shares-original.json"; then
-    printf '%s' "$current" | ssh "${SSH_OPTS[@]}" "$host" \
-      "cat > /local_apps/$app/.test-shares-original.json"
-  fi
-
-  test_shares=$(yq -o json '.shares' "$shares_file")
-  # POST body shape: {"options": {...}} (supervisor SCHEMA_OPTIONS wrapper)
-  new_options=$(jq -c --argjson shares "$test_shares" '{options: (. | .shares = $shares)}' <<<"$current")
-  result=$(printf '%s' "$new_options" | ssh "${SSH_OPTS[@]}" "$host" \
-    "curl -s -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" -H 'Content-Type: application/json' \
-       -X POST --data-binary @- http://supervisor/addons/$local_slug/options")
-  if ! echo "$result" | jq -e '.result == "ok"' >/dev/null 2>&1; then
-    echo "ERROR: the supervisor rejected the test options: $result" >&2
-    exit 1
-  fi
-
-  # The app validates that share paths exist as directories on the host;
-  # create missing ones and hand the writable ones to the squashed uid
-  # (default_uid 1000) so the roundtrip can write into them.
-  while IFS=$'\t' read -r spath sopts; do
-    [ -n "$spath" ] || continue
-    # -n: keep the loop's stdin (the yq stream) away from ssh
-    case ",$sopts," in
-      *,rw,*)
-        ssh -n "${SSH_OPTS[@]}" "$host" "mkdir -p '$spath' && chown 1000:1000 '$spath'"
-        ;;
-      *)
-        ssh -n "${SSH_OPTS[@]}" "$host" "mkdir -p '$spath'"
-        ;;
-    esac
-  done < <(yq -r '.shares[] | [.path, .options] | @tsv' "$shares_file")
-
-  ssh "${SSH_OPTS[@]}" "$host" "ha apps restart $local_slug"
-  echo "-- test shares active; original options saved on the device at"
-  echo "   /local_apps/$app/.test-shares-original.json (test:live restores them after the run)"
-fi
 echo "deploy OK"
