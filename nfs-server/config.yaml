@@ -20,10 +20,10 @@ init: false
 # AppArmor label) - no kernel_modules mapping or SYS_MODULE capability needed.
 privileged:
   - SYS_ADMIN
-# AppArmor: custom profile (apparmor.txt) — device-enforcement-verified; the
-# on-device gotchas live in nfs-server/KNOWLEDGE.md, the hardening context in
-# nfs-server/TODO.md (item 3)
-apparmor: true
+# AppArmor: the apparmor.txt custom profile is loaded because the file
+# exists (device-enforcement-verified); `apparmor` itself defaults to true —
+# the on-device gotchas live in nfs-server/KNOWLEDGE.md, the hardening
+# context in nfs-server/TODO.md (item 3)
 map:
   - media:rw
   - share:rw
