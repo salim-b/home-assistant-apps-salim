@@ -1,5 +1,12 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.4.7
+
+- AppArmor experiment: dropped the module-loading permissions (`sys_module`
+  capability, `modprobe` exec, `/lib/modules/**` read). Loading the module is
+  left to the kernel's mount-time autoload, which runs in kernel context
+  (outside the profile). Verified by rebooting the device with the module
+  unloaded.
 ## 0.4.6
 
 - AppArmor network mediation: a profile's network class is only mediated when

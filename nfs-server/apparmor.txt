@@ -63,10 +63,8 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   # AppArmor status reporting (s6 sets this up; harmless otherwise)
   /sys/kernel/security/apparmor/** r,
 
-  # Kernel module loading (kernel_modules: true maps /lib/modules in;
-  # modprobe and ip are busybox applets, hence the /bin/busybox ix)
-  /lib/modules/** r,
-  /sbin/modprobe rix,
+  # Address detection (APP_IP): `ip` is a busybox applet, hence the
+  # /bin/busybox ix (see KNOWLEDGE.md on busybox-applet exec mediation)
   /sbin/ip rix,
   /bin/busybox ix,
 
@@ -80,9 +78,10 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   # NOT the blocker - AppArmor also mediates capable(CAP_SYS_ADMIN) during
   # the mount syscall, and the profile lacked the capability grant (Docker's
   # default profile carries a blanket 'capability,', plain Docker containers
-  # do not hit this).
+  # do not hit this). Mounting the nfsd fs triggers the kernel's module
+  # autoload (request_module runs in kernel context, outside this label),
+  # so no sys_module/modprobe access is needed here.
   capability sys_admin,
-  capability sys_module,  # modprobe nfsd on fresh device boots
   # Tightened: the busybox mount passes the device string "nfsd" as the
   # mount source; fstype matching applies to new mounts only.
   mount fstype=(nfsd) nfsd -> /proc/fs/nfsd/,
