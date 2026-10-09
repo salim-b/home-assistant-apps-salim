@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # https://developers.home-assistant.io/docs/apps/configuration#app-dockerfile
 ARG BUILD_FROM=ghcr.io/home-assistant/base:3.24
 FROM ${BUILD_FROM}
