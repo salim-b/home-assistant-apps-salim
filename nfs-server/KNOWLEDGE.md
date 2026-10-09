@@ -153,3 +153,39 @@ Within a running container the version set lives in the kernel's network
 namespace: it survives s6 service restarts and is only reset to the kernel
 defaults (everything compiled-in: `+3 +4 +4.1 +4.2`) when the container –
 and with it the network namespace – is recreated.
+
+## AppArmor mediation gotchas (device-verified 2026-10, HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7)
+
+- **Capabilities are mediated**: an AppArmor profile without explicit
+  `capability …` rules denies all capabilities it is asked about at the LSM
+  hook – including the `capable(CAP_SYS_ADMIN)` check inside the mount(2)
+  syscall path, even when the `mount …` rule itself grants the mount.
+  Docker's default profile carries a blanket `capability,`, so plain Docker
+  containers never hit this. The app profile grants `sys_admin` (nfsd mount,
+  per-share bind mounts) and `sys_module` (`modprobe` on fresh boots); the
+  container's CapEff (`00000000a82525fb` on the device) already contains both
+  via `privileged: [SYS_ADMIN]` + `kernel_modules: true`.
+- **Errno forensics replace missing denial logs**: HAOS's kernel produces *no*
+  AppArmor audit messages in the host journal (`ha host logs` carries kernel
+  lines, but nothing apparmor/DENIED – no usable audit plumbing), so
+  complain-mode iteration is impossible and enforcement bugs must be
+  diagnosed from boot progress. Useful signals:
+  - busybox `mount` prints `mounting SRC on DST failed: Permission denied`
+    for **EACCES** (`%m`; observed for a *mount-rule* denial) and
+    `permission denied (are you root?)` for **EPERM** (dedicated abort path;
+    observed for a *capability* denial).
+  - In-container ground truth works and is file-rule-accessible:
+    `cat /proc/self/attr/current` (profile + mode) and
+    `grep CapEff /proc/self/status`.
+- **Mount rule grammar** (parser `apparmor.d.pod`): the mount-flags
+  conditional is `options=` (there is no `flags=`); `fstype=` matching only
+  applies to *new* mounts – not bind/remount – so `mount --bind` rules are
+  conditioned on `options=(bind)` instead. Mount sources are matched as
+  passed: busybox passes the device string `nfsd` (not a path). Reference
+  rules: `mount fstype=(nfsd) nfsd -> /proc/fs/nfsd/,`,
+  `mount options=(bind) /{share,media}{,/**} -> /data/pseudo_root{,/**},`,
+  `umount /data/pseudo_root{,/**},`.
+- **Iteration mechanics**: the supervisor re-installs (and reloads) the
+  profile on `ha apps update`, but `App.rebuild()` does **not** call
+  `install_apparmor()` – every profile change needs a `config.yaml` version
+  bump so the deploy task takes the update path.

@@ -1,5 +1,12 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.4.4
+
+- AppArmor refinement round (device-verified): tighten the nfsd mount rule to
+  the exact source string and target (`mount fstype=(nfsd) nfsd ->
+  /proc/fs/nfsd/`); follow the upstream dnsmasq app profile convention of a
+  bare `signal,` rule (send *and* receive) instead of send-only; remove the
+  temporary diagnostic logging from the startup script.
 ## 0.4.3
 
 - Fix the AppArmor profile's capability mediation: grant `sys_admin` (mount/

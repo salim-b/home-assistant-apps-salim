@@ -3,9 +3,15 @@
 profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   #include <abstractions/base>
 
-  # Generic file access, signals (s6 supervision, bash job control)
+  # Generic file access, signals (s6 supervision, bash job control).
+  # Bare `signal,` matches the upstream dnsmasq app profile convention: it
+  # grants send AND receive for all signals/peers. Cross-label signal
+  # delivery needs rules on both sides (pod: sender needs send for the
+  # peer's profile, receiver needs receive for the sender's); same-label
+  # pairs appear to be implicitly allowed, but not relying on that is
+  # cheaper than documenting it.
   file,
-  signal (send) set=(kill,term,int,hup,cont),
+  signal,
 
   # S6-Overlay
   /init rix,
@@ -47,7 +53,9 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   # do not hit this).
   capability sys_admin,
   capability sys_module,  # modprobe nfsd on fresh device boots
-  mount fstype=(nfsd),
+  # Tightened: the busybox mount passes the device string "nfsd" as the
+  # mount source; fstype matching applies to new mounts only.
+  mount fstype=(nfsd) nfsd -> /proc/fs/nfsd/,
   # NOTE: fstype matching only applies to new mounts (not bind/remount),
   # so bind mirrors are conditioned on the bind flag instead.
   mount options=(bind) /{share,media}{,/**} -> /data/pseudo_root{,/**},
