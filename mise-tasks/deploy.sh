@@ -13,6 +13,39 @@ app="${usage_app?}"
 host="${usage_host?}"
 SSH_OPTS=(-o ConnectTimeout=10)
 
+# The supervisor may still be settling after a device reboot (the ha CLI then
+# fails with e.g. "System is not ready with state: shutdown" or "Supervisor is
+# not ready to perform this operation"): wait for readiness up front, and
+# retry the mutating operations below on those transient messages.
+wait_supervisor() { # poll until the supervisor API answers
+  local n=1
+  until ssh "${SSH_OPTS[@]}" "$host" \
+    "ha supervisor info --raw-json 2>/dev/null | jq -e '.result == \"ok\"' >/dev/null" 2>/dev/null; do
+    [ "$n" -lt 30 ] || { echo "ERROR: supervisor on $host not ready after 3 min" >&2; return 1; }
+    echo "-- waiting for the supervisor to become ready ($n/30)"
+    n=$((n + 1))
+    sleep 6
+  done
+}
+ha_retry() { # ha_retry <timeout-s> <cmd...>: retry commands failing with known transient messages
+  local deadline=$((SECONDS + $1))
+  shift
+  local out rc
+  while true; do
+    out=$("$@" 2>&1)
+    rc=$?
+    if [ "$rc" -eq 0 ]; then printf '%s\n' "$out"; return 0; fi
+    if ! grep -qiE "not ready|is starting|is shutdown|connection refused" <<<"$out"; then
+      printf '%s\n' "$out" >&2
+      return "$rc"
+    fi
+    [ "$SECONDS" -lt "$deadline" ] || { printf '%s\n' "$out" >&2; return "$rc"; }
+    echo "-- transient supervisor failure, retrying: $(head -c 120 <<<"$out")"
+    sleep 5
+  done
+}
+wait_supervisor
+
 [ -d "$app" ] || { echo "ERROR: no app directory '$app' in the repo" >&2; exit 1; }
 version=$(yq -r '.version' "$app/config.yaml")
 slug=$(yq -r '.slug' "$app/config.yaml")
@@ -37,7 +70,7 @@ if [ -n "$repo_installs" ] && [ "$repo_installs" != "[]" ]; then
   if [ "${usage_replace:-false}" = "true" ]; then
     echo "-- --replace given: uninstalling the repository-installed copy first"
     for repo_slug in "${repo_slugs[@]}"; do
-      ssh "${SSH_OPTS[@]}" "$host" "ha apps uninstall $repo_slug"
+      ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps uninstall $repo_slug"
     done
   else
     echo "ERROR: two installations would conflict on the app's published port. Uninstall it first, e.g." >&2
@@ -63,7 +96,7 @@ else
 fi
 
 echo "-- reloading app store metadata (rescans /local_apps; that only happens on store reload/boot)"
-ssh "${SSH_OPTS[@]}" "$host" 'ha store reload'
+ha_retry 180 ssh "${SSH_OPTS[@]}" "$host" 'ha store reload'
 
 store_info=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null || true)
 if [ -z "$store_info" ] || ! echo "$store_info" | jq -e '.result == "ok"' >/dev/null 2>&1; then
@@ -75,15 +108,15 @@ fi
 installed_version=$(echo "$store_info" | jq -r '.data.version // empty')
 if [ -z "$installed_version" ]; then
   echo "-- not installed yet: installing"
-  ssh "${SSH_OPTS[@]}" "$host" "ha apps install $local_slug"
+  ha_retry 900 ssh "${SSH_OPTS[@]}" "$host" "ha apps install $local_slug"
   action="installed"
 elif [ "$installed_version" != "$version" ]; then
   echo "-- version changed ($installed_version -> $version): updating"
-  ssh "${SSH_OPTS[@]}" "$host" "ha apps update $local_slug"
+  ha_retry 900 ssh "${SSH_OPTS[@]}" "$host" "ha apps update $local_slug"
   action="updated"
 else
   echo "-- version unchanged ($version): rebuilding image"
-  ssh "${SSH_OPTS[@]}" "$host" "ha apps rebuild --force $local_slug"
+  ha_retry 900 ssh "${SSH_OPTS[@]}" "$host" "ha apps rebuild --force $local_slug"
   action="rebuilt"
 fi
 
@@ -93,7 +126,7 @@ case "$state" in
   started | startup) ;;
   *)
     echo "-- ensuring app is started (install never auto-starts; update/rebuild only restart when it was running)"
-    ssh "${SSH_OPTS[@]}" "$host" "ha apps start $local_slug"
+    ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps start $local_slug"
     ;;
 esac
 state=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \
