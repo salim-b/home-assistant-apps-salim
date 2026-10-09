@@ -11,6 +11,8 @@ cd "$MISE_PROJECT_ROOT"
 
 app="${usage_app?}"
 host="${usage_host?}"
+# Bare host (no user@) defaults to root: HAOS device access is root-based
+case "$host" in *@*) ;; *) host="root@$host" ;; esac
 SSH_OPTS=(-o ConnectTimeout=10)
 
 # The supervisor may still be settling after a device reboot (the ha CLI then
@@ -18,10 +20,22 @@ SSH_OPTS=(-o ConnectTimeout=10)
 # not ready to perform this operation"): wait for readiness up front, and
 # retry the mutating operations below on those transient messages.
 wait_supervisor() { # poll until the supervisor API answers
-  local n=1
-  until ssh "${SSH_OPTS[@]}" "$host" \
-    "ha supervisor info --raw-json 2>/dev/null | jq -e '.result == \"ok\"' >/dev/null" 2>/dev/null; do
-    [ "$n" -lt 30 ] || { echo "ERROR: supervisor on $host not ready after 3 min" >&2; return 1; }
+  local n=1 probe rc
+  while true; do
+    # '|| rc=$?' keeps this out of errexit (set -e) so the failure can be
+    # inspected instead of killing the script from inside the assignment
+    probe=$(ssh "${SSH_OPTS[@]}" "$host" \
+      "ha supervisor info --raw-json 2>&1 | jq -e '.result == \"ok\"' >/dev/null" 2>&1) && rc=0 || rc=$?
+    [ "$rc" -eq 0 ] && return 0
+    if [ "$rc" -eq 255 ]; then
+      # rc=255 = ssh itself failed (network/auth) — no retry can fix that
+      echo "ERROR: cannot ssh to $host: ${probe:-<no output>}" >&2
+      return 1
+    fi
+    [ "$n" -lt 30 ] || {
+      echo "ERROR: supervisor on $host not ready after 3 min (last probe: ${probe:-<no output>})" >&2
+      return 1
+    }
     echo "-- waiting for the supervisor to become ready ($n/30)"
     n=$((n + 1))
     sleep 6
@@ -32,8 +46,7 @@ ha_retry() { # ha_retry <timeout-s> <cmd...>: retry commands failing with known 
   shift
   local out rc
   while true; do
-    out=$("$@" 2>&1)
-    rc=$?
+    out=$("$@" 2>&1) && rc=0 || rc=$?
     if [ "$rc" -eq 0 ]; then printf '%s\n' "$out"; return 0; fi
     if ! grep -qiE "not ready|is starting|is shutdown|connection refused" <<<"$out"; then
       printf '%s\n' "$out" >&2
@@ -121,7 +134,7 @@ else
 fi
 
 state=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \
-  | jq -r '.data.state // empty')
+  | jq -r '.data.state // empty') || state=""
 case "$state" in
   started | startup) ;;
   *)
@@ -130,7 +143,7 @@ case "$state" in
     ;;
 esac
 state=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \
-  | jq -r '.data.state // empty')
+  | jq -r '.data.state // empty') || state=""
 
 echo "-- $action $local_slug v$version (state: $state)"
 

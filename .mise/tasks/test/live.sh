@@ -18,6 +18,8 @@ cd "$MISE_PROJECT_ROOT"
 
 app="${usage_app?}"
 host="${usage_host?}"
+# Bare host (no user@) defaults to root: HAOS device access is root-based
+case "$host" in *@*) ;; *) host="root@$host" ;; esac
 SSH_OPTS=(-o ConnectTimeout=10)
 
 # Forward the shared flags to deploy (native depends arg forwarding is not
@@ -131,7 +133,7 @@ wait_started
 # options), not the repo defaults: the user may have edited the shares in the
 # HA UI.
 LIVE_SHARES=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \
-  | jq -c '.data.options.shares // []')
+  | jq -c '.data.options.shares // []') || LIVE_SHARES="[]"
 export LIVE_SHARES
 if [ "$(jq length <<<"$LIVE_SHARES")" -gt 0 ] && [ "$(declare -f live_runtime_check)" != "" ]; then
   live_runtime_check
