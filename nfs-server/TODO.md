@@ -154,11 +154,12 @@ containers never hit this). See `KNOWLEDGE.md` for the full gotcha list.
 **Acceptance status:** app boots and serves with the profile enforcing
 (verified live: NFS client roundtrips — write/read/delete on the default
 share, read-only export rejection, pseudo-root browse — via the
-`test:live` task), including after a fresh device **reboot** (the nfsd
-module gets loaded from scratch under the enforcing profile; whether the
-app's `modprobe` or the kernel's mount-time autoload does the load is not
-distinguishable without audit logs, but the `sys_module` grant makes the
-app's own path possible and the boot works either way).
+`test:live` task), including after a fresh device **reboot**. The
+module-loading question is resolved by *removal* (0.4.8): the kernel's
+mount-time autoload loads nfsd in kernel context, outside the AppArmor
+label, so the app carries no `modprobe`/`sys_module`/`/lib/modules`
+access at all (device-verified by rebooting with the module unloaded;
+see `KNOWLEDGE.md`).
 
 ### 4. Local: validate share inputs in the schema *(cheap hardening)* — **done in 0.3.3**
 
