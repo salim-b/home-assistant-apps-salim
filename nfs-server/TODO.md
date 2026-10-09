@@ -93,7 +93,7 @@ Goal: eliminate `SYS_ADMIN` (and `modprobe`/`SYS_MODULE`) entirely.
   operating-system and a discussion/PR on supervisor with the netns
   analysis; implement the app-side switch only if welcomed upstream.
 
-### 3. Local: AppArmor profile *(independent of upstream)* — **implemented (0.4.0), device iteration pending**
+### 3. Local: AppArmor profile *(independent of upstream)* — **implemented, device-enforcement-verified (0.4.0–0.4.5)**
 
 Ground truth from supervisor sources (`utils/apparmor.py`, `apps/app.py`,
 `docker/app.py`, `apps/model.py`):
@@ -134,15 +134,25 @@ paths covered). Validated locally: `apparmor_parser -K -T -S` passes,
 supervisor's one-top-level-profile regex passes, static rule-coverage
 check over every path the scripts touch passes. `apparmor: true` set.
 
-**Next (needs the device):** the supervisor *renames* the profile to the
-installed slug and loads it at app install/restart — complain-mode
-iteration happens by loading the same profile text in complain mode,
-running the app, and reading the denials from the host journal
-(`journalctl -k | grep -i apparmor="DENIED"`), tightening rules until the
-boot + roundtrip is denial-free, then loading in enforce mode. Hand the
-user the command sequence (per the device-access rule) when they are ready;
-also watch for the OS Agent 1.14 parser being stricter than local parser
-versions.
+**State:** implemented and device-enforcement-verified through 0.4.5 (October
+2026). The planned complain-mode iteration turned out impossible: HAOS's
+kernel produces no AppArmor audit/denial messages in the host journal at all
+(no usable audit plumbing), so denials are silent. Iteration instead ran in
+enforce mode via the `deploy` task (version bump per round — `App.rebuild()`
+skips `install_apparmor()`, only `App.update()` re-installs the profile),
+diagnosing failures from boot progress + busybox errno forensics +
+in-container ground truth (`/proc/self/attr/current`, `/proc/self/status`
+CapEff). Two findings contradicted the static analysis: (1) the mount rule
+must match the device string `nfsd` as mount source (not a path), and (2)
+AppArmor mediates `capable(CAP_SYS_ADMIN)` during the mount syscall itself —
+profiles need explicit `capability` rules even when the mount rule passes
+(Docker's default profile carries a blanket `capability,`, plain Docker
+containers never hit this). See `KNOWLEDGE.md` for the full gotcha list.
+
+**Acceptance status:** app boots and serves (mountd + rpc.nfsd up, `-3 +4
++4.1 +4.2`) with the profile enforcing. Remaining verification: an NFS client
+roundtrip against the enforced app (device-access rule — user-side), and a
+fresh-device-boot check that `modprobe`/`sys_module` works from scratch.
 
 ### 4. Local: validate share inputs in the schema *(cheap hardening)* — **done in 0.3.3**
 

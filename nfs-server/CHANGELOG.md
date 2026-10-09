@@ -1,5 +1,12 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.4.5
+
+- AppArmor refinement round 2 (device-verified): scope sub-profile signal
+  receive to the app's own top profile (`signal (receive) peer=*_nfs`),
+  following the official dev-docs AppArmor template; document the researched
+  conventions in the profile header (upstream `file,` blanket kept
+  deliberately — HAOS has no AppArmor audit logging, see KNOWLEDGE.md).
 ## 0.4.4
 
 - AppArmor refinement round (device-verified): tighten the nfsd mount rule to

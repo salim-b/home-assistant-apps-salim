@@ -3,6 +3,22 @@
 profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   #include <abstractions/base>
 
+  ## Conventions & references (device-enforcement-verified on HAOS 18.3 /
+  ## OS Agent 1.14 / AppArmor 3.1.7 — see nfs-server/KNOWLEDGE.md):
+  ## - shape modeled on the official dev-docs AppArmor template
+  ##   (developers.home-assistant.io/docs/add-ons/presentation) and the
+  ##   shipped dnsmasq app profile; sub-profile signal receive is
+  ##   peer-scoped per the docs template.
+  ## - `file,` blanket: upstream HA convention (docs template + dnsmasq).
+  ##   Tightening file rules is impractical here because HAOS produces no
+  ##   AppArmor audit/denial logs (no audit plumbing) — silent breakage
+  ##   risk. The profile's confinement value sits in the non-file classes
+  ##   (mount/capability), which Docker's default profile would otherwise
+  ##   grant broadly (blanket `capability,`).
+  ## - explicit `capability` rules are REQUIRED for privileged mounts:
+  ##   AppArmor mediates capable(CAP_SYS_ADMIN) during mount(2) even when
+  ##   the `mount` rule itself grants it.
+
   # Generic file access, signals (s6 supervision, bash job control).
   # Bare `signal,` matches the upstream dnsmasq app profile convention: it
   # grants send AND receive for all signals/peers. Cross-label signal
@@ -92,6 +108,10 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
     file,
     signal (send) set=(kill,term,int,hup,cont),
+    # Official docs template: scope receive to the app's own top profile
+    # (the supervisor renames it to the installed slug on the device, e.g.
+    # local_nfs — the *_nfs glob covers repo installs too).
+    signal (receive) peer=*_nfs,
 
     /usr/sbin/exportfs rm,
     /lib/** mr,
@@ -113,6 +133,10 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
     file,
     signal (send) set=(kill,term,int,hup,cont),
+    # Official docs template: scope receive to the app's own top profile
+    # (the supervisor renames it to the installed slug on the device, e.g.
+    # local_nfs — the *_nfs glob covers repo installs too).
+    signal (receive) peer=*_nfs,
 
     capability net_bind_service,
     capability setgid,
@@ -144,7 +168,10 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
     file,
     signal (send) set=(kill,term,int,hup,cont),
-    signal receive,
+    # Official docs template: scope receive to the app's own top profile
+    # (the supervisor renames it to the installed slug on the device, e.g.
+    # local_nfs — the *_nfs glob covers repo installs too).
+    signal (receive) peer=*_nfs,
 
     capability net_bind_service,
     capability setgid,
