@@ -7,14 +7,10 @@ set -euo pipefail
 ## /proc/fs/nfsd is just an (empty) mountpoint which the kernel provides in
 ## every procfs instance; the actual control files (e.g. `versions`, `threads`)
 ## only exist once the `nfsd` filesystem is mounted there. Mounting it also
-## autoloads the `nfsd` kernel module on hosts that ship it. For hosts without
-## module autoload, we try to load the module explicitly first (host kernel
-## modules are mapped into the app read-only).
+## autoloads the `nfsd` kernel module on hosts that ship it (the kernel's
+## request_module runs in kernel context, outside the AppArmor label — no
+## explicit modprobe needed; verified on HAOS 18.3, see KNOWLEDGE.md).
 if [ ! -e /proc/fs/nfsd/versions ]; then
-  if command -v modprobe >/dev/null 2>&1; then
-    bashio::log.info "Loading nfsd kernel module (if available)..."
-    modprobe nfsd 2>/dev/null || true
-  fi
   bashio::log.info "Mounting nfsd filesystem..."
   if ! mount -t nfsd nfsd /proc/fs/nfsd; then
     bashio::log.fatal "Unable to mount the nfsd filesystem: the host's kernel probably lacks NFS server support."

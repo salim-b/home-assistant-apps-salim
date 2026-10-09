@@ -162,9 +162,9 @@ and with it the network namespace – is recreated.
   syscall path, even when the `mount …` rule itself grants the mount.
   Docker's default profile carries a blanket `capability,`, so plain Docker
   containers never hit this. The app profile grants `sys_admin` (nfsd mount,
-  per-share bind mounts) and `sys_module` (`modprobe` on fresh boots); the
-  container's CapEff (`00000000a82525fb` on the device) already contains both
-  via `privileged: [SYS_ADMIN]` + `kernel_modules: true`.
+  per-share bind mounts); the container's CapEff (`00000000a82525fb` on the
+  device, before `kernel_modules` was dropped) already contained it via
+  `privileged: [SYS_ADMIN]`.
 - **Errno forensics replace missing denial logs**: HAOS's kernel produces *no*
   AppArmor audit messages in the host journal (`ha host logs` carries kernel
   lines, but nothing apparmor/DENIED – no usable audit plumbing), so
@@ -189,7 +189,17 @@ and with it the network namespace – is recreated.
   profile on `ha apps update`, but `App.rebuild()` does **not** call
   `install_apparmor()` – every profile change needs a `config.yaml` version
   bump so the deploy task takes the update path.
-- **Network mediation is opt-in per class**: a profile without any `network`
+- **The kernel's mount-time module autoload makes app-level modprobe
+  unnecessary** (device-verified by rebooting with the module unloaded):
+  `mount -t nfsd …` makes the kernel `request_module("fs-nfsd")`, which runs
+  in kernel context (`call_usermodehelper`) – outside the container's
+  AppArmor label and its capability set. Consequently the profile needs no
+  `sys_module` capability, no `modprobe` exec rule and no `/lib/modules`
+  access, and the app config does not need `kernel_modules: true` (which
+  only mapped `/lib/modules` read-only and granted `SYS_MODULE` – both inert
+  under the denying profile). Verified on HAOS 18.3 / kernel 6.18.52-haos
+  (odroid-m1, CONFIG_NFSD=m): fresh boot with module unloaded → mount
+  succeeds, NFS serves, client roundtrip passes.
   rules has networking *entirely unmediated* (everything allowed) – "no
   rules" is not "no networking". Adding any network rule (allow or deny)
   enables mediation, and everything not matched by an allow rule is then

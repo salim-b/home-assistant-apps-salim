@@ -1,5 +1,15 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.4.8
+
+- Drop the module-loading machinery: the kernel's mount-time autoload loads
+  the nfsd module itself (`request_module` runs in kernel context, outside
+  the AppArmor label — verified by rebooting the device with the module
+  unloaded). The app no longer runs `modprobe` (removed from the startup
+  script), the AppArmor profile no longer grants `sys_module`/`modprobe`
+  exec/`/lib/modules` access, and the app config no longer sets
+  `kernel_modules: true` (the read-only `/lib/modules` mapping and the
+  `SYS_MODULE` capability were inert under the denying profile).
 ## 0.4.7
 
 - AppArmor experiment: dropped the module-loading permissions (`sys_module`
