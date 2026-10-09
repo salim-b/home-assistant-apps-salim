@@ -15,9 +15,11 @@
 # shellcheck disable=SC2034  # LIVE_* are the harness contract variables
 
 live_prepare() {
-  # The test options reference share paths on the device host; create missing
-  # ones and hand the writable ones to the squashed uid (default_uid 1000) so
-  # the roundtrip can write into them. (-n: keep the loop's stdin away from ssh)
+  # Make sure every test share directory exists and is writable by the
+  # squashed uid (default_uid 1000). The app itself creates missing dirs with
+  # its configured defaults, but never modifies existing ones — pre-made
+  # root-owned dirs would break the rw roundtrip. (-n: keep the loop's stdin
+  # away from ssh)
   while IFS=$'\t' read -r spath sopts; do
     [ -n "$spath" ] || continue
     case ",$sopts," in
