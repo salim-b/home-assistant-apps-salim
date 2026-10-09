@@ -114,9 +114,13 @@ global tasks from your mise user config); the essentials:
   fails, fix the repo, not CI config, unless the CI config itself is wrong.
   Builder caveats: the init job needs `fetch-depth: 0` — the changed-files
   filter otherwise only sees the tip commit and silently skips multi-commit
-  merges (regular merges instead of squash!). The lint workflow's
-  addon-linter retries once on failure (its lint image is built from Docker
-  Hub at run time; transient auth.docker.io outages look like lint errors).
+  merges (regular merges instead of squash!). The app Dockerfile must
+  not pull from Docker Hub at build time (this includes the
+  `# syntax=docker/dockerfile:1` directive — its frontend image comes from
+  Docker Hub; buildx's builtin frontend suffices). The lint workflow runs
+  frenck's app linter natively (pinned source + pypi requirements) instead
+  of via its Docker action, whose Docker Hub image builds flaked with 504s
+  and 429 runner-pool rate limits.
 - **Device access**: testing against the real HA device over SSH only on
   explicit user request; otherwise hand the user exact commands to run.
 - **Version-sensitive facts**: supervisor schemas, s6-overlay layout, HAOS

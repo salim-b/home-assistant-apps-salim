@@ -35,26 +35,23 @@ jobs:
       - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v7.0.1
 
+      - name: ⤵️ Check out the linter source
+        # run frenck's app linter natively instead of via its Docker action:
+        # the action builds its image from Docker Hub at run time, where
+        # transient auth.docker.io outages/429 rate limits (runner IP pools,
+        # unauthenticated pulls) otherwise flake the job — python + pypi are
+        # the reliable path. Renovate digest-pins this checkout.
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: frenck/action-addon-linter
+          ref: v2.21
+          path: linter
+
+      - name: 🐍 Install the linter requirements
+        run: python3 -m pip install --no-cache-dir --prefer-binary -r linter/src/requirements.txt
+
       - name: 🚀 Run Home Assistant App Lint
-        id: lint
-        # The action builds its lint image from Docker Hub at run time;
-        # transient auth.docker.io outages (observed: 504 on the token
-        # fetch) otherwise fail the whole run — try once more after a
-        # wait before giving up.
-        continue-on-error: true
-        uses: frenck/action-addon-linter@v2.21
-        with:
-          path: "./${{ matrix.path }}"
-
-      - name: ⏳ Wait before retrying the linter
-        if: steps.lint.outcome == 'failure'
-        run: sleep 60
-
-      - name: 🚀 Run Home Assistant App Lint (retry)
-        if: steps.lint.outcome == 'failure'
-        uses: frenck/action-addon-linter@v2.21
-        with:
-          path: "./${{ matrix.path }}"
+        run: python3 linter/src/lint.py "./${{ matrix.path }}"
 
   check:
     name: Mise check (lint + validate)
