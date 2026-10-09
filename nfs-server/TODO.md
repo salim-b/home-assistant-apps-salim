@@ -5,6 +5,8 @@ bottom. Underlying technical facts and root causes live in `KNOWLEDGE.md`.
 
 ## Tasks
 
+- Investigate mise task-arg-forwarding feature gap (see the `test:live` task source's comment header) and fix it upstream if indicated.
+
 - Create upstream PR in HA to render app configuration labels in the UI as Markdown blocks instead of the current single-line plain text.
 
 - Work through the security hardening plan below (items 1–3 remain; 4–5 are done).
