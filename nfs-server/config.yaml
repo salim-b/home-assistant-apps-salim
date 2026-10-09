@@ -1,6 +1,6 @@
 # https://developers.home-assistant.io/docs/apps/configuration#app-configuration
 name: NFS Server
-version: "0.4.2"
+version: "0.4.3"
 slug: nfs
 description: Network File System (NFS) server for Home Assistant
 # Generic (multi-arch) image name; CI builds & publishes per-arch images

@@ -1,5 +1,14 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.4.3
+
+- Fix the AppArmor profile's capability mediation: grant `sys_admin` (mount/
+  umount of the nfsd filesystem and the per-share bind mirrors) and
+  `sys_module` (module autoload on fresh boots). Device diagnosis: the mount
+  rules themselves were fine - AppArmor also mediates `capable(CAP_SYS_ADMIN)`
+  during the mount syscall, which Docker's default profile allows with a
+  blanket `capability,` rule. Removes the 0.4.2 diagnostic blanket `mount`
+  rule; the confinement/capability log lines stay one more release.
 ## 0.4.2
 
 - Temporary diagnostic release (AppArmor iteration): blanket `mount` rule plus

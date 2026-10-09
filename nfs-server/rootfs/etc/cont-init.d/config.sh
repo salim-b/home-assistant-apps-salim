@@ -20,6 +20,7 @@ if [ ! -e /proc/fs/nfsd/versions ]; then
   # mountpoint state to pinpoint which layer denies the mount.
   bashio::log.info "DIA confinement: $(cat /proc/self/attr/current 2>&1 || true)"
   bashio::log.info "DIA CapEff: $(grep CapEff /proc/self/status 2>/dev/null || true)"
+  # shellcheck disable=SC2012  # temporary diagnostic, ls is fine here
   bashio::log.info "DIA euid: $(id -u 2>/dev/null || true), /proc/fs: $(ls /proc/fs/ 2>&1 | tr '\n' ' ' || true)"
   if ! mount -t nfsd nfsd /proc/fs/nfsd; then
     bashio::log.fatal "Unable to mount the nfsd filesystem: the host's kernel probably lacks NFS server support."
