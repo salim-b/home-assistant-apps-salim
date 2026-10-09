@@ -7,6 +7,7 @@
   following the official dev-docs AppArmor template; document the researched
   conventions in the profile header (upstream `file,` blanket kept
   deliberately — HAOS has no AppArmor audit logging, see KNOWLEDGE.md).
+
 ## 0.4.4
 
 - AppArmor refinement round (device-verified): tighten the nfsd mount rule to
@@ -14,6 +15,7 @@
   /proc/fs/nfsd/`); follow the upstream dnsmasq app profile convention of a
   bare `signal,` rule (send *and* receive) instead of send-only; remove the
   temporary diagnostic logging from the startup script.
+
 ## 0.4.3
 
 - Fix the AppArmor profile's capability mediation: grant `sys_admin` (mount/
@@ -23,17 +25,20 @@
   during the mount syscall, which Docker's default profile allows with a
   blanket `capability,` rule. Removes the 0.4.2 diagnostic blanket `mount`
   rule; the confinement/capability log lines stay one more release.
+
 ## 0.4.2
 
 - Temporary diagnostic release (AppArmor iteration): blanket `mount` rule plus
   confinement/capability logging around the nfsd mount, to pinpoint which
   layer denies the mount. Will be tightened in the next release.
+
 ## 0.4.1
 
 - Fix the AppArmor profile so the app can start again: allow mounting the nfsd
   filesystem (the device string `nfsd` is the mount source, so the rule is
   scoped by filesystem type), the per-share `mount --bind` mirrors and their
   unmount; drop unproven raw-network rules from the rpc.nfsd sub-profile.
+
 ## 0.4.0
 
 - AppArmor support: ships a custom, much tightened AppArmor profile (per-app sub-profiles for `exportfs`, `rpc.nfsd` and `rpc.mountd`; mount restricted to the `nfsd` filesystem type; no more blanket `full` rules) – the app now runs with `apparmor: true` instead of AppArmor disabled
