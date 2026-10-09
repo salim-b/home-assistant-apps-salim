@@ -50,10 +50,20 @@ global tasks from your mise user config); the essentials:
   image metadata.
 - `mise run lab` — full-fidelity boot lab: fake Supervisor API serving the
   app's default options (adapted to the lab network), boots the app container
-  (complete s6-rc tree), client-mount roundtrip (rw write must reach the host
-  filesystem, ro must be blocked), graceful stop. **Run for every
-  runtime-affecting change**; it caught the mountd/pseudo-root class of bugs.
-  `mise run lab --keep` keeps containers/dirs for debugging.
+  (complete s6-rc tree), then an app-provided runtime check, then graceful
+  stop. **Run for every runtime-affecting change**; it caught the
+  mountd/pseudo-root class of bugs. `mise run lab --keep` keeps
+  containers/dirs for debugging.
+  - Apps without a `mise-tasks/lab/<app>.sh` hook get a *boot-only* lab
+    (config fetch, full boot, graceful stop, exit code 0) — zero ceremony
+    for new apps.
+  - Hook contract (`mise-tasks/lab/<app>.sh`, sourced by the harness; env:
+    `LAB_NET_NAME`, `LAB_TMPDIR`, `LAB_APP_IP`, `LAB_SUBNET`): append to
+    `lab_docker_args` (`lab_docker_args+=(…)` — do **not** overwrite it, the
+    harness pre-seeds the `/data` volume), optionally set `lab_fixture_py`
+    (app-relative python file defining `lab_adapt_fixture(options)`, with
+    `LABNETWORK` as subnet placeholder), and define `lab_runtime_check`.
+    See `mise-tasks/lab/nfs-server.sh` as the reference.
 
 ## Workflow rules
 

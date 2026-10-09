@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-#MISE description="Full-fidelity boot lab: fake supervisor API, boot, client mount roundtrip, graceful stop"
-#USAGE arg "[app]" help="App to lab-test (default: apps providing a lab fixture)" {
+#MISE description="Full-fidelity boot lab: fake supervisor API, boot, app-provided runtime check, graceful stop"
+#USAGE arg "[app]" help="App to lab-test (default: all apps)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
 #USAGE flag "--keep" help="Keep lab containers/dirs for debugging"
+#
+# Per-app specifics (docker args, fixture adaptation, a runtime roundtrip)
+# live in mise-tasks/lab/<app>.sh - see AGENTS.md. Apps without a hook get a
+# boot-only lab (config fetch via fake API, full s6-rc boot, graceful stop).
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 
@@ -12,12 +16,11 @@ apps=("${usage_app:-$(git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1
 
 net="nfslab-$$"
 ts() { echo "[t+${1}s] $2"; }
-subnet="172.31.0.0/16"
 tmpdir=$(mktemp -d /tmp/nfslab-XXXXXX)
 fails=0
 
 ## Lab convenience images (built once, reused across runs): python3+yaml for
-## the fake API, nfs-utils for the client
+## the fake API, plus a client image with common runtime-check tools
 api_image="local/nfslab-api:alpine3.24"
 client_image="local/nfslab-client:alpine3.24"
 if ! docker image inspect "$api_image" >/dev/null 2>&1; then
@@ -30,7 +33,7 @@ fi
 if ! docker image inspect "$client_image" >/dev/null 2>&1; then
   docker build -q -t "$client_image" -f - . <<'EOF'
 FROM alpine:3.24
-RUN apk add --no-cache nfs-utils
+RUN apk add --no-cache nfs-utils curl jq iputils
 EOF
 fi
 
@@ -55,7 +58,8 @@ subnet=$(docker network inspect "$net" --format '{{range .IPAM.Config}}{{.Subnet
 
 for app in "${apps[@]}"; do
   version=$(yq -r '.version' "$app/config.yaml")
-  echo "== lab for $app $version =="
+  hook="mise-tasks/lab/$app.sh"
+  echo "== lab for $app $version $([ -f "$hook" ] && echo "(hook: $hook)" || echo "(boot-only, no hook)") =="
 
   ts "$SECONDS" "-- fake supervisor API (serving $app/config.yaml options)"
   docker rm -f "$net-fakesup" >/dev/null 2>&1 || true
@@ -66,17 +70,24 @@ for app in "${apps[@]}"; do
 import http.server, json, os, yaml
 config = yaml.safe_load(open("/src/config.yaml"))
 NET = os.environ["LAB_NETWORK"]
-def adapt(value):
-    # fixture adaptation: client networks point at the lab subnet
-    if isinstance(value, dict):
-        return {k: NET if k == "network" else adapt(value[k]) for k in value}
-    if isinstance(value, list):
-        return [adapt(v) for v in value]
-    return value
-options = adapt(config.get("options", {}))
-data = json.dumps({"result": "ok", "data": options}).encode()
+
+def build_options():
+    """Per-request options: base options + per-app fixture adaptation (a
+    lab-fixture.py provided by the app defines lab_adapt_fixture)."""
+    options = config.get("options", {})
+    try:
+        ns = {}
+        exec(open("/lab-hook.py").read(), ns)
+        if callable(ns.get("lab_adapt_fixture")):
+            options = ns["lab_adapt_fixture"](options)
+            options = json.loads(json.dumps(options).replace("LABNETWORK", NET))
+    except FileNotFoundError:
+        pass
+    return options
+
 class H(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
+        data = json.dumps({"result": "ok", "data": build_options()}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
@@ -95,12 +106,25 @@ PYEOF' >/dev/null
   [ "$api_ok" = 1 ] || { echo "LAB FAILED ($app): fake API never became ready"; fails=$((fails + 1)); continue; }
 
   ts "$SECONDS" "-- booting the app container (full s6-rc tree, config via API)"
+  ## App-provided docker args (volumes, capabilities, devices...); the
+  ## defaults work for any app, hooks extend rather than replace them
+  lab_docker_args=("-v" "$tmpdir/data:/data")
+  lab_fixture_py=""
+  LAB_NET_NAME="$net"; LAB_APP_DIR="$PWD/$app"; LAB_TMPDIR="$tmpdir"; LAB_SUBNET="$subnet"
+  export LAB_NET_NAME LAB_APP_DIR LAB_TMPDIR LAB_SUBNET
+  if [ -f "$hook" ]; then
+    # shellcheck source=/dev/null
+    source "$hook"          # sets lab_docker_args, lab_fixture_py (opt.)
+  fi
   docker rm -f "$net-app" >/dev/null 2>&1 || true
   docker run -d --privileged --name "$net-app" --network "$net" \
-    -v /lib/modules:/lib/modules:ro \
-    -v "$tmpdir/share:/share" -v "$tmpdir/media:/media" -v "$tmpdir/data:/data" \
+    "${lab_docker_args[@]}" \
     -e SUPERVISOR_TOKEN=fake -e SUPERVISOR_API="http://$net-fakesup:8000" \
     "local/$app:$version" >/dev/null
+  # serve the app's fixture adapter (if any) to the fake API
+  if [ -n "$lab_fixture_py" ]; then
+    docker cp "$PWD/$app/$lab_fixture_py" "$net-fakesup:/lab-hook.py" >/dev/null
+  fi
 
   ts "$SECONDS" "-- waiting for boot"
   boot_ok=0
@@ -116,22 +140,16 @@ PYEOF' >/dev/null
     echo "LAB FAILED ($app): deprecation/error/fatal in boot log:"; docker logs "$net-app" 2>&1 | grep -iE "deprecated|error|fatal"; fails=$((fails + 1)); continue
   fi
 
-  ts "$SECONDS" "-- client mount roundtrip"
-  echo "host-file-$$" > "$tmpdir/share/nfs/hostfile.txt" 2>/dev/null \
-    || { mkdir -p "$tmpdir/share/nfs" && echo "host-file-$$" > "$tmpdir/share/nfs/hostfile.txt"; }
-  sip=$(docker inspect "$net-app" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
-  docker rm -f "$net-client" >/dev/null 2>&1 || true
-  if ! docker run --rm --privileged --name "$net-client" --network "$net" alpine:3.24 sh -c "
-    apk add -q nfs-utils >/dev/null 2>&1
-    mkdir -p /mnt/test
-    mount -t nfs4 '$sip:/share/nfs' /mnt/test || exit 10
-    grep -q 'host-file-$$' /mnt/test/hostfile.txt || exit 11
-    echo client-write > /mnt/test/client.txt || exit 12
-    sync" ; then
-    echo "LAB FAILED ($app): client roundtrip failed (rc=$?)"; fails=$((fails + 1)); continue
+  ts "$SECONDS" "-- app runtime check"
+  if [ -f "$hook" ] && declare -F lab_runtime_check >/dev/null; then
+    LAB_APP_IP=$(docker inspect "$net-app" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+    export LAB_APP_IP
+    if ! lab_runtime_check; then
+      echo "LAB FAILED ($app): runtime check failed"; fails=$((fails + 1)); continue
+    fi
+  else
+    echo "(no hook: boot-only lab)"
   fi
-  grep -q "client-write" "$tmpdir/share/nfs/client.txt" \
-    || { echo "LAB FAILED ($app): client write did not reach the host filesystem"; fails=$((fails + 1)); continue; }
 
   ts "$SECONDS" "-- graceful stop"
   docker stop -t 60 "$net-app" >/dev/null \
