@@ -1,0 +1,34 @@
+# Test shares for the `test:live` task: `mise run test:live <app> <host> --test-shares`
+# makes the deploy task apply these to the device app's options (and creates the
+# missing share directories), then the live task tests them and restores the
+# original options afterwards.
+#
+# Coverage rationale (whole AppArmor profile surface + export-generation paths):
+# - /share/nfs          the default share; the r/w roundtrip target
+# - /share/ro           read-only export: the write attempt must fail with
+#                       EROFS (per-share options are enforced at the export
+#                       boundary)
+# - /media/test         second bind-mount source root (/media/** branch of the
+#                       bind rule)
+# - /share/nested/deep  nested share path: two-level mirror directory in the
+#                       pseudo root (deepest-first umount ordering, {,/**}
+#                       glob depth)
+# - /share/alt-net      second client network: a second pseudo-root (fsid=0)
+#                       export line via the ROOT_NETWORKS dedup; no client can
+#                       mount it, only the export generation is exercised
+shares:
+  - path: /share/nfs
+    network: 192.168.1.0/24
+    options: rw,anonuid=1000,anongid=1000,no_subtree_check
+  - path: /share/ro
+    network: 192.168.1.0/24
+    options: ro,no_subtree_check,anonuid=1000,anongid=1000
+  - path: /media/test
+    network: 192.168.1.0/24
+    options: rw,anonuid=1000,anongid=1000,no_subtree_check
+  - path: /share/nested/deep
+    network: 192.168.1.0/24
+    options: rw,anonuid=1000,anongid=1000,no_subtree_check
+  - path: /share/alt-net
+    network: 10.99.99.0/24
+    options: rw,anonuid=1000,anongid=1000,no_subtree_check
