@@ -1,3 +1,5 @@
+#MISE hide=true
+#MISE description="⚠️ internal helper script (fixture adapter, sourced by the lab task)"
 """Fixture adapter for the nfs-server lab: rewrite the config.yaml options
 so the roundtrip works inside the lab network."""
 

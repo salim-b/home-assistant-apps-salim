@@ -72,8 +72,8 @@ config = yaml.safe_load(open("/src/config.yaml"))
 NET = os.environ["LAB_NETWORK"]
 
 def build_options():
-    """Per-request options: base options + per-app fixture adaptation (a
-    lab-fixture.py provided by the app defines lab_adapt_fixture)."""
+    """Per-request options: base options + per-app fixture adaptation (the
+    fixture adapter served as /lab-hook.py defines lab_adapt_fixture)."""
     options = config.get("options", {})
     try:
         ns = {}
@@ -123,7 +123,7 @@ PYEOF' >/dev/null
     "local/$app:$version" >/dev/null
   # serve the app's fixture adapter (if any) to the fake API
   if [ -n "$lab_fixture_py" ]; then
-    docker cp "$PWD/$app/$lab_fixture_py" "$net-fakesup:/lab-hook.py" >/dev/null
+    docker cp "$PWD/$lab_fixture_py" "$net-fakesup:/lab-hook.py" >/dev/null
   fi
 
   ts "$SECONDS" "-- waiting for boot"

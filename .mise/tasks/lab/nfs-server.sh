@@ -8,9 +8,10 @@
 #                       app container's docker run (volumes, capabilities,
 #                       devices; --privileged/--network and /data are
 #                       provided by the harness)
-# - lab_fixture_py    : path (relative to the app dir) of a python file
-#                       defining lab_adapt_fixture(options)->options, served
-#                       by the fake supervisor API (omit: raw config options)
+# - lab_fixture_py    : path (relative to the repo root; typically
+#                       .mise/tasks/lab/<app>.py) of a python file defining
+#                       lab_adapt_fixture(options)->options, served by the
+#                       fake supervisor API (omit: raw config options)
 # and may define
 # - lab_runtime_check : function running the app's runtime roundtrip
 #                       (runs after boot, before the graceful stop).
@@ -26,7 +27,7 @@ lab_docker_args+=(
 
 ## Fixture adaptation: every share's client network must point at the lab
 ## subnet for the roundtrip to be allowed
-lab_fixture_py="lab-fixture.py"
+lab_fixture_py=".mise/tasks/lab/nfs-server.py"
 
 lab_runtime_check() {
   ## Client-recovery tracker (cld): the daemon must be up with its sqlite
@@ -74,7 +75,8 @@ lab_runtime_check() {
   ## persists) and verify the held state survives. Catches the tracker
   ## regressions a plain boot cannot: a broken store path or missing record
   ## persistence fails only the ACROSS-RESTART property, while boot, boot
-  ## log and roundtrip all still pass. The lease override in lab-fixture.py
+  ## log and roundtrip all still pass. The lease override in the fixture
+  ## adapter (.mise/tasks/lab/nfs-server.py)
   ## (90 s) keeps the recovery detection fast (~lease/3 renewal cycle).
   if ! (
     reclaim="$LAB_NET_NAME-reclaim"

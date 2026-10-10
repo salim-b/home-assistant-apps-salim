@@ -63,8 +63,10 @@ global tasks from your mise user config); the essentials:
     `LAB_NET_NAME`, `LAB_TMPDIR`, `LAB_APP_IP`, `LAB_SUBNET`): append to
     `lab_docker_args` (`lab_docker_args+=(…)` — do **not** overwrite it, the
     harness pre-seeds the `/data` volume), optionally set `lab_fixture_py`
-    (app-relative python file defining `lab_adapt_fixture(options)`, with
-    `LABNETWORK` as subnet placeholder), and define `lab_runtime_check`.
+    (repo-root-relative python file defining `lab_adapt_fixture(options)`,
+    with `LABNETWORK` as subnet placeholder — keep it at
+    `.mise/tasks/lab/<app>.py`, *not* inside the app dir: app-dir contents
+    get copied to devices by `deploy`), and define `lab_runtime_check`.
     See `.mise/tasks/lab/nfs-server.sh` as the reference.
 - `mise run deploy <app> <host>` — deploy an app to a real device for testing:
   copies it to the device's `/local_apps` (removing the old copy), reloads the
