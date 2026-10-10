@@ -127,21 +127,11 @@ if [ "${usage_test_options:-false}" = "true" ]; then
   echo "   (restored automatically when this task exits)"
 fi
 
-wait_started
-
-# The runtime checks test the app's ACTUAL share configuration (device
-# options), not the repo defaults: the user may have edited the shares in the
-# HA UI.
-LIVE_SHARES=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \
-  | jq -c '.data.options.shares // []') || LIVE_SHARES="[]"
-export LIVE_SHARES
-if [ "$(jq length <<<"$LIVE_SHARES")" -gt 0 ] && [ "$(declare -f live_runtime_check)" != "" ]; then
-  live_runtime_check
-fi
-
-# --- restore test options (--test-options) ---------------------------------
 # Runs on every exit path (trap): leaving the test options active on the
-# device would be the worst possible failure mode of a test tool.
+# device would be the worst possible failure mode of a test tool. Defined
+# and trapped BEFORE the runtime checks — a failing check aborts under
+# `set -e`, and a trap installed later would never fire (device-verified:
+# the first device run left the test options active because of this).
 restore_options() {
   [ "${usage_test_options:-false}" = "true" ] || return 0
   if ssh "${SSH_OPTS[@]}" "$host" "test -f '$backup'" 2>/dev/null; then
@@ -174,5 +164,17 @@ restore_options() {
   fi
 }
 trap restore_options EXIT
+
+wait_started
+
+# The runtime checks test the app's ACTUAL share configuration (device
+# options), not the repo defaults: the user may have edited the shares in the
+# HA UI.
+LIVE_SHARES=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \
+  | jq -c '.data.options.shares // []') || LIVE_SHARES="[]"
+export LIVE_SHARES
+if [ "$(jq length <<<"$LIVE_SHARES")" -gt 0 ] && [ "$(declare -f live_runtime_check)" != "" ]; then
+  live_runtime_check
+fi
 
 echo "live test OK"

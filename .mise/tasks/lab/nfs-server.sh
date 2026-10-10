@@ -67,4 +67,59 @@ lab_runtime_check() {
     return 1
   fi
   echo "NFS roundtrip OK (rw write reached the host filesystem)"
+
+  ## Client-state reclaim across an app restart (the recovery tracker's
+  ## actual feature): hold an exclusive flock from a dedicated client,
+  ## restart the app container (fresh netns, sqlite store on /data
+  ## persists) and verify the held state survives. Catches the tracker
+  ## regressions a plain boot cannot: a broken store path or missing record
+  ## persistence fails only the ACROSS-RESTART property, while boot, boot
+  ## log and roundtrip all still pass. The lease override in lab-fixture.py
+  ## (90 s) keeps the recovery detection fast (~lease/3 renewal cycle).
+  if ! (
+    reclaim="$LAB_NET_NAME-reclaim"
+    trap 'docker rm -f "$reclaim" >/dev/null 2>&1 || true' EXIT
+    docker run -d --privileged --name "$reclaim" --network "$LAB_NET_NAME" \
+      local/nfslab-client:alpine3.24 sleep infinity >/dev/null
+    # Holder: open + exclusive flock + periodic writes through the held fd
+    # (the tick writes drive the client's recovery: a write on the stale
+    # open triggers the reclaim; the server-side file growth is the
+    # recovery-landed signal - client-side stat/mountstats lie from the
+    # page cache)
+    docker exec -d "$reclaim" sh -c '
+      mkdir -p /mnt/test
+      mount -t nfs4 '"$LAB_APP_IP"':/share/nfs /mnt/test || { echo "FAIL: reclaim-client mount" >&2; exit 10; }
+      exec 9>/mnt/test/reclaim.lock || exit 11
+      flock -x 9 || exit 12
+      while true; do sleep 2; echo tick >&9 2>/dev/null; done'
+    lockfile="$LAB_TMPDIR/share/nfs/reclaim.lock"
+    for _ in $(seq 1 30); do [ -s "$lockfile" ] && break; sleep 1; done
+    [ -s "$lockfile" ] || { echo "FAIL: reclaim holder never established state"; exit 1; }
+    sz0=$(stat -c %s "$lockfile")
+    sleep 5 # let ticks land: the baseline must be from a flowing holder
+    [ "$(stat -c %s "$lockfile")" -gt "$sz0" ] \
+      || { echo "FAIL: reclaim holder ticks not reaching the server"; exit 1; }
+    echo "-- restarting the app container (fresh netns, persistent /data)"
+    docker restart "$LAB_NET_NAME-app" >/dev/null
+    for _ in $(seq 1 60); do
+      docker logs "$LAB_NET_NAME-app" 2>&1 | grep -q "legacy-services successfully started" && break
+      sleep 1
+    done
+    sz=0
+    for _ in $(seq 1 75); do # ~150 s: generous vs the ~lease/3 recovery cycle
+      sz=$(stat -c %s "$lockfile" 2>/dev/null || echo 0)
+      [ "$sz" -gt "$sz0" ] && break
+      sleep 2
+    done
+    [ "$sz" -gt "$sz0" ] || { echo "FAIL: held state not reclaimed within 150s of the restart"; exit 1; }
+    # The flock itself must survive: a fresh open in the same container is
+    # a separate open-file-description, i.e. a valid lock contender
+    if docker exec "$reclaim" flock -n /mnt/test/reclaim.lock true 2>/dev/null; then
+      echo "FAIL: the held flock was lost across the restart"
+      exit 1
+    fi
+    echo "reclaim OK: held flock survived an app restart (recovered from the tracker's records)"
+  ); then
+    return 1
+  fi
 }

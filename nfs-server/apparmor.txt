@@ -241,8 +241,15 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     # local_nfs — the *_nfs glob covers repo installs too).
     signal (receive) peer=*_nfs,
 
-    # No capability rules: nfsdcld needs none (it prunes its own capability
-    # set at startup, and dropping capabilities needs no mediation).
+    # setpcap: nfsdcld prunes its own capability set at startup (prctl
+    # PR_CAPBSET_DROP for every capability + a final capset zeroing all
+    # sets) — both require CAP_SETPCAP, which AppArmor mediates: without
+    # this rule the daemon exits in a restart loop ("Unable to prune
+    # capability 0 from bounding set: Operation not permitted",
+    # device-enforcement-verified; the lab cannot catch this — no AppArmor
+    # enforcement there). The grant only enables the self-pruning; the
+    # daemon ends up with zero capabilities anyway.
+    capability setpcap,
     # Network: none at all - the daemon only talks to the kernel over the
     # rpc_pipefs pipe (inotify + file I/O); like the rpc.nfsd sub-profile,
     # a deny-only class denies everything in it.

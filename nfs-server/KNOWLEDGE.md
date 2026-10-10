@@ -205,7 +205,8 @@ mode = the old short-grace behavior) and creates `/data/nfsdcld`; the s6-rc
 `cld` longrun execs `nfsdcld -F -p /var/lib/nfs/rpc_pipefs -s
 /data/nfsdcld`; the `nfsd` oneshot depends on it. AppArmor: the rpc_pipefs
 mount rule plus an `nfsdcld` sub-profile (`deny network,` – the daemon
-makes no sockets; no capability rules needed).
+makes no sockets; it prunes its own capability set at startup and needs a
+`capability setpcap` rule for that, see the AppArmor gotchas below).
 
 Facts for mode 3, should it ever matter: the default recovery dir is
 hardcoded as `/var/lib/nfs/v4recovery` (`user_recovery_dirname`); it can be
@@ -287,6 +288,14 @@ read-only assertions).
   per-share bind mounts); the container's CapEff (`00000000a82525fb` on the
   device, before `kernel_modules` was dropped) already contained it via
   `privileged: [SYS_ADMIN]`.
+  Sub-profile subtlety (device-verified via nfsdcld): capabilities a binary
+  needs *for its own self-management* also need rules — `prctl
+  (PR_CAPBSET_DROP)` and `capset(2)` require `CAP_SETPCAP`, so the
+  `nfsdcld` sub-profile carries `capability setpcap,` (the daemon prunes its
+  whole bounding set at startup; without the rule it exits in a restart
+  loop: "Unable to prune capability 0 from bounding set: Operation not
+  permitted"). The lab cannot catch such issues — it has no AppArmor
+  enforcement.
 - **Errno forensics replace missing denial logs**: HAOS's kernel produces *no*
   AppArmor audit messages in the host journal (`ha host logs` carries kernel
   lines, but nothing apparmor/DENIED – no usable audit plumbing), so

@@ -37,29 +37,29 @@ live_prepare() {
 live_runtime_check() {
   local fails=0 spath snetwork soptions smode rc row
 
-  # Client-recovery tracker (cld): the daemon must be up with its sqlite
-  # store on /data and the kernel must have created the upcall pipe in the
-  # app container's rpc_pipefs instance. The kernel-side proof ("Using
-  # nfsdcld client tracking operations" in the host kernel log) is only
-  # visible from the host journal, not the app container's logs - asserted
-  # best-effort via a privileged dmesg read.
-  echo "-- checking the client-recovery tracker in the app container"
-  if ! ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
-    "docker exec '$LIVE_LOCAL_SLUG' sh -c '
-       ps | grep -q \"[n]fsdcld\" &&
-       test -f /data/nfsdcld/main.sqlite &&
-       test -p /var/lib/nfs/rpc_pipefs/nfsd/cld'"; then
-    echo "   ERROR: recovery tracker not fully up (nfsdcld process / sqlite store / upcall pipe)" >&2
+  # Client-recovery tracker (cld): the kernel's host-journal lines are the
+  # authoritative end-to-end proof — "NFSD: Using nfsdcld client tracking
+  # operations." only appears after the daemon answered the kernel's
+  # GetVersion + GraceStart upcalls (which requires daemon, rpc_pipefs
+  # channel and store all working). "NFSD: Unable to initialize client
+  # recovery tracking" is the failure signature (the kernel fell through to
+  # the container-refusing legacy trackers — daemon or channel missing).
+  # NOTE: HAOS ships no docker CLI on the host, so container-internal probes
+  # (ps/sqlite/pipe) are not reachable from here; the journal check is the
+  # strictly stronger assertion.
+  echo "-- checking the client-recovery tracker (host kernel journal)"
+  klog=$(ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
+    "ha host logs 2>/dev/null | grep -E 'NFSD:' | tail -10") || true
+  if grep -q "Using nfsdcld client tracking operations" <<<"$klog"; then
+    echo "   PASS: kernel uses the cld tracker (upcalls answered by nfsdcld)"
+  elif grep -q "Unable to initialize client recovery tracking" <<<"$klog"; then
+    echo "   FAIL: kernel fell back to the container-refusing legacy trackers" >&2
+    echo "         (nfsdcld daemon or rpc_pipefs channel missing — NFSD journal tail):" >&2
+    while IFS= read -r line; do echo "         $line" >&2; done <<<"$klog"
     fails=$((fails + 1))
   else
-    echo "   PASS: nfsdcld running, sqlite store on /data, upcall pipe present"
-    if ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
-      "docker exec '$LIVE_LOCAL_SLUG' dmesg" 2>/dev/null \
-      | grep -q "Using nfsdcld client tracking operations"; then
-      echo "   PASS: kernel uses the cld tracker (successful GetVersion/GraceStart upcalls)"
-    else
-      echo "   (note: kernel log not readable from the app container — tracker init verified via the daemon/pipe only)"
-    fi
+    echo "   (note: no NFSD tracker lines in the journal tail — tracker state unknown,"
+    echo "         app log lines about nfsdcld would indicate a daemon problem)"
   fi
 
   # Mode detection per share: exports(5) defaults to read-only — writable
