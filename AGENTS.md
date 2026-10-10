@@ -111,7 +111,11 @@ global tasks from your mise user config); the essentials:
   versions within the branch are fine where testing demands a version bump
   (AppArmor profile changes are only re-applied on app *update*, never on
   rebuild) — squash them back into the single version (config + one merged
-  changelog entry) before merging.
+  changelog entry) before merging. CI enforces the rule:
+  `.github/workflows/version-guard.yaml` fails when device-visible app files
+  (rootfs, Dockerfile, config.yaml, apparmor.txt, translations) changed
+  without a version bump — the Supervisor's update model makes a no-bump
+  change a silent no-op that only repoints an already-published version tag.
 - **CI/CD is the source of truth for what gets published**: pushes to `main`
   build and publish images (see `.github/workflows/builder.yaml`). If CI
   fails, fix the repo, not CI config, unless the CI config itself is wrong.
