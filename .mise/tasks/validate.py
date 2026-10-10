@@ -248,8 +248,7 @@ def main() -> int:
                         fail(app, f"translations[{lang}].configuration.{opt}.fields keys not in schema: {sorted(missing)}")
 
         aa_file = app_dir / "apparmor.txt"
-        if aa_file.is_file() and "apparmor" not in config:
-            pass  # apparmor key presence checked by CI linter
+        # (the apparmor key's presence itself is checked by the CI app linter)
         if aa_file.is_file():
             ns: dict[str, object] = {"re": __import__("re")}
             regex = eval(aa_src["RE_PROFILE"], ns)  # noqa: S307
