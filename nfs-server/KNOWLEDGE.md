@@ -50,6 +50,24 @@ express whitespace classes via `\\s` instead. Verified against the
 supervisor `AppOptions` validation code at the pinned ref (see
 `.mise/tasks/validate.py`).
 
+The options DSL (`supervisor/apps/options.py` `RE_SCHEMA_ELEMENT`) has **no
+uniqueness construct** – list-of-objects options are validated entry by
+entry, cross-entry constraints cannot be expressed (the supervisor itself
+uses `vol.Unique()`, but only in its *own* app-config schema, e.g. the
+`machine` list). Cross-entry guards therefore belong in the app's runtime
+scripts (defense in depth pattern): config.sh rejects duplicate
+(path, network) share entries at startup.
+
+Related runtime semantics (why duplicates would silently misbehave): the
+kernel keeps a single export cache entry per (path, client); duplicate
+`/etc/exports` lines for it are resolved by *last line wins* – identical
+duplicates are only noise, conflicting options silently apply whichever
+line is last, order-dependent. Also note the per-share `fsid=` is assigned
+by config order (a counter): removing/adding shares renumbers the
+followers – an existing wart that only matters across share-list edits
+(NFSv4 filehandles embed the fsid; a renumber makes clients' old handles
+stale, including their recovery records after a share edit + app restart).
+
 ## Security hardening — posture and what is left
 
 Current posture (0.4.0): a root container whose only high-risk capability

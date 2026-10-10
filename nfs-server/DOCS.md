@@ -6,6 +6,8 @@ NFS shares are configured in the app's options: each **NFS shares** entry export
 
 Saving the options restarts the app, which then exports the configured shares.
 
+Duplicate entries (the same path and network configured more than once) are rejected at startup with an explanatory message: one option set applies per path and network pair. The same path with different networks is valid – it exports the directory with different options per network.
+
 ## NFSv4 client state recovery
 
 The app runs the kernel's client-recovery tracker (`nfsdcld`, with a persistent sqlite store in the app's data directory), so NFSv4 clients that are connected across an app (re)start keep their state – open files, byte-range locks and delegations: they reclaim it from the tracker's records during the grace period that follows the restart, instead of losing it. Held locks surviving an app update/restart are the visible effect.

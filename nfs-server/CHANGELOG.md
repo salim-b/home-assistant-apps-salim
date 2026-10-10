@@ -1,5 +1,17 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 
+## 0.5.1
+
+- Reject duplicate share entries at startup: one option set applies per
+  path and network pair (the kernel keeps a single export cache entry for
+  it and silently applies the last `/etc/exports` line), so a second entry
+  for the same path and network is now a configuration error with an
+  explanatory message - identical duplicates (redundant) and same-path
+  same-network entries with conflicting options alike. The same path with
+  *different* networks remains valid (per-network options). The app
+  configuration schema cannot express this cross-entry constraint
+  (supervisor options DSL has no uniqueness construct).
+
 ## 0.5.0
 
 - NFSv4 client state recovery: the app now runs the client-recovery tracker

@@ -76,6 +76,7 @@ fi
 PSEUDO_ROOT="/data/pseudo_root"
 declare -A ROOT_NETWORKS=() # unique client networks of all shares
 declare -a MIRROR_PATHS=()  # for unmounting in the down script
+declare -A SEEN_SHARES=()   # options already configured per (path|network)
 FSID=1
 
 ## Bind-mount $1 at $2 if not already mounted (idempotent)
@@ -119,6 +120,21 @@ while IFS= read -r share; do
     bashio::log.fatal "Share path ${path} is not a directory: NFS exports must be directories."
     bashio::exit.nok
   fi
+
+  ## One export option set can apply per (path, network) pair - the kernel
+  ## keeps a single export cache entry for it and the last /etc/exports
+  ## line wins silently (see nfs-server/KNOWLEDGE.md). The same path may
+  ## legitimately appear with *different* networks (per-network options).
+  share_key="${path}|${network}"
+  if [[ -n "${SEEN_SHARES[${share_key}]+x}" ]]; then
+    if [ "${SEEN_SHARES[${share_key}]}" = "${options}" ]; then
+      bashio::log.fatal "Share ${path} for ${network} is configured more than once with identical settings: remove the redundant duplicate entry."
+    else
+      bashio::log.fatal "Share ${path} for ${network} is configured more than once with conflicting options ('${SEEN_SHARES[${share_key}]}' vs '${options}'): only one option set applies per path and network - keep a single entry (separate entries are only needed for different networks)."
+    fi
+    bashio::exit.nok
+  fi
+  SEEN_SHARES["${share_key}"]="${options}"
 
   bashio::log.info "Exporting NFS share ${path} for ${network} with options ${options}"
 
