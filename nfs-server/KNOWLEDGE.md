@@ -372,6 +372,7 @@ read-only assertions).
   under the denying profile). Verified on HAOS 18.3 / kernel 6.18.52-haos
   (odroid-m1, CONFIG_NFSD=m): fresh boot with module unloaded → mount
   succeeds, NFS serves, client roundtrip passes.
+- **Network mediation is opt-in per class**: a profile without any `network`
   rules has networking *entirely unmediated* (everything allowed) – "no
   rules" is not "no networking". Adding any network rule (allow or deny)
   enables mediation, and everything not matched by an allow rule is then
