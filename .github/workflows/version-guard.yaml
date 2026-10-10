@@ -56,7 +56,12 @@ jobs:
             sub="${rel#"$app"/}"
             [ "$sub" != "$rel" ] || return 1 # not inside the app dir
             case "$sub" in
-              rootfs | rootfs/* | Dockerfile | Dockerfile.* | apparmor.txt | translations | translations/* | config.yaml | config.yml | config.json) return 0 ;;
+              rootfs | rootfs/* | Dockerfile | Dockerfile.* | apparmor.txt)
+                return 0
+                ;;
+              translations | translations/* | config.yaml | config.yml | config.json)
+                return 0
+                ;;
               *) return 1 ;;
             esac
           }
@@ -134,7 +139,8 @@ jobs:
             fi
             if [ "$vbase" = "$vhead" ]; then
               {
-                echo "version-guard: ERROR: app '$app' changed device-visible files without a version bump ($vbase -> $vhead):"
+                echo "version-guard: ERROR: app '$app' changed device-visible files without a version bump:"
+                echo "  (version unchanged: $vbase -> $vhead); triggering files:"
                 while IFS= read -r f; do
                   if [ -n "$f" ]; then echo "  $f"; fi
                 done <<<"$triggering"
