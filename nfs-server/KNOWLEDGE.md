@@ -20,10 +20,25 @@ re-verify before relying on it) starts at **5** (1–8 clamp) and adjusts:
 - `hassio_role` manager/admin −1/−2; host networks −1 (net) / −2 (pid) /
   −1 (uts+SYS_ADMIN); docker-API or full access → forced to 1
 
-For this app (0.4.0): 5 + 1 (profile) − 1 (`SYS_ADMIN`) = **5** — the
+For this app (0.5.0): 5 + 1 (profile) − 1 (`SYS_ADMIN`) = **5** — the
 published-port +2 branch never applies (NFS needs its port), so **5 is the
-design's ceiling**; dropping `SYS_ADMIN` via a host-side nfsd mount (TODO
-item 2, upstream) would reach 6.
+design's ceiling**; dropping `SYS_ADMIN` via a host-side nfsd mount (the
+TODO task "Upstream: host-side nfsd mount + supervisor bind-mount") would
+reach 6.
+
+The rating differs between the store listing and an installed app —
+expected, not a device quirk: `AppModel.apparmor` (supervisor
+`apps/model.py`) returns `SECURITY_PROFILE` only if a profile *for this
+app is already installed on the host* (`sys_host.apparmor.exists(slug)`
+checks the supervisor's AppArmor profile store, which
+`install_apparmor()` fills during app install/update). A store-listed app
+has no profile on the host yet → `SECURITY_DEFAULT` → the AppArmor branch
+contributes 0 → the store shows 4 for this app (5 − 1 `SYS_ADMIN`), and 5
+only once installed. The same +1 delta appears for every app shipping a
+custom profile (e.g. the official dnsmasq app). It is *not* related to
+AppArmor support on the device — hosts without AppArmor support don't
+show different ratings; they reject installing such apps outright
+(`UnsupportedReason.APPARMOR`).
 
 ## Supervisor option schema `match()` quirks
 
