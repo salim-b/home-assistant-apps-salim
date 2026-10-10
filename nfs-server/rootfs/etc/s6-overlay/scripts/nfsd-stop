@@ -13,7 +13,7 @@ exportfs -au || true
 ## Tear down the pseudo file system root bind mounts (per-share mirrors;
 ## deepest paths first, mirrors may nest)
 PSEUDO_ROOT="/data/pseudo_root"
-bashio::log.info "Unmounting NFS pseudo file system root..."
+bashio::log.info "Unmounting the share mirrors under the pseudo file system root..."
 SHARES=$(bashio::config 'shares' || true)
 if bashio::var.has_value "${SHARES}"; then
   PATHS=""

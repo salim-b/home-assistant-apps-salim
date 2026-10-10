@@ -84,7 +84,7 @@ bind_mount() {
   if ! grep -qE " on ${2//\//\\/} " /proc/mounts; then
     mkdir -p "${2}"
     if ! mount --bind "${1}" "${2}"; then
-      bashio::log.fatal "Unable to bind-mount ${1} to ${2}: the share's mirror under the pseudo file system root is required for exporting it."
+      bashio::log.fatal "Unable to bind-mount ${1} to ${2}: could not create the share's export mirror."
       bashio::exit.nok
     fi
   fi
