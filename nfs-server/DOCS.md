@@ -6,7 +6,11 @@ NFS shares are configured in the app's options: each **NFS shares** entry export
 
 Saving the options restarts the app, which then exports the configured shares.
 
-The app keeps no NFS client state across app restarts: after a (re)start the server runs a short grace period (10 seconds by default, configurable via the `grace_time` option) instead of the kernel's 90-second default, so clients' first write attempt after a restart is delayed only briefly.
+## NFSv4 client state recovery
+
+The app runs the kernel's client-recovery tracker (`nfsdcld`, with a persistent sqlite store in the app's data directory), so NFSv4 clients that are connected across an app (re)start keep their state – open files, byte-range locks and delegations: they reclaim it from the tracker's records during the grace period that follows the restart, instead of losing it. Held locks surviving an app update/restart are the visible effect.
+
+The grace period only runs when there is client state to reclaim: after a boot with no recorded clients the server skips it entirely, and it ends early once all recorded clients have reclaimed. The `grace_time` option (if set) overrides the default, which matches the `lease_time` option (keep it at or above `lease_time` so idle clients – whose state-manager renewals fire at ~lease/3 intervals – can still recover).
 
 ## Mounting a share
 

@@ -102,42 +102,35 @@ for the union of all networks). Client paths stay unchanged. Consequences:
   the path components carry `crossmnt` anyway.
 - Every restart cycle of the kernel server (`rpc.nfsd 0` + start) starts a
   grace period (default 90 s) during which clients' write opens get
-  `NFS4ERR_GRACE` and retry – writes appear to stall. When nothing is to be
-  reclaimed (no client recovery records, as in this app), the grace period
-  ends early.
+  `NFS4ERR_GRACE` and retry – writes appear to stall. With the shipped
+  `nfsdcld`-based recovery tracking (see the recovery section below), this
+  only happens when client records exist (fresh boots skip the grace via the
+  kernel's fast path, and the grace ends early once all recorded clients
+  have reclaimed).
 
 ## The grace period stalls clients' first writes after every (re)start
 
 Measured in the lab: after an app (re)start, mounts are instant, but the
-**first write open waits out the full default 90-second grace period**
-(`NFS4ERR_GRACE`, client retries; ~104 s wall time with backoff). The grace
-period exists to let still-connected clients reclaim their state after a
-server restart – but this server has no client recovery state at all
-(client tracking does not work in a network namespace, see above), so the
-wait is pure dead time. Client-side manifestation of a write attempt during
-the grace window (observed on the device with the short grace): the open
-fails with `EINTR` – busybox ash prints it as `can't create …: Interrupted
-system call`.
+**first write open waits out the grace period** (`NFS4ERR_GRACE`, client
+retries; ~104 s wall time with backoff at the kernel's 90 s default).
+Client-side manifestation of a write attempt during the grace window
+(observed on the device with the short grace): the open fails with `EINTR`
+– busybox ash prints it as `can't create …: Interrupted system call`.
 
-The kernel *would* skip the grace on its own when there are no clients to
-reclaim – but that fast path needs reclaim-complete tracking
-(`track_reclaim_completes`, only the cld-v2 tracker sets it; see
-`nfs4_state_start_net`'s `skip_grace`), which is exactly what can't work
-in-container. Likewise, `/proc/fs/nfsd/v4_end_grace` refuses with `EBUSY`
-when `client_tracking_ops` is NULL (`nfsd4_force_end_grace` returns false
-without a tracker) – it is *not* a usable workaround here.
+Before the recovery tracking shipped, this was pure dead time (no client
+records existed), so the app defaulted `--grace-time` to 10 s; with the
+tracker the grace is only paid when there is state to reclaim, and the
+default now matches the lease time (see `nfsd-start`). The kernel's own
+skip path needs reclaim-complete tracking (`track_reclaim_completes`, set
+by the cld-v2 tracker init; see `nfs4_state_start_net`'s `skip_grace`) –
+reachable since the `nfsdcld` tracker shipped. Writes to
+`/proc/fs/nfsd/v4_end_grace` end the grace regardless of any tracker
+(v6.18: the only guard is a running server – `nn->nfsd_serv`, else
+`EBUSY`; the older kernel's `nfsd4_force_end_grace` tracker gate is gone)
+– but that would deny late reclaimers their window, so it is not a useful
+lever for a server that wants clients to recover.
 
-The working lever is the **grace duration itself**: `rpc.nfsd
---grace-time N` writes the kernel's `nfsv4gracetime` control file *before*
-the server threads start (see nfs-utils `utils/nfsd/nfsd.c`), so the server
-starts with an N-second grace; the laundromat (queued at grace end) then
-ends it. The app therefore always passes `--grace-time`: the user's
-`grace_time` option when set, otherwise the schema minimum (10 s) – the
-first write after a restart stalls ≤ ~10 s instead of ~104 s. With the
-planned `nfsdcld`-based tracking (TODO), the kernel's own skip path makes
-this zero; keep the explicit `--grace-time` anyway as a safety net.
-
-## NFSv4 client state recovery does not work in-container (yet)
+## NFSv4 client state recovery works in-container (shipped: `nfsdcld` + per-netns rpc_pipefs)
 
 NFSv4 is stateful: after a *server* restart, still-connected clients must
 reclaim their state (opens, locks, delegations) during the grace period.
@@ -150,14 +143,69 @@ For that, the server needs a persistent store of client identities – the
 2. **UMH helper**: spawns `/sbin/nfsdcltrack` via the usermode helper.
 3. **legacy**: filesystem store in a recovery directory.
 
-Modes 2 and 3 are compiled in on HAOS but **explicitly refuse non-init
-network namespaces** (`/* The legacy code won't work in a container */
-if (net != &init_net) … -EINVAL`) – our server runs in the container's
-netns, so the host log line "Unable to initialize client recovery tracking!
-(-2)" is expected. Mode 1 needs `nfsdcld` (not shipped) and a working
-rpc_pipefs upcall channel in the container (per-netns rpc_pipefs mount) –
-worth investigating (see TODO.md): it would give real recovery state
-across app restarts, stored on the app's persistent `/data`.
+The app ships mode 1 (`nfsdcld` comes with the `nfs-utils` package the
+image already installs, including its sqlite runtime; the daemon needs no
+capability grants – it prunes its own capability set at startup). All of
+the following was verified in privileged containers against the real host
+kernel (kernel v6.18 sources checked for the mechanisms):
+
+- **The upcall pipe lives in the per-netns rpc_pipefs**: the kernel creates
+  `<rpc_pipefs>/nfsd/cld` inside the rpc_pipefs superblock registered for
+  the server's network namespace (`rpc_get_sb_net(net)`); the `nfsd/`
+  subdirectory is pre-created by the kernel when rpc_pipefs mounts. The
+  container must therefore mount one itself (`mount -t rpc_pipefs sunrpc
+  <dir>`) – `sunrpc` is built-in wherever the NFS *client* is
+  (`CONFIG_NFS_FS=y`), i.e. on every HAOS board. Mounting it into the app
+  (cont-init) is what makes the whole tracker work in a container.
+- **Ordering**: `nfsd4_cld_tracking_init` waits only ~1 s (10 × 100 ms,
+  `cld_running` = the pipe has readers/writers) for the daemon to hold the
+  pipe open. The s6-rc dependency (`nfsd` oneshot depends on the `cld`
+  longrun) keeps the daemon ahead of `rpc.nfsd`; the daemon itself is
+  race-tolerant (inotify watch on the pipefs dir – it opens the pipe as
+  soon as it appears), so even a slightly late daemon start is fine.
+- **Fallback is silent degradation**: if the daemon/pipefs is missing, the
+  tracker init times out (`-ETIMEDOUT`) and the dispatcher falls back to
+  the legacy trackers, which refuse non-init network namespaces (`net !=
+  init_net → -EINVAL`) – the known "Unable to initialize client recovery
+  tracking! (-2)" host-log line. The kernel log carries the authoritative
+  tracker messages ("NFSD: Using nfsdcld client tracking operations." /
+  "no clients to reclaim, skipping NFSv4 grace period") – visible in the
+  *host* journal / `dmesg`, NOT in `ha apps logs`.
+- **Storage**: `-s <dir>/main.sqlite` (per-epoch record tables
+  `rec-<epoch-hex>` plus a `grace` current/recovery epoch table; unclaimed
+  records only survive while their epoch is current or the recovery epoch).
+  `-p` selects the pipefs root. nfsdcld 2.6.x answers GetVersion with
+  upcall protocol version 2.
+- **End-to-end verified** (fresh netns + persistent sqlite volume, client
+  holding an open fd + exclusive flock across the server recreation): the
+  reloaded record makes the kernel run a grace period instead of skipping
+  ("starting 300-second grace period"), the client's state manager renews →
+  detects the reboot → reclaims (`nfs4_schedule_lease_recovery` traces), a
+  held exclusive flock **survives the restart** (contested by a second
+  client afterwards: still blocked), and the grace **ends early** once the
+  reclaiming client is back (the daemon's GraceDone downcall arrives well
+  before the configured grace is up). Fresh boots with no records log
+  "no clients to reclaim, skipping NFSv4 grace period" – the kernel's own
+  fast path, now reachable because `track_reclaim_completes` is set by the
+  cld tracker init (`nfs4_cld_state_init`).
+- **Residual unknown**: the exact kernel path that ends the grace early for
+  NFSv4.0 reclaimers. The "all clients done reclaiming, ending NFSv4 grace
+  period" printk only fires via `inc_reclaim_complete` (the RECLAIM_COMPLETE
+  op – the Linux client sends it only for NFSv4.1, confirmed in
+  `fs/nfs/nfs4proc.c`'s `nfs40_reboot_recovery_ops`), and the laundromat
+  cannot fire before the configured grace on its own schedule – yet the
+  observed GraceDone always followed the reclaim promptly. Most plausible:
+  reclaim events (`somebody_reclaimed = true` in the reclaim-lock path)
+  plus the immediate laundromat kicks (`mod_delayed_work(..., 0)` sites)
+  ending the grace once nobody is still reclaiming (`clients_still_reclaiming`).
+  Only re-verify if this behavior ever looks wrong.
+
+App wiring: cont-init mounts rpc_pipefs (non-fatal on failure – degraded
+mode = the old short-grace behavior) and creates `/data/nfsdcld`; the s6-rc
+`cld` longrun execs `nfsdcld -F -p /var/lib/nfs/rpc_pipefs -s
+/data/nfsdcld`; the `nfsd` oneshot depends on it. AppArmor: the rpc_pipefs
+mount rule plus an `nfsdcld` sub-profile (`deny network,` – the daemon
+makes no sockets; no capability rules needed).
 
 Facts for mode 3, should it ever matter: the default recovery dir is
 hardcoded as `/var/lib/nfs/v4recovery` (`user_recovery_dirname`); it can be

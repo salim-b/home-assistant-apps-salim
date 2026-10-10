@@ -28,3 +28,9 @@ if bashio::var.has_value "${SHARES}"; then
       umount "${PSEUDO_ROOT}${path}" 2>/dev/null || true
     done
 fi
+
+## NOTE: the rpc_pipefs mount (client-recovery upcall channel,
+## /var/lib/nfs/rpc_pipefs) is deliberately NOT unmounted here: the cld
+## daemon still holds its upcall pipe open at this point (services stop in
+## dependency-reverse order), the umount would fail with EBUSY, and the
+## mount evaporates with the container's mount namespace anyway.

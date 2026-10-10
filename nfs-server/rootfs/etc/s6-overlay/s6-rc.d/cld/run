@@ -1,0 +1,27 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+## Client-recovery tracker daemon (NFSv4 state across app restarts).
+##
+## The kernel's cld tracker upcalls this daemon over rpc_pipefs (the pipe
+## <rpc_pipefs>/nfsd/cld is created inside the rpc_pipefs instance mounted in
+## this container's network namespace, see etc/cont-init.d/config.sh); the
+## daemon keeps the client identities in a sqlite database on /data, so
+## clients that are connected across an app (re)start can reclaim their state
+## (opens, locks, delegations) during the grace period instead of losing it.
+## See nfs-server/KNOWLEDGE.md in the app's source repository.
+##
+## NOTE: the kernel's tracker initialization (fs/nfsd/nfs4recover.c,
+## nfsd4_cld_tracking_init) waits only ~1s for this daemon to hold the upcall
+## pipe open, and falls back to the legacy trackers (which refuse to work in
+## a container) - hence the s6-rc dependency making the `nfsd` oneshot start
+## after this service. The daemon itself tolerates the pipe appearing later
+## (it watches the pipefs directory via inotify and opens the pipe once it
+## shows up).
+##
+## -F: foreground (s6-supervise runs the daemon directly; SIGTERM triggers a
+## clean shutdown that closes the sqlite store). -p/-s: this container's
+## rpc_pipefs mount and the persistent store directory on /data (both set up
+## in etc/cont-init.d/config.sh).
+exec nfsdcld -F -p /var/lib/nfs/rpc_pipefs -s /data/nfsdcld

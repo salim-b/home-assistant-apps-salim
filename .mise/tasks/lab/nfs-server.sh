@@ -29,6 +29,26 @@ lab_docker_args+=(
 lab_fixture_py="lab-fixture.py"
 
 lab_runtime_check() {
+  ## Client-recovery tracker (cld): the daemon must be up with its sqlite
+  ## store on /data and the kernel must have created the upcall pipe in the
+  ## container's rpc_pipefs instance; "Using nfsdcld client tracking
+  ## operations" in the kernel log is the end-to-end proof (the kernel only
+  ## logs it after the daemon answered its GetVersion + GraceStart upcalls).
+  ## Fresh /data => no records => the kernel's skip-grace path must show too.
+  if ! docker exec "$LAB_NET_NAME-app" sh -c '
+      ps | grep -q "[n]fsdcld" &&
+      test -f /data/nfsdcld/main.sqlite &&
+      test -p /var/lib/nfs/rpc_pipefs/nfsd/cld'; then
+    echo "recovery tracker not fully up (nfsdcld process / sqlite store / upcall pipe)"
+    return 1
+  fi
+  klog=$(docker exec "$LAB_NET_NAME-app" dmesg 2>/dev/null | grep "NFSD:" | tail -5)
+  grep -q "Using nfsdcld client tracking operations" <<<"$klog" \
+    || { echo "kernel did not use the cld tracker; NFSD log tail: $klog"; return 1; }
+  grep -q "no clients to reclaim, skipping NFSv4 grace period" <<<"$klog" \
+    || { echo "expected the skip-grace path (fresh /data, no records); NFSD log tail: $klog"; return 1; }
+  echo "recovery tracker up (nfsdcld, sqlite on /data, kernel upcalls + skip-grace OK)"
+
   echo "host-file" > "$LAB_TMPDIR/share/nfs/hostfile.txt" 2>/dev/null \
     || { mkdir -p "$LAB_TMPDIR/share/nfs" && echo "host-file" > "$LAB_TMPDIR/share/nfs/hostfile.txt"; }
   docker rm -f "$LAB_NET_NAME-client" >/dev/null 2>&1 || true

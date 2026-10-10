@@ -85,6 +85,11 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   # Tightened: the busybox mount passes the device string "nfsd" as the
   # mount source; fstype matching applies to new mounts only.
   mount fstype=(nfsd) nfsd -> /proc/fs/nfsd/,
+  # Client-recovery tracker upcall channel: the nfsdcld pipe lives in the
+  # rpc_pipefs instance mounted in this netns (cont-init.d/config.sh). Same
+  # grammar note as above: busybox passes the device string "sunrpc" as the
+  # mount source; fstype matching applies to new mounts only.
+  mount fstype=(rpc_pipefs) sunrpc -> /var/lib/nfs/rpc_pipefs/,
   # NOTE: fstype matching only applies to new mounts (not bind/remount),
   # so bind mirrors are conditioned on the bind flag instead.
   mount options=(bind) /{share,media}{,/**} -> /data/pseudo_root{,/**},
@@ -219,5 +224,36 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     /proc/[0-9]*/{,cmdline,mounts} r,
     /tmp/** rwk,
     /data/** r,
+  }
+
+  # nfsdcld (cld service: client-recovery tracker daemon; answers the
+  # kernel's upcalls on <rpc_pipefs>/nfsd/cld and keeps its sqlite store on
+  # /data/nfsdcld)
+  /usr/sbin/nfsdcld cx -> nfsdcld,
+
+  profile nfsdcld flags=(attach_disconnected,mediate_deleted) {
+    #include <abstractions/base>
+
+    file,
+    signal (send) set=(kill,term,int,hup,cont),
+    # Official docs template: scope receive to the app's own top profile
+    # (the supervisor renames it to the installed slug on the device, e.g.
+    # local_nfs — the *_nfs glob covers repo installs too).
+    signal (receive) peer=*_nfs,
+
+    # No capability rules: nfsdcld needs none (it prunes its own capability
+    # set at startup, and dropping capabilities needs no mediation).
+    # Network: none at all - the daemon only talks to the kernel over the
+    # rpc_pipefs pipe (inotify + file I/O); like the rpc.nfsd sub-profile,
+    # a deny-only class denies everything in it.
+    deny network,
+
+    /usr/sbin/nfsdcld rm,
+    /lib/** mr,
+    /data/** rw,
+    /var/lib/nfs/rpc_pipefs/** rw,
+    /proc/fs/nfsd/** r,
+    /proc/[0-9]*/{,cmdline,mounts} r,
+    /tmp/** rwk,
   }
 }

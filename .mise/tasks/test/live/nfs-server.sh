@@ -37,6 +37,31 @@ live_prepare() {
 live_runtime_check() {
   local fails=0 spath snetwork soptions smode rc row
 
+  # Client-recovery tracker (cld): the daemon must be up with its sqlite
+  # store on /data and the kernel must have created the upcall pipe in the
+  # app container's rpc_pipefs instance. The kernel-side proof ("Using
+  # nfsdcld client tracking operations" in the host kernel log) is only
+  # visible from the host journal, not the app container's logs - asserted
+  # best-effort via a privileged dmesg read.
+  echo "-- checking the client-recovery tracker in the app container"
+  if ! ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
+    "docker exec '$LIVE_LOCAL_SLUG' sh -c '
+       ps | grep -q \"[n]fsdcld\" &&
+       test -f /data/nfsdcld/main.sqlite &&
+       test -p /var/lib/nfs/rpc_pipefs/nfsd/cld'"; then
+    echo "   ERROR: recovery tracker not fully up (nfsdcld process / sqlite store / upcall pipe)" >&2
+    fails=$((fails + 1))
+  else
+    echo "   PASS: nfsdcld running, sqlite store on /data, upcall pipe present"
+    if ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
+      "docker exec '$LIVE_LOCAL_SLUG' dmesg" 2>/dev/null \
+      | grep -q "Using nfsdcld client tracking operations"; then
+      echo "   PASS: kernel uses the cld tracker (successful GetVersion/GraceStart upcalls)"
+    else
+      echo "   (note: kernel log not readable from the app container — tracker init verified via the daemon/pipe only)"
+    fi
+  fi
+
   # Mode detection per share: exports(5) defaults to read-only — writable
   # only with an explicit rw
   share_mode() {
@@ -64,12 +89,13 @@ live_runtime_check() {
     echo "   -- share listing:"; ls -la /mnt/test
 
     if [ "$MODE" = rw ]; then
-      # The server refuses writes during its post-restart grace period
-      # (~10s; client-side manifestation: "Interrupted system call") -
-      # retry until writes settle (max ~30s). The attempt runs in a
-      # subshell: a failed redirection is diagnosed by the shell itself
-      # and would bypass the per-command 2>/dev/null; this way the
-      # message is captured and only shown if the retries never succeed.
+      # With the recovery tracker, a grace period only runs when client
+      # records exist (fresh boots skip it) and it ends early once all
+      # recorded clients have reclaimed; during it, writes BLOCK (client
+      # retries the open) instead of failing - the subshell captures the
+      # message if the retries never succeed. A failed redirection is
+      # diagnosed by the shell itself and would bypass the per-command
+      # 2>/dev/null.
       i=0
       until out=$( (echo live-test-ok > "/mnt/test/$TESTFILE") 2>&1); do
         i=$((i + 1))
@@ -81,10 +107,13 @@ live_runtime_check() {
       rm "/mnt/test/$TESTFILE" || { echo "FAIL: cleanup delete failed"; exit 1; }
       echo "   PASS: delete via NFS"
     else
-      sleep 12 # outlast the (max 10s) grace period so the denial is final
+      # The write attempt may block during a running grace period (the
+      # client retries its open) - bound it so a device with active clients
+      # does not stall this check until the grace ends; on a read-only
+      # export the attempt cannot succeed once the grace is over either.
       # subshell: a failed redirection is diagnosed by the shell itself
       # and would bypass the per-command 2>/dev/null (see above)
-      if (echo x > "/mnt/test/$TESTFILE") 2>/dev/null; then
+      if timeout 30 sh -ec "(echo x > /mnt/test/\$TESTFILE) 2>/dev/null"; then
         rm -f "/mnt/test/$TESTFILE" 2>/dev/null
         echo "FAIL: read-only share accepted a write"; exit 1
       fi
@@ -150,9 +179,11 @@ sys.exit(0 if ipaddress.ip_address('$LIVE_HOST_IP') in ipaddress.ip_network('$sn
   echo "   -- pseudo-root listing:"; ls /mnt/root
   ls /mnt/root | grep -q share || { echo "FAIL: pseudo-root does not list the share tree"; exit 1; }
   echo "   PASS: pseudo-root (fsid=0) export browsable"
+  # The write attempt may block during a running grace period (the client
+  # retries its open) - bound it (same as the ro share check above).
   # subshell: a failed redirection is diagnosed by the shell itself and
   # would bypass the per-command 2>/dev/null (same as in test_share)
-  if (echo x > /mnt/root/probe) 2>/dev/null; then
+  if timeout 30 sh -ec "(echo x > /mnt/root/probe) 2>/dev/null"; then
     rm -f /mnt/root/probe
     echo "FAIL: pseudo-root accepted a write"; exit 1
   fi

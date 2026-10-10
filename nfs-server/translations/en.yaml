@@ -80,8 +80,12 @@ configuration:
       the server. Valid range is from 10 to 3600.
   grace_time:
     name: NFS server grace-time (seconds)
-    description: >-
-      If set, new file open requests will not be allowed until after this time
-      has passed to allow clients to recover state. Must be >= `lease_time`.
+    description: |
+      Window during which NFSv4 clients may reclaim their state (opens,
+      locks, delegations) after a server restart. Boots with no clients to
+      recover skip it entirely; otherwise it ends early once all recorded
+      clients have reclaimed. If unset, the grace time matches the lease
+      time (keep it at or above `lease_time` so idle clients can still
+      recover their state).
 network:
   2049/tcp: nfsd

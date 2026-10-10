@@ -20,6 +20,30 @@ if [ ! -e /proc/fs/nfsd/versions ]; then
   fi
 fi
 
+## Mount rpc_pipefs in this network namespace - the upcall channel for the
+## client-recovery tracker (cld): the kernel creates the nfsdcld upcall pipe
+## inside the rpc_pipefs instance registered for the netns the server runs in
+## (fs/nfsd/nfs4recover.c consults rpc_get_sb_net(net)), so one must exist
+## here. Without it (or without the cld daemon, s6-rc service 'cld') the
+## tracker cannot initialize: the legacy trackers the kernel would fall back
+## to refuse to work in a container, and connected clients lose their NFSv4
+## state (opens, locks, delegations) across app restarts.
+## Not fatal: without it the app runs as before, only without cross-restart
+## client state recovery.
+## (NFSv4 recovery tracking in the container: see nfs-server/KNOWLEDGE.md.)
+RPC_PIPEFS_DIR=/var/lib/nfs/rpc_pipefs
+mkdir -p "${RPC_PIPEFS_DIR}"
+if ! grep -qsE " on ${RPC_PIPEFS_DIR//\//\\/} rpc_pipefs " /proc/mounts; then
+  bashio::log.info "Mounting rpc_pipefs (client recovery upcall channel)..."
+  if ! mount -t rpc_pipefs sunrpc "${RPC_PIPEFS_DIR}"; then
+    bashio::log.warning "Unable to mount rpc_pipefs: NFSv4 client state will not survive app restarts."
+  fi
+fi
+
+## Persistent store of the client-recovery tracker daemon (nfsdcld's sqlite
+## database lives here; the daemon creates the directory itself if missing).
+mkdir -p /data/nfsdcld
+
 ## NOTE: rpc.nfsd configures the kernel's NFS version set itself at server
 ## start (see /etc/s6-overlay/scripts/nfsd-start and KNOWLEDGE.md in the app's
 ## source repository for why direct writes to /proc/fs/nfsd/* don't work).

@@ -66,9 +66,19 @@ facts and root causes live in `KNOWLEDGE.md`.
   signing as supply-chain hygiene (worth having when upstream ships
   verification).
 
-- Investigate real NFSv4 client recovery tracking in the container (see `KNOWLEDGE.md`): ship `nfsdcld` (cld tracker), mount rpc_pipefs per-netns in the container, keep its sqlite store on `/data` – gives clients state reclaim across app restarts (and enables the kernel's own grace-period skip path). Verify the per-netns rpc_pipefs upcall channel works in a privileged container first.
-
 ## Resolved
+
+- ~~Real NFSv4 client recovery tracking in the container~~
+
+  **Done (October 2026):** shipped — `nfsdcld` (cld tracker, sqlite store on
+  `/data`) plus the per-netns rpc_pipefs upcall channel; verified in
+  privileged containers: the kernel uses the tracker and skips the grace on
+  fresh boots ("no clients to reclaim, skipping NFSv4 grace period"), and a
+  connected client reclaims its state across a server recreation (held
+  exclusive flock survives, contested by a second client). Facts, wiring and
+  the residual unknowns in `KNOWLEDGE.md`. Device-side verification of the
+  enforcing-mode profile additions (rpc_pipefs mount rule, `nfsdcld`
+  sub-profile) still pending.
 
 - ~~The host's kernel doesn't include the `nfsd` kernel module and hence the container can't load that module.~~
 

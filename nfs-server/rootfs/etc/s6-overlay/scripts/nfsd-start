@@ -11,16 +11,18 @@ APP_IP=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | 
 # NOTE: rpc.nfsd writes its default version set (NFSv3+NFSv4) to the kernel,
 # hence `--no-nfs-version 3` is what keeps this setup NFSv4-only (see
 # KNOWLEDGE.md in the app's source repository).
-# NOTE: the NFSv4 grace period defaults to 90 seconds; with the in-container
-# server having no client recovery state (client tracking does not work in a
-# network namespace), that grace would only stall clients' first write opens
-# - hence a short default, still honoring a user-configured `grace_time`.
+# NOTE: the NFSv4 grace period defaults to the lease time here (the kernel's
+# own default ratio is 1:1). The app's client-recovery tracking (nfsdcld; see
+# cont-init.d/config.sh and s6-rc.d/cld) makes this costless in the common
+# cases: a fresh boot with no recorded clients skips the grace entirely (the
+# kernel's skip path), and it ends early once all recorded clients have
+# reclaimed. When set, a user-configured `grace_time` overrides the default.
 NFSD_CMD="rpc.nfsd \
   --no-nfs-version 3 \
   --no-udp \
   --host ${APP_IP} \
   --lease-time $(bashio::config 'lease_time') \
-  --grace-time $(bashio::config 'grace_time' 10) \
+  --grace-time $(bashio::config 'grace_time' "$(bashio::config 'lease_time')") \
   $(bashio::config 'n_threads')"
 
 bashio::log.info "Executing nfsd with: ${NFSD_CMD}"
