@@ -78,7 +78,9 @@ facts and root causes live in `KNOWLEDGE.md`.
   exclusive flock survives, contested by a second client). Facts, wiring and
   the residual unknowns in `KNOWLEDGE.md`. Device-side verification of the
   enforcing-mode profile additions (rpc_pipefs mount rule, `nfsdcld`
-  sub-profile) still pending.
+  sub-profile) followed with the 0.5.0 device rollout — it surfaced the
+  `capability setpcap,` requirement (see `KNOWLEDGE.md`, AppArmor gotchas);
+  `test:live` checks the tracker via the host kernel journal.
 
 - ~~The host's kernel doesn't include the `nfsd` kernel module and hence the container can't load that module.~~
 
