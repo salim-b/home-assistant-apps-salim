@@ -20,5 +20,8 @@ yq = "4.54.1"
 
 [vars]
 # supervisor ref the validate task fetches schemas from (single source of
-# the pin; bump deliberately and review the diff like a dependency update)
+# the pin). Renovate bumps this to the newest home-assistant/supervisor
+# release (github-tags) and automerges when the CI check job is green -
+# green means the new schemas still validate our app configs (see
+# .github/renovate.json, custom.regex manager).
 supervisor_ref = "2026.10.1"

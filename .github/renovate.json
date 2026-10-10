@@ -6,11 +6,27 @@
   ],
   "enabledManagers": [
     "dockerfile",
-    "github-actions"
+    "github-actions",
+    "custom.regex"
   ],
   "semanticCommits": "disabled",
   "labels": [
     "dependencies"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The supervisor ref the validate task fetches schemas from (mise.toml [vars].supervisor_ref; see .mise/tasks/validate.py). Tracks home-assistant/supervisor GitHub releases: validating against the newest release keeps the app configs ahead of the installed fleet (stable-channel rollout lags releases). PRs automerge once the CI check job is green - green means the new schemas validate our app configs.",
+      "managerFilePatterns": [
+        "/^mise\\.toml$/"
+      ],
+      "matchStrings": [
+        "supervisor_ref\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "home-assistant/supervisor",
+      "versioningTemplate": "semver-coerced"
+    }
   ],
   "packageRules": [
     {
@@ -46,6 +62,19 @@
       ],
       "matchCurrentValue": "/^(dev|main|master)$/",
       "pinDigests": false
+    },
+    {
+      "description": "Supervisor schema pin: weekly, same cadence as the actions manager; automerges once the CI check job (mise run validate against the new ref) is green. The Renovate PR body lists the upstream changelog for an audit trail.",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "addLabels": [
+        "supervisor_pin"
+      ],
+      "schedule": [
+        "before 8am on monday"
+      ],
+      "automerge": true
     }
   ]
 }
