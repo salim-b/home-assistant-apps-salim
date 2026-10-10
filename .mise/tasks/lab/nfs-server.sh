@@ -8,13 +8,13 @@
 #                       app container's docker run (volumes, capabilities,
 #                       devices; --privileged/--network and /data are
 #                       provided by the harness)
-# - lab_fixture_py    : path (relative to the repo root; typically
-#                       .mise/tasks/lab/<app>.py) of a python file defining
-#                       lab_adapt_fixture(options)->options, served by the
-#                       fake supervisor API (omit: raw config options)
 # and may define
 # - lab_runtime_check : function running the app's runtime roundtrip
 #                       (runs after boot, before the graceful stop).
+#
+# Fixture adaptation (rewriting config options for the lab network) lives
+# separately in .mise/tasks/lab/<app>.py by convention (no hook variable;
+# the harness serves it to the fake supervisor API when the file exists).
 #
 # shellcheck disable=SC2034  # contract variables are consumed by the harness
 
@@ -25,9 +25,9 @@ lab_docker_args+=(
   -v "$LAB_TMPDIR/media:/media"
 )
 
-## Fixture adaptation: every share's client network must point at the lab
-## subnet for the roundtrip to be allowed
-lab_fixture_py=".mise/tasks/lab/nfs-server.py"
+## The fixture adaptation itself lives in .mise/tasks/lab/nfs-server.py
+## (convention: every share's client network must point at the lab subnet
+## for the roundtrip to be allowed)
 
 lab_runtime_check() {
   ## Client-recovery tracker (cld): the daemon must be up with its sqlite

@@ -62,12 +62,13 @@ global tasks from your mise user config); the essentials:
   - Hook contract (`.mise/tasks/lab/<app>.sh`, sourced by the harness; env:
     `LAB_NET_NAME`, `LAB_TMPDIR`, `LAB_APP_IP`, `LAB_SUBNET`): append to
     `lab_docker_args` (`lab_docker_args+=(…)` — do **not** overwrite it, the
-    harness pre-seeds the `/data` volume), optionally set `lab_fixture_py`
-    (repo-root-relative python file defining `lab_adapt_fixture(options)`,
-    with `LABNETWORK` as subnet placeholder — keep it at
-    `.mise/tasks/lab/<app>.py`, *not* inside the app dir: app-dir contents
-    get copied to devices by `deploy`), and define `lab_runtime_check`.
-    See `.mise/tasks/lab/nfs-server.sh` as the reference.
+    harness pre-seeds the `/data` volume) and define `lab_runtime_check`.
+    The optional fixture adapter is a separate file `.mise/tasks/lab/<app>.py`
+    (convention over configuration — never inside the app dir: app-dir
+    contents get copied to devices by `deploy`) defining
+    `lab_adapt_fixture(options)` with `LABNETWORK` as subnet placeholder; the
+    harness serves it to the fake API whenever the file exists.
+    See `.mise/tasks/lab/nfs-server.sh` / `nfs-server.py` as the reference.
 - `mise run deploy <app> <host>` — deploy an app to a real device for testing:
   copies it to the device's `/local_apps` (removing the old copy), reloads the
   store, then installs/updates/rebuilds depending on installed vs. local

@@ -5,8 +5,9 @@
 #USAGE }
 #USAGE flag "--keep" help="Keep lab containers/dirs for debugging"
 #
-# Per-app specifics (docker args, fixture adaptation, a runtime roundtrip)
-# live in .mise/tasks/lab/<app>.sh - see AGENTS.md. Apps without a hook get a
+# Per-app specifics (docker args, a runtime roundtrip) live in the
+# .mise/tasks/lab/<app>.sh hook, fixture adaptation (optional) in
+# .mise/tasks/lab/<app>.py - see AGENTS.md. Apps without a hook get a
 # boot-only lab (config fetch via fake API, full s6-rc boot, graceful stop).
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
@@ -109,21 +110,22 @@ PYEOF' >/dev/null
   ## App-provided docker args (volumes, capabilities, devices...); the
   ## defaults work for any app, hooks extend rather than replace them
   lab_docker_args=("-v" "$tmpdir/data:/data")
-  lab_fixture_py=""
   LAB_NET_NAME="$net"; LAB_APP_DIR="$PWD/$app"; LAB_TMPDIR="$tmpdir"; LAB_SUBNET="$subnet"
   export LAB_NET_NAME LAB_APP_DIR LAB_TMPDIR LAB_SUBNET
   if [ -f "$hook" ]; then
     # shellcheck source=/dev/null
-    source "$hook"          # sets lab_docker_args, lab_fixture_py (opt.)
+    source "$hook"          # sets lab_docker_args (opt.)
   fi
   docker rm -f "$net-app" >/dev/null 2>&1 || true
   docker run -d --privileged --name "$net-app" --network "$net" \
     "${lab_docker_args[@]}" \
     -e SUPERVISOR_TOKEN=fake -e SUPERVISOR_API="http://$net-fakesup:8000" \
     "local/$app:$version" >/dev/null
-  # serve the app's fixture adapter (if any) to the fake API
-  if [ -n "$lab_fixture_py" ]; then
-    docker cp "$PWD/$lab_fixture_py" "$net-fakesup:/lab-hook.py" >/dev/null
+  # serve the app's fixture adapter to the fake API, if one exists
+  # (convention over configuration: .mise/tasks/lab/<app>.py)
+  fixture_py=".mise/tasks/lab/$app.py"
+  if [ -f "$fixture_py" ]; then
+    docker cp "$PWD/$fixture_py" "$net-fakesup:/lab-hook.py" >/dev/null
   fi
 
   ts "$SECONDS" "-- waiting for boot"
