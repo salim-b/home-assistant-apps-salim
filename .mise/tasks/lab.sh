@@ -112,6 +112,9 @@ PYEOF' >/dev/null
   lab_docker_args=("-v" "$tmpdir/data:/data")
   LAB_NET_NAME="$net"; LAB_APP_DIR="$PWD/$app"; LAB_TMPDIR="$tmpdir"; LAB_SUBNET="$subnet"
   export LAB_NET_NAME LAB_APP_DIR LAB_TMPDIR LAB_SUBNET
+  # Drop a previous app's hook function first: on a default all-apps run,
+  # an app without a runtime check must not inherit the last app's
+  unset -f lab_runtime_check 2>/dev/null || true
   if [ -f "$hook" ]; then
     # shellcheck source=/dev/null
     source "$hook"          # sets lab_docker_args (opt.)

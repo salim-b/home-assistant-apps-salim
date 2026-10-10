@@ -83,6 +83,9 @@ LIVE_APP="$app" \
 export LIVE_APP LIVE_LOCAL_SLUG LIVE_HOST LIVE_DEVICE_IP LIVE_HOST_IP \
   LIVE_CLIENT_IMAGE LIVE_TEST_OPTIONS_FILE LIVE_SHARES
 
+# Drop a previous app's hook functions first: on a default all-apps run,
+# an app without prepare/check functions must not inherit the last app's
+unset -f live_prepare live_runtime_check 2>/dev/null || true
 hook=".mise/tasks/test/live/$app.sh"
 if [ -f "$hook" ]; then
   # shellcheck source=/dev/null
