@@ -141,14 +141,18 @@ global tasks from your mise user config); the essentials:
   Required args are declared `arg "<name>"` (mise errors before the task
   starts when missing — no manual checks); read them with `${usage_name?}`,
   optional ones with `${usage_name:-…}` defaults, boolean flags with
-  `${usage_name:-false}` (mise docs, "Read argument values").
+  `${usage_name:-false}` (mise docs, "Read argument values"); in Python
+  tasks the values are exported as `usage_<underscored_name>` env vars.
 - `.mise/tasks/validate.py` fetches supervisor schemas from the ref pinned in
   `mise.toml` `[vars].supervisor_ref` (cached under `~/.cache/`). Renovate
   bumps the pin to the newest supervisor release and **automerges the bump
   once the CI `check` job is green** — green means the new schemas validate
-  our app configs. Renovate does not track schema-*behavior* changes:
+  our app configs (rebase-merge strategy, see `.github/renovate.json`).
+  Renovate does not track schema-*behavior* changes:
   re-verify version-sensitive supervisor facts against the new ref when
-  relying on them (see the version-sensitive-facts rule above).
+  relying on them (see the version-sensitive-facts rule above). validate.py
+  also schema-validates `.github/renovate.json` against the published
+  Renovate config schema (refetched whenever that file changes).
 - The HA base image's bash emits `echo`/`printf` as `writev(2)` — it cannot
   write to procfs transaction files (`/proc/fs/nfsd/*`); see
   `nfs-server/KNOWLEDGE.md` before writing to any such file from app code.

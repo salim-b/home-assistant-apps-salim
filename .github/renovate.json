@@ -64,7 +64,7 @@
       "pinDigests": false
     },
     {
-      "description": "Supervisor schema pin: weekly, same cadence as the actions manager; automerges once the CI check job (mise run validate against the new ref) is green. The Renovate PR body lists the upstream changelog for an audit trail.",
+      "description": "Supervisor schema pin: weekly, same cadence as the actions manager; automerges once the CI check job (mise run validate against the new ref) is green. The Renovate PR body lists the upstream changelog for an audit trail. automergeStrategy rebase: linear history without merge bubbles (GitHub rebase-merge; conflicts block the automerge until resolved — same as manual). Applies on both merge paths (Renovate's own merge today, platform-native automerge if branch protection ever arrives).",
       "matchManagers": [
         "custom.regex"
       ],
@@ -74,7 +74,8 @@
       "schedule": [
         "before 8am on monday"
       ],
-      "automerge": true
+      "automerge": true,
+      "automergeStrategy": "rebase"
     }
   ]
 }

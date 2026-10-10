@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --with voluptuous --with pyyaml python3
+#!/usr/bin/env -S uv run --with voluptuous --with pyyaml --with jsonschema python3
 #MISE description="Validate app configs and translations against supervisor schemas"
 #USAGE arg "[app]" help="App directory to validate (default: all apps)"
 #USAGE flag "--schemas-only" help="Only refetch the pinned supervisor schemas"
@@ -14,6 +14,8 @@
   regex (exactly one top-level profile)
 - cross-checks: translation 'configuration' keys vs schema keys (incl. the
   nested 'fields'), 'network' keys (lowercase!) vs config.yaml 'ports' keys
+- validates .github/renovate.json against the published Renovate config
+  schema (option typos fail at `mise run check`, not on Renovate's next run)
 """
 from __future__ import annotations
 
@@ -21,6 +23,7 @@ import ast
 import json
 import os
 import pathlib
+import shutil
 import sys
 import urllib.request
 
@@ -114,16 +117,64 @@ def fail(app: str, msg: str) -> None:
     problems.append(f"[{app}] {msg}")
 
 
+def _flag(name: str) -> bool:
+    """Read a mise #USAGE boolean flag (exposed to the task as env vars)."""
+    for env in (f"usage_{name.replace('-', '_')}", name.upper().replace("-", "_")):
+        if os.environ.get(env, "").lower() in ("true", "1"):
+            return True
+    return False
+
+
+def validate_renovate_config() -> None:
+    """Schema-validate .github/renovate.json against the published Renovate
+    config schema (schema self-describing; cached next to the supervisor
+    schemas, refetched whenever the config file changed)."""
+    import jsonschema
+
+    config_file = ROOT / ".github" / "renovate.json"
+    if not config_file.is_file():
+        return
+    try:
+        config = json.loads(config_file.read_text())
+    except json.JSONDecodeError as err:
+        fail("renovate.json", f"does not parse: {err}")
+        return
+
+    schema_url = "https://docs.renovatebot.com/renovate-schema.json"
+    schema_file = CACHE.parent / "renovate-schema.json"
+    if (
+        not schema_file.is_file()
+        or schema_file.stat().st_mtime < config_file.stat().st_mtime
+    ):
+        schema_file.parent.mkdir(parents=True, exist_ok=True)
+        print(f"fetching {schema_url}")
+        schema_file.write_text(urllib.request.urlopen(schema_url).read().decode())
+    try:
+        jsonschema.validate(config, json.loads(schema_file.read_text()))
+    except jsonschema.ValidationError as err:
+        loc = "/".join(str(p) for p in err.absolute_path) or "<root>"
+        fail("renovate.json", f"schema mismatch at {loc}: {err.message[:200]}")
+    except jsonschema.SchemaError as err:
+        fail("renovate.json", f"fetched schema unusable: {err.message[:200]}")
+
+
 def main() -> int:
+    global CONST_NAMES
+    if _flag("schemas-only"):
+        print("-- refetching pinned supervisor schemas (invalidating the cache)")
+        shutil.rmtree(CACHE, ignore_errors=True)
     # needed ATTR_* names: grep the schemas first, then fetch their values
     schema_src = extract("supervisor/apps/validate.py", SCHEMA_NAMES)
     aa_src = extract("supervisor/utils/apparmor.py", APPARMOR_RE_NAME)
-    global CONST_NAMES
     CONST_NAMES = set()
     for src in (*schema_src.values(), *aa_src.values()):
         for node in ast.walk(ast.parse(src)):
             if isinstance(node, ast.Name) and node.id.startswith("ATTR_"):
                 CONST_NAMES.add(node.id)
+
+    if _flag("schemas-only"):
+        return 0  # cache warmed by the fetches above
+    validate_renovate_config()
 
     for app in find_apps():
         app_dir = ROOT / app
