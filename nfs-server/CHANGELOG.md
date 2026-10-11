@@ -1,4 +1,9 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
+## 0.5.2
+
+- Report share bind-mount failures with an explanatory message.
+- Move the lab fixture adapter out of the app dir.
+- Improve docs.
 
 ## 0.5.1
 
