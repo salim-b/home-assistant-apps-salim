@@ -42,7 +42,7 @@ configuration:
             security benefits, but can decrease reliability in some
             circumstances.
           - `no_subtree_check`: Disable subtree checking (default).
-          - `pnfs: Enable the pNFS (Parallel NFS) extension if the filesystem
+          - `pnfs`: Enable the pNFS (Parallel NFS) extension if the filesystem
             supports it.
           - `no_pnfs`: Disable the pNFS extension (default).
 
