@@ -1,4 +1,8 @@
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
+## 0.5.3
+
+- Minor documentation fix.
+
 ## 0.5.2
 
 - Report share bind-mount failures with an explanatory message.
