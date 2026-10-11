@@ -32,7 +32,7 @@ Note that the task comments out the top-level `image:` key in the *device-side* 
 
 If the app is already installed on the device **from an app repository** (i.e. not as a local app — such installs have a hashed store slug like `f8b2d53d_nfs`), the task refuses: a second installation would conflict on the app's published port. Uninstall that copy first (the error message shows the exact command) or pass `--replace` to have the task uninstall it automatically.
 
-For a full end-to-end test including an NFS client roundtrip against the running app, run `test:live` (it deploys, forwarding `--replace`/`--test-options`, and then mounts each configured share from this machine — write + read-back + delete on writable shares, a read-only assertion on `ro` shares, and a pseudo-root browse check — cleaning up after itself):
+For a full end-to-end test, run `test:live` (for the `nfs-server` app, this includes an NFS client roundtrip against the running app). It deploys the app, forwarding `--replace`/`--test-options`:
 
 ```sh
 # plain: tests the device app's currently configured shares
