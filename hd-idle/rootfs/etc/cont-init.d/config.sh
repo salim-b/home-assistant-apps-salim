@@ -1,0 +1,291 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+## Validate the app configuration and generate the hd-idle command line.
+##
+## hd-idle is configured exclusively via command line arguments - there is no
+## config file (the /etc/default/hd-idle + HD_IDLE_OPTS mechanisms of the
+## distro packages are shell/systemd conventions that merely construct the
+## argv; see hd-idle/KNOWLEDGE.md). This script therefore translates the app
+## options into a validated argument list for the s6 run script:
+##
+##   hd-idle -s 1 -c <default> -p <default> -i <default|0>   # global defaults
+##           -a <system-disk> -i 0 ...                       # auto-exclusions
+##           -a <drive> [-i idle] [-c type] [-p condition]   # configured drives
+##           [-d] [-I] [-l /data/hd-idle.log]                # global flags
+##
+## hd-idle semantics relied upon (verified against v1.22 source, see
+## hd-idle/KNOWLEDGE.md):
+## - arguments before the first -a set the global defaults; each -a seeds a
+##   per-device config from the defaults parsed so far, and subsequent
+##   -i/-c/-p before the next -a override that device's values;
+## - a device entry matches by resolved kernel name; the first matching entry
+##   wins (deviceConfig iterates the device list);
+## - devices WITHOUT a matching entry are governed by the global defaults -
+##   which is why opt-in mode pins the global idle to 0 (only configured
+##   drives are ever touched) and why the system disk gets an explicit
+##   `-a <disk> -i 0` entry (defense in depth, see below).
+
+ARGS_FILE=/etc/hd-idle.args
+LOG_FILE=/data/hd-idle.log
+
+MODE=$(bashio::config 'mode')
+DEFAULT_IDLE=$(bashio::config 'default_idle')
+DEFAULT_COMMAND=$(bashio::config 'default_command_type')
+DEFAULT_POWER=$(bashio::config 'default_power_condition')
+DISKS=$(bashio::config 'disks')
+
+## Defense in depth: the supervisor schema already validates these; cheap
+## re-checks keep a hand-edited options.json from producing a bogus command
+## line (every emitted token must be space-free, see the run script).
+case "$MODE" in
+  opt-in | opt-out) ;;
+  *)
+    bashio::exit.nok "Invalid mode '${MODE}': must be opt-in or opt-out."
+    ;;
+esac
+[[ "${DEFAULT_IDLE}" =~ ^[0-9]+$ ]] ||
+  bashio::exit.nok "Invalid default idle time '${DEFAULT_IDLE}': must be a non-negative integer."
+case "$DEFAULT_COMMAND" in
+  scsi | ata) ;;
+  *)
+    bashio::exit.nok "Invalid default command type '${DEFAULT_COMMAND}': must be scsi or ata."
+    ;;
+esac
+if ! [[ "${DEFAULT_POWER}" =~ ^[0-9]+$ ]] || [ "${DEFAULT_POWER}" -gt 15 ]; then
+  bashio::exit.nok "Invalid default power condition '${DEFAULT_POWER}': must be 0-15."
+fi
+
+## ---------------------------------------------------------------------------
+## Device resolution
+## ---------------------------------------------------------------------------
+
+## Parent block device of a partition name (sdi1 -> sdi, mmcblk0p3 ->
+## mmcblk0, nvme0n1p2 -> nvme0n1). A trailing "p" is only stripped when
+## preceded by a digit, so genuinely named disks (e.g. "sdp") survive.
+parent_disk() {
+  local name="$1"
+  ## Device-mapper names (dm-0, ...) have no partition suffixes; their
+  ## holder attribution happens via /sys/block/*/holders (see resolve_device).
+  if [[ "${name}" == dm-* ]]; then
+    printf '%s' "${name}"
+    return
+  fi
+  while [[ "${name}" =~ [0-9]$ ]]; do
+    name="${name%?}"
+  done
+  if [[ "${name}" =~ [0-9]p$ ]]; then
+    name="${name%p}"
+  fi
+  printf '%s' "${name}"
+}
+
+## Resolve a configured device value (stable /dev/disk/by-* path, /dev node,
+## or bare kernel name) to its kernel base name. Prints the base name;
+## returns 1 if the path does not resolve (e.g. drive currently detached).
+resolve_device() {
+  local dev="$1" target base holder
+  case "${dev}" in
+    /dev/*)
+      target=$(readlink -f "${dev}" 2>/dev/null || true)
+      if [ -z "${target}" ]; then
+        return 1
+      fi
+      base="${target##*/}"
+      ;;
+    *)
+      base="${dev}"
+      ;;
+  esac
+  ## A device-mapper device (e.g. LUKS) attributes to its holding disk
+  ## (hd-idle attributes dm stats to the holder disk as well).
+  if [[ "${base}" =~ ^dm-[0-9]+$ ]]; then
+    holder=$(ls "/sys/class/block/${base}/holders" 2>/dev/null | head -n 1 || true)
+    if [ -z "${holder}" ]; then
+      return 1
+    fi
+    base="${holder}"
+  fi
+  printf '%s' "${base}"
+}
+
+## ---------------------------------------------------------------------------
+## System disk detection (always on - HA's own partitions are never spun down)
+## ---------------------------------------------------------------------------
+
+## Three independent layers protect the system disk; this is the second:
+## (1) the supervisor refuses device access for system-used devices, (2) we
+## resolve the boot device and every hassos-* partition here and pin them to
+## idle 0 (first matching entry wins in hd-idle), (3) hd-idle itself only
+## ever monitors sd*/dm-* devices (nvme*/mmcblk* are out of its reach).
+## Detected system disks are collected as kernel base names.
+SYSTEM_DISKS=""
+
+add_system_disk() {
+  local parent
+  parent=$(parent_disk "${1}")
+  [ -n "${parent}" ] || return 0
+  if ! grep -qxF "${parent}" <<<"${SYSTEM_DISKS}"; then
+    SYSTEM_DISKS+="${parent}"$'\n'
+  fi
+}
+
+## The kernel command line's root= parameter (visible inside the container -
+## /proc/cmdline is not namespaced). HAOS boots with root=UUID=... or
+## root=PARTUUID=...; resolve via the udev symlink trees in /dev/disk.
+ROOT_PARAM=$(awk '{for (i = 1; i <= NF; i++) if ($i ~ /^root=/) { sub(/^root=/, "", $i); print $i } }' /proc/cmdline)
+case "${ROOT_PARAM}" in
+  UUID=*) ROOT_LINK="/dev/disk/by-uuid/${ROOT_PARAM#UUID=}" ;;
+  PARTUUID=*) ROOT_LINK="/dev/disk/by-partuuid/${ROOT_PARAM#PARTUUID=}" ;;
+  PARTLABEL=*) ROOT_LINK="/dev/disk/by-partlabel/${ROOT_PARAM#PARTLABEL=}" ;;
+  /dev/*) ROOT_LINK="${ROOT_PARAM}" ;;
+  *) ROOT_LINK="" ;;
+esac
+if [ -n "${ROOT_LINK}" ] && RESOLVED=$(readlink -f "${ROOT_LINK}" 2>/dev/null); then
+  add_system_disk "${RESOLVED##*/}"
+  ROOT_SOURCE="root=${ROOT_PARAM}"
+else
+  ROOT_SOURCE=""
+fi
+
+## Every hassos-* partition (boot, kernel/system RAUC slots, data, overlay)
+## sits on the system disk; resolving their partlabels also covers setups
+## where root= cannot be resolved.
+for link in /dev/disk/by-partlabel/hassos-*; do
+  [ -e "${link}" ] || continue
+  RESOLVED=$(readlink -f "${link}")
+  add_system_disk "${RESOLVED##*/}"
+done
+
+## Only sd* disks can be pinned (hd-idle monitors nothing else); other
+## system-disk types (mmcblk, nvme) are out of hd-idle's reach anyway.
+SYSTEM_SD_DISKS=""
+for disk in $(printf '%s' "${SYSTEM_DISKS}" | sort -u); do
+  if [[ "${disk}" =~ ^sd[a-z]+$ ]]; then
+    SYSTEM_SD_DISKS+="${disk} "
+  else
+    bashio::log.info "System disk ${disk} detected - not an sd* device, hd-idle ignores it anyway."
+  fi
+done
+if [ -n "${SYSTEM_SD_DISKS}" ]; then
+  bashio::log.info "Excluding the system disk(s) from spin-down: ${SYSTEM_SD_DISKS% } (${ROOT_SOURCE:+${ROOT_SOURCE}; }hassos-* partitions)"
+else
+  bashio::log.warning "Could not identify the system disk via root= or hassos-* partlabels. In opt-in mode this is safe (only configured drives are touched); in opt-out mode make sure not to list the system disk."
+fi
+
+## ---------------------------------------------------------------------------
+## Drive inventory (helps users map by-id paths to kernel names)
+## ---------------------------------------------------------------------------
+
+bashio::log.info "Detected sd* disks:"
+for block in /sys/block/sd*; do
+  [ -e "${block}" ] || continue
+  name="${block##*/}"
+  model=$(xargs <<<"$(cat "${block}/device/model" 2>/dev/null || true)" || true)
+  byid=""
+  for link in /dev/disk/by-id/*; do
+    [ -L "${link}" ] || continue
+    if [ "$(readlink -f "${link}")" = "/dev/${name}" ]; then
+      byid="${link##*/}"
+      break
+    fi
+  done
+  bashio::log.info "  ${name}: ${model:-unknown} ${byid:+(by-id: ${byid})}"
+done
+
+## ---------------------------------------------------------------------------
+## Drive configuration -> per-device entries
+## ---------------------------------------------------------------------------
+
+ARGS=(-s 1 -c "${DEFAULT_COMMAND}" -p "${DEFAULT_POWER}")
+if [ "${MODE}" = "opt-in" ]; then
+  ARGS+=(-i 0)
+  if [ "${DEFAULT_IDLE}" != "0" ]; then
+    bashio::log.warning "The default idle time is only used in opt-out mode; opt-in mode pins hd-idle's global idle to 0 so unconfigured disks are never touched."
+  fi
+else
+  ARGS+=(-i "${DEFAULT_IDLE}")
+fi
+
+for disk in ${SYSTEM_SD_DISKS}; do
+  ARGS+=(-a "${disk}" -i 0)
+done
+
+N_DRIVES=0
+declare -A SEEN_DEVICES=()
+while IFS= read -r disk; do
+  [ -n "${disk}" ] || continue
+  N_DRIVES=$((N_DRIVES + 1))
+  DEV=$(bashio::jq "${disk}" '.device')
+  IDLE=$(bashio::jq "${disk}" '.idle // empty')
+  COMMAND_TYPE=$(bashio::jq "${disk}" '.command_type // empty')
+  POWER_CONDITION=$(bashio::jq "${disk}" '.power_condition // empty')
+
+  ## Partition selection would grant cgroup access for the partition node
+  ## only, while hd-idle opens the disk node -> always broken, reject it.
+  if [[ "${DEV}" == *-part[0-9]* ]]; then
+    bashio::exit.nok "Drive '${DEV}' is a partition (by-id path ending in -partN): select the disk itself (the dropdown entry without -partN) - the app needs the whole disk."
+  fi
+
+  if RESOLVED=$(resolve_device "${DEV}"); then
+    if [[ "${RESOLVED}" =~ ^sd[a-z]+$ ]]; then
+      NAME="${RESOLVED}"
+    elif [[ "${RESOLVED}" =~ ^sd[a-z]+[0-9]+$ ]]; then
+      bashio::exit.nok "Drive '${DEV}' resolves to partition ${RESOLVED}: select the disk itself (the dropdown entry without -partN) - the app needs the whole disk."
+    else
+      bashio::log.warning "Drive '${DEV}' resolves to ${RESOLVED}, which is not an sd* disk - hd-idle cannot manage it; entry ignored."
+      continue
+    fi
+    if grep -qxF "${NAME}" <<<"${SYSTEM_DISKS}"; then
+      bashio::exit.nok "Drive '${DEV}' is the system disk Home Assistant runs from (${NAME}) - it is always excluded from spin-down and cannot be configured as a managed drive."
+    fi
+    if [[ -n "${SEEN_DEVICES[${NAME}]+x}" ]]; then
+      bashio::exit.nok "Drive ${NAME} (${DEV}) is configured more than once: one configuration per disk - remove the redundant entry."
+    fi
+    SEEN_DEVICES["${NAME}"]=1
+    bashio::log.info "Drive ${DEV} -> ${NAME}"
+    EMIT_NAME="${NAME}"
+  else
+    ## Detached at startup (or a race during boot): pass the configured path
+    ## through and let hd-idle's runtime symlink resolution (-s 1) pick it up
+    ## once it appears. The supervisor grants the cgroup access dynamically
+    ## on hotplug, so no app restart is needed for that part.
+    bashio::log.warning "Drive '${DEV}' does not resolve right now (detached or still enumerating?) - passing it through for hd-idle's runtime resolution."
+    EMIT_NAME="${DEV}"
+  fi
+
+  if [ "${MODE}" = "opt-in" ] && [ -z "${IDLE}" ]; then
+    bashio::exit.nok "Drive '${DEV}' has no idle time: in opt-in mode every configured drive needs an explicit idle time (seconds, 0 = never spin down)."
+  fi
+
+  ARGS+=(-a "${EMIT_NAME}")
+  if [ -n "${IDLE}" ]; then
+    ARGS+=(-i "${IDLE}")
+  fi
+  if [ -n "${COMMAND_TYPE}" ]; then
+    ARGS+=(-c "${COMMAND_TYPE}")
+  fi
+  if [ -n "${POWER_CONDITION}" ]; then
+    ARGS+=(-p "${POWER_CONDITION}")
+  fi
+done < <(echo "${DISKS}")
+
+if [ "${N_DRIVES}" -eq 0 ]; then
+  bashio::log.info "No drives configured - hd-idle will not spin down anything (${MODE} mode)."
+fi
+
+## ---------------------------------------------------------------------------
+## Global flags + command line output
+## ---------------------------------------------------------------------------
+
+bashio::config.true 'debug' && ARGS+=(-d)
+bashio::config.true 'ignore_spin_down_detection' && ARGS+=(-I)
+if bashio::config.true 'activity_log'; then
+  ARGS+=(-l "${LOG_FILE}")
+  bashio::log.info "Detailed activity log: ${LOG_FILE}"
+fi
+
+printf '%s\n' "${ARGS[*]}" >"${ARGS_FILE}"
+bashio::log.info "hd-idle command line: /usr/sbin/hd-idle ${ARGS[*]}"
+bashio::log.info "hd-idle configuration completed"

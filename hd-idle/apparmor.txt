@@ -1,0 +1,107 @@
+#include <tunables/global>
+
+profile hd-idle flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  ## Conventions & references: modeled on the nfs-server app profile and the
+  ## official dev-docs AppArmor template; the AppArmor mediation gotchas
+  ## documented there apply here too (capabilities are mediated, network
+  ## mediation is opt-in per class, HAOS produces no AppArmor audit logs).
+  ## See hd-idle/KNOWLEDGE.md and nfs-server/KNOWLEDGE.md.
+
+  # Generic file access, signals (s6 supervision, bash job control).
+  # `file,` is the upstream HA convention (docs template + dnsmasq + the
+  # nfs-server app): tightening file rules is impractical because HAOS
+  # produces no AppArmor audit/denial logs - silent breakage risk. The
+  # profile's confinement value sits in the non-file classes (network,
+  # capability): the app gets NO capability rules at all - SG_IO ioctls on
+  # the disk nodes are kernel-permitted for read-safe commands (START STOP
+  # UNIT) and gated by the container's CAP_SYS_RAWIO for ATA passthrough;
+  # AppArmor mediates the file access (below), not ioctls, on AppArmor 3.x.
+  file,
+  signal,
+
+  # Network: mediation is enabled by the PRESENCE of any network rule. The
+  # app only needs supervisor-API HTTP (bashio) and DNS resolution; the
+  # hd-idle daemon itself makes no sockets (its sub-profile denies network
+  # entirely).
+  network inet stream,
+  network inet dgram,
+  network inet6 stream,
+  network inet6 dgram,
+
+  # S6-Overlay
+  /init rix,
+  /bin/** ix,
+  /usr/bin/** ix,
+  /run/{s6,s6-rc*,service}/** rwix,
+  /package/** ix,
+  /command/** ix,
+  /etc/s6-overlay/** rix,
+  /run/{,**} rwk,
+
+  # Bashio
+  /usr/lib/bashio/** ix,
+  /tmp/** rwk,
+
+  # Access to options.json and other files within the app's data dir
+  /data/** rw,
+
+  # AppArmor status reporting (s6 sets this up; harmless otherwise)
+  /sys/kernel/security/apparmor/** r,
+
+  # Disk introspection and spindown targets. hd-idle opens disk nodes
+  # O_RDONLY and issues SG_IO ioctls (AppArmor 3.x mediates ioctls via the
+  # file's r/w permission). /dev/disk/by-* is read for device-path
+  # resolution (config.sh), /sys/class/block and /sys/block for disk
+  # attribution (partition/device-mapper stats) and USB-bridge detection
+  # (sgio's idVendor walk). The explicit rules document the app's disk
+  # access surface; the supervisor's cgroup device rules (granted per
+  # configured drive via the device-type option fields) are the layer that
+  # actually scopes WHICH disks are reachable, and it refuses devices the
+  # system uses. (The nfs-server KNOWLEDGE.md AppArmor notes apply.)
+  /dev/sd* rwk,
+  /dev/disk/{,**} r,
+  /sys/class/block/{,**} r,
+  /sys/block/{,**} r,
+
+  # Generated hd-idle command line (cont-init config.sh -> s6 run script)
+  /etc/hd-idle.args rw,
+
+  # Runtime check scripts
+  /etc/cont-init.d/config.sh rix,
+  /etc/s6-overlay/scripts/* rix,
+
+  ## The hd-idle daemon runs under its own tighter sub-profile (cx = change
+  ## profile on execute): no networking at all, and only the disk/sysfs
+  ## surface it actually needs.
+  /usr/sbin/hd-idle cx -> hdidle,
+
+  profile hdidle flags=(attach_disconnected,mediate_deleted) {
+    #include <abstractions/base>
+
+    file,
+    signal (send) set=(kill,term,int,hup,cont),
+    # Official docs template: scope receive to the app's own top profile
+    # (the supervisor renames it to the installed slug on the device, e.g.
+    # local_hd-idle - the *_hd-idle glob covers repo installs too).
+    signal (receive) peer=*_hd-idle,
+
+    # hd-idle creates no sockets: reads /proc/diskstats, sysfs, and issues
+    # SG_IO ioctls on the disk nodes. A deny-only network class denies
+    # everything in it.
+    deny network,
+
+    /usr/sbin/hd-idle rm,
+    /lib/** mr,
+    /dev/sd* rwk,
+    /dev/disk/{,**} r,
+    /proc/diskstats r,
+    /sys/class/block/{,**} r,
+    /sys/block/{,**} r,
+    # Activity log (-l, written only on spinup/spindown events)
+    /data/** rw,
+    /proc/[0-9]*/{,cmdline,mounts,stat} r,
+    /tmp/** rwk,
+  }
+}

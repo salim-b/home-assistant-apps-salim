@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- hd-idle app icon: hard-disk glyph (drive body, platter, actuator arm) -->
+<svg width="2e3" height="2e3" version="1.1" viewBox="0 0 2000 2000" xmlns="http://www.w3.org/2000/svg">
+ <g fill="none" stroke="#18bcf2">
+  <rect x="300" y="520" width="1400" height="960" rx="120" stroke-width="90"/>
+  <circle cx="880" cy="1000" r="270" stroke-width="90"/>
+  <path d="m1540 660 -320 240" stroke-width="90" stroke-linecap="round"/>
+ </g>
+ <circle cx="1540" cy="660" r="70" fill="#18bcf2"/>
+ <circle cx="880" cy="1000" r="70" fill="#18bcf2"/>
+</svg>

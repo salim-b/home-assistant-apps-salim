@@ -1,0 +1,163 @@
+# Development knowledge
+
+Non-obvious facts and gotchas learned while developing this app, collected
+here so they don't have to be re-learned the hard way.
+
+## hd-idle configuration is command-line-only
+
+`main.go` (v1.22) parses `os.Args` and nothing else. The `/etc/default/hd-idle`
+file and the `HD_IDLE_OPTS` variable are distro-packaging conventions: the
+systemd unit declares `EnvironmentFile=/etc/default/hd-idle` and
+`ExecStart=/usr/sbin/hd-idle $HD_IDLE_OPTS` – the shell word-splits the
+variable into argv. The Alpine package does the same via its OpenRC `conf.d`
+file. The only environment variable the binary itself reads is
+`START_HD_IDLE` (exits immediately when set to `false`). Sources:
+[debian/hd-idle.service](https://github.com/adelolmo/hd-idle/blob/v1.22/debian/hd-idle.service),
+[main.go](https://github.com/adelolmo/hd-idle/blob/v1.22/main.go),
+[v3.24 APKBUILD](https://gitlab.alpinelinux.org/alpine/aports/-/blob/3.24-stable/community/hd-idle/APKBUILD).
+
+Alpine v3.24 ships `hd-idle 1.22-r7` (community repo; v1.22 is a GitHub tag
+*without* a release). The package installs `/usr/sbin/hd-idle`, has no
+runtime dependencies, and is built from the same code as the v1.22 tag
+(`main.go` is byte-identical to it as of 2026-10).
+
+## hd-idle CLI semantics relied upon by config.sh
+
+Verified against the v1.22 source (`main.go`, `hdidle.go`):
+
+- Arguments before the first `-a` set the global defaults; each `-a` seeds a
+  per-device config **from the defaults parsed so far**, and `-i`/`-c`/`-p`
+  after a `-a` (before the next one) override that device's values. Our
+  generator therefore always emits defaults first, then entries.
+- Unconfigured devices are governed by the global defaults: opt-in mode pins
+  the global idle to `0`, and the system disk gets an explicit
+  `-a <disk> -i 0` entry (first-match-wins: `deviceConfig()` returns the
+  first device entry whose name matches the `/proc/diskstats` name).
+- `-a` accepts a bare kernel name (`sdi` – returned as-is), a `/dev` node
+  (`filepath.Base`), or a `/dev/disk/by-*` symlink (readlink + basename +
+  trailing-digit strip, i.e. partition links resolve to their disk).
+  Resolution happens once at startup with `-s 0`; `-s 1` re-resolves at
+  runtime **only while the entry is still unresolved** – a device that
+  re-attaches with a different kernel name after being resolved stays stale
+  until an app restart. That is why config.sh resolves by-id paths itself
+  (kernel names are stable within a boot) and passes `-s 1` only as the
+  fallback for devices unresolvable at startup.
+- `-I` (ignore spin-down detection) is **global only**: parsed as a valueless
+  flag into `Defaults.IgnoreSpinDownDetection`; `DeviceConf` has no such
+  field and `updateState()` reads only the default.
+- The poll interval is `min(configured idle)/10` (min 1 s; 60 s when no
+  devices are configured); a sleep overrun of >3x the interval resets spin
+  state (suspend detection).
+- Spindown failures do not loop per poll cycle: the device is marked spun
+  down with `LastSpunDownAt=now` even on error, so an unspindownable disk
+  produces one error line per idle interval, not per poll.
+- Events are logged as `<givenName> spindown|spinup` to stdout; with kernel
+  names as given names the app log reads `sdi spindown`.
+
+## hd-idle's monitoring scope
+
+`diskstats/snapshot.go` matches `/proc/diskstats` names against
+`sd[a-z]+$` (disk), `sd[a-z]+[0-9]+$` (partition → attributed to parent
+disk) and `dm-*$` (device-mapper → attributed to its holder disk). **Anything
+else is never touched**: `nvme*`, `mmcblk*`, `loop*`, `ram*`. Consequences:
+system disks on SD/eMMC/NVMe are out of hd-idle's reach (third exclusion
+layer), and the app cannot manage NVMe drives at all. Partition/dm
+attribution also makes per-partition activity wake the configured disk.
+
+## SG_IO privileges: what the kernel actually requires
+
+hd-idle opens disk nodes **O_RDONLY** (`sgio/common.go openDevice`, gated by
+`SG_GET_VERSION_NUM`) and issues `SG_IO` ioctls. Kernel-side
+(`drivers/scsi/scsi_ioctl.c`, `scsi_cmd_allowed()` – verified against master
+2026-10; re-verify against the device's kernel (6.18-haos) before relying on
+it for new work):
+
+- **START STOP UNIT (0x1B) is in the "read-safe" list**: allowed for any
+  process that can open the node – no capability, no write access needed.
+  This covers hd-idle's `scsi` command type entirely.
+- **ATA PASS-THROUGH (0x85/0xa1, the `ata` command type) is in neither list**
+  → requires `CAP_SYS_RAWIO` (the kernel's "root can do any command" branch).
+  That is the sole reason for the app's `privileged: [SYS_RAWIO]`. It is
+  unconditional in `config.yaml` because some USB bridges (Jmicron quirk,
+  supported since 1.21) and all SATA disks need the `ata` path.
+
+AppArmor 3.x mediates ioctls via the file's r/w permission (no per-command
+mediation until AppArmor 4), so the profile's `/dev/sd* rwk,` (plus the
+`file,` blanket) covers the ioctl path; no capability rules are needed in
+the profile.
+
+## Supervisor device-access mechanics (ref 2026.10.1 – re-verify per the version-sensitive-facts rule)
+
+- Every app container gets the **host `/dev` bind-mounted**
+  (`supervisor/docker/app.py` `mounts`: `MOUNT_DEV`); what actually gates
+  access are Docker `DeviceCgroupRules`, computed per app.
+- Device-typed option fields (`device` schema type, optionally
+  `device(subsystem=block)` - `UdevSubsystem.DISK = "block"`) are what grants
+  those rules: `AppOptions._collect_device_paths` **recurses into
+  list-of-objects schemas**, so our `disks[].device` fields grant cgroup
+  access (`b <major>:<minor> rwm`) per configured drive. The UI renders them
+  as a dropdown of `(device.by_id or device.path)` values.
+- **Hotplug**: `docker/app.py::_hardware_events` listens for
+  HARDWARE_NEW_DEVICE and re-grants the cgroup rule when a new device
+  matches one of the configured paths against `device.path`, `device.sysfs`
+  or **`device.links`** (the udev symlinks - hence by-id paths match after
+  re-plugging even when the kernel letter changed). No app restart needed.
+- **System-disk rail**: `hardware/policy.py::allowed_for_access` refuses
+  devices where `sys_hardware.disk.is_used_by_system(device)` - both at
+  container start and in the hotplug listener. The system disk cannot be
+  granted to the app, period (this is exclusion layer 1).
+- The `device` type validates existence **at options save time**
+  (`write_options` → `get_by_path`), so saving a config while a drive is
+  detached fails with a clear message. At app **startup** the validation
+  result is suppressed (`App.devices` does `with suppress(vol.Invalid)`);
+  a detached drive at boot does not prevent the app from starting.
+
+## Security rating
+
+`rating_security` (apps/utils.py, 2026.10.1; see also
+nfs-server/KNOWLEDGE.md): 5 + 1 (custom profile) + 2 (no ports, no host
+network) − 1 (`SYS_RAWIO` is in the high-risk capability list) = **7
+installed, 6 in the store listing**. `full_access` would force the rating to
+1 and disable protection mode - deliberately avoided: it would grant cgroup
+access to *all* devices including the system disk, which the device-option
+mechanism refuses precisely.
+
+## hd-idle -t (single-shot spindown) quirks
+
+- The disk argument needs the **full `/dev/` path**: single-shot mode, unlike
+  the daemon path (which does `fmt.Sprintf("/dev/%s", name)`), passes the
+  argument straight to `openDevice` - bare kernel names fail with
+  `open sdi: no such file or directory`. The usage string's `-t sda` example
+  is misleading. Verified against v1.22 (`main.go` singleDiskMode branch).
+- The command uses the **global default** command type / power condition only
+  (single-disk mode skips the per-device config entirely).
+
+## Verifying drive power states from the lab (USB bridges)
+
+`hdparm -C` is **not a safe probe** for these drives: empirically (WD
+My Book 1230 / Elements 25A3 USB bridges on this machine) it races the
+spin-down window (`SG_IO: bad/missing sense data` with sense key 70 00 02,
+ASC/ASCQ 04 01 = NOT READY / "in process of becoming ready") and then
+**actually wakes the drive** (STOP → `smartctl -n standby` says SLEEP → one
+`hdparm -C` → smartctl says active). Use **`smartctl -H -n standby`** instead
+(exit code 2 + "Device is in STANDBY/SLEEP mode" without any media access) -
+that is what the lab hook does, with polling retries (desktop IO on mounted
+drives may wake a drive between the STOP command and the probe).
+
+## Local-lab host interference (spindown mechanisms on the dev machine)
+
+The lab runs the app container `--privileged` **on the dev machine**, so
+host-side disk power management interacts with spindown tests. Checked on
+the development machine (2026-10, ostree-based Fedora): no udisks2 (hence no
+GNOME-Disks drive settings that get re-applied on hotplug), no TLP/
+laptop-mode/powertop service, no smartd, `hdparm` not installed and
+`/etc/hdparm.conf` inert (commented), and the disks' SCSI device runtime-PM
+`power/control` is `on` (Fedora udev default for storage) - i.e. no USB
+autosuspend that could break SG_IO. General reality check: mainstream
+distros ship nothing active by default; the realistic interference sources
+are user-configured (GNOME Disks stored settings in `/var/lib/udisks2`
+re-applied per hotplug, `/etc/hdparm.conf` directives, TLP `DISK_*`,
+smartd) and the inverse: desktop IO on mounted drives waking them. The lab
+hook prints read-only preflight warnings for all of these and asserts
+event-based (hd-idle's own log lines + `hdparm -C` immediately after a
+forced `hd-idle -t`), never "stays spundown for N minutes".

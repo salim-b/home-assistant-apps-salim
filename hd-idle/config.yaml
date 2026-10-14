@@ -1,0 +1,64 @@
+# https://developers.home-assistant.io/docs/apps/configuration#app-configuration
+name: hd-idle
+version: "0.1.0"
+slug: hd-idle
+description: Spin down idle hard disks (USB, SATA) automatically using hd-idle
+# Generic (multi-arch) image name; CI builds & publishes per-arch images
+# (`ghcr.io/salim-b/{amd64,aarch64}-app-hd-idle`) and a multi-arch manifest
+# under this name on pushes to main.
+image: "ghcr.io/salim-b/app-hd-idle"
+url: "https://github.com/salim-b/home-assistant-apps-salim/tree/main/hd-idle"
+panel_icon: mdi:harddisk
+arch:
+  - aarch64
+  - amd64
+startup: services
+init: false
+# CAP_SYS_RAWIO is required for hd-idle's `ata` command type: the kernel only
+# allows SCSI passthrough ioctls (SG_IO) without CAP_SYS_RAWIO for the
+# read-safe command list - START STOP UNIT (the `scsi` path) is in it, ATA
+# PASS-THROUGH (the `ata` path, needed for SATA disks and some USB bridges)
+# is not (drivers/scsi/scsi_ioctl.c scsi_cmd_allowed(); see
+# hd-idle/KNOWLEDGE.md). Device-node access itself is granted per drive via
+# the supervisor's device-type option fields (see the disks schema below),
+# which also refuses devices the system uses - the system disk cannot be
+# granted to the app even if a user configured it.
+privileged:
+  - SYS_RAWIO
+options:
+  # opt-in: only configured drives spin down (hd-idle's global default idle
+  # is pinned to 0). opt-out: all monitored drives get the global defaults,
+  # per-drive entries override and idle:0 entries exclude.
+  mode: opt-in
+  disks: []
+  default_idle: 600
+  default_command_type: scsi
+  default_power_condition: 0
+  debug: false
+  activity_log: false
+  ignore_spin_down_detection: false
+schema:
+  mode: list(opt-in|opt-out)
+  disks:
+    # `device` is a supervisor device-type field: it renders as a dropdown of
+    # block devices with their stable /dev/disk/by-id paths AND is what grants
+    # the app kernel cgroup access to that drive (dynamically re-granted on
+    # hotplug; refused for system-used devices). Select the disk itself, never
+    # a partition (a partition entry would grant access only to the partition
+    # node, while hd-idle opens the disk node).
+    - device: "device(subsystem=block)"
+      # Idle time in seconds; 0 = never spin down this drive.
+      # opt-in mode: required. opt-out mode: empty = use default_idle.
+      idle: "int(0,)?"
+      command_type: "list(scsi|ata)?"
+      power_condition: "int(0,15)?"
+  # Global defaults. default_idle is only used in opt-out mode (opt-in pins
+  # hd-idle's global idle to 0); default_command_type/default_power_condition
+  # seed drives whose per-drive fields are left empty (both modes) and drives
+  # that appear without a list entry at runtime.
+  default_idle: "int(0,)?"
+  default_command_type: "list(scsi|ata)"
+  default_power_condition: "int(0,15)"
+  debug: "bool?"
+  activity_log: "bool?"
+  ignore_spin_down_detection: "bool?"

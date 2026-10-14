@@ -1,0 +1,105 @@
+configuration:
+  mode:
+    name: Configuration mode
+    description: >-
+      How the drive list relates to hd-idle's global defaults.
+
+      `opt-in` (recommended): only the drives configured in the drive list
+      are spun down, each with its own settings. All other disks are never
+      touched. The global default idle time is not used in this mode.
+
+      `opt-out`: all monitored drives get the global defaults (default idle
+      time, default command type, default power condition); drive list
+      entries override the defaults per drive, and an entry with idle time
+      `0` excludes that drive. Note that on Home Assistant OS only drives
+      listed in the drive list can be accessed by the app at all (device
+      access is granted per listed drive); drives without a list entry can
+      therefore not actually be spun down and produce a warning in the app
+      log once per idle cycle.
+  disks:
+    name: Drives
+    description: >-
+      The drives hd-idle manages. Pick each drive from the dropdown, which
+      lists the system's block devices by their stable `/dev/disk/by-id`
+      paths. Select the disk itself, never one of its partitions (entries
+      ending in `-part...`): the app needs access to the whole disk.
+    fields:
+      device:
+        name: Device
+        description: >-
+          The drive to manage, selected by its stable `/dev/disk/by-id`
+          path. Every listed drive is granted device access for the app
+          (dynamically, also after hotplug); the drive Home Assistant
+          itself runs from cannot be granted and is always excluded from
+          spin-down.
+      idle:
+        name: Idle time (seconds)
+        description: |
+          Spin the drive down after this many seconds without I/O activity.
+          `0` never spins the drive down (use this to exclude a drive in
+          opt-out mode). Manufacturers recommend at least 3-5 minutes;
+          hd-idle's own default is 10 minutes. Frequent spin-down/spin-up
+          cycles wear the drive.
+
+          In `opt-in` mode this field is required. In `opt-out` mode an
+          empty value uses the global default idle time.
+      command_type:
+        name: Command type
+        description: >-
+          API used to send the spin-down command. `scsi` (default) works
+          for drives behind a SCSI translation layer - typically all USB
+          drives. `ata` sends the native ATA STANDBY command (like
+          `hdparm -y`) and is needed for SATA drives and some USB bridge
+          chips (e.g. JMicron); it requires elevated privileges which the
+          app requests. An empty value uses the global default command
+          type.
+      power_condition:
+        name: Power condition
+        description: >-
+          Power condition value sent with the SCSI START STOP UNIT command
+          (`0`-`15`). `0` works for drives reachable via the SCSI layer
+          (USB, IEEE 1394) and is what nearly all users need. Only real
+          SCSI/SAS drives need other values (`2` = idle, `3` = standby) -
+          a stopped SAS drive does not spin up on access by itself. An
+          empty value uses the global default power condition.
+  default_idle:
+    name: Default idle time (seconds)
+    description: >-
+      Idle time in seconds applied to drives whose per-drive idle time is
+      empty (opt-out mode) and to drives that appear without a list entry
+      while the app runs. `0` never spins such drives down. Only used in
+      `opt-out` mode: in `opt-in` mode the global default idle time is
+      pinned to `0` so that only the configured drives are ever touched.
+  default_command_type:
+    name: Default command type
+    description: >-
+      Command type applied to drives whose per-drive command type is empty
+      and to drives that appear without a list entry while the app runs.
+      See the per-drive command type for details.
+  default_power_condition:
+    name: Default power condition
+    description: >-
+      Power condition applied to drives whose per-drive power condition is
+      empty and to drives that appear without a list entry while the app
+      runs. See the per-drive power condition for details.
+  debug:
+    name: Debug mode
+    description: >-
+      Enable hd-idle's debug output: every monitoring cycle prints the
+      watched state of each disk (read/write counters, idle durations,
+      spin-down/spin-up timestamps). Useful for diagnosing drives that
+      won't spin down; produces log lines every few seconds.
+  activity_log:
+    name: Activity log
+    description: >-
+      Write hd-idle's detailed activity log to `/data/hd-idle.log` (in the
+      app's persistent data directory, so it survives restarts). For each
+      completed run-standby-wakeup cycle it records when the drive spun up
+      and how long it had been running resp. sleeping.
+  ignore_spin_down_detection:
+    name: Ignore spin-down detection
+    description: >-
+      Send the spin-down command even when hd-idle believes the drive is
+      already spun down. Useful when a drive keeps spinning because of
+      activities hd-idle cannot see (e.g. SMART polling by other tools).
+      This is a global hd-idle setting; it cannot be set per drive.

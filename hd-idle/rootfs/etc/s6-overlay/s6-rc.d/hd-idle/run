@@ -1,0 +1,17 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+## hd-idle daemon (longrun service).
+##
+## hd-idle is configured exclusively via command line arguments - there is no
+## config file (see hd-idle/KNOWLEDGE.md); cont-init config.sh generated and
+## validated the argument list. `exec` makes hd-idle this service's process:
+## s6 signals it directly on stop, and its stdout (spin-down/spin-up events
+## like "sdi spindown", debug lines in debug mode) lands in the app log.
+## -s 1 (runtime symlink resolution) is always included so detached-then-
+## reattached drives configured by stable by-id paths get picked up without
+## an app restart.
+read -r -a HD_IDLE_ARGS </etc/hd-idle.args
+bashio::log.info "Starting hd-idle: /usr/sbin/hd-idle ${HD_IDLE_ARGS[*]}"
+exec /usr/sbin/hd-idle "${HD_IDLE_ARGS[@]}"
