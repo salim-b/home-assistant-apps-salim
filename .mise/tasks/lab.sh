@@ -4,6 +4,7 @@
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
 #USAGE flag "--keep" help="Keep lab containers/dirs for debugging"
+#USAGE flag "--spindown-drives <drives>" help="Comma-separated sd* kernel names an app hook may spin down for real (hd-idle smoke test; read-only: no data is written)"
 #
 # Per-app specifics (docker args, a runtime roundtrip) live in the
 # .mise/tasks/lab/<app>.sh hook, fixture adaptation (optional) in
@@ -14,6 +15,12 @@ cd "$MISE_PROJECT_ROOT"
 
 # shellcheck disable=SC2124
 apps=("${usage_app:-$(git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1 | sort -u)}")
+
+# Drives a lab hook may spin down for real (hd-idle smoke test; read-only:
+# standby commands + state queries only). Consumed by the app hook and the
+# fixture adapter (both read LAB_SPINDOWN_DRIVES).
+spindown_drives="${usage_spindown_drives:-}"
+export LAB_SPINDOWN_DRIVES="$spindown_drives"
 
 net="nfslab-$$"
 ts() { echo "[t+${1}s] $2"; }
@@ -66,7 +73,8 @@ for app in "${apps[@]}"; do
   docker rm -f "$net-fakesup" >/dev/null 2>&1 || true
   docker run -d --name "$net-fakesup" --network "$net" \
     -v "$PWD/$app/config.yaml:/src/config.yaml:ro" \
-    -e LAB_NETWORK="$subnet" "$api_image" sh -c '
+    -e LAB_NETWORK="$subnet" \
+    -e LAB_SPINDOWN_DRIVES="$spindown_drives" "$api_image" sh -c '
       python3 - <<PYEOF
 import http.server, json, os, yaml
 config = yaml.safe_load(open("/src/config.yaml"))
