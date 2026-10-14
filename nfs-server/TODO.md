@@ -5,9 +5,11 @@ facts and root causes live in `KNOWLEDGE.md`.
 
 ## Tasks
 
-- Investigate mise task-arg-forwarding feature gap (see the `test:live` task source's comment header) and fix it upstream if indicated.
+- ~~Create upstream PR in HA to render app configuration labels in the UI as Markdown blocks instead of the current single-line plain text.~~
 
-- Create upstream PR in HA to render app configuration labels in the UI as Markdown blocks instead of the current single-line plain text.
+  *Submitted [`home-assistant/frontend#54839`](https://github.com/home-assistant/frontend/pull/54839) which got rejected. Seems we have to wait for [OpenHomeFoundation/roadmap#57](https://github.com/OpenHomeFoundation/roadmap/issues/57) to get implemented.*
+
+- Investigate mise task-arg-forwarding feature gap (see the `test:live` task source's comment header) and fix it upstream if indicated.
 
 - Upstream: `CONFIG_NFSD=m` in all HAOS board kernels *(do first)*
 
