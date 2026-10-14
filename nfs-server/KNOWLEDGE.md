@@ -1,65 +1,32 @@
 # Development knowledge
 
 Non-obvious facts and gotchas learned while developing this app, collected
-here so they don't have to be re-learned the hard way.
+here so they don't have to be re-learned the hard way. App-specific facts
+only — repository-wide knowledge (supervisor rating formula, option-schema
+quirks, device access, AppArmor mechanics, base-image shell gotchas, lab
+testing) lives in the repository-root `KNOWLEDGE.md`.
 
-## Supervisor security rating: formula and our ceiling
+## Security rating — this app's ceiling
 
-`supervisor/apps/utils.py::rating_security` (read at supervisor 2026.09.3,
-re-verify before relying on it) starts at **5** (1–8 clamp) and adjusts:
+For the rating *formula* (every branch, sources, the store-vs-installed
+delta and the unreachable `signed` +1) see the repository-root
+`KNOWLEDGE.md`.
 
-- AppArmor: disabled −1 / custom profile **+1** (not +2 — easy to miscount)
-- Ingress +2; *else* no host network **and no mapped ports** +2; *else*
-  supervisor-auth-API access +1
-- signed +1 — **unreachable**: `AppModel.signed` is a hardcoded `False`
-  stub ("Currently no signing support"; verified in 2026.09.3 and
-  2026.10.1). Our images *are* cosign-signed (workflow keyless signing;
-  `cosign verify` passes), but supervisor cannot credit it yet.
-- High-risk capabilities (`SYS_ADMIN`, `SYS_MODULE`, …) or
-  `kernel_modules` −1 (single deduction for the whole branch)
-- `hassio_role` manager/admin −1/−2; host networks −1 (net) / −2 (pid) /
-  −1 (uts+SYS_ADMIN); docker-API or full access → forced to 1
-
-For this app (0.5.0): 5 + 1 (profile) − 1 (`SYS_ADMIN`) = **5** — the
+For this app (0.5.0): 5 + 1 (custom profile) − 1 (`SYS_ADMIN`) = **5** — the
 published-port +2 branch never applies (NFS needs its port), so **5 is the
 design's ceiling**; dropping `SYS_ADMIN` via a host-side nfsd mount (the
 TODO task "Upstream: host-side nfsd mount + supervisor bind-mount") would
 reach 6.
 
-The rating differs between the store listing and an installed app —
-expected, not a device quirk: `AppModel.apparmor` (supervisor
-`apps/model.py`) returns `SECURITY_PROFILE` only if a profile *for this
-app is already installed on the host* (`sys_host.apparmor.exists(slug)`
-checks the supervisor's AppArmor profile store, which
-`install_apparmor()` fills during app install/update). A store-listed app
-has no profile on the host yet → `SECURITY_DEFAULT` → the AppArmor branch
-contributes 0 → the store shows 4 for this app (5 − 1 `SYS_ADMIN`), and 5
-only once installed. The same +1 delta appears for every app shipping a
-custom profile (e.g. the official dnsmasq app). It is *not* related to
-AppArmor support on the device — hosts without AppArmor support don't
-show different ratings; they reject installing such apps outright
-(`UnsupportedReason.APPARMOR`).
+## Export-cache and fsid semantics of the per-share configuration
 
-## Supervisor option schema `match()` quirks
+(The schema-side constraints — `match()` search semantics, the DSL's missing
+uniqueness construct and the defense-in-depth pattern — are
+repository-wide, see the repository-root `KNOWLEDGE.md`.)
 
-`match(...)` regexes in `config.yaml` schema fields use voluptuous `Match`
-(*search* semantics, not fullmatch) – always anchor with explicit `^…$`.
-Also, the supervisor's schema-element parser breaks on literal `\t`/`\n`
-inside YAML double-quoted scalars (they become real control characters) –
-express whitespace classes via `\\s` instead. Verified against the
-supervisor `AppOptions` validation code at the pinned ref (see
-`.mise/tasks/validate.py`).
-
-The options DSL (`supervisor/apps/options.py` `RE_SCHEMA_ELEMENT`) has **no
-uniqueness construct** – list-of-objects options are validated entry by
-entry, cross-entry constraints cannot be expressed (the supervisor itself
-uses `vol.Unique()`, but only in its *own* app-config schema, e.g. the
-`machine` list). Cross-entry guards therefore belong in the app's runtime
-scripts (defense in depth pattern): config.sh rejects duplicate
-(path, network) share entries at startup.
-
-Related runtime semantics (why duplicates would silently misbehave): the
-kernel keeps a single export cache entry per (path, client); duplicate
+Runtime semantics of share-list configuration (why duplicates would
+silently misbehave): the kernel keeps a single export cache entry per
+(path, client); duplicate
 `/etc/exports` lines for it are resolved by *last line wins* – identical
 duplicates are only noise, conflicting options silently apply whichever
 line is last, order-dependent. Also note the per-share `fsid=` is assigned
@@ -247,26 +214,17 @@ relocated at runtime via the `/proc/fs/nfsd/nfsv4recoverydir` control file
 (must be set before the server starts). The app does *not* create that dir:
 for the containerized server it would be inert.
 
-## `echo`/`printf` cannot write to `/proc/fs/nfsd/*` (`EINVAL`)
+## nfsd control files reject `writev(2)` (`EINVAL`)
 
-The app base image's bash (5.3.9) implements the output of its `echo` and
-`printf` builtins as a single `writev(2)` call, with the text and the
-trailing newline as separate iovecs. The kernel's nfsd control files
-(`fs/nfsd/nfsctl.c`, `transaction_ops`) only implement the old-style
-single-buffer `.write` and no `.write_iter`, and `writev(2)` against such
-files fails with `EINVAL` on modern kernels.
-
-Consequences:
-
-- Every `echo`/`printf` redirection into `/proc/fs/nfsd/*` fails with a
-  misleading `write error: Invalid argument` – the error is about the syscall
-  shape, not the written content (e.g. referencing non-available NFS
-  versions is irrelevant here).
-- Single-`write(2)` callers succeed: busybox `echo`, `cat`, and `rpc.nfsd`'s
-  own writes (which is why `rpc.nfsd` can configure the version set fine).
-
-Workaround, if a direct write to such a kernel file is ever needed: stage the
-string in a regular file (e.g. on tmpfs) and `cat` it into the target.
+`/proc/fs/nfsd/*` are procfs *transaction files* (`fs/nfsd/nfsctl.c`,
+`transaction_ops`): old-style single-buffer `.write`, no `.write_iter` — so
+the base image's bash `echo`/`printf` (which emit a single `writev(2)`; the
+mechanism and the general workaround are repository-wide, see the
+repository-root `KNOWLEDGE.md`) fail against them with a misleading
+`write error: Invalid argument` — about the syscall shape, not the content
+(e.g. referencing non-available NFS versions is irrelevant). Single-
+`write(2)` callers succeed: busybox `echo`, `cat`, and `rpc.nfsd`'s own
+writes (which is why `rpc.nfsd` can configure the version set fine).
 
 ## `rpc.nfsd` is not a daemon
 
@@ -300,86 +258,41 @@ namespace: it survives s6 service restarts and is only reset to the kernel
 defaults (everything compiled-in: `+3 +4 +4.1 +4.2`) when the container –
 and with it the network namespace – is recreated.
 
-## Shell: failed redirections bypass the command's `2>/dev/null`
+## AppArmor profile — nfs-server-specific notes
 
-A failed redirection is diagnosed **by the shell itself, before the
-command's own redirections are in effect** – `echo x > /some/ro/path
-2>/dev/null` still prints `sh: can't create /some/ro/path: …`. To suppress
-(or capture) the shell's diagnostic, run the attempt in a subshell:
-`out=$( (echo x > /some/ro/path) 2>&1 )` captures message *and* exit code
-(used by the `test:live` client script for the grace-period retry and the
-read-only assertions).
+(Mediation mechanics — capability mediation, errno forensics, mount-rule
+grammar, network opt-in, ioctl mediation, supervisor profile mechanics, the
+version-bump iteration requirement, kernel-context module autoload — are
+repository-wide, see the repository-root `KNOWLEDGE.md`. Device-verified
+2026-10, HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7.)
 
-## AppArmor mediation gotchas (device-verified 2026-10, HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7)
-
-- **Capabilities are mediated**: an AppArmor profile without explicit
-  `capability …` rules denies all capabilities it is asked about at the LSM
-  hook – including the `capable(CAP_SYS_ADMIN)` check inside the mount(2)
-  syscall path, even when the `mount …` rule itself grants the mount.
-  Docker's default profile carries a blanket `capability,`, so plain Docker
-  containers never hit this. The app profile grants `sys_admin` (nfsd mount,
-  per-share bind mounts); the container's CapEff (`00000000a82525fb` on the
-  device, before `kernel_modules` was dropped) already contained it via
+- The top profile grants `sys_admin` (nfsd mount, per-share bind mirrors);
+  the container's CapEff (`00000000a82525fb` on the device, before
+  `kernel_modules` was dropped) already contained it via
   `privileged: [SYS_ADMIN]`.
-  Sub-profile subtlety (device-verified via nfsdcld): capabilities a binary
-  needs *for its own self-management* also need rules — `prctl
-  (PR_CAPBSET_DROP)` and `capset(2)` require `CAP_SETPCAP`, so the
-  `nfsdcld` sub-profile carries `capability setpcap,` (the daemon prunes its
-  whole bounding set at startup; without the rule it exits in a restart
-  loop: "Unable to prune capability 0 from bounding set: Operation not
-  permitted"). The lab cannot catch such issues — it has no AppArmor
-  enforcement.
-- **Errno forensics replace missing denial logs**: HAOS's kernel produces *no*
-  AppArmor audit messages in the host journal (`ha host logs` carries kernel
-  lines, but nothing apparmor/DENIED – no usable audit plumbing), so
-  complain-mode iteration is impossible and enforcement bugs must be
-  diagnosed from boot progress. Useful signals:
-  - busybox `mount` prints `mounting SRC on DST failed: Permission denied`
-    for **EACCES** (`%m`; observed for a *mount-rule* denial) and
-    `permission denied (are you root?)` for **EPERM** (dedicated abort path;
-    observed for a *capability* denial).
-  - In-container ground truth works and is file-rule-accessible:
-    `cat /proc/self/attr/current` (profile + mode) and
-    `grep CapEff /proc/self/status`.
-- **Mount rule grammar** (parser `apparmor.d.pod`): the mount-flags
-  conditional is `options=` (there is no `flags=`); `fstype=` matching only
-  applies to *new* mounts – not bind/remount – so `mount --bind` rules are
-  conditioned on `options=(bind)` instead. Mount sources are matched as
-  passed: busybox passes the device string `nfsd` (not a path). Reference
-  rules: `mount fstype=(nfsd) nfsd -> /proc/fs/nfsd/,`,
+- The mounts are the profile's core; reference rules in `apparmor.txt`:
+  `mount fstype=(nfsd) nfsd -> /proc/fs/nfsd/,`,
+  `mount fstype=(rpc_pipefs) sunrpc -> /var/lib/nfs/rpc_pipefs/,`,
   `mount options=(bind) /{share,media}{,/**} -> /data/pseudo_root{,/**},`,
-  `umount /data/pseudo_root{,/**},`.
-- **Iteration mechanics**: the supervisor re-installs (and reloads) the
-  profile on `ha apps update`, but `App.rebuild()` does **not** call
-  `install_apparmor()` – every profile change needs a `config.yaml` version
-  bump so the deploy task takes the update path.
-- **Supervisor profile mechanics**: the profile is installed from the app
-  folder's `apparmor.txt` on install/update and **renamed to the installed
-  slug** (`local_nfs` while testing, `<hash>_<slug>` when installed from a
-  repository) – the declared profile name is otherwise arbitrary.
-  Requirements: exactly one top-level (non-indented) `profile` declaration
-  (the supervisor's profile-name regex rejects more than one), nested
-  sub-profiles must be indented so `^profile` doesn't match them. Sources:
-  supervisor `utils/apparmor.py`, `apps/app.py`.
-- **The kernel's mount-time module autoload makes app-level modprobe
-  unnecessary** (device-verified by rebooting with the module unloaded):
-  `mount -t nfsd …` makes the kernel `request_module("fs-nfsd")`, which runs
-  in kernel context (`call_usermodehelper`) – outside the container's
-  AppArmor label and its capability set. Consequently the profile needs no
-  `sys_module` capability, no `modprobe` exec rule and no `/lib/modules`
-  access, and the app config does not need `kernel_modules: true` (which
-  only mapped `/lib/modules` read-only and granted `SYS_MODULE` – both inert
-  under the denying profile). Verified on HAOS 18.3 / kernel 6.18.52-haos
-  (odroid-m1, CONFIG_NFSD=m): fresh boot with module unloaded → mount
-  succeeds, NFS serves, client roundtrip passes.
-- **Network mediation is opt-in per class**: a profile without any `network`
-  rules has networking *entirely unmediated* (everything allowed) – "no
-  rules" is not "no networking". Adding any network rule (allow or deny)
-  enables mediation, and everything not matched by an allow rule is then
-  denied. Device-verified allowlist (parser 5.0.2 does not support
-  domain/type tuples – write individual rules):
-  `network inet stream/dgram` + `network inet6 stream/dgram` (bashio
-  supervisor-API HTTP, DNS, the HEALTHCHECK `/dev/tcp` probe) and
-  `network netlink raw` (busybox `ip`'s rtnetlink address detection – easy
-  to miss); `deny network,` denies a class outright (used for rpc.nfsd,
-  which configures the kernel via procfs and creates no sockets).
+  `umount /data/pseudo_root{,/**},` (the `options=(bind)` conditioning is
+  the grammar's new-mounts-only rule applied).
+- The nfsdcld sub-profile carries `capability setpcap,` — the daemon prunes
+  its whole bounding set at startup (the generic self-capability-management
+  subtlety is in the repository-root `KNOWLEDGE.md`; without the rule it
+  exits in a restart loop: "Unable to prune capability 0 from bounding set:
+  Operation not permitted").
+- `deny network,` sub-profiles: rpc.nfsd (configures the kernel via procfs,
+  creates no sockets) and nfsdcld (talks only to the kernel over the
+  rpc_pipefs pipe). The top profile's allowlist: `network inet/inet6
+  stream/dgram` (bashio supervisor-API HTTP, DNS, the HEALTHCHECK
+  `/dev/tcp` probe) and `network netlink raw` (busybox `ip`'s rtnetlink
+  address detection — easy to miss).
+- The kernel's mount-time module autoload was device-verified for nfsd
+  (fresh boot with the module unloaded: mount succeeds, NFS serves, client
+  roundtrip passes) — hence no `sys_module`, no modprobe exec rule, no
+  `/lib/modules` access, no `kernel_modules: true`.
+- Observed denial messages (busybox `mount`): `mounting SRC on DST failed:
+  Permission denied` (**EACCES**, mount-rule denial) and `permission denied
+  (are you root?)` (**EPERM**, capability denial) — the general forensics
+  toolkit (no AppArmor audit logs on HAOS!) is in the repository-root
+  `KNOWLEDGE.md`.

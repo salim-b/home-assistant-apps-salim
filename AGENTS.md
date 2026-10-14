@@ -25,14 +25,21 @@ Never duplicate information across files. Place it where it belongs and
 reference it from everywhere else:
 
 - `README.md` — human users: what the repo is, how to install/test on a device.
+- `KNOWLEDGE.md` (repo root) — cross-app technical facts for human devs and
+  agents alike: supervisor behaviors (security-rating formula, option-schema
+  quirks, device access), AppArmor mediation and profile mechanics, HA
+  base-image shell gotchas, hardware-testing/lab wisdom — anything applying
+  to Home Assistant apps in general.
 - `<app>/DOCS.md` — end-user documentation (shown in the HA UI): usage,
   configuration, requirements. Must not duplicate the option field
   descriptions from `translations/en.yaml` — point at the UI instead.
 - `<app>/CHANGELOG.md` — user-visible changes per version.
-- `<app>/KNOWLEDGE.md` — cross-session technical facts: root causes, kernel/
-  container design facts, gotchas (e.g. the writev/EINVAL issue). Write a
-  new entry whenever you learn something non-obvious that outlives the
-  current change.
+- `<app>/KNOWLEDGE.md` — app-specific cross-session technical facts: root
+  causes, kernel/container design facts, gotchas (e.g. the
+  writev/EINVAL issue's nfsd instance). Write a new entry whenever you
+  learn something non-obvious about *this app* that outlives the current
+  change; repository-wide facts go to the repo-root `KNOWLEDGE.md` instead
+  (reference it, don't duplicate).
 - `<app>/TODO.md` — open work items and plans.
 - `AGENTS.md` (this file) — agent-specific process and commands only.
 
@@ -169,5 +176,6 @@ global tasks from your mise user config); the essentials:
   also schema-validates `.github/renovate.json` against the published
   Renovate config schema (refetched whenever that file changes).
 - The HA base image's bash emits `echo`/`printf` as `writev(2)` — it cannot
-  write to procfs transaction files (`/proc/fs/nfsd/*`); see
-  `nfs-server/KNOWLEDGE.md` before writing to any such file from app code.
+  write to procfs transaction files (`/proc/fs/nfsd/*`); see the repo-root
+  `KNOWLEDGE.md` (base-image shell gotchas) before writing to any such file
+  from app code.

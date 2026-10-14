@@ -7,7 +7,7 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
   ## official dev-docs AppArmor template; the AppArmor mediation gotchas
   ## documented there apply here too (capabilities are mediated, network
   ## mediation is opt-in per class, HAOS produces no AppArmor audit logs).
-  ## See hd-idle/KNOWLEDGE.md and nfs-server/KNOWLEDGE.md.
+  ## See hd-idle/KNOWLEDGE.md and the repository-root KNOWLEDGE.md.
 
   # Generic file access, signals (s6 supervision, bash job control).
   # `file,` is the upstream HA convention (docs template + dnsmasq + the

@@ -1,7 +1,10 @@
 # Development knowledge
 
 Non-obvious facts and gotchas learned while developing this app, collected
-here so they don't have to be re-learned the hard way.
+here so they don't have to be re-learned the hard way. App-specific facts
+only — repository-wide knowledge (supervisor rating formula, schema quirks,
+device access, AppArmor mechanics, base-image shell gotchas, lab testing)
+lives in the repository-root `KNOWLEDGE.md`.
 
 ## hd-idle configuration is command-line-only
 
@@ -81,46 +84,44 @@ it for new work):
   unconditional in `config.yaml` because some USB bridges (Jmicron quirk,
   supported since 1.21) and all SATA disks need the `ata` path.
 
-AppArmor 3.x mediates ioctls via the file's r/w permission (no per-command
-mediation until AppArmor 4), so the profile's `/dev/sd* rwk,` (plus the
-`file,` blanket) covers the ioctl path; no capability rules are needed in
-the profile.
+Consequence for the profile: AppArmor 3.x mediates ioctls only via the
+file's r/w permission (no per-command mediation until AppArmor 4 — the
+mechanism is repository-wide, see the repository-root `KNOWLEDGE.md`), so
+`/dev/sd* rwk,` (plus the `file,` blanket) covers the ioctl path; no
+capability rules are needed for it.
 
-## Supervisor device-access mechanics (ref 2026.10.1 – re-verify per the version-sensitive-facts rule)
+## Device access in this app (mechanics: repository-root `KNOWLEDGE.md`)
 
-- Every app container gets the **host `/dev` bind-mounted**
-  (`supervisor/docker/app.py` `mounts`: `MOUNT_DEV`); what actually gates
-  access are Docker `DeviceCgroupRules`, computed per app.
-- Device-typed option fields (`device` schema type, optionally
-  `device(subsystem=block)` - `UdevSubsystem.DISK = "block"`) are what grants
-  those rules: `AppOptions._collect_device_paths` **recurses into
-  list-of-objects schemas**, so our `disks[].device` fields grant cgroup
-  access (`b <major>:<minor> rwm`) per configured drive. The UI renders them
-  as a dropdown of `(device.by_id or device.path)` values.
-- **Hotplug**: `docker/app.py::_hardware_events` listens for
-  HARDWARE_NEW_DEVICE and re-grants the cgroup rule when a new device
-  matches one of the configured paths against `device.path`, `device.sysfs`
-  or **`device.links`** (the udev symlinks - hence by-id paths match after
-  re-plugging even when the kernel letter changed). No app restart needed.
-- **System-disk rail**: `hardware/policy.py::allowed_for_access` refuses
-  devices where `sys_hardware.disk.is_used_by_system(device)` - both at
-  container start and in the hotplug listener. The system disk cannot be
-  granted to the app, period (this is exclusion layer 1).
-- The `device` type validates existence **at options save time**
-  (`write_options` → `get_by_path`), so saving a config while a drive is
-  detached fails with a clear message. At app **startup** the validation
-  result is suppressed (`App.devices` does `with suppress(vol.Invalid)`);
-  a detached drive at boot does not prevent the app from starting.
+Supervisor facts verified at ref 2026.10.1 — re-verify per the
+version-sensitive-facts rule before relying on them for new work.
 
-## Security rating
+- The app grants device access **exclusively via device-typed option
+  fields**: `disks[].device` (`device(subsystem=block)`) — cgroup rules per
+  configured drive, UI dropdown of stable by-id paths, hotplug re-grant
+  via udev links (no restart needed on re-plug), and the system-disk
+  refusal as exclusion layer 1. This is why opt-out mode can only work for
+  listed drives and why every managed drive must be listed.
+- Validation timing matters for the UX: saving options while a drive is
+  detached fails (device existence is validated at save time); at boot the
+  validation is suppressed, so a detached drive does not prevent the app
+  from starting (config.sh passes it through for hd-idle's runtime
+  resolution, see the watcher section below).
+- Plain Docker (the lab) exposes no `/dev/disk` udev symlink trees (HAOS
+  binds the host `/dev` read-only into app containers) — the lab hook
+  mirrors it with `-v /dev/disk:/dev/disk:ro` so config.sh's by-id
+  resolution and inventory behave as on a device.
 
-`rating_security` (apps/utils.py, 2026.10.1; see also
-nfs-server/KNOWLEDGE.md): 5 + 1 (custom profile) + 2 (no ports, no host
+## Security rating — this app's ceiling
+
+For the rating *formula* (every branch, sources, the store-vs-installed
+delta) see the repository-root `KNOWLEDGE.md`.
+
+For this app (0.1.0): 5 + 1 (custom profile) + 2 (no ports, no host
 network) − 1 (`SYS_RAWIO` is in the high-risk capability list) = **7
-installed, 6 in the store listing**. `full_access` would force the rating to
-1 and disable protection mode - deliberately avoided: it would grant cgroup
-access to *all* devices including the system disk, which the device-option
-mechanism refuses precisely.
+installed, 6 in the store listing**. `full_access` would force the rating
+to 1 and disable protection mode — deliberately avoided: it would grant
+cgroup access to *all* devices including the system disk, which the
+device-option mechanism refuses precisely.
 
 ## hd-idle -t (single-shot spindown) quirks
 
@@ -199,20 +200,18 @@ drives may wake a drive between the STOP command and the probe).
   daemon's argv, both untouched on failure; the persistent source of truth
   is `options.json` on /data.
 
-## Local-lab host interference (spindown mechanisms on the dev machine)
+## Local-lab host interference on this dev machine
 
-The lab runs the app container `--privileged` **on the dev machine**, so
-host-side disk power management interacts with spindown tests. Checked on
-the development machine (2026-10, ostree-based Fedora): no udisks2 (hence no
-GNOME-Disks drive settings that get re-applied on hotplug), no TLP/
-laptop-mode/powertop service, no smartd, `hdparm` not installed and
-`/etc/hdparm.conf` inert (commented), and the disks' SCSI device runtime-PM
-`power/control` is `on` (Fedora udev default for storage) - i.e. no USB
-autosuspend that could break SG_IO. General reality check: mainstream
-distros ship nothing active by default; the realistic interference sources
-are user-configured (GNOME Disks stored settings in `/var/lib/udisks2`
-re-applied per hotplug, `/etc/hdparm.conf` directives, TLP `DISK_*`,
-smartd) and the inverse: desktop IO on mounted drives waking them. The lab
-hook prints read-only preflight warnings for all of these and asserts
-event-based (hd-idle's own log lines + `hdparm -C` immediately after a
-forced `hd-idle -t`), never "stays spundown for N minutes".
+(The general principle — interference sweep, event-based assertions,
+side-effect-free probes — is repository-wide, see the repository-root
+`KNOWLEDGE.md`; the preflight sweep lives in the lab hook
+`.mise/tasks/lab/hd-idle.sh`.)
+
+Checked on the development machine (2026-10, ostree-based Fedora): no
+udisks2 (hence no GNOME-Disks drive settings that get re-applied on
+hotplug), no TLP/laptop-mode/powertop service, no smartd, `hdparm` not
+installed and `/etc/hdparm.conf` inert (commented), and the disks' SCSI
+device runtime-PM `power/control` is `on` (Fedora udev default for
+storage) — i.e. no USB autosuspend that could break SG_IO. Nothing
+interferes with spindown tests here today; the preflight sweep guards
+against that changing.

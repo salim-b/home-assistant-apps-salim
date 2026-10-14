@@ -13,9 +13,18 @@ This repository holds [@salim-b](https://github.com/salim-b)'s [Home Assistant a
 
 Turn your Home Assistant instance into a [Network File System (NFS)](https://en.wikipedia.org/wiki/Network_File_System) server.
 
+### [hd-idle](./hd-idle)
+
+![Supports aarch64 Architecture][aarch64-shield]
+![Supports amd64 Architecture][amd64-shield]
+
+Spins down idle USB and SATA hard disk drives automatically.
+
 ## Development
 
 The structure of all apps in this repository follows Home Assistant's [best practices](https://developers.home-assistant.io/docs/apps) as far as possible.
+
+Non-obvious development knowledge lives in [`KNOWLEDGE.md`](./KNOWLEDGE.md) (repository-wide: supervisor behaviors, AppArmor, base-image gotchas, testing) and in each app's own `KNOWLEDGE.md` (e.g. [`hd-idle/KNOWLEDGE.md`](./hd-idle/KNOWLEDGE.md), [`nfs-server/KNOWLEDGE.md`](./nfs-server/KNOWLEDGE.md)).
 
 To test an app on your Home Assistant server (device), use the `deploy` mise task. It copies the app folder to the device's `/local_apps/` directory (removing an existing copy first), refreshes the app store metadata, then installs the app (if not present), updates it (if the version changed in `config.yaml`) or rebuilds its image (otherwise), and makes sure it is running afterwards:
 

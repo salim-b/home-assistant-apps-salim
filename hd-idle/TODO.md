@@ -16,7 +16,7 @@ facts and root causes live in `KNOWLEDGE.md`.
   `/dev/sd*` ioctl path are lab-untestable (no AppArmor enforcement in the
   lab). Profile changes need a `config.yaml` version bump to reach the
   device (the supervisor re-installs profiles on app *update*, not rebuild -
-  see nfs-server/KNOWLEDGE.md).
+  see the repository-root KNOWLEDGE.md, AppArmor section).
 
 - Extend `test:live` with real spindown checks once USB HDDs are attached to
   the odroid-m1: force a spindown via the app container's `hd-idle -t`
