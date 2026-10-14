@@ -8,10 +8,16 @@ information lives elsewhere — see the placement rule below.
 A [Home Assistant app repository](https://developers.home-assistant.io/docs/apps/)
 (formerly "add-ons"): each app is a subdirectory with a `config.yaml`,
 `Dockerfile`, `rootfs/`, docs, translations, and its own `TODO.md` /
-`KNOWLEDGE.md`. Currently contains `nfs-server` (an NFSv4 server app running
-the NFS server in the host kernel via the HAOS kernel module — the
-architecture and its gotchas are non-obvious: read
-`nfs-server/KNOWLEDGE.md` before touching the app's runtime code).
+`KNOWLEDGE.md`. Currently contains:
+
+- `nfs-server` — an NFSv4 server app running the NFS server in the host
+  kernel via the HAOS kernel module; the architecture and its gotchas are
+  non-obvious (read `nfs-server/KNOWLEDGE.md` before touching the app's
+  runtime code).
+- `hd-idle` — spins down idle USB/SATA hard disk drives via the Alpine
+  `hd-idle` package (CLI-only config, per-drive device access and spindown
+  specifics are non-obvious: read `hd-idle/KNOWLEDGE.md` before touching
+  the app's runtime code).
 
 ## Information placement rule
 
@@ -103,6 +109,8 @@ global tasks from your mise user config); the essentials:
 - **Commits**: Conventional Commits (`fix:`/`feat:`/`docs:`/`chore:`/…);
   scope app changes (`fix(nfs-server): …`); one commit per logical unit;
   final trailer line `Assisted-by: Goose:<model-slug>`.
+- **Text files**: always write POSIX-conformant text files — end every
+  text file with a final newline (the `mise run lint` gate enforces it).
 - **App releases**: a working branch starting from `main` bumps
   `version` in `config.yaml` to a *single* next version (major, minor or
   patch according to semantic versioning — the branch ships one version,
