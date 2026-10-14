@@ -29,6 +29,8 @@ facts and root causes live in `KNOWLEDGE.md`.
   explanatory message. Consider an upstream suggestion for a finer filter
   (e.g. `type=disk`) if the UX annoys real users.
 
+- Design a better logo. Maybe a HDD that sleeps/snores ("zzzz")?
+
 ## Resolved
 
 (none yet)
