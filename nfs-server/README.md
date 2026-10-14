@@ -20,7 +20,7 @@ Turn your Home Assistant instance into a [Network File System (NFS)](https://en.
 
 ## Documentation
 
-For usage, configuration, security notes and client mounting instructions, see the [**Documentation**](./DOCS.md).
+For usage, configuration, security notes and client mounting instructions, see the [**Documentation**](/config/app/f8b2d53d_nfs/documentation).
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg

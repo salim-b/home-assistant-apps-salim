@@ -34,16 +34,16 @@ The NFS server requires appropriate filesystem permissions on shared directories
 
 ## NFSv4 client state recovery
 
-The app runs the kernel's client-recovery tracker (`nfsdcld`, with a persistent sqlite store in the app's data directory), so NFSv4 clients that are connected across an app (re)start keep their state – open files, byte-range locks and delegations: they reclaim it from the tracker's records during the grace period that follows the restart, instead of losing it. Held locks surviving an app update/restart are the visible effect.
+The app runs the kernel's client-recovery tracker (`nfsdcld`, with a persistent SQLite store in the app's data directory), so clients that are connected across an app (re)start keep their state – open files, byte-range locks and delegations: they reclaim it from the tracker's records during the grace period that follows the restart, instead of losing it. Held locks surviving an app update/restart are the visible effect.
 
 The grace period only runs when there is client state to reclaim: after a boot with no recorded clients the server skips it entirely, and it ends early once all recorded clients have reclaimed. The `grace_time` option (if set) overrides the default, which matches the `lease_time` option (keep it at or above `lease_time` so idle clients – whose state-manager renewals fire at ~lease/3 intervals – can still recover).
 
 ## Security notes
 
-- **Authentication**: NFSv4 with `sec=sys` (the default here) has no cryptographic authentication – a client's claimed user ID is taken at face value. Anyone on an allowed network can connect as any user ID; treat only trusted networks as allowed clients.
+- **Authentication**: NFSv4 with `sec=sys` has no cryptographic authentication – a client's claimed user ID is taken at face value. Anyone on an allowed network can connect as any user ID, therefore it's essential to allow only trusted networks.
 - **Access control**: The `network` option of each share is the only access control (plus the port being published on **all** host interfaces by the container runtime – restricting reachability to the intended LAN is a router/firewall concern). Prefer listing specific networks over `*` (all clients).
 - **Read-only by default**: Exports without `rw` in their options are read-only. For shares that only need to be read (e.g. media), omit `rw`.
-- **User identity mapping**: By default, requests from user ID `0` (root) are squashed to the anonymous user (`anonuid`/`anongid`, default `1000`) – see the option descriptions in the configuration dialog.
+- **User identity mapping**: By default, requests from user ID `0` (root) are squashed to the anonymous user defined via `anonuid` and `anongid` (default `65534`) – see the option descriptions in the configuration dialog.
 
 ## Requirements
 
