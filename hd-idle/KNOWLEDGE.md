@@ -183,6 +183,22 @@ drives may wake a drive between the STOP command and the probe).
   remove it if/when upstream ships the behavior (Alpine package users would
   get it via a package version bump + app version bump).
 
+- **The watcher's failure class is nearly empty, by construction** (the
+  regeneration-failure guard is cheap insurance, not a fix for a real path):
+  the options cannot change under a running app (supervisor validates at
+  save time - `api/apps.py` options endpoint - and only hands the new
+  options.json to the app at its next start), so all config-content
+  rejections fire at boot. Device-resolution failures are not failures
+  (pass-through path). The one reachable mid-run failure: two configured
+  symlink names of the same physical drive (drives can carry several by-id
+  links - e.g. `ata-*` and `usb-*` for one disk) where one was detached at
+  boot; once the drive is plugged in, the duplicate-entry rejection fires
+  per tick (ERROR lines every 30 s until the user fixes the config -
+  spammy but truthful, accepted). "Known-good configuration" = the args
+  file (re-read by the run script on every (re)start) plus the running
+  daemon's argv, both untouched on failure; the persistent source of truth
+  is `options.json` on /data.
+
 ## Local-lab host interference (spindown mechanisms on the dev machine)
 
 The lab runs the app container `--privileged` **on the dev machine**, so

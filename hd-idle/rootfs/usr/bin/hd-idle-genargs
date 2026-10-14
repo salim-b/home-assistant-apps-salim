@@ -19,10 +19,13 @@ set -euo pipefail
 ##           [-d] [-I] [-l /data/hd-idle.log]                # global flags
 ##
 ## --quiet suppresses ALL narrative/info output (boot narrative and the
-## watcher's per-tick noise); warnings and errors are always logged. Invalid
-## configuration still exits nonzero in both modes: cont-init turns that
-## into a failed app boot, the watcher catches it and keeps the current
-## (known-good) configuration.
+## watcher's per-tick noise); warnings and errors are always logged, and
+## invalid configuration still exits nonzero in both modes. For cont-init
+## (boot) that fails the app boot. For the watcher it means regeneration
+## failed and the current configuration (the args file + the running
+## daemon's argv - the hd-idle-watch run script spells out when this can
+## happen at all; the options themselves cannot change mid-run) stays as
+## is.
 ##
 ## hd-idle semantics relied upon (verified against v1.22 source, see
 ## hd-idle/KNOWLEDGE.md):
@@ -121,7 +124,12 @@ resolve_device() {
   ## A device-mapper device (e.g. LUKS) attributes to its holding disk
   ## (hd-idle attributes dm stats to the holder disk as well).
   if [[ "${base}" =~ ^dm-[0-9]+$ ]]; then
-    holder=$(ls "/sys/class/block/${base}/holders" 2>/dev/null | head -n 1 || true)
+    holder=""
+    for entry in "/sys/class/block/${base}/holders/"*; do
+      [ -e "${entry}" ] || continue
+      holder="${entry##*/}"
+      break
+    done
     if [ -z "${holder}" ]; then
       return 1
     fi

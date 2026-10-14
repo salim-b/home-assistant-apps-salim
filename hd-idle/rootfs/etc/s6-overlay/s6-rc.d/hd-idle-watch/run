@@ -37,9 +37,19 @@ CAND_FILE=/tmp/hd-idle-args.new
 while true; do
   sleep "${INTERVAL}"
 
-  ## Regenerate from current options + current resolution. A failure
-  ## (invalid options cannot appear mid-run - they'd have failed the boot -
-  ## but a transient system state could) keeps the known-good config.
+  ## Regenerate from current options + current device resolution. Mid-run,
+  ## the options themselves cannot change: the supervisor validates new
+  ## options against the schema (device-path existence included) at save
+  ## time and only hands them to the app at its next (re)start - so the
+  ## config-content rejections (partition/system-disk/duplicate/missing
+  ## idle) all fired at boot already. Realistic mid-run failure sources are
+  ## the exotic duplicate-after-replug case (two configured symlink names
+  ## of one physical drive, e.g. an ata-* and a usb-* by-id link, where one
+  ## was detached at boot and only resolves once the drive is plugged in)
+  ## and unforeseen transient system states - hence keeping the known-good
+  ## configuration instead of aborting (the persistent source of truth is
+  ## options.json on /data; the run script re-reads the args file on every
+  ## (re)start, so nothing needs re-installing here).
   if ! /usr/bin/hd-idle-genargs --quiet "${CAND_FILE}"; then
     bashio::log.warning "hd-idle configuration regeneration failed - keeping the current configuration."
     continue
