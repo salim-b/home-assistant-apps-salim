@@ -5,6 +5,12 @@ facts and root causes live in `KNOWLEDGE.md`.
 
 ## Tasks
 
+- Upstream: hd-idle's `-s 1` re-resolves only *unresolved* device entries and
+  never re-verifies already-resolved ones (`resolveSymlinks()` skips entries
+  with a populated `Name`). A small upstream change (re-verify resolved
+  symlinks each cycle, update entries whose resolution changed) would let us
+  remove the app's `hd-idle-watch` service (see `KNOWLEDGE.md`).
+
 - Verify the AppArmor profile on the real device (odroid-m1) with the drives
   attached: the `hdidle` sub-profile (`cx` + `deny network`) and the
   `/dev/sd*` ioctl path are lab-untestable (no AppArmor enforcement in the

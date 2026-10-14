@@ -1,0 +1,61 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+## Drive re-resolution watcher (longrun service).
+##
+## hd-idle resolves device entries ONCE at startup and only re-resolves
+## entries that are still unresolved (its -s 1 never re-checks entries whose
+## symlink already resolved - upstream behavior, see hd-idle/KNOWLEDGE.md).
+## Kernel names are not stable across re-plugs (ports/hubs/enumeration
+## order), so a moved drive would otherwise keep its stale -a <name> entry:
+## hd-idle would watch (and spin down) the wrong name or none, until an app
+## restart fixed it. The supervisor offers no callback for this (its
+## hardware events only re-grant cgroup device rules to the running
+## container) - hence this in-container watcher:
+##
+## - periodically regenerate the hd-idle command line with the shared
+##   generator (/usr/bin/hd-idle-genargs --quiet) from the CURRENT options
+##   and the CURRENT device resolution (readlink -f of the configured
+##   by-id paths);
+## - install it and restart just the hd-idle service (s6-svc -r) when the
+##   generated configuration actually changed (a plain comparison, so
+##   unrelated churn never triggers a restart).
+##
+## hd-idle restart effects are benign: it re-reads /etc/hd-idle.args from
+## the run script and starts with fresh in-memory stats - idle timers
+## restart, and no immediate command is sent to any disk, so a drive in
+## standby is NOT spun up by the restart.
+##
+## First sleep: the boot-time generation (cont-init config.sh) already
+## wrote the args file; the first cycle only compares against it.
+
+INTERVAL=30
+ARGS_FILE=/etc/hd-idle.args
+CAND_FILE=/tmp/hd-idle-args.new
+
+while true; do
+  sleep "${INTERVAL}"
+
+  ## Regenerate from current options + current resolution. A failure
+  ## (invalid options cannot appear mid-run - they'd have failed the boot -
+  ## but a transient system state could) keeps the known-good config.
+  if ! /usr/bin/hd-idle-genargs --quiet "${CAND_FILE}"; then
+    bashio::log.warning "hd-idle configuration regeneration failed - keeping the current configuration."
+    continue
+  fi
+
+  if cmp -s "${ARGS_FILE}" "${CAND_FILE}"; then
+    rm -f "${CAND_FILE}"
+    continue
+  fi
+
+  ## The new command line itself (logged by the hd-idle run script after
+  ## the restart) shows the new drive names - the generator runs fully
+  ## quiet per tick so unchanged states produce no log lines at all.
+  bashio::log.info "Drive device paths changed - updating the hd-idle configuration and restarting hd-idle"
+  mv -f "${CAND_FILE}" "${ARGS_FILE}"
+  if ! s6-svc -r /run/service/hd-idle; then
+    bashio::log.warning "Restarting the hd-idle service failed - it will pick up the new configuration on its next restart."
+  fi
+done

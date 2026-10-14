@@ -144,6 +144,45 @@ ASC/ASCQ 04 01 = NOT READY / "in process of becoming ready") and then
 that is what the lab hook does, with polling retries (desktop IO on mounted
 drives may wake a drive between the STOP command and the probe).
 
+## Automatic drive re-resolution (hd-idle-watch)
+
+- **The problem**: hd-idle resolves its `-a` device entries **once** at
+  startup; `-s 1` re-resolves *only entries that are still unresolved*
+  (`resolveSymlinks()` skips entries whose `Name` is already populated -
+  verified in v1.22). Kernel names (`sdX`) are not stable across re-plugs
+  (different ports/hubs, enumeration order), so a moved drive would keep its
+  stale entry: hd-idle watches (and spins down) the wrong name or none, until
+  an app restart fixed it.
+- **The supervisor cannot help**: its HARDWARE_NEW_DEVICE handling only
+  re-grants cgroup device rules to the *running* container - there is no
+  callback/notification API to apps and no restart-on-device-change
+  mechanism (verified against supervisor 2026.10.1). The fix is entirely
+  app-internal; no HAOS interaction is involved.
+- **Design**: the arg generation lives in a shared helper
+  (`/usr/bin/hd-idle-genargs`, used by cont-init config.sh and the watcher).
+  The `hd-idle-watch` longrun polls every 30 s: regenerate the command line
+  with `hd-idle-genargs --quiet` into a candidate file, `cmp` it against
+  `/etc/hd-idle.args`, and only on an actual difference install the new file
+  and restart just the hd-idle service (`s6-svc -r /run/service/hd-idle`).
+  Unrelated churn therefore never triggers a restart, and `--quiet` makes
+  unchanged 30-s ticks produce **no log output at all** (warnings/errors
+  still surface; the new command line is logged by the hd-idle run script
+  after each restart). Polling (not udev
+  events) because mapping the host's `/run/udev` socket (`with_udev`) into
+  an Alpine-based container for event-driven monitoring is version-fragile
+  for zero gain - 30 s worst-case latency is fine for a maintenance action.
+- **hd-idle restart effects are benign**: the run script re-reads the args
+  file; hd-idle starts with fresh in-memory stats (idle timers restart) and
+  no command is sent to any disk at startup - a drive in standby is NOT spun
+  up by the restart. Minor cosmetic cost: an activity-log "running" period
+  spanning the restart is misaccounted (hd-idle cannot know it was
+  restarted).
+- **The clean upstream fix** would make the watcher redundant: re-verify
+  already-resolved symlinks each cycle in `-s 1` mode and update changed
+  entries (see TODO.md). Until then the watcher is the app-side workaround;
+  remove it if/when upstream ships the behavior (Alpine package users would
+  get it via a package version bump + app version bump).
+
 ## Local-lab host interference (spindown mechanisms on the dev machine)
 
 The lab runs the app container `--privileged` **on the dev machine**, so

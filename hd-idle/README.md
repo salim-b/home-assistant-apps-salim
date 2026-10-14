@@ -10,7 +10,7 @@ Spin down idle USB and SATA hard disk drives automatically.
 - **Automatic spin-down**: Runs [hd-idle](https://github.com/adelolmo/hd-idle), which watches I/O activity per disk (`/proc/diskstats`) and sends SCSI/ATA standby commands to hard disk drives that have been idle for their configured time.
 - **Per-drive configuration**: Every managed drive gets its own idle time, command type and power condition, selected from a dropdown of the system's drives by their stable `/dev/disk/by-id` paths.
 - **Opt-in / opt-out modes**: Either explicitly list the drives to spin down (only those are ever touched), or let all monitored drives follow a global default with per-drive overrides and exclusions.
-- **Hotplug-aware**: Drives are granted device access dynamically (including after re-plugging), and disk IDs are re-resolved to their device paths at runtime.
+- **Hotplug-aware**: Drives are granted device access dynamically (including after re-plugging), and disk IDs are re-resolved to their device paths at runtime - drives moved between ports or machines are picked up automatically without a restart.
 - **System disk is always protected**: The drive Home Assistant runs from is excluded by three independent layers (supervisor device policy, startup detection of the boot disk and `hassos-*` partitions, and hd-idle's own monitoring scope) – regardless of whether Home Assistant boots from USB.
 - **Hardened runtime**: Ships a custom [AppArmor](https://apparmor.net/) profile; the app itself needs no network access.
 

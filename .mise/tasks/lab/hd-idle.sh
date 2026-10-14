@@ -66,7 +66,7 @@ lab_preflight() {
 }
 
 lab_runtime_check() {
-  local app="$LAB_NET_NAME-app" drives="$LAB_SPINDOWN_DRIVES" dev state check_img
+  local app="$LAB_NET_NAME-app" drives="$LAB_SPINDOWN_DRIVES" dev check_img
   local fail=0 waited=0 missing=""
 
   ## Boot sanity: hd-idle must be running, its config dump must be in the
@@ -168,5 +168,34 @@ EOF
     return 1
   fi
   echo "   PASS: daemon logged its own spindown events for all smoke-test drives"
+
+  ## Watcher mechanics (drive re-resolution): the watcher must regenerate
+  ## the args file and restart hd-idle when the configuration changed. A
+  ## kernel-name move cannot be simulated in the lab (renames happen
+  ## kernel-side), so verify the mechanism deterministically: corrupt
+  ## /etc/hd-idle.args and expect the watcher to regenerate the identical
+  ## content from the options within one poll interval and restart hd-idle
+  ## (second "Starting hd-idle" log line, daemon process up again).
+  if docker exec "$app" sh -c "test -x /usr/bin/hd-idle-genargs" 2>/dev/null; then
+    echo "-- verifying the drive re-resolution watcher (corrupt-args roundtrip)"
+    docker exec "$app" cp /etc/hd-idle.args /tmp/args.expected
+    docker exec "$app" sh -c 'printf "corrupted\n" > /etc/hd-idle.args'
+    restored=0
+    for _ in $(seq 1 10); do
+      sleep 5
+      if docker exec "$app" cmp -s /etc/hd-idle.args /tmp/args.expected; then restored=1; break; fi
+    done
+    [ "$restored" = 1 ] || { echo "   FAIL: args file not restored within 50 s (watcher not running?)"; return 1; }
+    restarts=$(docker logs "$app" 2>&1 | grep -c "Starting hd-idle" || true)
+    [ "$restarts" -ge 2 ] \
+      || { echo "   FAIL: args restored but hd-idle not restarted (Starting count: $restarts)"; return 1; }
+    if ! docker exec "$app" sh -c "ps | grep -q '[s]bin/hd-idle'"; then
+      echo "   FAIL: hd-idle process gone after the watcher restart"
+      return 1
+    fi
+    echo "   PASS: watcher restored the configuration and restarted hd-idle"
+  else
+    echo "(no hd-idle-genargs: watcher check skipped - app image predates the watcher?)"
+  fi
   return 0
 }

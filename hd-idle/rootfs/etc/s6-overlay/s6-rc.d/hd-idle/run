@@ -6,7 +6,9 @@ set -euo pipefail
 ##
 ## hd-idle is configured exclusively via command line arguments - there is no
 ## config file (see hd-idle/KNOWLEDGE.md); cont-init config.sh generated and
-## validated the argument list. `exec` makes hd-idle this service's process:
+## validated the argument list, and the hd-idle-watch longrun may regenerate
+## it later and restart this service when drive paths move (moved drives
+## change their kernel names). `exec` makes hd-idle this service's process:
 ## s6 signals it directly on stop, and its stdout (spin-down/spin-up events
 ## like "sdi spindown", debug lines in debug mode) lands in the app log.
 ## -s 1 (runtime symlink resolution) is always included so detached-then-
