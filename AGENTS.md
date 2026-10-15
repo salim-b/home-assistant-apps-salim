@@ -120,11 +120,13 @@ essentials:
   heading hierarchy, ...). Don't hand-wrap prose: write it naturally and let `fmt` shape it. rumdl (`.rumdl.toml`,
   schema-validated by validate.py) stays as the markdownlint-rules-rich second linter — its own reflow is disabled
   (panache's and rumdl's fill states disagree), so its MD013 is a pure width check: code blocks exempt, lines whose only
-  overrun is an unbreakable code span forgiven. Both exclude `AI_POLICY.md` (upstream-verbatim). Known edges: panache's
-  reflow is non-idempotent on a multi-line ~~strikethrough~~ list item (indent grows every run) — keep struck spans on a
-  single line (shorten the wording; MD013 caps it at 120). And don't let prose wrap so that a line starts with an
-  ordered-list marker (`4)`, `2026.` — a parenthetical ending in digits does this at wrap boundaries): CommonMark
-  renders such a line as prose, panache formats it as a nested list, and the two disagree.
+  overrun is an unbreakable code span forgiven. Both exclude `AI_POLICY.md` (upstream-verbatim). rumdl never rewrites
+  files: its fix allow-list is pinned to an inert `all` sentinel (`.rumdl.toml`, behavioral canary in validate.py) —
+  formatting fixes go through panache (`mise run fmt`), non-format rumdl findings are fixed by hand. Known edges:
+  panache's reflow is non-idempotent on a multi-line ~~strikethrough~~ list item (indent grows every run) — keep struck
+  spans on a single line (shorten the wording; MD013 caps it at 120). And don't let prose wrap so that a line starts
+  with an ordered-list marker (`4)`, `2026.` — a parenthetical ending in digits does this at wrap boundaries):
+  CommonMark renders such a line as prose, panache formats it as a nested list, and the two disagree.
 - mise tasks: file tasks in `.mise/tasks/` with proper suffixes (`.sh`, `.py`, … — mise resolves the short names, e.g.
   `mise run lint`) and `#MISE`/`#USAGE` headers. Task arguments must be documented and typed via usage specs (never bare
   `$1` handling unless `raw_args = true`). Required args are declared `arg "<name>"` (mise errors before the task starts

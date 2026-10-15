@@ -6,6 +6,20 @@
 # rumdl's published JSON schema (see .mise/tasks/validate.py).
 
 [global]
+# rumdl must never rewrite files: panache (panache.toml) owns ALL markdown
+# formatting, and a rumdl `fmt` / `check --fix` pass would rewrite the very
+# wrapping panache just shaped. `fixable` is rumdl's fix allow-list (empty =
+# everything fixable; entries = only the listed rules fix, all fix paths go
+# through this gate - the fix coordinator and the LSP). There is no
+# "fix nothing" wildcard, so pin an *inert* allow-list entry instead: `all`
+# is preserved by rumdl's rule-list canonicalization and never matched
+# against a rule name (verified on 0.2.79: fmt/check --fix change nothing,
+# `disable = ["all"]` is equally inert). The behavioral canary in
+# validate.py fails loudly if a rumdl upgrade ever flips this (e.g.
+# implementing `all` as a fix wildcard, which would silently allow
+# everything again).
+fixable = ["all"]
+
 # AI_POLICY.md is the Open Home Foundation's policy text, kept verbatim for
 # upstream syncs - not this repo's prose to style: excluded from linting
 # entirely.

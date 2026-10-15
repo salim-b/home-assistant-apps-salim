@@ -18,6 +18,8 @@
   schema (option typos fail at `mise run check`, not on Renovate's next run)
 - validates .rumdl.toml against rumdl's published config schema (fetched at
   the installed rumdl version's tag; the pin lives in mise.toml [tools])
+- canary-checks that rumdl's autofix is disabled (fmt must not rewrite any
+  file - panache owns formatting; see .rumdl.toml `fixable`)
 - validates panache.toml against panache's published config schema (fetched
   once per installed panache version; the pin lives in mise.toml [tools])
 """
@@ -33,6 +35,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 import tomllib
 import urllib.request
@@ -203,6 +206,41 @@ def validate_rumdl_config() -> None:
         fail(".rumdl.toml", f"fetched schema unusable: {err.message[:200]}")
 
 
+def validate_rumdl_no_autofix() -> None:
+    """Behavioral canary: rumdl must not rewrite ANY file (panache owns all
+    markdown formatting). The `.rumdl.toml` fix allow-list pins an inert
+    `all` entry (see the comment there) - this canary runs `rumdl fmt` on a
+    scratch violation file with the repo config and fails if the file
+    changed, so a rumdl upgrade that flips the semantics (e.g. implementing
+    `all` as a fix wildcard) is caught at `mise run check`, not by silently
+    reformatted files. Requires rumdl on PATH, i.e. run via `mise run
+    validate`."""
+    canary = "# canary\n\nSome  text with fixable issues.   \n\n- item one\n+ item two\nTab\there\n"
+    with tempfile.TemporaryDirectory() as td:
+        canary_file = pathlib.Path(td) / "canary.md"
+        canary_file.write_text(canary)
+        try:
+            subprocess.run(
+                ["rumdl", "fmt", "--config", str(ROOT / ".rumdl.toml"), str(canary_file)],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except FileNotFoundError:
+            sys.exit("rumdl not on PATH: run this task via `mise run validate`")
+        except subprocess.CalledProcessError as err:
+            fail(".rumdl.toml", f"canary fmt invocation failed: {err.stderr[-200:]}")
+            return
+        if canary_file.read_text() != canary:
+            fail(
+                ".rumdl.toml",
+                "rumdl fmt rewrote a canary file: rumdl's autofix must stay"
+                " disabled (panache owns formatting; see the fixable comment"
+                " in .rumdl.toml) - re-verify the installed rumdl version's"
+                " fixable/unfixable semantics",
+            )
+
+
 def validate_panache_config() -> None:
     """Schema-validate panache.toml against panache's published config schema,
     fetched at the *installed* panache version's tag (the single source of
@@ -356,6 +394,7 @@ def main() -> int:
         return 0  # cache warmed by the fetches above
     validate_renovate_config()
     validate_rumdl_config()
+    validate_rumdl_no_autofix()
     validate_panache_config()
     validate_apk_pins()
 
