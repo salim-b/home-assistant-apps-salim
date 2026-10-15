@@ -9,6 +9,11 @@
   non-read-safe SCSI command failed with EPERM even though the container carried the capability - hd-idle's `ata`
   spindown path (ATA PASS-THROUGH) and smartctl's ATA commands were affected, while the `scsi` path (START STOP UNIT, in
   the kernel's read-safe list) worked.
+- New option **Disable drive power management** (default on): the app issues `apm,off` and `standby,off` (via
+  smartmontools) for every managed drive at app start and whenever a drive (re)appears, so hd-idle's idle time is the
+  only thing that puts a drive to sleep - this stops some WD USB bridge firmwares from waking drives shortly after an
+  external spindown (an effect invisible to I/O monitoring). Bridges that do not forward APM produce a logged one-time
+  failure; the standby-timer disable is honored by all tested bridges.
 
 ## 0.1.0
 

@@ -264,6 +264,21 @@ else
   ARGS+=(-i "${DEFAULT_IDLE}")
 fi
 
+## Machine-readable drive list for hd-idle-pmfix (the drive-PM treatment;
+## written next to the args file). One "<name> <idle> <command-type>" line
+## per drive with its EFFECTIVE values: exclusions carry idle 0, entries
+## without explicit values carry the inherited defaults.
+DRIVES_FILE="${ARGS_FILE%.args}.drives"
+[[ "${DRIVES_FILE}" == */* ]] || DRIVES_FILE="./${DRIVES_FILE}"
+case "${ARGS_FILE}" in
+  *.args) ;;
+  *) DRIVES_FILE="${ARGS_FILE}.drives" ;;
+esac
+DRIVES_LINES=()
+for disk in ${SYSTEM_SD_DISKS}; do
+  DRIVES_LINES+=("${disk} 0 ${DEFAULT_COMMAND}")
+done
+
 for disk in ${SYSTEM_SD_DISKS}; do
   ARGS+=(-a "${disk}" -i 0)
 done
@@ -327,6 +342,17 @@ while IFS= read -r disk; do
   if [ -n "${POWER_CONDITION}" ]; then
     ARGS+=(-p "${POWER_CONDITION}")
   fi
+
+  ## Effective per-drive values for the drives file (pmfix reads those;
+  ## exclusions carry idle 0, missing per-drive values inherit the defaults).
+  if [ -n "${IDLE}" ]; then
+    EFFECTIVE_IDLE="${IDLE}"
+  elif [ "${MODE}" = "opt-in" ]; then
+    EFFECTIVE_IDLE="0"
+  else
+    EFFECTIVE_IDLE="${DEFAULT_IDLE}"
+  fi
+  DRIVES_LINES+=("${EMIT_NAME} ${EFFECTIVE_IDLE} ${COMMAND_TYPE:-${DEFAULT_COMMAND}}")
 done < <(echo "${DISKS}")
 
 if [ "${N_DRIVES}" -eq 0 ]; then
@@ -349,5 +375,6 @@ if bashio::config.true 'activity_log'; then
 fi
 
 printf '%s\n' "${ARGS[*]}" >"${ARGS_FILE}"
+printf '%s\n' "${DRIVES_LINES[@]}" >"${DRIVES_FILE}"
 qlog_info "hd-idle command line: /usr/sbin/hd-idle ${ARGS[*]}"
 qlog_info "hd-idle configuration completed"

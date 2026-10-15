@@ -12,4 +12,15 @@ set -euo pipefail
 ## are re-plugged into other ports etc.). See hd-idle/KNOWLEDGE.md.
 
 bashio::log.info "Configuring hd-idle..."
-exec /usr/bin/hd-idle-genargs /etc/hd-idle.args
+if /usr/bin/hd-idle-genargs /etc/hd-idle.args; then
+  ## Drive-PM treatment at boot (volatile drive settings; re-applied by the
+  ## watcher on drive (re)appearance). Default on (absent key = enabled:
+  ## installed options are user data and are NOT refreshed on app update -
+  ## a pre-existing options.json without the key must not silently disable
+  ## the feature).
+  if [ "$(bashio::config 'disable_drive_pm' true)" = "true" ]; then
+    /usr/bin/hd-idle-pmfix /etc/hd-idle.drives
+  fi
+  exit 0
+fi
+exit 1

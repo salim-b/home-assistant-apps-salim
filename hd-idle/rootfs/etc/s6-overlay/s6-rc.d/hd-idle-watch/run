@@ -64,7 +64,21 @@ while true; do
   ## the restart) shows the new drive names - the generator runs fully
   ## quiet per tick so unchanged states produce no log lines at all.
   bashio::log.info "Drive device paths changed - updating the hd-idle configuration and restarting hd-idle"
+  ## Keep the previous drives file for hd-idle-pmfix (--since): only drives
+  ## that are NEW or CHANGED relative to it get the (possibly
+  ## wake-causing) treatment re-applied; unchanged drives keep their
+  ## volatile settings.
+  DRIVES_FILE="${ARGS_FILE%.args}.drives"
+  case "${ARGS_FILE}" in *.args) ;; *) DRIVES_FILE="${ARGS_FILE}.drives" ;; esac
+  CAND_DRIVES_FILE="${CAND_FILE%.args}.drives"
+  case "${CAND_FILE}" in *.args) ;; *) CAND_DRIVES_FILE="${CAND_FILE}.drives" ;; esac
+  cp "${DRIVES_FILE}" "${DRIVES_FILE}.prev" 2>/dev/null || true
   mv -f "${CAND_FILE}" "${ARGS_FILE}"
+  mv -f "${CAND_DRIVES_FILE}" "${DRIVES_FILE}"
+  if [ "$(bashio::config 'disable_drive_pm' true)" = "true" ]; then
+    /usr/bin/hd-idle-pmfix "${DRIVES_FILE}" --since "${DRIVES_FILE}.prev" ||
+      bashio::log.warning "hd-idle-pmfix failed - the drives' power management stays as is."
+  fi
   if ! s6-svc -r /run/service/hd-idle; then
     bashio::log.warning "Restarting the hd-idle service failed - it will pick up the new configuration on its next restart."
   fi

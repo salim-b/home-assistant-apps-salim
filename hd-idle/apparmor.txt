@@ -80,10 +80,20 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
 
   # Generated hd-idle command line (cont-init config.sh -> s6 run script)
   /etc/hd-idle.args rw,
+  /etc/hd-idle.drives rw,
 
   # Runtime check scripts
   /etc/cont-init.d/config.sh rix,
   /etc/s6-overlay/scripts/* rix,
+
+  # Drive power-management treatment (hd-idle-pmfix, option disable_drive_pm):
+  # smartctl issues the ATA SET FEATURES commands (APM level and standby
+  # timer - non-read-safe SCSI commands, hence the capability rule above).
+  # Read-only sysfs coverage beyond the block/class dirs above: kept broad
+  # per the header note above (no AppArmor denial logs on HAOS to tighten
+  # file rules safely).
+  /usr/sbin/smartctl rix,
+  /sys/devices/{,**} r,
 
   ## The hd-idle daemon runs under its own tighter sub-profile (cx = change
   ## profile on execute): no networking at all, and only the disk/sysfs

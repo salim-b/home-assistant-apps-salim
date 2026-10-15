@@ -13,8 +13,11 @@ FROM ${BUILD_FROM}
 # in the daily CI cron) flags the mismatch with that workflow. This differs
 # deliberately from nfs-server's floating nfs-utils - the policy background
 # is in the repository-root KNOWLEDGE.md (apk package version policy).
+# smartmontools: powers the drive-PM treatment (hd-idle-pmfix, option
+# disable_drive_pm - see hd-idle/KNOWLEDGE.md).
 RUN apk add --no-cache \
-  hd-idle=1.22-r7
+  hd-idle=1.22-r7 \
+  smartmontools=7.5-r0
 
 # Copy root filesystem
 COPY --link rootfs /

@@ -82,6 +82,20 @@ configuration:
       Power condition applied to drives whose per-drive power condition is
       empty and to drives that appear without a list entry while the app
       runs. See the per-drive power condition for details.
+  disable_drive_pm:
+    name: Disable drive power management
+    description: >-
+      Disable the drives' own power management (Advanced Power Management
+      and the built-in standby timer) for every managed drive, so hd-idle's
+      configured idle time is the only thing that puts a drive to sleep.
+      This prevents drives - and some USB bridge firmwares - from
+      re-spinning themselves up shortly after an external spindown, an
+      effect that is invisible to the app's I/O monitoring. The settings
+      are volatile: they are re-applied at app start and whenever a drive
+      (re)appears. A bridge that does not forward a feature makes the
+      corresponding command fail (logged once, harmless): most WD USB
+      bridges do not forward APM at all, but all commonly encountered ones
+      honor the standby-timer disable.
   debug:
     name: Debug mode
     description: >-

@@ -38,6 +38,7 @@ options:
   default_idle: 600
   default_command_type: scsi
   default_power_condition: 0
+  disable_drive_pm: true
   debug: false
   activity_log: false
   ignore_spin_down_detection: false
@@ -63,6 +64,7 @@ schema:
   default_idle: "int(0,)?"
   default_command_type: "list(scsi|ata)"
   default_power_condition: "int(0,15)"
+  disable_drive_pm: "bool?"
   debug: "bool?"
   activity_log: "bool?"
   ignore_spin_down_detection: "bool?"

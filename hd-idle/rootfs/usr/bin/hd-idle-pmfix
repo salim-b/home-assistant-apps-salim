@@ -1,0 +1,77 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+## Disable the drives' own power management (APM + internal standby timer)
+## for every managed drive - the app's drive-PM treatment (option
+## disable_drive_pm, enabled by default).
+##
+## Why: drives (and some WD USB bridge firmwares) run their own power
+## policies that can wake a drive again shortly after an external
+## spindown - host-invisibly (no /proc/diskstats activity, see
+## hd-idle/KNOWLEDGE.md). Disabling the drive's own APM level and standby
+## timer makes hd-idle's configured idle time the only spindown influence.
+## (Empirical per-bridge matrix in hd-idle/KNOWLEDGE.md: most WD USB
+## bridges do not forward APM at all - the command fails and is logged,
+## harmlessly - while ALL tested bridges honor the standby-timer disable.)
+##
+## Usage: hd-idle-pmfix <drives-file> [--since <old-drives-file>]
+##
+## <drives-file> is the machine-readable companion of the hd-idle command
+## line (written by hd-idle-genargs next to the args file; one
+## "<kernel-name> <idle> <command-type>" line per drive). Only drives with
+## idle != 0 are treated (idle-0 entries are exclusions). With --since,
+## only drives NEW or CHANGED relative to the old file are treated (the
+## treatment state persists while a drive keeps power; re-issuing the
+## commands to an already-treated drive risks needless bridge-mediated
+## motor starts - device-verified for redundant STOP commands).
+##
+## The settings are VOLATILE (reset on drive power cycle): the treatment is
+## applied at app start and, via the watcher, on drive (re)appearance.
+## Known gap (see hd-idle/TODO.md): a drive that reconnects under the SAME
+## kernel name (power-cycled by its bridge, name unchanged) is invisible to
+## the --since diff and is re-treated only at the next app restart.
+
+DRIVES_FILE="${1:-/etc/hd-idle.drives}"
+SINCE_FILE=""
+
+case "${2:-}" in
+  --since)
+    [ -n "${3:-}" ] || { bashio::log.error "hd-idle-pmfix: --since needs a file argument"; exit 1; }
+    SINCE_FILE="$3"
+    ;;
+  "") ;;
+  *) bashio::log.error "hd-idle-pmfix: unknown argument '${2}'"; exit 1 ;;
+esac
+
+[ -r "${DRIVES_FILE}" ] || { bashio::log.warning "hd-idle-pmfix: no drives file (${DRIVES_FILE}) - nothing to treat"; exit 0; }
+
+smart() {
+  local dev="$1" flag="$2" value="$3" out rc
+  out=$(timeout 60 smartctl -d sat -s "${flag},${value}" "/dev/${dev}" 2>&1) && rc=0 || rc=$?
+  if [ "$rc" = 0 ] && ! grep -qi "failed\|unknown\|unavailable" <<<"$out"; then
+    printf 'ok'
+  else
+    printf 'rc=%s (%s)' "$rc" "$(grep -aiE 'failed|unavailable|aborted|invalid' <<<"$out" | head -1 | sed 's/^smartctl [^|]*//;s/^ *//' | cut -c1-60)"
+  fi
+}
+
+is_treated_before() {
+  [ -n "${SINCE_FILE}" ] && [ -r "${SINCE_FILE}" ] &&
+    grep -qxF "$1" "${SINCE_FILE}"
+}
+
+## Entries are "<name> <idle> <command-type>"; only resolved sd* disks with
+## a non-zero idle are treatment targets.
+while read -r name idle ctype; do
+  [ -n "${name:-}" ] || continue
+  [ "${idle:-0}" != "0" ] || continue
+  [[ "${name}" =~ ^sd[a-z]+$ ]] || continue
+  if is_treated_before "${name} ${idle} ${ctype}"; then
+    bashio::log.info "Drive ${name}: power management already disabled (unchanged configuration) - skipping."
+    continue
+  fi
+  apm=$(smart "${name}" "apm" "off")
+  stby=$(smart "${name}" "standby" "off")
+  bashio::log.info "Drive ${name}: APM disable ${apm}; standby timer disable ${stby}."
+done <"${DRIVES_FILE}"

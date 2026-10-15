@@ -33,6 +33,16 @@ configured drive to its kernel name, so log lines like `sda spindown` can be att
 Drive /dev/disk/by-id/usb-WD_Elements_1234567890AB-0:0 -> sda
 ```
 
+### Drive power management
+
+Drives run their own power management: an APM level and an internal standby timer. On Home Assistant OS, both can
+conflict with hd-idle - some USB bridge firmwares wake the drive again shortly after an external spindown, an effect
+invisible to hd-idle's I/O monitoring (no host I/O occurs). The app therefore disables the drives' own APM and standby
+timer for every managed drive by default (**Disable drive power management**); the settings are volatile, so they are
+re-applied at every app start and whenever a drive (re)appears. Bridges that do not forward a feature make the
+corresponding command fail - logged once, harmless (most WD USB bridges do not forward APM at all, but honor the
+standby-timer disable).
+
 ### Command types
 
 hd-idle can send the spin-down command via two APIs:
