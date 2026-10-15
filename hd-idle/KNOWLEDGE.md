@@ -95,6 +95,26 @@ mediation until AppArmor 4 - mechanism repository-wide, see the repository-root 
 the capability: capable() returned false and `scsi_cmd_allowed()` fell through to `return open_for_write` (the EPERM
 source for hd-idle's O_RDONLY fds).
 
+### Why the capability cannot be tightened (CAP_SYS_RAWIO scope analysis, 2026-10)
+
+- **No subsetting exists**: AppArmor capability rules enumerate whole capabilities (apparmor.d(5): "the only
+  capabilities a confined process may use may be enumerated") - they mediate the kernel's boolean `capable()` check, so
+  a fraction of `CAP_SYS_RAWIO` is not expressible. Per-command ioctl mediation (which would scope SG_IO without the
+  capability) does not exist upstream (4.0 added mqueue/userns/io_uring/AF_UNIX mediation; fine-grained inet/inet6 still
+  WIP as of the 6.17-era pulls - repository-root `KNOWLEDGE.md` §AppArmor) and HAOS ships AppArmor 3.1.7 anyway.
+- **Both grant sites are needed**: the daemon sub-profile (ata spindowns) and the top profile (pmfix's smartctl ATA SET
+  FEATURES commands are the same non-read-safe class, and `hd-idle -t` single-shot runs in the TOP-profile context -
+  e.g. the lab smoke test's `docker exec`). Moving the rule into sub-profiles only would break the latter.
+- **What the capability additionally unlocks inside this container** (capabilities(7)), and what closes each surface:
+  `/proc/kcore` reads - kernel-gated on capable(CAP_SYS_RAWIO), file side allowed by the `file,` blanket -> genuinely
+  reachable for a compromised process (denied before the capability rule): the accepted residual risk of the ata path
+  (analysis, not device-verified). `ioperm`/`iopl` (x86 only - relevant on amd64): reachable in principle, same class.
+  `/dev/mem`, `/dev/kmem`, `/dev/port`, `/dev/cpu/*/msr`: character devices outside the supervisor's device-cgroup
+  allowlist -> blocked by the cgroup layer. `mmap_min_addr`: `/proc/sys` is mounted read-only (non-privileged mounts).
+  SCSI commands to other nodes: the device cgroup opens only granted drives.
+- **Seccomp** could trim further (block ioperm/iopl syscalls, restrict ioctl cmd values), but the supervisor exposes no
+  per-app seccomp customization - not available in this framework.
+
 ## Device access in this app (mechanics: repository-root `KNOWLEDGE.md`)
 
 Supervisor facts verified at ref 2026.10.1 — re-verify per the version-sensitive-facts rule before relying on them for

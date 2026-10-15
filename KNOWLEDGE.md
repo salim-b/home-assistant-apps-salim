@@ -107,9 +107,13 @@ Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7.
   `fstype=` matching only applies to *new* mounts — not bind/remount — so `mount --bind` rules are conditioned on
   `options=(bind)` instead. Mount sources are matched as passed: busybox passes the device string for pseudo-filesystems
   (e.g. `nfsd`, `sunrpc`, not a path).
-- **Ioctls**: AppArmor 3.x mediates ioctls only via the file's r/w permission — per-command mediation arrives with
-  AppArmor 4 — e.g. `SG_IO` on disk nodes is covered by `/dev/sd* rwk`-style file rules, and no capability rules are
-  needed for the ioctl itself.
+- **Ioctls**: AppArmor mediates ioctls only via the file's r/w permission. Per-command ioctl mediation does not exist in
+  any released AppArmor (re-verified 2026-10 against the AppArmor 4.0 release notes and the 6.17-era upstream pulls: new
+  mediation covers POSIX mqueue, user namespaces, io_uring and AF_UNIX; fine-grained inet/inet6 is still
+  work-in-progress
+  - ioctls are not on the roadmap) — e.g. `SG_IO` on disk nodes is covered by `/dev/sd* rwk`-style file rules, and no
+    capability rules are needed for the ioctl itself (kernel-side `capable()` checks inside command paths are a separate
+    gate — capabilities are mediated, see above).
 - **Network mediation is opt-in per class**: a profile without any `network` rules has networking *entirely unmediated*
   (everything allowed) — "no rules" is not "no networking". Adding any network rule (allow or deny) enables mediation,
   and everything not matched by an allow rule is then denied; `deny network,` denies a class outright. The parser
