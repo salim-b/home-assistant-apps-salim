@@ -160,7 +160,10 @@ restore_options() {
           suspicious=1
           while IFS= read -r tkey; do
             [ -n "$tkey" ] || continue
-            if [ "$(ssh "${SSH_OPTS[@]}" "$host" \
+            ## -n: keep the loop's stdin away from ssh (without it, ssh eats
+            ## the remaining keys and the check silently degenerates to the
+            ## first key only)
+            if [ "$(ssh -n "${SSH_OPTS[@]}" "$host" \
                 "jq -c --arg k '$tkey' '.[\$k] // \"<key-missing>\"' '$backup'")" \
               != "$(yq -o json ".$tkey" "$LIVE_TEST_OPTIONS_FILE" | jq -c .)" ]; then
               suspicious=0
