@@ -92,7 +92,8 @@ mediation until AppArmor 4 - mechanism repository-wide, see the repository-root 
 `/dev/sd* rwk,` (plus the `file,` blanket) covers it; (2) the kernel's `capable(CAP_SYS_RAWIO)` check inside
 `scsi_cmd_allowed()` is mediated by AppArmor itself (repository-root `KNOWLEDGE.md` §AppArmor), so both profiles need
 `capability sys_rawio,` - without that rule every ata-path command failed with EPERM even though the container carried
-the capability.
+the capability: capable() returned false and `scsi_cmd_allowed()` fell through to `return open_for_write` (the EPERM
+source for hd-idle's O_RDONLY fds).
 
 ## Device access in this app (mechanics: repository-root `KNOWLEDGE.md`)
 
@@ -128,7 +129,8 @@ the device-option mechanism refuses precisely.
 - The command uses the **global default** command type / power condition only (single-disk mode skips the per-device
   config entirely).
 
-(No in-app caller since the diagnostics build was reverted - kept as reference knowledge for manual debugging.)
+(No in-app caller since the diagnostics build was reverted; the lab spindown smoke test drives `hd-idle -t` via docker
+exec, and it is useful for manual debugging.)
 
 ## Verifying drive power states from the lab (USB bridges)
 

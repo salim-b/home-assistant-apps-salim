@@ -96,7 +96,8 @@ lab_runtime_check() {
   ##   does not prepend /dev/ (bare kernel names fail with "open sda: no
   ##   such file or directory"; the usage string's "-t sda" is misleading)
   ## - uses the GLOBAL default command type (single-shot mode has no
-  ##   per-device config) - the lab fixture sets scsi, what USB drives need
+  ##   per-device config) - config.yaml's scsi default is what USB drives
+  ##   need; the fixture sets it per drive, which -t ignores
   check_img="local/hdidle-lab-check:smartctl"
   if ! docker image inspect "$check_img" >/dev/null 2>&1; then
     echo "-- building the spindown-check image ($check_img)"

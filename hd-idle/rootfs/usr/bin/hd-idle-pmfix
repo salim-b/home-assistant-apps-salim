@@ -29,7 +29,7 @@ esac
 smart() {
   local dev="$1" flag="$2" value="$3" out rc
   out=$(timeout 60 smartctl -d sat -s "${flag},${value}" "/dev/${dev}" 2>&1) && rc=0 || rc=$?
-  if [ "$rc" = 0 ] && ! grep -qi "failed\|unknown\|unavailable" <<<"$out"; then
+  if [ "$rc" = 0 ] && ! grep -qiE 'failed|unknown|unavailable' <<<"$out"; then
     printf 'ok'
   else
     printf 'rc=%s (%s)' "$rc" "$(grep -aiE 'failed|unavailable|aborted|invalid' <<<"$out" | head -1 | sed 's/^smartctl [^|]*//;s/^ *//' | cut -c1-60)"

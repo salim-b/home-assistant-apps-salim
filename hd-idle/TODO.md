@@ -39,41 +39,15 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
   observation that a "command failed/no-op" signal would help (hd-idle currently marks drives spun down even when the
   command has no effect).
 
-## Round 2 findings (2026-10-15, post-cleanup, fresh read incl. README + mise hooks)
-
-Must-fix (doc accuracy):
-
-- `KNOWLEDGE.md` -t note says "no in-app caller" - true for rootfs, but the lab spindown smoke test
-  (`.mise/tasks/lab/hd-idle.sh`) drives `hd-idle -t` via docker exec. Reword: no in-app caller; exercised by the lab
-  check + useful for manual debugging.
-- Zero-loss violation in the slimming: the kernel's EPERM fall-through detail (`scsi_cmd_allowed()` ->
-  `return open_for_write` when capable() fails - the exact mechanism behind the 0.1.3 EPERM symptom) lived only in
-  apparmor.txt comments and is now gone. Restore into `KNOWLEDGE.md` §"SG_IO privileges".
-
-Nice-to-have (behavior/style):
-
-- `config.sh`: hd-idle-pmfix failure at boot is FATAL (`set -e`) while the watcher treats the same failure as a warning -
-  inconsistent semantics; a smartctl hiccup would crash-loop the app over a best-effort treatment (practically
-  unreachable: pmfix exits nonzero only on argv misuse, but make boot non-fatal for consistency).
-- `pmfix`: `grep -qi "failed\|unknown\|unavailable"` uses BRE `\|` alternation (GNU/busybox-specific, POSIX undefined)
-  while the neighboring extraction grep uses `-aiE` - unify on `-iE` for robustness.
-- README: "the app itself needs no network access" is imprecise (bashio talks supervisor API + DNS; the daemon itself
-  opens no sockets) - align with DOCS.md wording; also "3―5" (U+2015) instead of "3-5".
-- lab hook: "the lab fixture sets scsi" is imprecise - the `-t` single-shot uses the GLOBAL default command type; the
-  fixture sets per-drive scsi, the global default comes from config.yaml. Reword.
-- `KNOWLEDGE.md` watcher design bullet: lost the first-sleep rationale in slimming (boot-time generation already wrote
-  the installed files, so the first tick at +30 s only compares). Re-add as a clause.
-
-Verified OK (round 2): dual-file path derivation is consistent between genargs and the watcher (the case-nonsuffix
-branch exists precisely for the /tmp/hd-idle-args.new naming); prev-file semantics correct (copied before the mv);
-args-differ-only ticks (e.g. -d flag) skip treatment via --since unchanged-line matching; empty DRIVES_LINES under set
--u is safe (bash 5); a genargs failure AFTER the args write (ENOSPC class) leaves installed files divergent and
-converges via the dual-cmp (and via boot-failure restart in cont-init); passthrough duplicate entries are the documented
-per-tick rejection path; live hook's exclusion parsing (-a/-i 0 adjacency) matches the emitted argv order; README
-hashed-slug link (f8b2d53d_hd-idle) matches the repo's store-slug pattern; shellcheck --severity=style clean; apk policy
-facts fully covered by the root KNOWLEDGE (Dockerfile slimming lost nothing there).
-
 ## Resolved
+
+- Round 2 review applied (2026-10-15): the SG_IO section documents the kernel's EPERM fall-through mechanism
+  (`scsi_cmd_allowed()` -> `return open_for_write`, restored as slimming collateral); the `-t` KNOWLEDGE note reflects
+  the lab smoke test's docker-exec caller; boot-time hd-idle-pmfix failure is non-fatal (consistent with the watcher,
+  CHANGELOG 0.1.3); pmfix's result classification greps use `-iE` (POSIX alternation); README wording (the daemon opens
+  no sockets; ASCII hyphen in "3-5"); lab-hook comment corrected (single-shot uses the GLOBAL default command type).
+  Durable verified-OK facts from the round: the drives-file derivation's nonsuffix case branch exists for the watcher's
+  /tmp candidate naming; a genargs failure after the args write converges via the dual-cmp (or boot restart).
 
 - Code review + doc/comment cleanup (2026-10-15, v0.1.3) done: full read-only review of all scripts, profile, config and
   Dockerfile (shellcheck/bash -n clean); both must-fix doc defects fixed (the SG_IO capability guidance contradicted the

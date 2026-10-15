@@ -19,8 +19,8 @@ Spin down idle USB and SATA hard disk drives automatically.
 - **System disk is always protected**: The drive Home Assistant runs from is excluded by three independent layers
   (supervisor device policy, startup detection of the boot disk and `hassos-*` partitions, and hd-idle's own monitoring
   scope) – regardless of whether Home Assistant boots from USB.
-- **Hardened runtime**: Ships a custom [AppArmor](https://apparmor.net/) profile; the app itself needs no network
-  access.
+- **Hardened runtime**: Ships a custom [AppArmor](https://apparmor.net/) profile; the hd-idle daemon itself opens no
+  sockets (the app's only network traffic is supervisor-API HTTP and DNS resolution).
 
 ## Limitations
 
@@ -29,7 +29,7 @@ Spin down idle USB and SATA hard disk drives automatically.
   the app cannot manage NVMe drives.
 - **Do not run other disk-monitoring tools alongside**: hd-idle is incompatible with SMART-polling tools like
   smartmontools (polling keeps waking the drives, and undetected activities can confuse the state machine).
-- **Spin-up wear**: Drives do not like frequent spin-down/spin-up cycles. Manufacturers recommend idle times of 3―5
+- **Spin-up wear**: Drives do not like frequent spin-down/spin-up cycles. Manufacturers recommend idle times of 3-5
   minutes at minimum (hd-idle's default is 10 minutes).
 
 ## Documentation
