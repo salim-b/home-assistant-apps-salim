@@ -79,9 +79,10 @@ LIVE_APP="$app" \
   LIVE_HOST_IP="$host_ip" \
   LIVE_CLIENT_IMAGE="$CLIENT_IMAGE" \
   LIVE_TEST_OPTIONS_FILE="$MISE_PROJECT_ROOT/.mise/tasks/test/live/$app.yaml" \
-  LIVE_SHARES=""
+  LIVE_SHARES="" \
+  LIVE_SSH_OPTS=("${SSH_OPTS[@]}")
 export LIVE_APP LIVE_LOCAL_SLUG LIVE_HOST LIVE_DEVICE_IP LIVE_HOST_IP \
-  LIVE_CLIENT_IMAGE LIVE_TEST_OPTIONS_FILE LIVE_SHARES
+  LIVE_CLIENT_IMAGE LIVE_TEST_OPTIONS_FILE LIVE_SHARES LIVE_SSH_OPTS
 
 # Drop a previous app's hook functions first: on a default all-apps run,
 # an app without prepare/check functions must not inherit the last app's
