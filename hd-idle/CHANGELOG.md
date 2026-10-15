@@ -19,6 +19,7 @@
   treatment for affected drives; hd-idle-genargs now rejects option values containing whitespace (defense in depth
   against hand-edited options files); a hd-idle-pmfix failure at app start is logged as a warning instead of failing the
   boot (consistent with the watcher's re-application path).
+- Documentation: shorter, clearer option descriptions in the settings dialog (same information, easier to follow).
 
 ## 0.1.0
 
