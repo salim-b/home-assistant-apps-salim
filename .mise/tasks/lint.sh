@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Lint all scripts, workflows, Dockerfiles and YAML files"
+#MISE description="Lint scripts, workflows, Dockerfiles, YAML and Markdown files"
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 
@@ -33,6 +33,18 @@ done < <(git ls-files | grep -E '(^|/)Dockerfile$')
 echo "== yamllint (yaml files) =="
 mapfile -t yamlfiles < <(git ls-files | grep -E '\.ya?ml$')
 yamllint "${yamlfiles[@]}" || fails=$((fails + 1))
+
+echo "== panache (markdown formatting + semantic lint) =="
+## Panache owns markdown autoformatting (see panache.toml): `format --check`
+## gates the formatted state (nonzero + diff when a file needs formatting).
+## `lint` checks semantic correctness (references, heading hierarchy, ...).
+## Both walk directories recursively respecting .gitignore and the config's
+## extend-exclude (AI_POLICY.md); the default exclude base skips common
+## build/cache dirs and **/LICENSE.md. Like rumdl's walk, untracked
+## non-ignored .md files are covered locally - a deliberate fail-fast.
+## Panache's cache lives outside the repo (~/.cache/panache/).
+panache format --check . || fails=$((fails + 1))
+panache lint . || fails=$((fails + 1))
 
 echo "== rumdl (markdown files) =="
 ## Idiomatic `rumdl check .` (documented default): a gitignore-respecting

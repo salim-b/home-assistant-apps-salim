@@ -1,0 +1,28 @@
+#:schema https://panache.bz/panache.schema.json
+
+# Panache configuration - Markdown formatter + semantic linter
+# (https://panache.bz, docs v3.16.0)
+#
+# Panache owns ALL markdown autoformatting: it is the single source for
+# prose wrapping (run `panache format .`, wired up as `mise run fmt`).
+# rumdl (see .rumdl.toml) stays as the markdownlint-rules-rich second
+# linter - with its own reflow disabled so the two never fight over
+# wrapping. The config is schema-validated (see .mise/tasks/validate.py);
+# the schema directive above also gives editors completion + validation.
+# Unknown keys are errors (upstream design).
+
+# Plain GitHub-Flavored Markdown repository.
+flavor = "gfm"
+
+# AI_POLICY.md is the Open Home Foundation's policy text, kept verbatim for
+# upstream syncs - not this repo's prose to style: excluded from formatting
+# and linting entirely (mirrors rumdl's exclude).
+extend-exclude = ["AI_POLICY.md"]
+
+[format]
+# Match rumdl's enforced MD013 limit so the formatter and the second
+# linter agree on what "fits" means: paragraph prose is reflowed to fill
+# this width (default wrap mode is reflow, spelled out for clarity).
+# Columns, not bytes; code blocks are never rewrapped.
+line-width = 120
+wrap = "reflow"

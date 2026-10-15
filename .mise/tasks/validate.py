@@ -18,6 +18,8 @@
   schema (option typos fail at `mise run check`, not on Renovate's next run)
 - validates .rumdl.toml against rumdl's published config schema (fetched at
   the installed rumdl version's tag; the pin lives in mise.toml [tools])
+- validates panache.toml against panache's published config schema (fetched
+  once per installed panache version; the pin lives in mise.toml [tools])
 """
 from __future__ import annotations
 
@@ -201,6 +203,46 @@ def validate_rumdl_config() -> None:
         fail(".rumdl.toml", f"fetched schema unusable: {err.message[:200]}")
 
 
+def validate_panache_config() -> None:
+    """Schema-validate panache.toml against panache's published config schema,
+    fetched at the *installed* panache version's tag (the single source of
+    the pin is mise.toml [tools] + mise.lock; refetched when the version
+    changes) - same pattern as rumdl. The `#:schema` directive in
+    panache.toml itself points at the unversioned panache.bz URL for
+    editors. Requires panache on PATH, i.e. run via `mise run validate`."""
+    import jsonschema
+
+    config_file = ROOT / "panache.toml"
+    if not config_file.is_file():
+        return
+    config = tomllib.loads(config_file.read_text())
+
+    try:
+        version = (
+            subprocess.run(
+                ["panache", "--version"], capture_output=True, text=True, check=True
+            )
+            .stdout.strip()
+            .split()[-1]
+        )
+    except (OSError, subprocess.CalledProcessError):
+        sys.exit("panache not on PATH: run this task via `mise run validate`")
+
+    schema_url = f"https://raw.githubusercontent.com/jolars/panache/v{version}/panache.schema.json"
+    schema_file = CACHE.parent / f"panache-schema-v{version}.json"
+    if not schema_file.is_file():
+        schema_file.parent.mkdir(parents=True, exist_ok=True)
+        print(f"fetching {schema_url}")
+        schema_file.write_text(urllib.request.urlopen(schema_url).read().decode())
+    try:
+        jsonschema.validate(config, json.loads(schema_file.read_text()))
+    except jsonschema.ValidationError as err:
+        loc = "/".join(str(p) for p in err.absolute_path) or "<root>"
+        fail("panache.toml", f"schema mismatch at {loc}: {err.message[:200]}")
+    except jsonschema.SchemaError as err:
+        fail("panache.toml", f"fetched schema unusable: {err.message[:200]}")
+
+
 APKINDEX_TTL = 24 * 3600  # the daily CI cron should see Alpine-side repoints
 
 
@@ -314,6 +356,7 @@ def main() -> int:
         return 0  # cache warmed by the fetches above
     validate_renovate_config()
     validate_rumdl_config()
+    validate_panache_config()
     validate_apk_pins()
 
     for app in find_apps():

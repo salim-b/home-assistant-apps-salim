@@ -8,10 +8,17 @@ DOCKER_BUILDKIT = "1"
 description = "Run all pre-commit checks (lint + validate)"
 depends = ["lint", "validate"]
 
+# Panache owns ALL markdown autoformatting (see panache.toml); rumdl stays a
+# check-only second linter.
+[tasks.fmt]
+description = "Auto-format the repository's markdown via panache"
+run = "panache format ."
+
 [tools]
 actionlint = "1.7.12"
 hadolint = "2.15.1"
 jq = "1.8.2"
+"aqua:jolars/panache" = "3.16.0"
 python = "3.14.8"
 rumdl = "0.2.79"
 shellcheck = "0.11.0"

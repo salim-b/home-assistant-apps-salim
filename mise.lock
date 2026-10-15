@@ -49,6 +49,53 @@ url = "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_
 url_api = "https://api.github.com/repos/rhysd/actionlint/releases/assets/384924919"
 provenance = "github-attestations"
 
+[[tools."aqua:jolars/panache"]]
+version = "3.16.0"
+backend = "aqua:jolars/panache"
+specifiers = ["3.16.0"]
+
+[tools."aqua:jolars/panache"."platforms.linux-arm64"]
+checksum = "sha256:b0df4c8eb04e9efa5dfb76192d15b67b710e3ace949ddf703a9ee3920026dbe1"
+url = "https://github.com/jolars/panache/releases/download/v3.16.0/panache-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/jolars/panache/releases/assets/636221742"
+provenance = "github-attestations"
+
+[tools."aqua:jolars/panache"."platforms.linux-arm64-musl"]
+checksum = "sha256:f7b687f9fcd704e15a2e133e621b5c5044a4f7049e28182ecfb64a3bf3b6a326"
+url = "https://github.com/jolars/panache/releases/download/v3.16.0/panache-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/jolars/panache/releases/assets/636220585"
+provenance = "github-attestations"
+
+[tools."aqua:jolars/panache"."platforms.linux-x64"]
+checksum = "sha256:d8b86d20a178e18d06ab935058d1f6d4381a690f261c4e228bfa7e9c94610ca9"
+url = "https://github.com/jolars/panache/releases/download/v3.16.0/panache-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/jolars/panache/releases/assets/636223512"
+provenance = "github-attestations"
+
+[tools."aqua:jolars/panache"."platforms.linux-x64-musl"]
+checksum = "sha256:c2ba9550c8a3c0101263f89389941ddff11b813e2d55bdf53819f52f26cdf3f4"
+url = "https://github.com/jolars/panache/releases/download/v3.16.0/panache-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/jolars/panache/releases/assets/636222253"
+provenance = "github-attestations"
+
+[tools."aqua:jolars/panache"."platforms.macos-arm64"]
+checksum = "sha256:0a745a0a7e165983342e0e2eff862473c4eb1751c6b5c19111f8dd776d1ba41f"
+url = "https://github.com/jolars/panache/releases/download/v3.16.0/panache-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/jolars/panache/releases/assets/636224407"
+provenance = "github-attestations"
+
+[tools."aqua:jolars/panache"."platforms.macos-x64"]
+checksum = "sha256:7291ae36db1838df1bbcf5c9f0e8903e603c803587d493a39ff7c8b2a5ba48bc"
+url = "https://github.com/jolars/panache/releases/download/v3.16.0/panache-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/jolars/panache/releases/assets/636235843"
+provenance = "github-attestations"
+
+[tools."aqua:jolars/panache"."platforms.windows-x64"]
+checksum = "sha256:e35c94cab03b714610a2a40facf6e86b1f0e158d89bc1e3a0e551f38a891f52d"
+url = "https://github.com/jolars/panache/releases/download/v3.16.0/panache-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/jolars/panache/releases/assets/636228520"
+provenance = "github-attestations"
+
 [[tools.hadolint]]
 version = "2.15.1"
 backend = "aqua:hadolint/hadolint"
