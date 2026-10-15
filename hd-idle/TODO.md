@@ -21,27 +21,27 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
 
 - Design a better logo. Maybe a HDD that sleeps/snores ("zzzz")?
 
-- Upstream: file a feature request for per-drive (and/or global) disabling of the drives' own power management - the
-  ATA SET FEATURES APM level and standby timer equivalents (`hdparm -B off` / `smartctl -d sat -s apm,off` and
+- Upstream: file a feature request for per-drive (and/or global) disabling of the drives' own power management - the ATA
+  SET FEATURES APM level and standby timer equivalents (`hdparm -B off` / `smartctl -d sat -s apm,off` and
   `-s standby,off`). hd-idle v1.22 only issues standby commands and has zero APM/standby-timer code (verified in
   `main.go`/`hdidle.go`); drives with their own power management active can wake themselves up again after an external
-  standby command entirely invisibly to the host (no `/proc/diskstats` activity - observed on the odroid-m1 device for
-  three of nine drives, 2026-10-15; the OpenWrt-era fix for the same drives was disabling APM + standby timer before
-  forcing standby). Note the empirical complication found on the dev machine: behind some WD USB bridges the APM
-  feature page is filtered out entirely ("APM feature is: Unavailable"), so the feature would need graceful handling
-  of unsupported/filtered feature pages. Related: hd-idle's default `scsi` command type was a silent no-op
-  (GOOD status, no drive action) for such a bridge under one host stack while `ata` worked - worth including in the
-  request the observation that a "command failed/no-op" signal would help (hd-idle currently marks drives spun down
-  even when the command has no effect).
+  standby command entirely invisibly to the host (no `/proc/diskstats` activity - observed on a test device for three of
+  nine drives, 2026-10-15; an earlier setup.s fix for the same drives was disabling APM + standby timer before forcing
+  standby). Note the empirical complication found on another host: behind some WD USB bridges the APM feature page is
+  filtered out entirely ("APM feature is: Unavailable"), so the feature would need graceful handling of
+  unsupported/filtered feature pages. Related: hd-idle's default `scsi` command type was a silent no-op (GOOD status, no
+  drive action) for such a bridge under one host stack while `ata` worked - worth including in the request the
+  observation that a "command failed/no-op" signal would help (hd-idle currently marks drives spun down even when the
+  command has no effect).
 
 ## Resolved
 
-- AppArmor profile verified on the real device (odroid-m1, 2026-10-15): the `hdidle` sub-profile (`cx` transition +
-  `deny network`) and the `/dev/sd*` ioctl path work under real enforcement. Proven functionally rather than via audit
-  logs (HAOS produces no AppArmor audit logs, and the SSH app context cannot read apparmorfs): `test:live` ran the
-  daemon in opt-in mode against all nine glob-selected USB disks and every single drive issued its daemon-driven
-  spindown event - device cgroup grant, `/dev` node open, SG_IO `START STOP UNIT` and command execution all happened
-  under the enforced profile. Zero error/denial lines in the app log and dmesg.
+- AppArmor profile verified on a real device (2026-10-15): the `hdidle` sub-profile (`cx` transition + `deny network`)
+  and the `/dev/sd*` ioctl path work under real enforcement. Proven functionally rather than via audit logs (HAOS
+  produces no AppArmor audit logs, and the SSH app context cannot read apparmorfs): `test:live` ran the daemon in opt-in
+  mode against all nine glob-selected USB disks and every single drive issued its daemon-driven spindown event - device
+  cgroup grant, `/dev` node open, SG_IO `START STOP UNIT` and command execution all happened under the enforced profile.
+  Zero error/denial lines in the app log and dmesg.
 
 - `test:live` does real spindown checks (`.mise/tasks/test/live/hd-idle.sh`): `LIVE_HDIDLE_LABEL_GLOB` selects the
   drives by filesystem label (only disks whose labeled partitions ALL match the glob; non-`sd*` disks and disks hosting

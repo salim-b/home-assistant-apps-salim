@@ -196,9 +196,20 @@ Version-sensitive gotchas learned while implementing:
   `sh: can't create /some/ro/path: …`. To suppress (or capture) the shell's diagnostic, run the attempt in a subshell:
   `out=$( (echo x > /some/ro/path) 2>&1 )` captures message *and* exit code.
 
+## s6-overlay: user bundles live OUTSIDE s6-rc.d
+
+Adding a service to a bundle (e.g. the default `user` bundle) is done via
+`/etc/s6-overlay/user-bundles.d/<bundle>/contents.d/<service>` — a path that must NOT be under `s6-rc.d/`. A stray
+directory under `s6-rc.d/` (e.g. `s6-rc.d/user-bundles.d/`) is scanned by `s6-rc-compile` as a *service source
+directory* and fails the whole boot with
+`fatal: unable to read /etc/s6-overlay/s6-rc.d/user-bundles.d/type: No such file or directory` — the container
+crash-loops at preinit while the supervisor still reports the app state as "started" (device-verified 2026-10-15). The
+symptom is invisible to health checks (the container never reaches them), so any change under
+`rootfs/etc/s6-overlay/s6-rc.d/` or `user-bundles.d/` must be lab-booted (`mise run lab <app>`) before deploy.
+
 ## Testing: hardware-behavior checks in the lab
 
-The lab boots app containers `--privileged` **on the dev machine**, so host-side hardware state interacts with tests:
+The lab boots app containers `--privileged` **on the lab host**, so host-side hardware state interacts with tests:
 
 - **Host-side interference sweep**: OS-level power-management mechanisms can skew hardware tests (for disk spindown:
   udisks2 stored drive settings — re-applied on every hotplug; `/etc/hdparm.conf` directives; TLP `DISK_*`; smartd;

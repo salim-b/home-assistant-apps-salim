@@ -138,8 +138,8 @@ drives audibly spinning while `smartctl -n standby` and the app's diagnostics re
 
 `hd-idle-pmfix` disables the drives' own power management (ATA SET FEATURES: APM level off + standby timer off) for
 every managed drive at boot and on drive (re)appearance (the watcher re-applies to NEW/CHANGED drives only - redundant
-treatment of sleeping drives risks bridge-mediated motor starts). Device-verified per-bridge matrix (odroid-m1, five WD
-USB bridges, 2026-10-15):
+treatment of sleeping drives risks bridge-mediated motor starts). Device-verified per-bridge matrix (a test device, five
+WD USB bridges, 2026-10-15):
 
 - **`standby,off`: honored by ALL five bridges** (My Book 1110/1230/25EE, Elements 107C, Ext HDD 1021) - the universally
   deliverable part.
@@ -191,14 +191,3 @@ USB bridges, 2026-10-15):
   duplicate-entry rejection fires per tick (ERROR lines every 30 s until the user fixes the config - spammy but
   truthful, accepted). "Known-good configuration" = the args file (re-read by the run script on every (re)start) plus
   the running daemon's argv, both untouched on failure; the persistent source of truth is `options.json` on /data.
-
-## Local-lab host interference on this dev machine
-
-(The general principle — interference sweep, event-based assertions, side-effect-free probes — is repository-wide, see
-the repository-root `KNOWLEDGE.md`; the preflight sweep lives in the lab hook `.mise/tasks/lab/hd-idle.sh`.)
-
-Checked on the development machine (2026-10, ostree-based Fedora): no udisks2 (hence no GNOME-Disks drive settings that
-get re-applied on hotplug), no TLP/laptop-mode/powertop service, no smartd, `hdparm` not installed and
-`/etc/hdparm.conf` inert (commented), and the disks' SCSI device runtime-PM `power/control` is `on` (Fedora udev default
-for storage) — i.e. no USB autosuspend that could break SG_IO. Nothing interferes with spindown tests here today; the
-preflight sweep guards against that changing.
