@@ -127,13 +127,17 @@ the next versioned release).
   below): the Dockerfile manager extracts `apk add pkg=version` pins into the `apk` datasource, and the `.github/renovate.json` apk packageRule supplies the `registryUrls` (dl-cdn
   APKINDEX URLs, branch + arch pinned) without which Renovate silently skips the pins (`skipReason: unknown-registry` — it cannot infer the Alpine
   branch from the base-image ARG). The rule also carries a `bumpVersions` entry (experimental Renovate feature): the app's `config.yaml` version is
-  patch-bumped in the same PR (`{{packageFileDir}}/config.{yaml,yml}`), so the version-guard workflow passes on the Renovate PR as opened. What Renovate
-  cannot do on the hosted app: run post-upgrade tasks — `postUpgradeTasks.commands` need `allowedPostUpgradeCommands`, a **self-hosted-only** option — so the changelog entry
-  for the bumped version stays a manual step before the merge (one templated line; if it ever becomes a burden, the
-  alternatives are a self-hosted Renovate or an own completion workflow). The rule's registryUrls branch value must be
-  updated together with the Dockerfile's `BUILD_FROM` default on a base-image bump; the validate.py drift check derives the branch
-  dynamically and remains the config-independent net (if `bumpVersions` ever misbehaves, version-guard fails the PR loudly — no silent
-  drift). Floating apk packages (nfs-utils) are skipped (`unspecified-version`), as intended.
+  patch-bumped in the same PR (`{{packageFileDir}}/config.{yaml,yml}`). The matchString anchors at line start via `(?:^|\n)` emulation: Renovate compiles matchStrings
+  without the `m` flag (`bump-versions.ts` runs `regEx(templated)`), so a plain `^` would bind to file offset 0 (config.yaml's first line is a comment → zero
+  matches → silent no-bump), and an unanchored match would let a future comment containing `version: "..."` hijack the bump (both
+  verified against our config with node); only the FIRST match per file is bumped (single `exec`, no `g` flag). The version-guard
+  workflow still passes on the Renovate PR as opened. What Renovate cannot do on the hosted app: run post-upgrade tasks
+  — `postUpgradeTasks.commands` need `allowedPostUpgradeCommands`, a **self-hosted-only** option — so the changelog entry for the bumped version stays a manual step before the
+  merge (one templated line; if it ever becomes a burden, the alternatives are a self-hosted Renovate or an own
+  completion workflow). The rule's registryUrls branch value must be updated together with the Dockerfile's `BUILD_FROM` default on
+  a base-image bump; the validate.py drift check derives the branch dynamically and remains the config-independent net
+  (if `bumpVersions` ever misbehaves, version-guard fails the PR loudly — no silent drift). Floating apk packages (nfs-utils) are
+  skipped (`unspecified-version`), as intended.
 
 Version-sensitive gotchas learned while implementing:
 

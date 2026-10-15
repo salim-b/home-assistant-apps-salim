@@ -41,7 +41,7 @@
             "{{packageFileDir}}/config.{yaml,yml}"
           ],
           "matchStrings": [
-            "version:\\s*\"(?<version>[^\"]+)\""
+            "(?:^|\\n)version:\\s*\"(?<version>[^\"\\n]+)\""
           ],
           "bumpType": "patch"
         }
