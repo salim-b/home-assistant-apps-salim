@@ -19,8 +19,12 @@ set -euo pipefail
 ##           [-d] [-I] [-l /data/hd-idle.log]                # global flags
 ##
 ## --quiet suppresses ALL narrative/info output (boot narrative and the
-## watcher's per-tick noise); warnings and errors are always logged, and
-## invalid configuration still exits nonzero in both modes. For cont-init
+## watcher's per-tick noise) as well as the warning-level notes for
+## expected-transient states (a currently detached drive, a non-sd* entry)
+## - both are surfaced once per boot by the non-quiet cont-init run, and
+## the options themselves cannot change mid-run, so repeating them every
+## watcher tick adds nothing. Errors are always logged, and invalid
+## configuration still exits nonzero in both modes. For cont-init
 ## (boot) that fails the app boot. For the watcher it means regeneration
 ## failed and the current configuration (the args file + the running
 ## daemon's argv - the hd-idle-watch run script spells out when this can
@@ -51,6 +55,16 @@ LOG_FILE=/data/hd-idle.log
 
 qlog_info() {
   [ "${QUIET}" = 1 ] || bashio::log.info "$@"
+}
+
+## Quiet-mode warning wrapper for states that are EXPECTED transients or
+## already surfaced once per boot by the non-quiet cont-init run: a drive
+## that is currently detached (hotplug workflows keep such entries
+## configured for hd-idle's runtime resolution) would otherwise produce a
+## warning every watcher tick forever. Genuine regeneration failures
+## (bashio::exit.nok) are unaffected - they always log and exit nonzero.
+qlog_warning() {
+  [ "${QUIET}" = 1 ] || bashio::log.warning "$@"
 }
 
 MODE=$(bashio::config 'mode')
@@ -113,6 +127,16 @@ resolve_device() {
     /dev/*)
       target=$(readlink -f "${dev}" 2>/dev/null || true)
       if [ -z "${target}" ]; then
+        return 1
+      fi
+      ## busybox readlink -f prints the INPUT path itself when the final
+      ## component does not exist (missing symlink or dangling link):
+      ## without an existence check such a path was misclassified as
+      ## "resolves to <its own name>, not an sd* disk" - silently dropping
+      ## the drive from the configuration on every watcher tick - instead
+      ## of taking the detached pass-through path (device-verified
+      ## 2026-10-15, a drive whose bridge had left the bus).
+      if [ ! -e "${target}" ]; then
         return 1
       fi
       base="${target##*/}"
@@ -266,7 +290,7 @@ while IFS= read -r disk; do
     elif [[ "${RESOLVED}" =~ ^sd[a-z]+[0-9]+$ ]]; then
       bashio::exit.nok "Drive '${DEV}' resolves to partition ${RESOLVED}: select the disk itself (the dropdown entry without -partN) - the app needs the whole disk."
     else
-      bashio::log.warning "Drive '${DEV}' resolves to ${RESOLVED}, which is not an sd* disk - hd-idle cannot manage it; entry ignored."
+      qlog_warning "Drive '${DEV}' resolves to ${RESOLVED}, which is not an sd* disk - hd-idle cannot manage it; entry ignored."
       continue
     fi
     if grep -qxF "${NAME}" <<<"${SYSTEM_DISKS}"; then
@@ -285,7 +309,7 @@ while IFS= read -r disk; do
     ## on hotplug, so no app restart is needed for that part. Once the drive
     ## shows up and resolves here again, the watcher restarts hd-idle with
     ## the kernel-name entry (see the hd-idle-watch service).
-    bashio::log.warning "Drive '${DEV}' does not resolve right now (detached or still enumerating?) - passing it through for hd-idle's runtime resolution."
+    qlog_warning "Drive '${DEV}' does not resolve right now (detached or still enumerating?) - passing it through for hd-idle's runtime resolution."
     EMIT_NAME="${DEV}"
   fi
 
