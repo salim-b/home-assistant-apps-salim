@@ -1,6 +1,6 @@
 # https://developers.home-assistant.io/docs/apps/configuration#app-configuration
 name: hd-idle
-version: "0.1.0"
+version: "0.1.3"
 slug: hd-idle
 description: Spin down idle hard disks (USB, SATA) automatically using hd-idle
 # Generic (multi-arch) image name; CI builds & publishes per-arch images
@@ -19,7 +19,11 @@ init: false
 # read-safe command list - START STOP UNIT (the `scsi` path) is in it, ATA
 # PASS-THROUGH (the `ata` path, needed for SATA disks and some USB bridges)
 # is not (drivers/scsi/scsi_ioctl.c scsi_cmd_allowed(); see
-# hd-idle/KNOWLEDGE.md). Device-node access itself is granted per drive via
+# hd-idle/KNOWLEDGE.md). The AppArmor profile must grant the capability as
+# well (`capability sys_rawio,` in apparmor.txt): AppArmor mediates
+# capable() checks themselves (security_capable hook), so the container
+# merely carrying the cap is not sufficient. Device-node access itself is
+# granted per drive via
 # the supervisor's device-type option fields (see the disks schema below),
 # which also refuses devices the system uses - the system disk cannot be
 # granted to the app even if a user configured it.

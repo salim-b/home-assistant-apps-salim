@@ -14,12 +14,25 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
   # nfs-server app): tightening file rules is impractical because HAOS
   # produces no AppArmor audit/denial logs - silent breakage risk. The
   # profile's confinement value sits in the non-file classes (network,
-  # capability): the app gets NO capability rules at all - SG_IO ioctls on
-  # the disk nodes are kernel-permitted for read-safe commands (START STOP
-  # UNIT) and gated by the container's CAP_SYS_RAWIO for ATA passthrough;
-  # AppArmor mediates the file access (below), not ioctls, on AppArmor 3.x.
+  # capability).
   file,
   signal,
+
+  # CAP_SYS_RAWIO for SCSI passthrough: the kernel only allows non-read-
+  # safe SCSI commands (ATA PASS-THROUGH - the `ata` spindown path and
+  # smartctl's ATA commands) when capable(CAP_SYS_RAWIO) holds
+  # (drivers/scsi/scsi_ioctl.c scsi_cmd_allowed(); read-safe commands like
+  # START STOP UNIT - the `scsi` path - need no capability). AppArmor
+  # MEDIATES THAT CHECK: the security_capable LSM hook runs
+  # apparmor_capable() after the credential check, so a profile without a
+  # `capability` rule denies the check itself - the container may carry the
+  # cap (verified via CapEff), but capable() still returns false and the
+  # kernel falls through to `return open_for_write` (EPERM for hd-idle's
+  # O_RDONLY fds). Before this rule every ata-path SG_IO failed with
+  # "operation not permitted" while the `scsi` path worked via the kernel's
+  # read-safe list; HAOS logs no AppArmor denials, so the root cause
+  # surfaced only through source analysis.
+  capability sys_rawio,
 
   # Network: mediation is enabled by the PRESENCE of any network rule. The
   # app only needs supervisor-API HTTP (bashio) and DNS resolution; the
@@ -81,6 +94,11 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
     #include <abstractions/base>
 
     file,
+    # CAP_SYS_RAWIO for the daemon's ata path: see the top profile
+    # (AppArmor mediates the capable() check the kernel's SG_IO permission
+    # gate relies on - without this rule every ATA PASS-THROUGH fails with
+    # EPERM even though the container carries the capability).
+    capability sys_rawio,
     signal (send) set=(kill,term,int,hup,cont),
     # Official docs template: scope receive to the app's own top profile
     # (the supervisor renames it to the installed slug on the device, e.g.

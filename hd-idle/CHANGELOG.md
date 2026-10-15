@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.1.3
+
+- Fix: the AppArmor profile now grants `CAP_SYS_RAWIO` (`capability sys_rawio,` in the top and the daemon sub-profile).
+  AppArmor mediates the kernel's capable() check itself (the security_capable LSM hook), so without the rule every
+  non-read-safe SCSI command failed with EPERM even though the container carried the capability - hd-idle's `ata`
+  spindown path (ATA PASS-THROUGH) and smartctl's ATA commands were affected, while the `scsi` path (START STOP UNIT, in
+  the kernel's read-safe list) worked.
+
 ## 0.1.0
 
 - Initial release.
