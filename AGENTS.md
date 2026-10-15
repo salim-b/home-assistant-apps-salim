@@ -156,9 +156,10 @@ global tasks from your mise user config); the essentials:
 
 ## Tool notes
 
-- Markdown: rumdl lints tracked `.md` files as part of `mise run lint`
-  (config `.rumdl.toml`, schema-validated by validate.py). Auto-fixes via
-  `mise exec rumdl -- rumdl fmt .`. Line length (MD013) is enforced at 120
+- Markdown: rumdl lints the repository's Markdown files (`rumdl check .`,
+  a gitignore-respecting walk shaped by `.rumdl.toml`, which is
+  schema-validated by validate.py) as part of `mise run lint`. Auto-fixes
+  via `mise exec rumdl -- rumdl fmt .`. Line length (MD013) is enforced at 120
   (`fmt` reflows overlong prose; code blocks are exempt via
   `code-block-line-length = 0`, lines whose only overrun is an unbreakable
   code span are forgiven). Match each file's existing wrap style when

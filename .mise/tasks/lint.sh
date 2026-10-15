@@ -35,8 +35,13 @@ mapfile -t yamlfiles < <(git ls-files | grep -E '\.ya?ml$')
 yamllint "${yamlfiles[@]}" || fails=$((fails + 1))
 
 echo "== rumdl (markdown files) =="
-mapfile -t mdfiles < <(git ls-files | grep -E '\.md$')
-rumdl check "${mdfiles[@]}" || fails=$((fails + 1))
+## Idiomatic `rumdl check .` (documented default): a gitignore-respecting
+## walk with the config's exclude patterns applied (AI_POLICY.md). In CI's
+## clean checkout this covers exactly the tracked .md files; locally,
+## untracked non-ignored scratch .md files are linted as well (verified -
+## a deliberate fail-fast so a to-be-committed file can't slip through).
+## rumdl's cache dir (.rumdl_cache/) self-ignores via its own .gitignore.
+rumdl check . || fails=$((fails + 1))
 
 ## .editorconfig [**] insert_final_newline: no linter above covers it for
 ## non-YAML text files (yamllint's new-line-at-end-of-file only sees YAML) -
