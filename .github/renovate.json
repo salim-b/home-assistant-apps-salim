@@ -30,6 +30,19 @@
   ],
   "packageRules": [
     {
+      "description": "Alpine apk pins in app Dockerfiles (e.g. hd-idle=1.22-r7): read the apk datasource's versions from the Alpine binary repositories. Renovate cannot infer the branch from the base-image ARG default - without registryUrls it silently skips these pins (skipReason unknown-registry) - so the branch is pinned here; update it together with the Dockerfile BUILD_FROM default on a base-image bump (the validate.py drift check derives the branch dynamically and cross-checks the pins either way). No automerge: a package bump must become an app release (config.yaml version + changelog entry; the version-guard workflow fails the PR until that is done - treat the PR as the prepared change).",
+      "matchDatasources": [
+        "apk"
+      ],
+      "registryUrls": [
+        "https://dl-cdn.alpinelinux.org/alpine?branch=v3.24&components=main,community&arch=x86_64",
+        "https://dl-cdn.alpinelinux.org/alpine?branch=v3.24&components=main,community&arch=aarch64"
+      ],
+      "addLabels": [
+        "apk_pin"
+      ]
+    },
+    {
       "description": "GitHub Actions: weekly, like Dependabot did",
       "matchManagers": [
         "github-actions"
