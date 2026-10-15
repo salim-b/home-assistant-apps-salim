@@ -60,6 +60,13 @@ on the device — hosts without AppArmor support don't show different ratings; t
   detached fails with a clear message. At app **startup** the validation result is suppressed (`App.devices` does `with suppress(vol.Invalid)`); a detached
   device at boot does not prevent the app from starting.
 
+## Supervisor: store slugs (in-app documentation links)
+
+- Installing an app **from an app repository** gives it the installed slug `<hash>_<slug>` where hash = the first 8 hex of `sha1(lowercased_repository_url)` (`supervisor/store/utils.py` `get_hash_from_repository`;
+  verified numerically 2026-10: `sha1("https://github.com/salim-b/home-assistant-apps-salim")[:8]` = `f8b2d53d`). Local test installs under `/local_apps/` get `local_<slug>`.
+- In-app links (`README.md`/`DOCS.md` `/config/app/<hash>_<slug>/...`) must use the hashed form to work for the repository install (the normal user case); they are dead
+  links for local test installs — expected, those are dev-only.
+
 ## AppArmor: mediation gotchas and profile mechanics
 
 Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7.
