@@ -26,7 +26,7 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
 - AppArmor profile verified on the real device (odroid-m1, 2026-10-15): the `hdidle` sub-profile (`cx` transition +
   `deny network`) and the `/dev/sd*` ioctl path work under real enforcement. Proven functionally rather than via audit
   logs (HAOS produces no AppArmor audit logs, and the SSH app context cannot read apparmorfs): `test:live` ran the
-  daemon in opt-in mode against all nine salim-labeled USB disks and every single drive issued its daemon-driven
+  daemon in opt-in mode against all nine glob-selected USB disks and every single drive issued its daemon-driven
   spindown event - device cgroup grant, `/dev` node open, SG_IO `START STOP UNIT` and command execution all happened
   under the enforced profile. Zero error/denial lines in the app log and dmesg.
 

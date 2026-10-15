@@ -37,6 +37,9 @@ Verified against the v1.22 source (`main.go`, `hdidle.go`):
   for devices unresolvable at startup.
 - `-I` (ignore spin-down detection) is **global only**: parsed as a valueless flag into
   `Defaults.IgnoreSpinDownDetection`; `DeviceConf` has no such field and `updateState()` reads only the default.
+- `-d` (debug) and `-l` (logfile) are **global only and position-independent**, like `-I`: the parser assigns them to
+  `Defaults` no matter where they appear - only `-i`/`-c`/`-p` follow the `-a` context. The generator therefore appends
+  them after the `-a` entries; both orders are equivalent, do not "reorder" them expecting a stricter parse.
 - The poll interval is `min(configured idle)/10` (min 1 s; 60 s when no devices are configured); a sleep overrun of >3x
   the interval resets spin state (suspend detection).
 - Spindown failures do not loop per poll cycle: the device is marked spun down with `LastSpunDownAt=now` even on error,
