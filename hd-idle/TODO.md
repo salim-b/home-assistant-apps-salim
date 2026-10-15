@@ -9,15 +9,6 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
   cycle, update entries whose resolution changed) would let us remove the app's `hd-idle-watch` service (see
   `KNOWLEDGE.md`).
 
-- Verify the AppArmor profile on the real device (odroid-m1) with the drives attached: the `hdidle` sub-profile (`cx` +
-  `deny network`) and the `/dev/sd*` ioctl path are lab-untestable (no AppArmor enforcement in the lab). Profile changes
-  need a `config.yaml` version bump to reach the device (the supervisor re-installs profiles on app *update*, not
-  rebuild - see the repository-root KNOWLEDGE.md, AppArmor section).
-
-- Extend `test:live` with real spindown checks once USB HDDs are attached to the odroid-m1: force a spindown via the app
-  container's `hd-idle -t` (single-shot) and assert the standby state + the app log events. Needs a device-side hdparm
-  check (no docker CLI on HAOS - probably via `ha apps logs` events only, or an exec-capable path).
-
 - Monitor hd-idle upstream: v1.22 has no GitHub release (Alpine tracks the tag); Alpine-side package updates are caught
   automatically by the apk drift check (validate.py, daily CI cron) and released per the repository-root KNOWLEDGE.md
   workflow. Upstream *behavior* changes (new flags etc.) are read and adapted when such a release is made; a future
@@ -32,4 +23,17 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
 
 ## Resolved
 
-(none yet)
+- AppArmor profile verified on the real device (odroid-m1, 2026-10-15): the `hdidle` sub-profile (`cx` transition +
+  `deny network`) and the `/dev/sd*` ioctl path work under real enforcement. Proven functionally rather than via audit
+  logs (HAOS produces no AppArmor audit logs, and the SSH app context cannot read apparmorfs): `test:live` ran the
+  daemon in opt-in mode against all nine salim-labeled USB disks and every single drive issued its daemon-driven
+  spindown event - device cgroup grant, `/dev` node open, SG_IO `START STOP UNIT` and command execution all happened
+  under the enforced profile. Zero error/denial lines in the app log and dmesg.
+
+- `test:live` does real spindown checks (`.mise/tasks/test/live/hd-idle.sh`): `LIVE_HDIDLE_LABEL_GLOB` selects the
+  drives by filesystem label (only disks whose labeled partitions ALL match the glob; non-`sd*` disks and disks hosting
+  non-matching labels are excluded - the glob is a test-target selector, not a safety boundary), generates opt-in test
+  options with a 30 s idle on the fly and asserts the boot (managed-disk set exactly equal to the discovery, by-id to
+  kernel mapping) plus per-drive daemon-issued spindown events within a 300 s window. HAOS ships no docker CLI, so the
+  lab's forced `hd-idle -t` single-shot check is not reproducible on the device - the daemon's own events are the
+  stronger end-to-end assertion anyway.
