@@ -33,7 +33,7 @@ Spin down idle USB and SATA hard disk drives automatically.
 
 ## Documentation
 
-For usage, configuration and security notes, see the [**Documentation**](/config/app/hd-idle/documentation).
+For usage, configuration and security notes, see the [**Documentation**](/config/app/f8b2d53d_hd-idle/documentation).
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg

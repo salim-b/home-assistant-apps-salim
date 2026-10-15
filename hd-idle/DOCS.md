@@ -2,7 +2,7 @@
 
 ## Configuration
 
-Drives are configured in the app's [settings](/config/app/hd-idle/config). Each entry in the **Drives** list manages one drive; see the field
+Drives are configured in the app's [settings](/config/app/f8b2d53d_hd-idle/config). Each entry in the **Drives** list manages one drive; see the field
 descriptions in the configuration dialog for details. Saving configuration changes restarts the app, which re-validates
 the configuration and regenerates the hd-idle command line.
 
@@ -25,10 +25,10 @@ when the kernel name (`/dev/sda`, `/dev/sdb`, ...) changes. Select the **disk it
 needs the whole disk, and the startup validation rejects partition entries with an explanatory message.
 
 On startup the app logs an inventory of all detected `sd*` disks (model and by-id path) and the mapping of every configured
-drive to its kernel name, so log lines like `sdi spindown` can be attributed:
+drive to its kernel name, so log lines like `sda spindown` can be attributed:
 
 ```text
-Drive /dev/disk/by-id/usb-WDC_WD40EZRX-00SPEB0_WD-WCC4E0486370-0:0 -> sdi
+Drive /dev/disk/by-id/usb-WD_Elements_1234567890AB-0:0 -> sda
 ```
 
 ### Command types

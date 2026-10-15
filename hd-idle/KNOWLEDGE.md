@@ -25,7 +25,7 @@ Verified against the v1.22 source (`main.go`, `hdidle.go`):
   generator therefore always emits defaults first, then entries.
 - Unconfigured devices are governed by the global defaults: opt-in mode pins the global idle to `0`, and the system disk
   gets an explicit `-a <disk> -i 0` entry (first-match-wins: `deviceConfig()` returns the first device entry whose name matches the `/proc/diskstats` name).
-- `-a` accepts a bare kernel name (`sdi` – returned as-is), a `/dev` node (`filepath.Base`), or a `/dev/disk/by-*` symlink (readlink + basename + trailing-digit
+- `-a` accepts a bare kernel name (`sda` – returned as-is), a `/dev` node (`filepath.Base`), or a `/dev/disk/by-*` symlink (readlink + basename + trailing-digit
   strip, i.e. partition links resolve to their disk). Resolution happens once at startup with `-s 0`; `-s 1` re-resolves at runtime
   **only while the entry is still unresolved** – a device that re-attaches with a different kernel name after being
   resolved stays stale until an app restart. That is why config.sh resolves by-id paths itself (kernel names are stable
@@ -36,7 +36,7 @@ Verified against the v1.22 source (`main.go`, `hdidle.go`):
   state (suspend detection).
 - Spindown failures do not loop per poll cycle: the device is marked spun down with `LastSpunDownAt=now` even on error, so an unspindownable
   disk produces one error line per idle interval, not per poll.
-- Events are logged as `<givenName> spindown|spinup` to stdout; with kernel names as given names the app log reads `sdi spindown`.
+- Events are logged as `<givenName> spindown|spinup` to stdout; with kernel names as given names the app log reads `sda spindown`.
 
 ## hd-idle's monitoring scope
 
@@ -87,7 +87,7 @@ refuses precisely.
 ## hd-idle -t (single-shot spindown) quirks
 
 - The disk argument needs the **full `/dev/` path**: single-shot mode, unlike the daemon path (which does `fmt.Sprintf("/dev/%s", name)`), passes the
-  argument straight to `openDevice` - bare kernel names fail with `open sdi: no such file or directory`. The usage string's `-t sda` example is misleading. Verified against
+  argument straight to `openDevice` - bare kernel names fail with `open sda: no such file or directory`. The usage string's `-t sda` example is misleading. Verified against
   v1.22 (`main.go` singleDiskMode branch).
 - The command uses the **global default** command type / power condition only (single-disk mode skips the per-device
   config entirely).

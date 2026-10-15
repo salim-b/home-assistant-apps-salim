@@ -33,11 +33,11 @@ updates it (if the version changed in `config.yaml`) or rebuilds its image (othe
 
 ```sh
 # app name (repo subfolder) + SSH target of the device
-mise run deploy nfs-server root@192.168.1.11
+mise run deploy nfs-server root@homeassistant.local
 
 # get app logs (`--follow` continuously prints new log entries until you abort;
 # app slug is `local_<config.yaml slug>`)
-ssh root@192.168.1.11 'ha apps logs --follow local_nfs'
+ssh root@homeassistant.local 'ha apps logs --follow local_nfs'
 ```
 
 Note that the task comments out the top-level `image:` key in the *device-side* copy of `config.yaml`: with an `image` key set, the Supervisor would
@@ -52,13 +52,13 @@ deploys the app, forwarding `--replace`/`--test-options`:
 
 ```sh
 # plain: tests the device app's currently configured shares
-mise run test:live nfs-server root@192.168.1.11
+mise run test:live nfs-server root@homeassistant.local
 
 # with the repo's test options applied for the run (a minimal set exercising
 # the whole export surface: default share, read-only share, /media share,
 # nested path, second client network — your app options are backed up and
 # restored automatically)
-mise run test:live nfs-server root@192.168.1.11 --test-options
+mise run test:live nfs-server root@homeassistant.local --test-options
 ```
 
 ## CI

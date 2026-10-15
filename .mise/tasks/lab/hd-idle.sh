@@ -23,8 +23,8 @@ fi
 #
 # The lab container sees this machine's real /dev and /proc/diskstats. The
 # optional spindown smoke test is driven by LAB_SPINDOWN_DRIVES (comma-
-# separated sd* kernel names, e.g. "sdi,sdj" — set via
-# `mise run lab hd-idle --spindown-drives sdi,sdj`). It performs READ-ONLY
+# separated sd* kernel names, e.g. "sda,sdb" — set via
+# `mise run lab hd-idle --spindown-drives sda,sdb`). It performs READ-ONLY
 # standby commands + state queries (smartctl -n standby) only. The fixture
 # adapter (.mise/tasks/lab/hd-idle.py) configures these drives in opt-in
 # mode with a 30 s idle so the daemon also exercises its natural spindown
@@ -93,7 +93,7 @@ lab_runtime_check() {
   ##
   ## hd-idle -t quirks (verified, see hd-idle/KNOWLEDGE.md):
   ## - needs the FULL /dev path - unlike the daemon path, single-shot mode
-  ##   does not prepend /dev/ (bare kernel names fail with "open sdi: no
+  ##   does not prepend /dev/ (bare kernel names fail with "open sda: no
   ##   such file or directory"; the usage string's "-t sda" is misleading)
   ## - uses the GLOBAL default command type (single-shot mode has no
   ##   per-device config) - the lab fixture sets scsi, what USB drives need

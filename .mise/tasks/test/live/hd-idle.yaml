@@ -5,7 +5,7 @@
 #
 # Safe no-op by design: opt-in mode with an empty drive list - the app boots,
 # runs and monitors nothing until real drives are configured. Extend with
-# device-specific drives + a short idle once the odroid-m1 has USB HDDs
+# device-specific drives + a short idle once drives are attached to the test device
 # attached (see hd-idle/TODO.md).
 mode: opt-in
 disks: []
