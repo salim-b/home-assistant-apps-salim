@@ -12,13 +12,13 @@ Duplicate entries (the same path and network configured more than once) are reje
 
 The server only provides NFSv4.x, so mount with `-t nfs4`, using the share's **Path** as the export path. For the default share:
 
-```
+```sh
 mount -t nfs4 homeassistant.local:/share/nfs /mnt/nfs
 ```
 
 For read-only access to all configured shares at once (under a single parent), mount the NFS pseudo-filesystem root:
 
-```
+```sh
 mount -t nfs4 homeassistant.local:/ /mnt/nfs
 ```
 

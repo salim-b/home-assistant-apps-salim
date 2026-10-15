@@ -183,7 +183,6 @@ drives may wake a drive between the STOP command and the probe).
   entries (see TODO.md). Until then the watcher is the app-side workaround;
   remove it if/when upstream ships the behavior (Alpine package users would
   get it via a package version bump + app version bump).
-
 - **The watcher's failure class is nearly empty, by construction** (the
   regeneration-failure guard is cheap insurance, not a fix for a real path):
   the options cannot change under a running app (supervisor validates at

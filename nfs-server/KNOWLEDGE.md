@@ -153,8 +153,8 @@ kernel (kernel v6.18 sources checked for the mechanisms):
   `<rpc_pipefs>/nfsd/cld` inside the rpc_pipefs superblock registered for
   the server's network namespace (`rpc_get_sb_net(net)`); the `nfsd/`
   subdirectory is pre-created by the kernel when rpc_pipefs mounts. The
-  container must therefore mount one itself (`mount -t rpc_pipefs sunrpc
-  <dir>`) – `sunrpc` is built-in wherever the NFS *client* is
+  container must therefore mount one itself (`mount -t rpc_pipefs sunrpc <dir>`) –
+  `sunrpc` is built-in wherever the NFS *client* is
   (`CONFIG_NFS_FS=y`), i.e. on every HAOS board. Mounting it into the app
   (cont-init) is what makes the whole tracker work in a container.
 - **Ordering**: `nfsd4_cld_tracking_init` waits only ~1 s (10 × 100 ms,

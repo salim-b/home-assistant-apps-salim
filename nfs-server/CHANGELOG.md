@@ -1,3 +1,4 @@
+# Changelog
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
 ## 0.5.3
 
@@ -103,7 +104,7 @@
 
 ## 0.2.5
 
-- Fixed the configuration option labels/descriptions in the UI: the translations file did not parse as YAML at all (a `: ` inside a plain scalar string), the port label key used the wrong case (`2049/TCP` instead of `2049/tcp`) and the `shares` sub-option labels were nested at the wrong level (they must live under the option's `fields` key)
+- Fixed the configuration option labels/descriptions in the UI: the translations file did not parse as YAML at all (a `:` inside a plain scalar string), the port label key used the wrong case (`2049/TCP` instead of `2049/tcp`) and the `shares` sub-option labels were nested at the wrong level (they must live under the option's `fields` key)
 
 ## 0.2.4
 

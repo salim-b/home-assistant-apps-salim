@@ -16,7 +16,7 @@ The drive dropdown lists the system's block devices by their stable `/dev/disk/b
 
 On startup the app logs an inventory of all detected `sd*` disks (model and by-id path) and the mapping of every configured drive to its kernel name, so log lines like `sdi spindown` can be attributed:
 
-```
+```text
 Drive /dev/disk/by-id/usb-WDC_WD40EZRX-00SPEB0_WD-WCC4E0486370-0:0 -> sdi
 ```
 
