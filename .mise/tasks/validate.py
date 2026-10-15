@@ -16,6 +16,8 @@
   nested 'fields'), 'network' keys (lowercase!) vs config.yaml 'ports' keys
 - validates .github/renovate.json against the published Renovate config
   schema (option typos fail at `mise run check`, not on Renovate's next run)
+- validates .rumdl.toml against rumdl's published config schema (fetched at
+  the installed rumdl version's tag; the pin lives in mise.toml [tools])
 """
 from __future__ import annotations
 
@@ -24,7 +26,9 @@ import json
 import os
 import pathlib
 import shutil
+import subprocess
 import sys
+import tomllib
 import urllib.request
 
 import voluptuous
@@ -158,6 +162,41 @@ def validate_renovate_config() -> None:
         fail("renovate.json", f"fetched schema unusable: {err.message[:200]}")
 
 
+def validate_rumdl_config() -> None:
+    """Schema-validate .rumdl.toml against rumdl's published config schema,
+    fetched at the *installed* rumdl version's tag (the single source of the
+    pin is mise.toml [tools] + mise.lock; refetched when the version
+    changes). Requires rumdl on PATH, i.e. run via `mise run validate`."""
+    import jsonschema
+
+    config_file = ROOT / ".rumdl.toml"
+    if not config_file.is_file():
+        return
+    config = tomllib.loads(config_file.read_text())
+
+    try:
+        out = subprocess.run(
+            ["rumdl", "--version"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        sys.exit("rumdl not on PATH: run this task via `mise run validate`")
+    version = out.split()[-1]
+
+    schema_url = f"https://raw.githubusercontent.com/rvben/rumdl/v{version}/rumdl.schema.json"
+    schema_file = CACHE.parent / f"rumdl-schema-v{version}.json"
+    if not schema_file.is_file():
+        schema_file.parent.mkdir(parents=True, exist_ok=True)
+        print(f"fetching {schema_url}")
+        schema_file.write_text(urllib.request.urlopen(schema_url).read().decode())
+    try:
+        jsonschema.validate(config, json.loads(schema_file.read_text()))
+    except jsonschema.ValidationError as err:
+        loc = "/".join(str(p) for p in err.absolute_path) or "<root>"
+        fail(".rumdl.toml", f"schema mismatch at {loc}: {err.message[:200]}")
+    except jsonschema.SchemaError as err:
+        fail(".rumdl.toml", f"fetched schema unusable: {err.message[:200]}")
+
+
 def main() -> int:
     global CONST_NAMES
     if _flag("schemas-only"):
@@ -175,6 +214,7 @@ def main() -> int:
     if _flag("schemas-only"):
         return 0  # cache warmed by the fetches above
     validate_renovate_config()
+    validate_rumdl_config()
 
     for app in find_apps():
         app_dir = ROOT / app

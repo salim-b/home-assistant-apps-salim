@@ -1,0 +1,17 @@
+# rumdl configuration - Markdown linter (https://github.com/rvben/rumdl)
+#
+# Runs as part of `mise run lint` (all git-tracked .md files); `mise exec
+# rumdl -- rumdl fmt .` applies auto-fixes. The config is schema-validated
+# against rumdl's published JSON schema (see .mise/tasks/validate.py).
+
+[global]
+# Line length (MD013) is deliberately not enforced: the repo mixes
+# hard-wrapped prose (KNOWLEDGE/TODO files, AGENTS.md) with long-line
+# documents (READMEs, DOCS.md, CHANGELOGs), and MD013's reflow would rewrap
+# whole files. Don't reflow prose wholesale when editing - match the file's
+# existing style.
+disable = ["MD013"]
+
+[per-file-ignores]
+# Badges/my.home-assistant.io embeds are conventional GitHub README content.
+"README.md" = ["MD033"]

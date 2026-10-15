@@ -34,6 +34,10 @@ echo "== yamllint (yaml files) =="
 mapfile -t yamlfiles < <(git ls-files | grep -E '\.ya?ml$')
 yamllint "${yamlfiles[@]}" || fails=$((fails + 1))
 
+echo "== rumdl (markdown files) =="
+mapfile -t mdfiles < <(git ls-files | grep -E '\.md$')
+rumdl check "${mdfiles[@]}" || fails=$((fails + 1))
+
 ## .editorconfig [**] insert_final_newline: no linter above covers it for
 ## non-YAML text files (yamllint's new-line-at-end-of-file only sees YAML) -
 ## enforce it repo-wide. Binary files are skipped (grep -I: "process a
