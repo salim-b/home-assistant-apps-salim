@@ -313,7 +313,6 @@ fi
 ## Global flags + command line output
 ## ---------------------------------------------------------------------------
 
-bashio::config.true 'debug' && ARGS+=(-d)
 if bashio::config.true 'debug'; then
   ARGS+=(-d)
 fi

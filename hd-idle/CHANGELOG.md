@@ -18,3 +18,4 @@
 - hd-idle apk package pinned (1.22-r7): Alpine-side package updates become explicit app releases, guided by the CI drift
   check (see the repository-root `KNOWLEDGE.md` apk package version policy).
 - Custom AppArmor profile; the daemon runs network-free under its own sub-profile.
+- Debug mode emits hd-idle's `-d` flag once (it was previously passed twice).
