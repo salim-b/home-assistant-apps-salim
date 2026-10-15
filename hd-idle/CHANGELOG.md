@@ -17,7 +17,8 @@
 - Robustness: the hd-idle-watch service compares and re-syncs both generated files (command line + drives list) every
   cycle, so an interrupted configuration install self-heals on the next tick instead of silently skipping the drive-PM
   treatment for affected drives; hd-idle-genargs now rejects option values containing whitespace (defense in depth
-  against hand-edited options files).
+  against hand-edited options files); a hd-idle-pmfix failure at app start is logged as a warning instead of failing the
+  boot (consistent with the watcher's re-application path).
 
 ## 0.1.0
 
