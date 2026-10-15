@@ -115,6 +115,31 @@ one `hdparm -C` → smartctl says active). Use **`smartctl -H -n standby`** inst
 STANDBY/SLEEP mode" without any media access) - that is what the lab hook does, with polling retries (desktop IO on
 mounted drives may wake a drive between the STOP command and the probe).
 
+## WD USB bridges lie about the drive's power state
+
+The bridge firmware answers SCSI power-condition queries (the sense data behind
+`smartctl -H -n standby`, and hd-idle's own state view is equally blind) from its
+**own** power-state model without consulting the drive: a drive that woke itself up
+host-invisibly still reports STANDBY/SLEEP to every passive host-side probe
+(device-verified 2026-10-15: three drives audibly spinning while `smartctl -n
+standby` and the app's diagnostics reported SLEEP, with frozen `/proc/diskstats`
+counters). Consequences:
+
+- No passive host-side probe can detect a host-invisible wake-up through these
+  bridges. hd-idle's diskstats-based belief therefore never resets after such a
+  wake: it never re-issues a spindown, and the drive can spin for hours while the
+  app reports it as spun down.
+- The only host-side truth is the ramp-up latency of a *real* read: an actually
+  spinning drive answers in well under a second, an asleep drive takes the
+  motor ramp (seconds). That probe is intrusive (it wakes an asleep drive) and
+  must bypass the page cache (read far offsets; the first sector of a partition
+  is typically cached from udev/blkid probing).
+- `CHECK POWER MODE` (what `hdparm -C` sends) is forwarded to the drive - it is
+  truthful but **wakes the drive** (see the section above), so it is likewise
+  useless for passive observation.
+- Prevention (the drive's own power management off + a spindown command class
+  the bridge actually honors) beats detection here; see `TODO.md`.
+
 ## Automatic drive re-resolution (hd-idle-watch)
 
 - **The problem**: hd-idle resolves its `-a` device entries **once** at startup; `-s 1` re-resolves *only entries that
