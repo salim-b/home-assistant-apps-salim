@@ -30,9 +30,21 @@
   ],
   "packageRules": [
     {
-      "description": "Alpine apk pins in app Dockerfiles (e.g. hd-idle=1.22-r7): read the apk datasource's versions from the Alpine binary repositories. Renovate cannot infer the branch from the base-image ARG default - without registryUrls it silently skips these pins (skipReason unknown-registry) - so the branch is pinned here; update it together with the Dockerfile BUILD_FROM default on a base-image bump (the validate.py drift check derives the branch dynamically and cross-checks the pins either way). No automerge: a package bump must become an app release (config.yaml version + changelog entry; the version-guard workflow fails the PR until that is done - treat the PR as the prepared change).",
+      "description": "Alpine apk pins in app Dockerfiles (e.g. hd-idle=1.22-r7): read the apk datasource's versions from the Alpine binary repositories and bump the app's config.yaml version in the same PR (experimental bumpVersions feature; patch bump - the dependency update is a fix-level change). Renovate cannot infer the branch from the base-image ARG default - without registryUrls it silently skips these pins (skipReason unknown-registry) - so the branch is pinned here; update it together with the Dockerfile BUILD_FROM default on a base-image bump (the validate.py drift check derives the branch dynamically and cross-checks the pins either way). No automerge: the changelog entry for the new version is still missing - it is completed manually before the merge (the hosted Renovate app cannot run post-upgrade tasks, so the templated changelog insertion would need a self-hosted instance or an own workflow).",
       "matchDatasources": [
         "apk"
+      ],
+      "bumpVersions": [
+        {
+          "name": "hd-idle apk package bump",
+          "filePatterns": [
+            "{{packageFileDir}}/config.{yaml,yml}"
+          ],
+          "matchStrings": [
+            "version:\\s*\"(?<version>[^\"]+)\""
+          ],
+          "bumpType": "patch"
+        }
       ],
       "registryUrls": [
         "https://dl-cdn.alpinelinux.org/alpine?branch=v3.24&components=main,community&arch=x86_64",

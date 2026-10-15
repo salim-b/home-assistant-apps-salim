@@ -122,14 +122,18 @@ the next versioned release).
   main, cached 24 h). A mismatch fails with the release workflow — turning an Alpine-side repoint into a guided release
   instead of silent image drift. It runs in `mise run check`, and the CI lint workflow's **daily cron** flags drift within a day; until
   the pin is chased, the *next* build would break anyway (the index serves only the current pkgrel, old ones disappear).
-- **Renovate opens the update PR** (verified with a local `npx renovate@latest --platform=local --dry-run=full` run): the Dockerfile manager extracts `apk add pkg=version` pins into the `apk`
-  datasource, and the `.github/renovate.json` apk packageRule supplies the `registryUrls` (dl-cdn APKINDEX URLs, branch + arch pinned) without which Renovate
-  silently skips the pins (`skipReason: unknown-registry` — it cannot infer the Alpine branch from the base-image ARG). The rule's branch value must
-  be updated together with the Dockerfile's `BUILD_FROM` default on a base-image bump; the validate.py drift check derives the
-  branch dynamically and remains the config-independent net. **No automerge by design**: the Renovate PR changes only
-  the Dockerfile, so the version-guard workflow fails it until the release completion (config.yaml version bump +
-  changelog entry, same branch) — the PR is the prepared change, not the release. Floating apk packages (nfs-utils) are
-  skipped (`unspecified-version`), as intended.
+- **Renovate opens the update PR — including the config.yaml version bump** (verified with a local `npx renovate@latest --platform=local --dry-run=full` run: extraction +
+  APKINDEX lookup + rule resolution; the branch edit itself only happens in a real run — safe by construction, see
+  below): the Dockerfile manager extracts `apk add pkg=version` pins into the `apk` datasource, and the `.github/renovate.json` apk packageRule supplies the `registryUrls` (dl-cdn
+  APKINDEX URLs, branch + arch pinned) without which Renovate silently skips the pins (`skipReason: unknown-registry` — it cannot infer the Alpine
+  branch from the base-image ARG). The rule also carries a `bumpVersions` entry (experimental Renovate feature): the app's `config.yaml` version is
+  patch-bumped in the same PR (`{{packageFileDir}}/config.{yaml,yml}`), so the version-guard workflow passes on the Renovate PR as opened. What Renovate
+  cannot do on the hosted app: run post-upgrade tasks — `postUpgradeTasks.commands` need `allowedPostUpgradeCommands`, a **self-hosted-only** option — so the changelog entry
+  for the bumped version stays a manual step before the merge (one templated line; if it ever becomes a burden, the
+  alternatives are a self-hosted Renovate or an own completion workflow). The rule's registryUrls branch value must be
+  updated together with the Dockerfile's `BUILD_FROM` default on a base-image bump; the validate.py drift check derives the branch
+  dynamically and remains the config-independent net (if `bumpVersions` ever misbehaves, version-guard fails the PR loudly — no silent
+  drift). Floating apk packages (nfs-utils) are skipped (`unspecified-version`), as intended.
 
 Version-sensitive gotchas learned while implementing:
 
