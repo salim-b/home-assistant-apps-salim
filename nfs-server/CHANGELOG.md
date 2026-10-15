@@ -1,5 +1,7 @@
-# Changelog
 <!-- https://developers.home-assistant.io/docs/apps/presentation#keeping-a-changelog -->
+
+# Changelog
+
 ## 0.5.3
 
 - Minor documentation fix.
