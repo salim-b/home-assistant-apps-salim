@@ -98,5 +98,9 @@ configuration:
     description: >-
       Send the spin-down command even when hd-idle thinks the drive is
       already spun down - for drives kept awake by activity hd-idle cannot
-      see (for example SMART polling by other tools). This is a global
-      setting; it cannot be set per drive.
+      see (for example SMART polling by other tools).
+
+      Caveat: on some USB bridges, re-issuing the command to an
+      already-sleeping drive wakes it again - needless spin-up cycles and
+      extra wear. Only use this when drives otherwise won't stay spun
+      down. This is a global setting; it cannot be set per drive.

@@ -75,7 +75,8 @@ With **Activity log** enabled, hd-idle writes per-drive spin-up records (running
   tools generally.
 - **Spin-up wear**: frequent spin-down/spin-up cycles stress the spindle motor and bearings; keep idle times at 3-5
   minutes minimum (hd-idle's default is 10).
-- **Ignore spin-down detection** is a global hd-idle setting and cannot be set per drive (upstream limitation).
+- **Ignore spin-down detection** is a global hd-idle setting and cannot be set per drive (upstream limitation), and can
+  cause extra wear on some bridges (see its description in the options UI).
 
 ## Security notes
 
