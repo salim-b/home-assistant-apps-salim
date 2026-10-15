@@ -10,4 +10,6 @@
 - Hotplug-aware: dynamic device-access grants and runtime by-id re-resolution; drives moved between ports/machines are
   picked up automatically (watcher restarts hd-idle with the updated kernel names).
 - Detailed activity log (optional, `/data/hd-idle.log`), debug mode, ignore-spin-down-detection (global hd-idle setting).
+- hd-idle apk package pinned (1.22-r7): Alpine-side package updates become explicit app releases, guided by the CI drift
+  check (see the repository-root `KNOWLEDGE.md` apk package version policy).
 - Custom AppArmor profile; the daemon runs network-free under its own sub-profile.

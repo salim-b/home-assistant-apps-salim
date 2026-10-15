@@ -17,9 +17,11 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
   container's `hd-idle -t` (single-shot) and assert the standby state + the app log events. Needs a device-side hdparm check (no
   docker CLI on HAOS - probably via `ha apps logs` events only, or an exec-capable path).
 
-- Monitor hd-idle upstream: v1.22 has no GitHub release (Alpine tracks the tag); if a future version adds per-device `-I` or
-  a config file, revisit the option schema. Worth filing upstream: per-device `-I` would make the global-only limitation
-  moot for mixed setups.
+- Monitor hd-idle upstream: v1.22 has no GitHub release (Alpine tracks the tag); Alpine-side package updates are caught
+  automatically by the apk drift check (validate.py, daily CI cron) and released per the repository-root KNOWLEDGE.md
+  workflow. Upstream *behavior* changes (new flags etc.) are read and adapted when such a release is made; a future
+  version adding per-device `-I` or a config file would also relax the option schema. Worth filing upstream: per-device `-I`
+  would make the global-only limitation moot for mixed setups.
 
 - The supervisor's `device(subsystem=block)` dropdown lists partitions and loop devices alongside disks (filter is by udev subsystem only); users
   can pick a `-partN` entry, which our startup validation rejects with an explanatory message. Consider an upstream suggestion

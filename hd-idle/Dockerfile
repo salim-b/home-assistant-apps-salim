@@ -2,13 +2,19 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/base:3.24
 FROM ${BUILD_FROM}
 
-# hd-idle (a static Go binary) from the Alpine community repo; unpinned
-# deliberately: Alpine minor releases repoint package versions, and the app
-# image is rebuilt regularly. The package installs the binary to
-# /usr/sbin/hd-idle (no runtime dependencies beyond musl).
-# hadolint ignore=DL3018
+# hd-idle (a static Go binary) from the Alpine community repo, version
+# PINNED (full pkgver-pkgrel, DL3018-compliant): the app's argument
+# generation encodes hd-idle's CLI semantics (see rootfs/usr/bin/hd-idle-genargs
+# and hd-idle/KNOWLEDGE.md), so package changes must be explicit app changes -
+# each new package version becomes an app release (bump pin + config.yaml
+# version + changelog). Alpine stable branches repoint package versions
+# (pkgrel bumps; the binary index then serves only the current one, so a
+# stale pin would break the build): validate.py's apk-drift check (running
+# in the daily CI cron) flags the mismatch with that workflow. This differs
+# deliberately from nfs-server's floating nfs-utils - the policy background
+# is in the repository-root KNOWLEDGE.md (apk package version policy).
 RUN apk add --no-cache \
-  hd-idle
+  hd-idle=1.22-r7
 
 # Copy root filesystem
 COPY --link rootfs /

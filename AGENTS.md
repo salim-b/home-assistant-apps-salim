@@ -117,6 +117,8 @@ Run `mise tasks ls --local` for the task list (the `--local` flag excludes globa
   release and **automerges the bump once the CI `check` job is green** — green means the new schemas validate our app
   configs (rebase-merge strategy, see `.github/renovate.json`). Renovate does not track schema-*behavior* changes: re-verify version-sensitive
   supervisor facts against the new ref when relying on them (see the version-sensitive-facts rule above). validate.py
-  also schema-validates `.github/renovate.json` against the published Renovate config schema (refetched whenever that file changes).
+  also schema-validates `.github/renovate.json` against the published Renovate config schema (refetched whenever that file changes) and `.rumdl.toml`
+  against rumdl's config schema, and compares pinned apk package versions in app Dockerfiles against the Alpine binary
+  indexes (drift = guided release; the repo-root KNOWLEDGE.md apk policy holds the details).
 - The HA base image's bash emits `echo`/`printf` as `writev(2)` — it cannot write to procfs transaction files (`/proc/fs/nfsd/*`); see the repo-root `KNOWLEDGE.md` (base-image
   shell gotchas) before writing to any such file from app code.

@@ -102,6 +102,35 @@ Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7.
   kernel 6.18.52-haos by rebooting with the module unloaded; the `kernel_modules` option only maps `/lib/modules` read-only and grants `SYS_MODULE` — both inert
   under a denying profile).
 
+## apk package version policy
+
+**Official apps' practice** (home-assistant/addons, verified 2026-10): apk packages **float** (`dnsmasq`, `samba`, `mariadb`, `vlc`: bare `apk add --no-cache <pkg>`), while
+version-sensitive *cores* are pinned explicitly via `build.yaml` ARGs and used in build/pip (`mosquitto` 2.1.2, `letsencrypt`'s certbot/cryptography stack,
+`whisper`'s pip stack). Base images float within their branch tag. Floating apk packages means their released images get newer
+package content on rebuilds without a version bump (fresh installs drift; existing installs keep the old digest until
+the next versioned release).
+
+**Our policy** splits by coupling:
+
+- **Pin** (full `pkgver-pkgrel`, e.g. `hd-idle=1.22-r7`) when the app's runtime logic encodes the package's interface: hd-idle's arg generator (`hd-idle/rootfs/usr/bin/hd-idle-genargs`) relies
+  on hd-idle's CLI semantics, so every package change must be a deliberate app change - one app release (pin + `config.yaml`
+  version + changelog) per package version.
+- **Float** when chasing pkgrel rebuilds adds churn without user value: nfs-server's `nfs-utils` (multi-binary ecosystem whose
+  kernel-consistency matters more than the exact userspace version).
+- Both are enforced/verified by `validate.py` (`validate_apk_pins`): it extracts the BUILD_FROM default branch and the apk pins from each app's
+  Dockerfile and compares them against the Alpine **binary indexes** (dl-cdn APKINDEX, x86_64 + aarch64, community then
+  main, cached 24 h). A mismatch fails with the release workflow — turning an Alpine-side repoint into a guided release
+  instead of silent image drift. It runs in `mise run check`, and the CI lint workflow's **daily cron** flags drift within a day; until
+  the pin is chased, the *next* build would break anyway (the index serves only the current pkgrel, old ones disappear).
+
+Version-sensitive gotchas learned while implementing:
+
+- **The aports source branch can outrun the binary index**: verified 2026-10 — the `3.24-stable` APKBUILD said `pkgrel=8` while both arches'
+  APKINDEX still served `1.22-r7`. A pin must be compared against what `apk add` actually resolves (the APKINDEX), not the APKBUILD
+  source.
+- The GitHub aports mirror (alpinelinux/aports) names stable branches `3.24-stable` (no `v` prefix, unlike the GitLab branches); raw
+  fetches there are for source inspection only — version checks use dl-cdn.
+
 ## HA base image: shell gotchas
 
 - **`echo`/`printf` emit a single `writev(2)`**: the base image's bash (5.3.9) implements the output of its `echo` and `printf`
