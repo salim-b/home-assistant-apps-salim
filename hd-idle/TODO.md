@@ -22,6 +22,11 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
   5. Final gates: `mise run check`, `mise run lab hd-idle`, dangling-reference sweep (every "see X" resolves), move
      resolved items down.
 
+- Drive-PM treatment blind spot (see `KNOWLEDGE.md` §"Drive-PM treatment"): a drive that reconnects under the SAME
+  kernel name (its bridge power-cycled it) is invisible to hd-idle-pmfix's `--since` diff and stays untreated until the
+  next app restart. Find a detection mechanism that respects the redundant-treatment risk (device-verified motor starts,
+  see `KNOWLEDGE.md`).
+
 - Upstream: hd-idle's `-s 1` re-resolves only *unresolved* device entries and never re-verifies already-resolved ones
   (`resolveSymlinks()` skips entries with a populated `Name`). A small upstream change (re-verify resolved symlinks each
   cycle, update entries whose resolution changed) would let us remove the app's `hd-idle-watch` service (see

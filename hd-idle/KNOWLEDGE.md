@@ -19,6 +19,14 @@ Alpine v3.24 ships `hd-idle 1.22-r7` (community repo; v1.22 is a GitHub tag *wit
 `/usr/sbin/hd-idle`, has no runtime dependencies, and is built from the same code as the v1.22 tag (`main.go` is
 byte-identical to it as of 2026-10).
 
+## bashio option parsing (list-of-object options)
+
+`bashio::config '<list-option>'` returns one compact JSON object per line for list-of-object options: hd-idle-genargs
+reads the `disks` option with
+`while IFS= read -r entry; do ... bashio::jq "${entry}" '.field' ... done < <(echo "${DISKS}")` and relies on that shape
+(verified against the v3.24 base image's bashio). If a bashio update ever changed the return shape (e.g. to
+pretty-printed arrays), every drive entry would fail to parse - a lab boot with configured drives catches it.
+
 ## hd-idle CLI semantics relied upon by config.sh
 
 Verified against the v1.22 source (`main.go`, `hdidle.go`):
@@ -47,6 +55,16 @@ Verified against the v1.22 source (`main.go`, `hdidle.go`):
 - Events are logged as `<givenName> spindown|spinup` to stdout; with kernel names as given names the app log reads
   `sda spindown`.
 
+## hd-idle-genargs quiet mode
+
+`hd-idle-genargs --quiet` (the watcher's per-tick mode) suppresses ALL narrative/info output and the warning-level notes
+for expected-transient states (a currently detached drive, a non-sd\* entry): both are surfaced once per boot by the
+non-quiet cont-init run, and options cannot change mid-run (repository-root `KNOWLEDGE.md` §"Supervisor: option schema
+quirks"), so repeating them every 30-s tick adds nothing. Errors always log, and invalid configuration still exits
+nonzero in both modes: for cont-init that fails the app boot; for the watcher it means regeneration failed and the
+current configuration (the args file plus the running daemon's argv - see §"Automatic drive re-resolution" for when that
+can happen at all) stays as is.
+
 ## hd-idle's monitoring scope
 
 `diskstats/snapshot.go` matches `/proc/diskstats` names against `sd[a-z]+$` (disk), `sd[a-z]+[0-9]+$` (partition →
@@ -68,9 +86,13 @@ against the device's kernel (6.18-haos) before relying on it for new work):
   unconditional in `config.yaml` because some USB bridges (Jmicron quirk, supported since 1.21) and all SATA disks need
   the `ata` path.
 
-Consequence for the profile: AppArmor 3.x mediates ioctls only via the file's r/w permission (no per-command mediation
-until AppArmor 4 — the mechanism is repository-wide, see the repository-root `KNOWLEDGE.md`), so `/dev/sd* rwk,` (plus
-the `file,` blanket) covers the ioctl path; no capability rules are needed for it.
+Consequence for the profile - TWO independent gates, both must be open (device-verified 2026-10-15; the missing second
+gate was the 0.1.3 fix): (1) the SG_IO ioctl itself is mediated only via the file's r/w permission (no per-command
+mediation until AppArmor 4 - mechanism repository-wide, see the repository-root `KNOWLEDGE.md` §AppArmor), so
+`/dev/sd* rwk,` (plus the `file,` blanket) covers it; (2) the kernel's `capable(CAP_SYS_RAWIO)` check inside
+`scsi_cmd_allowed()` is mediated by AppArmor itself (repository-root `KNOWLEDGE.md` §AppArmor), so both profiles need
+`capability sys_rawio,` - without that rule every ata-path command failed with EPERM even though the container carried
+the capability.
 
 ## Device access in this app (mechanics: repository-root `KNOWLEDGE.md`)
 
@@ -105,6 +127,8 @@ the device-option mechanism refuses precisely.
   (`main.go` singleDiskMode branch).
 - The command uses the **global default** command type / power condition only (single-disk mode skips the per-device
   config entirely).
+
+(No in-app caller since the diagnostics build was reverted - kept as reference knowledge for manual debugging.)
 
 ## Verifying drive power states from the lab (USB bridges)
 
@@ -157,6 +181,12 @@ WD USB bridges, 2026-10-15):
   generator, NOT production-safe; (b) each app restart makes the fresh daemon fire one spindown wave at ALL drives
   (fresh state), including already-asleep ones - the app restarts rarely (only on real config changes), so the cost is
   one wave per restart. Both documented in TODO.md as upstream-report items.
+
+The drives file (`/etc/hd-idle.drives`, written by hd-idle-genargs next to the args file - the derivation of its name
+from the args-file path is mirrored in the hd-idle-watch run script) is pmfix's machine-readable interface: one
+`<kernel-name> <idle> <command-type>` line per drive with EFFECTIVE values (exclusions carry idle 0, entries without
+explicit values carry the inherited defaults). pmfix treats only idle != 0 entries; with `--since <old-file>` only
+drives whose line is NEW or CHANGED are treated.
 
 ## Automatic drive re-resolution (hd-idle-watch)
 

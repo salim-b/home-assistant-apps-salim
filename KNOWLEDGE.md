@@ -47,6 +47,9 @@ such apps outright (`UnsupportedReason.APPARMOR`).
 - Options are validated **at save time** (schema incl. device-path existence) and delivered to the running app only at
   its next (re)start — option values cannot change under a running app (`supervisor/api/apps.py` options endpoint →
   `app.save_persist()`).
+- Installed options are **user data**: config.yaml default changes do NOT reach existing installs (options.json is
+  written at first install and at save time only) - new options therefore need absent-key handling in app code
+  (`bashio::config '<key>' <default>`), and changing a default is not a behavior change for existing users.
 
 ## Supervisor: device access
 
