@@ -6,14 +6,12 @@ Drives are configured in the app's [settings](/config/app/f8b2d53d_hd-idle/confi
 manages one drive; see the field descriptions in the configuration dialog for details. Saving configuration changes
 restarts the app, which re-validates the configuration and regenerates the hd-idle command line.
 
-### Configuration modes
+### Drive list semantics
 
-**Opt-in** (default, recommended, fail-safe): only the listed drives are spun down, each with its own settings; all
-other disks - including anything that appears on the system later - are never touched. **Opt-out**: all monitored drives
-follow the global defaults, drive entries override them per drive, and an entry with idle time `0` excludes that drive.
-See the **Configuration mode** field description in the options UI for the details and an important Home Assistant OS
-caveat. In `opt-out` mode, list every drive you want spun down (leaving its other fields empty to follow the defaults)
-and use `idle: 0` entries for exclusions.
+Every **listed** drive is managed: it follows the global defaults (**Default idle time**, **Default command type**,
+**Default power condition**) wherever its own fields are left empty, an idle time of `0` never spins it down, and
+unlisted drives - including anything that appears on the system later - are never touched. Only listed drives receive
+device access on Home Assistant OS, which also keeps the system disk out of reach.
 
 ### Selecting drives
 

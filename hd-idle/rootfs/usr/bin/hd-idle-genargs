@@ -39,27 +39,13 @@ require_space_free() {
     bashio::exit.nok "Invalid ${what} '${value}': must not contain whitespace."
 }
 
-MODE=$(bashio::config 'mode')
 DEFAULT_IDLE=$(bashio::config 'default_idle')
 DEFAULT_COMMAND=$(bashio::config 'default_command_type')
 DEFAULT_POWER=$(bashio::config 'default_power_condition')
 DISKS=$(bashio::config 'disks')
 
-## Prominent mode statement at the top of the boot log (the mode cannot change mid-run, so quiet ticks need no
-## repeat): the effective drive-management semantics differ fundamentally between the modes.
-case "${MODE}" in
-  opt-in) qlog_info "Configuration mode: opt-in - only the listed drives are spun down." ;;
-  opt-out) qlog_info "Configuration mode: opt-out - unlisted drives follow the global defaults; drive entries override them per drive, and idle-0 entries exclude." ;;
-esac
-
 ## Defense in depth: the supervisor schema already validates these; cheap re-checks keep a hand-edited options.json
 ## from producing a bogus command line (every emitted token must be space-free - the run script word-splits the file).
-case "$MODE" in
-  opt-in | opt-out) ;;
-  *)
-    bashio::exit.nok "Invalid mode '${MODE}': must be opt-in or opt-out."
-    ;;
-esac
 [[ "${DEFAULT_IDLE}" =~ ^[0-9]+$ ]] ||
   bashio::exit.nok "Invalid default idle time '${DEFAULT_IDLE}': must be a non-negative integer."
 case "$DEFAULT_COMMAND" in
@@ -203,7 +189,7 @@ if [ -n "${SYSTEM_SD_DISKS}" ]; then
 elif [ -z "${SYSTEM_DISKS//[[:space:]]/}" ]; then
   ## Boot-time concern only (cont-init warns once loudly); the watcher's
   ## periodic runs must not repeat it every poll interval.
-  qlog_info "Could not identify the system disk via root= or hassos-* partlabels. In opt-in mode this is safe (only configured drives are touched); in opt-out mode make sure not to list the system disk."
+  qlog_info "Could not identify the system disk via root= or hassos-* partlabels. Only listed drives are ever touched; do not list the system disk."
 else
   qlog_info "System disk(s) identified but not sd* devices - hd-idle ignores them anyway."
 fi
@@ -237,15 +223,10 @@ fi
 ## Drive configuration -> per-device entries
 ## ---------------------------------------------------------------------------
 
-ARGS=(-s 1 -c "${DEFAULT_COMMAND}" -p "${DEFAULT_POWER}")
-if [ "${MODE}" = "opt-in" ]; then
-  ARGS+=(-i 0)
-  if [ "${DEFAULT_IDLE}" != "0" ]; then
-    qlog_info "The default idle time is only used in opt-out mode; opt-in mode pins hd-idle's global idle to 0 so unconfigured disks are never touched."
-  fi
-else
-  ARGS+=(-i "${DEFAULT_IDLE}")
-fi
+## hd-idle's global idle stays pinned to 0: unlisted drives (and drives appearing at runtime) are never touched -
+## Home Assistant OS grants device access per listed drive only, so anything else could only fail. Every -a entry
+## carries an explicit -i: the per-drive idle, or the configured default idle when left empty.
+ARGS=(-s 1 -c "${DEFAULT_COMMAND}" -p "${DEFAULT_POWER}" -i 0)
 
 ## Companion drives file for hd-idle-pmfix, written next to the args file (format and --since semantics:
 ## hd-idle/KNOWLEDGE.md §"Drive-PM treatment"; the derivation below is mirrored in the hd-idle-watch run script).
@@ -311,14 +292,13 @@ while IFS= read -r disk; do
     EMIT_NAME="${DEV}"
   fi
 
-  if [ "${MODE}" = "opt-in" ] && [ -z "${IDLE}" ]; then
-    bashio::exit.nok "Drive '${DEV}' has no idle time: in opt-in mode every configured drive needs an explicit idle time (seconds, 0 = never spin down)."
-  fi
-
   ARGS+=(-a "${EMIT_NAME}")
   if [ -n "${IDLE}" ]; then
-    ARGS+=(-i "${IDLE}")
+    EFFECTIVE_IDLE="${IDLE}"
+  else
+    EFFECTIVE_IDLE="${DEFAULT_IDLE}"
   fi
+  ARGS+=(-i "${EFFECTIVE_IDLE}")
   if [ -n "${COMMAND_TYPE}" ]; then
     ARGS+=(-c "${COMMAND_TYPE}")
   fi
@@ -327,31 +307,11 @@ while IFS= read -r disk; do
   fi
 
   ## Effective per-drive values for the drives-file line (format: hd-idle/KNOWLEDGE.md §"Drive-PM treatment").
-  if [ -n "${IDLE}" ]; then
-    EFFECTIVE_IDLE="${IDLE}"
-  elif [ "${MODE}" = "opt-in" ]; then
-    EFFECTIVE_IDLE="0"
-  else
-    EFFECTIVE_IDLE="${DEFAULT_IDLE}"
-  fi
   DRIVES_LINES+=("${EMIT_NAME} ${EFFECTIVE_IDLE} ${COMMAND_TYPE:-${DEFAULT_COMMAND}}")
 done < <(echo "${DISKS}")
 
 if [ "${N_DRIVES}" -eq 0 ]; then
-  case "${MODE}" in
-    opt-in)
-      qlog_info "No drives configured - hd-idle will not spin down anything (opt-in mode: only listed drives are ever touched)."
-      ;;
-    *)
-      if [ "${DEFAULT_IDLE}" = "0" ]; then
-        qlog_info "No drives configured, and the global default idle time is 0 - nothing is spun down."
-      else
-        qlog_warning "No drives configured (opt-out mode): unlisted drives follow the global defaults (idle ${DEFAULT_IDLE} s, command type ${DEFAULT_COMMAND}), but Home Assistant OS grants device access per listed drive only - their spindown attempts will fail with 'operation not permitted' once per idle cycle. Add the drives you want managed to the drive list."
-      fi
-      ;;
-  esac
-elif [ "${MODE}" = "opt-out" ]; then
-  qlog_info "Unlisted drives follow the global defaults; device access is granted per listed drive only, so unlisted drives cannot actually be spun down (their spindown attempts fail with 'operation not permitted')."
+  qlog_warning "No drives are listed - hd-idle will not spin down anything. Add the drives you want managed to the drive list (device access is granted per listed drive only)."
 fi
 
 ## ---------------------------------------------------------------------------

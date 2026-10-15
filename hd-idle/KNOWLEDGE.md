@@ -34,9 +34,11 @@ Verified against the v1.22 source (`main.go`, `hdidle.go`):
 - Arguments before the first `-a` set the global defaults; each `-a` seeds a per-device config **from the defaults
   parsed so far**, and `-i`/`-c`/`-p` after a `-a` (before the next one) override that device's values. Our generator
   therefore always emits defaults first, then entries.
-- Unconfigured devices are governed by the global defaults: opt-in mode pins the global idle to `0`, and the system disk
-  gets an explicit `-a <disk> -i 0` entry (first-match-wins: `deviceConfig()` returns the first device entry whose name
-  matches the `/proc/diskstats` name).
+- Unconfigured devices are governed by the global defaults; the app pins the global idle to `0` (unlisted drives are
+  never touched - HAOS grants device access per listed drive only) and emits an explicit `-i` after EVERY `-a` (the
+  per-drive idle, or the configured default idle when left empty; system disks: `-i 0`) - the passthrough path for
+  detached drives inherits the right idle without a watcher restart. First-match-wins: `deviceConfig()` returns the
+  first device entry whose name matches the `/proc/diskstats` name.
 - `-a` accepts a bare kernel name (`sda` – returned as-is), a `/dev` node (`filepath.Base`), or a `/dev/disk/by-*`
   symlink (readlink + basename + trailing-digit strip, i.e. partition links resolve to their disk). Resolution happens
   once at startup with `-s 0`; `-s 1` re-resolves at runtime **only while the entry is still unresolved** – a device
@@ -122,8 +124,8 @@ new work.
 
 - The app grants device access **exclusively via device-typed option fields**: `disks[].device`
   (`device(subsystem=block)`) — cgroup rules per configured drive, UI dropdown of stable by-id paths, hotplug re-grant
-  via udev links (no restart needed on re-plug), and the system-disk refusal as exclusion layer 1. This is why opt-out
-  mode can only work for listed drives and why every managed drive must be listed.
+  via udev links (no restart needed on re-plug), and the system-disk refusal as exclusion layer 1. This is why every
+  managed drive must be listed (and why unlisted drives are pinned to never spin down instead of being attempted).
 - Validation timing matters for the UX: saving options while a drive is detached fails (device existence is validated at
   save time); at boot the validation is suppressed, so a detached drive does not prevent the app from starting
   (config.sh passes it through for hd-idle's runtime resolution, see the watcher section below).

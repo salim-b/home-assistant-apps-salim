@@ -1,6 +1,6 @@
 # https://developers.home-assistant.io/docs/apps/configuration#app-configuration
 name: hd-idle
-version: "0.1.4"
+version: "0.1.5"
 slug: hd-idle
 description: Spin down idle hard disks (USB, SATA) automatically using hd-idle
 # Generic (multi-arch) image name; CI builds & publishes per-arch images
@@ -20,10 +20,8 @@ init: false
 privileged:
   - SYS_RAWIO
 options:
-  # opt-in: only configured drives spin down (hd-idle's global default idle
-  # is pinned to 0). opt-out: all monitored drives get the global defaults,
-  # per-drive entries override and idle:0 entries exclude.
-  mode: opt-in
+  # Every listed drive is managed: it follows the global defaults wherever its own fields are left empty, and an
+  # idle time of 0 never spins it down. Unlisted drives are never touched (hd-idle's global idle is pinned to 0).
   disks: []
   default_idle: 600
   default_command_type: scsi
@@ -33,7 +31,6 @@ options:
   activity_log: false
   ignore_spin_down_detection: false
 schema:
-  mode: list(opt-in|opt-out)
   disks:
     # `device` is a supervisor device-type field: it renders as a dropdown of
     # block devices with their stable /dev/disk/by-id paths AND is what grants
@@ -43,14 +40,15 @@ schema:
     # node, while hd-idle opens the disk node).
     - device: "device(subsystem=block)"
       # Idle time in seconds; 0 = never spin down this drive.
-      # opt-in mode: required. opt-out mode: empty = use default_idle.
+      # Empty = use the default idle time.
       idle: "int(0,)?"
       command_type: "list(scsi|ata)?"
       power_condition: "int(0,15)?"
-  # Global defaults. default_idle is only used in opt-out mode (opt-in pins
-  # hd-idle's global idle to 0); default_command_type/default_power_condition
-  # seed drives whose per-drive fields are left empty (both modes) and drives
-  # that appear without a list entry at runtime.
+  # Global defaults, filling the per-drive fields that are left empty.
+  # default_idle only applies to LISTED drives (unlisted drives are never
+  # touched - the global idle stays pinned to 0); default_command_type and
+  # default_power_condition also seed drives that appear without a list
+  # entry at runtime.
   default_idle: "int(0,)?"
   default_command_type: "list(scsi|ata)"
   default_power_condition: "int(0,15)"

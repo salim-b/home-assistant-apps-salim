@@ -13,7 +13,6 @@ if [ ! -r /etc/hd-idle.args ]; then
   bashio::log.error "/etc/hd-idle.args is missing - the hd-idle configuration did not complete (see the earlier log lines for the configuration error)."
   exit 1
 fi
-MODE=$(bashio::config 'mode')
 read -r -a HD_IDLE_ARGS </etc/hd-idle.args
-bashio::log.info "Starting hd-idle (configuration mode: ${MODE}): /usr/sbin/hd-idle ${HD_IDLE_ARGS[*]}"
+bashio::log.info "Starting hd-idle: /usr/sbin/hd-idle ${HD_IDLE_ARGS[*]}"
 exec /usr/sbin/hd-idle "${HD_IDLE_ARGS[@]}"

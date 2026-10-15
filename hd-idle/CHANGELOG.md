@@ -2,6 +2,16 @@
 
 # Changelog
 
+## 0.1.5
+
+- Change: the **Configuration mode** option is removed. The app now manages exactly the listed drives, and every listed
+  drive follows the global defaults (default idle time, default command type, default power condition) wherever its own
+  fields are left empty - the convenience of the former opt-out mode is now simply how the app works. Unlisted drives
+  are never spun down: Home Assistant OS grants device access per listed drive only, so spinning down unlisted drives
+  was never realizable - previously the daemon attempted it once per idle cycle and logged 'operation not permitted'
+  each time. The former opt-in rejection of entries without an idle time is gone (the default idle time fills them). A
+  stored `mode` key from an older version is simply ignored.
+
 ## 0.1.4
 
 - Fix: the hd-idle and hd-idle-watch services now start only after the boot-time configuration phase completed (s6-rc

@@ -1,17 +1,4 @@
 configuration:
-  mode:
-    name: Configuration mode
-    description: >-
-      How the drive list relates to the global defaults.
-
-      `opt-in` (recommended): only listed drives are spun down, each with
-      its own settings. All other disks are never touched.
-
-      `opt-out`: all monitored drives follow the global defaults; drive
-      entries override them per drive, and an entry with idle time `0`
-      excludes that drive. On Home Assistant OS, only listed drives get
-      device access - unlisted drives cannot actually be spun down and
-      produce a warning in the app log once per idle cycle.
   disks:
     name: Drives
     description: >-
@@ -30,10 +17,9 @@ configuration:
         name: Idle time (seconds)
         description: |
           Spin the drive down after this many seconds without I/O activity.
-          `0` never spins the drive down (excludes it in `opt-out` mode).
+          `0` never spins the drive down (excludes the drive).
 
-          Required in `opt-in` mode. In `opt-out` mode, an empty value uses
-          the default idle time.
+          An empty value uses the default idle time.
 
           Tip: manufacturers recommend at least 3-5 minutes - short idle
           times wear drives out faster.
@@ -54,10 +40,9 @@ configuration:
   default_idle:
     name: Default idle time (seconds)
     description: >-
-      Idle time for drives without their own setting: drive entries with an
-      empty idle field, and drives that appear without an entry. Used in
-      `opt-out` mode only - in `opt-in` mode it is pinned to `0`, so only
-      listed drives are ever touched. `0` never spins drives down.
+      Idle time for drive entries whose own idle field is left empty. `0`
+      never spins such drives down. Applies to listed drives only - unlisted
+      drives are never spun down.
   default_command_type:
     name: Default command type
     description: >-

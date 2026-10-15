@@ -26,9 +26,9 @@ fi
 # separated sd* kernel names, e.g. "sda,sdb" — set via
 # `mise run lab hd-idle --spindown-drives sda,sdb`). It performs READ-ONLY
 # standby commands + state queries (smartctl -n standby) only. The fixture
-# adapter (.mise/tasks/lab/hd-idle.py) configures these drives in opt-in
-# mode with a 30 s idle so the daemon also exercises its natural spindown
-# path within the check window.
+# adapter (.mise/tasks/lab/hd-idle.py) configures these drives on a
+# 30 s idle so the daemon also exercises its natural spindown path within
+# the check window.
 #
 # Host-side interference: OS-level spindown mechanisms (udisks2 stored drive
 # settings, hdparm.conf, TLP, smartd, ...) and desktop IO on mounted drives
@@ -83,8 +83,8 @@ lab_runtime_check() {
   if docker logs "$app" 2>&1 | grep -q "./run: line"; then
     echo "a run script crashed during boot (raw './run: line N:' error in the app log)"; return 1
   fi
-  docker logs "$app" 2>&1 | grep -q "Configuration mode:" \
-    || { echo "configuration mode statement missing from the app log"; return 1; }
+  docker logs "$app" 2>&1 | grep -qE "hd-idle command line: /usr/sbin/hd-idle -s 1 -c [a-z]+ -p [0-9]+ -i 0([^0-9]|$)" \
+    || { echo "the hd-idle command line does not pin the global idle to 0 (unlisted drives would be managed)"; return 1; }
   echo "hd-idle up (process, /proc/diskstats, config dump, drive inventory OK)"
 
   lab_preflight

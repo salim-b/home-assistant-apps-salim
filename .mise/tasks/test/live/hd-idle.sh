@@ -22,10 +22,10 @@
 #   only monitors sd*), and the supervisor's device validation is the
 #   final layer refusing system-used devices. Each included disk is mapped
 #   to its preferred /dev/disk/by-id path (usb-*, then ata-*, then wwn-*,
-#   then anything else) and configured in opt-in mode with a 30 s idle (as
+#   then anything else) and configured with a 30 s idle (as
 #   in the lab fixture) so the daemon exercises its natural spindown path
 #   within the check window. Without the variable, the repo's test options
-#   file (a safe no-op: opt-in, no drives) is applied unchanged. Note that
+#   file (a safe no-op: no drives) is applied unchanged. Note that
 #   a match-everything glob (e.g. '*') includes every labeled disk -
 #   choose the glob deliberately.
 # - LIVE_HDIDLE_DISKS_JSON (set by live_prepare): JSON object mapping the
@@ -133,8 +133,8 @@ live_prepare() {
   done
 
   tmpfile=$(mktemp "${TMPDIR:-/tmp}/hd-idle-live-options.XXXXXX")
-  jq -n --argjson disks "$disks_json" '{mode: "opt-in", disks: $disks}' >"$tmpfile"
-  echo "-- generated test options (opt-in, 30s idle, scsi):"
+  jq -n --argjson disks "$disks_json" '{disks: $disks}' >"$tmpfile"
+  echo "-- generated test options (30s idle, scsi):"
   jq -r 'to_entries[] | "   \(.value.device) (\(.key), label \(.value.label))"' <<<"$disks_map"
 
   ## Hand the generated file to the harness's option-application and
