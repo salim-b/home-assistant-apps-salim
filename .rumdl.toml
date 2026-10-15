@@ -29,6 +29,11 @@ exclude = ["AI_POLICY.md"]
 # badges/my.home-assistant.io embeds are conventional GitHub README content.
 [per-file-ignores]
 "README.md" = ["MD033"]
+"*/README.md" = ["MD033"]
+# Changelog version placeholders are conventionally emphasis lines
+# (e.g. *Unreleased*), not headings - MD036's "emphasis instead of a
+# heading" is not a useful signal there.
+"*/CHANGELOG.md" = ["MD036"]
 
 [MD013]
 line-length = 120
