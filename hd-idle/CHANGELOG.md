@@ -21,6 +21,9 @@
   boot (consistent with the watcher's re-application path).
 - Documentation: shorter, clearer option descriptions in the settings dialog; the **Ignore spin-down detection**
   description now warns about possible extra wear on some bridges.
+- Performance: the watcher's per-tick configuration regeneration skips the boot-only disk inventory walk (two process
+  spawns per disk plus one per by-id link per disk), and the healthcheck probe scans `/proc` with the read builtin
+  instead of one `cat` per process - cutting the app's periodic process churn by roughly 90% (no behavior change).
 
 ## 0.1.0
 

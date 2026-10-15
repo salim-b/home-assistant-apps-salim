@@ -205,21 +205,26 @@ fi
 ## Drive inventory (helps users map by-id paths to kernel names)
 ## ---------------------------------------------------------------------------
 
-qlog_info "Detected sd* disks:"
-for block in /sys/block/sd*; do
-  [ -e "${block}" ] || continue
-  name="${block##*/}"
-  model=$(xargs <<<"$(cat "${block}/device/model" 2>/dev/null || true)" || true)
-  byid=""
-  for link in /dev/disk/by-id/*; do
-    [ -L "${link}" ] || continue
-    if [ "$(readlink -f "${link}")" = "/dev/${name}" ]; then
-      byid="${link##*/}"
-      break
-    fi
+## Boot-time UX only (non-quiet cont-init run): the walk costs two spawns per disk plus one readlink per by-id link
+## per disk - pure waste in the watcher's per-tick quiet runs (which log nothing anyway). The quiet-mode guard is the
+## app's main long-run CPU/spawn-churn saver.
+if [ "${QUIET}" = 0 ]; then
+  qlog_info "Detected sd* disks:"
+  for block in /sys/block/sd*; do
+    [ -e "${block}" ] || continue
+    name="${block##*/}"
+    model=$(xargs <<<"$(cat "${block}/device/model" 2>/dev/null || true)" || true)
+    byid=""
+    for link in /dev/disk/by-id/*; do
+      [ -L "${link}" ] || continue
+      if [ "$(readlink -f "${link}")" = "/dev/${name}" ]; then
+        byid="${link##*/}"
+        break
+      fi
+    done
+    qlog_info "  ${name}: ${model:-unknown} ${byid:+(by-id: ${byid})}"
   done
-  qlog_info "  ${name}: ${model:-unknown} ${byid:+(by-id: ${byid})}"
-done
+fi
 
 ## ---------------------------------------------------------------------------
 ## Drive configuration -> per-device entries

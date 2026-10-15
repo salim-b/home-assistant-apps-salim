@@ -41,6 +41,16 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
 
 ## Resolved
 
+- Long-running footprint review (2026-10-15): taken - the genargs inventory walk (boot-time UX) is now guarded off in
+  quiet mode (~290 process spawns per watcher tick eliminated, dominant churn source) and the healthcheck scans /proc
+  with the read builtin (one spawn per checked PID eliminated); lab-verified, no behavior change (the inventory log line
+  is boot-only, and args-file content is unchanged). Considered and rejected: batching the per-disk jq calls into one
+  @tsv call (~27 fewer spawns for nine disks; parsing subtlety disproportionate after the guard), raising or backing off
+  the watcher's 30 s interval (changes the documented hotplug pickup latency), a by-id hash pre-gate before regeneration
+  (complexity disproportionate now), and RAM trimming (peaks are transient; the resident set is the watcher bash and the
+  upstream Go daemon only). The daemon's poll interval is upstream and scales with user-configured idle times - not ours
+  to change.
+
 - Round 2 review applied (2026-10-15): the SG_IO section documents the kernel's EPERM fall-through mechanism
   (`scsi_cmd_allowed()` -> `return open_for_write`, restored as slimming collateral); the `-t` KNOWLEDGE note reflects
   the lab smoke test's docker-exec caller; boot-time hd-idle-pmfix failure is non-fatal (consistent with the watcher,

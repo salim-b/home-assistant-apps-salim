@@ -1,12 +1,13 @@
 #!/bin/bash
 # Docker HEALTHCHECK probe: hd-idle exits itself (log.Fatal, then s6 restarts it) if /proc/diskstats becomes
-# unreadable - check the stats file and the daemon process (plain /proc/*/comm scan, no pgrep dependency).
+# unreadable - check the stats file and the daemon process (plain /proc/*/comm scan, no pgrep dependency). The scan
+# uses the read builtin (no process per checked PID - the probe runs every 30 s).
 set -euo pipefail
 
-[ -r /proc/diskstats ]
-for comm in /proc/[0-9]*/comm; do
-  if [ "$(cat "${comm}" 2>/dev/null || true)" = "hd-idle" ]; then
-    exit 0
-  fi
+[ -r /proc/diskstats ] || exit 1
+comm=""
+for f in /proc/[0-9]*/comm; do
+  read -r comm 2>/dev/null <"${f}" || continue
+  [ "${comm}" = "hd-idle" ] && exit 0
 done
 exit 1
