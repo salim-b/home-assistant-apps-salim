@@ -25,6 +25,14 @@
   spawns per disk plus one per by-id link per disk), and the healthcheck probe scans `/proc` with the read builtin
   instead of one `cat` per process - cutting the app's periodic process churn by roughly 90% (no behavior change).
 
+## 0.1.2
+
+*Unreleased development version*
+
+## 0.1.1
+
+*Unreleased development version*
+
 ## 0.1.0
 
 - Initial release.
