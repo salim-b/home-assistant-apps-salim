@@ -5,13 +5,21 @@
 # against rumdl's published JSON schema (see .mise/tasks/validate.py).
 
 [global]
-# Line length (MD013) is deliberately not enforced: the repo mixes
-# hard-wrapped prose (KNOWLEDGE/TODO files, AGENTS.md) with long-line
-# documents (READMEs, DOCS.md, CHANGELOGs), and MD013's reflow would rewrap
-# whole files. Don't reflow prose wholesale when editing - match the file's
-# existing style.
-disable = ["MD013"]
-
+# Line length enforced (MD013, see its section below). READMEs ignore MD033:
+# badges/my.home-assistant.io embeds are conventional GitHub README content.
 [per-file-ignores]
-# Badges/my.home-assistant.io embeds are conventional GitHub README content.
 "README.md" = ["MD033"]
+
+[MD013]
+line-length = 120
+# Code is not prose: fenced/indented code blocks (shell commands, config
+# snippets) keep their natural length.
+code-block-line-length = 0
+# A line whose only overflow is an unbreakable inline code span must not
+# fail the check (nothing to wrap without rewriting the code).
+code-spans = false
+# rumdl fmt wraps overlong prose lines (default mode: word boundaries,
+# structure-preserving - no joining of short lines, no sentence reshaping).
+# Never rewrites a line the check itself forgives (URL-only overruns etc.).
+reflow = true
+reflow-length-exemptions = true

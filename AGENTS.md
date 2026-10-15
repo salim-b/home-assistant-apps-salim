@@ -158,9 +158,12 @@ global tasks from your mise user config); the essentials:
 
 - Markdown: rumdl lints tracked `.md` files as part of `mise run lint`
   (config `.rumdl.toml`, schema-validated by validate.py). Auto-fixes via
-  `mise exec rumdl -- rumdl fmt .`. Line length (MD013) is disabled on
-  purpose — match each file's existing wrap style (hard-wrapped KNOWLEDGE/
-  TODO prose vs. long-line READMEs), never reflow prose wholesale.
+  `mise exec rumdl -- rumdl fmt .`. Line length (MD013) is enforced at 120
+  (`fmt` reflows overlong prose; code blocks are exempt via
+  `code-block-line-length = 0`, lines whose only overrun is an unbreakable
+  code span are forgiven). Match each file's existing wrap style when
+  editing — never reflow (join or rewrap) prose that is already within the
+  limit, and don't restructure hard-wrapped files.
 - mise tasks: file tasks in `.mise/tasks/` with proper suffixes (`.sh`,
   `.py`, … — mise resolves the short names, e.g. `mise run lint`) and
   `#MISE`/`#USAGE` headers. Task arguments must be documented and typed via

@@ -24,9 +24,12 @@ Spins down idle USB and SATA hard disk drives automatically.
 
 The structure of all apps in this repository follows Home Assistant's [best practices](https://developers.home-assistant.io/docs/apps) as far as possible.
 
-Non-obvious development knowledge lives in [`KNOWLEDGE.md`](./KNOWLEDGE.md) (repository-wide: supervisor behaviors, AppArmor, base-image gotchas, testing) and in each app's own `KNOWLEDGE.md` (e.g. [`hd-idle/KNOWLEDGE.md`](./hd-idle/KNOWLEDGE.md), [`nfs-server/KNOWLEDGE.md`](./nfs-server/KNOWLEDGE.md)).
+Non-obvious development knowledge lives in [`KNOWLEDGE.md`](./KNOWLEDGE.md) (repository-wide: supervisor behaviors, AppArmor, base-image
+gotchas, testing) and in each app's own `KNOWLEDGE.md` (e.g. [`hd-idle/KNOWLEDGE.md`](./hd-idle/KNOWLEDGE.md), [`nfs-server/KNOWLEDGE.md`](./nfs-server/KNOWLEDGE.md)).
 
-To test an app on your Home Assistant server (device), use the `deploy` mise task. It copies the app folder to the device's `/local_apps/` directory (removing an existing copy first), refreshes the app store metadata, then installs the app (if not present), updates it (if the version changed in `config.yaml`) or rebuilds its image (otherwise), and makes sure it is running afterwards:
+To test an app on your Home Assistant server (device), use the `deploy` mise task. It copies the app folder to the device's `/local_apps/`
+directory (removing an existing copy first), refreshes the app store metadata, then installs the app (if not present),
+updates it (if the version changed in `config.yaml`) or rebuilds its image (otherwise), and makes sure it is running afterwards:
 
 ```sh
 # app name (repo subfolder) + SSH target of the device
@@ -37,11 +40,15 @@ mise run deploy nfs-server root@192.168.1.11
 ssh root@192.168.1.11 'ha apps logs --follow local_nfs'
 ```
 
-Note that the task comments out the top-level `image:` key in the *device-side* copy of `config.yaml`: with an `image` key set, the Supervisor would pull that image from GHCR instead of building locally from your working tree — see the [dev docs](https://developers.home-assistant.io/docs/add-ons/testing/#remote-development).
+Note that the task comments out the top-level `image:` key in the *device-side* copy of `config.yaml`: with an `image` key set, the Supervisor would
+pull that image from GHCR instead of building locally from your working tree — see the [dev docs](https://developers.home-assistant.io/docs/add-ons/testing/#remote-development).
 
-If the app is already installed on the device **from an app repository** (i.e. not as a local app — such installs have a hashed store slug like `f8b2d53d_nfs`), the task refuses: a second installation would conflict on the app's published port. Uninstall that copy first (the error message shows the exact command) or pass `--replace` to have the task uninstall it automatically.
+If the app is already installed on the device **from an app repository** (i.e. not as a local app — such installs have a
+hashed store slug like `f8b2d53d_nfs`), the task refuses: a second installation would conflict on the app's published port. Uninstall
+that copy first (the error message shows the exact command) or pass `--replace` to have the task uninstall it automatically.
 
-For a full end-to-end test, run `test:live` (for the `nfs-server` app, this includes an NFS client roundtrip against the running app). It deploys the app, forwarding `--replace`/`--test-options`:
+For a full end-to-end test, run `test:live` (for the `nfs-server` app, this includes an NFS client roundtrip against the running app). It
+deploys the app, forwarding `--replace`/`--test-options`:
 
 ```sh
 # plain: tests the device app's currently configured shares
@@ -56,7 +63,9 @@ mise run test:live nfs-server root@192.168.1.11 --test-options
 
 ## CI
 
-On every push to `main`, the [Builder](./.github/workflows/builder.yaml) workflow builds each app whose relevant files changed and publishes its container images to GHCR via the [Build app](./.github/workflows/build-app.yaml) workflow: per-arch images (e.g. `ghcr.io/salim-b/amd64-app-nfs-server`) plus a multi-arch manifest (e.g. `ghcr.io/salim-b/app-nfs-server`), tagged with the app's `version` and `latest`. Pull requests only build without publishing.
+On every push to `main`, the [Builder](./.github/workflows/builder.yaml) workflow builds each app whose relevant files changed and publishes its container
+images to GHCR via the [Build app](./.github/workflows/build-app.yaml) workflow: per-arch images (e.g. `ghcr.io/salim-b/amd64-app-nfs-server`) plus a
+multi-arch manifest (e.g. `ghcr.io/salim-b/app-nfs-server`), tagged with the app's `version` and `latest`. Pull requests only build without publishing.
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg
