@@ -30,6 +30,15 @@ qlog_warning() {
   [ "${QUIET}" = 1 ] || bashio::log.warning "$@"
 }
 
+## Every emitted token must be space-free: the hd-idle run script reads the args file with plain word splitting, so
+## whitespace inside any value would silently corrupt the argv. The supervisor schema blocks this for saved options;
+## this check covers hand-edited options.json (defense in depth).
+require_space_free() {
+  local what="$1" value="$2"
+  [[ "${value}" != *[[:space:]]* ]] ||
+    bashio::exit.nok "Invalid ${what} '${value}': must not contain whitespace."
+}
+
 MODE=$(bashio::config 'mode')
 DEFAULT_IDLE=$(bashio::config 'default_idle')
 DEFAULT_COMMAND=$(bashio::config 'default_command_type')
@@ -254,7 +263,10 @@ while IFS= read -r disk; do
   IDLE=$(bashio::jq "${disk}" '.idle // empty')
   COMMAND_TYPE=$(bashio::jq "${disk}" '.command_type // empty')
   POWER_CONDITION=$(bashio::jq "${disk}" '.power_condition // empty')
-
+  require_space_free 'device' "${DEV}"
+  require_space_free 'idle' "${IDLE}"
+  require_space_free 'command_type' "${COMMAND_TYPE}"
+  require_space_free 'power_condition' "${POWER_CONDITION}"
   ## Partition selection would grant cgroup access for the partition node
   ## only, while hd-idle opens the disk node -> always broken, reject it.
   if [[ "${DEV}" == *-part[0-9]* ]]; then
