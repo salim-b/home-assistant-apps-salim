@@ -72,7 +72,6 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
 
   # Runtime check scripts
   /etc/cont-init.d/config.sh rix,
-  /etc/s6-overlay/scripts/* rix,
 
   # Drive power-management treatment (hd-idle-pmfix, option disable_drive_pm): smartctl issues the ATA SET FEATURES
   # commands (non-read-safe SCSI commands, hence the capability rule above). The sysfs coverage is kept broad per the

@@ -59,11 +59,11 @@ Verified against the v1.22 source (`main.go`, `hdidle.go`):
 
 `hd-idle-genargs --quiet` (the watcher's per-tick mode) suppresses ALL narrative/info output and the warning-level notes
 for expected-transient states (a currently detached drive, a non-sd\* entry): both are surfaced once per boot by the
-non-quiet cont-init run, and options cannot change mid-run (repository-root `KNOWLEDGE.md` §"Supervisor: option schema
-quirks"), so repeating them every 30-s tick adds nothing. Errors always log, and invalid configuration still exits
-nonzero in both modes: for cont-init that fails the app boot; for the watcher it means regeneration failed and the
-current configuration (the args file plus the running daemon's argv - see §"Automatic drive re-resolution" for when that
-can happen at all) stays as is.
+non-quiet cont-init run, and options cannot change mid-run (repository-root `KNOWLEDGE.md`
+§`Supervisor: option schema quirks`), so repeating them every 30-s tick adds nothing. Errors always log, and invalid
+configuration still exits nonzero in both modes: for cont-init that fails the app boot; for the watcher it means
+regeneration failed and the current configuration (the args file plus the running daemon's argv - see
+§`Automatic drive re-resolution` for when that can happen at all) stays as is.
 
 ## hd-idle's monitoring scope
 
@@ -202,11 +202,11 @@ drives whose line is NEW or CHANGED are treated.
   into candidate files, compare BOTH generated files (args + drives) against the installed ones, and only on an actual
   difference install them and restart just the hd-idle service (`s6-svc -r /run/service/hd-idle`) - the args file is
   installed last (commit point), so an interrupted install leaves the drives file stale behind it and the next tick's
-  comparison re-syncs it. Unrelated churn therefore never triggers a
-  restart, and `--quiet` makes unchanged 30-s ticks produce **no log output at all** (warnings/errors still surface; the
-  new command line is logged by the hd-idle run script after each restart). Polling (not udev events) because mapping
-  the host's `/run/udev` socket (`with_udev`) into an Alpine-based container for event-driven monitoring is
-  version-fragile for zero gain - 30 s worst-case latency is fine for a maintenance action.
+  comparison re-syncs it. Unrelated churn therefore never triggers a restart, and `--quiet` makes unchanged 30-s ticks
+  produce **no log output at all** (warnings/errors still surface; the new command line is logged by the hd-idle run
+  script after each restart). Polling (not udev events) because mapping the host's `/run/udev` socket (`with_udev`) into
+  an Alpine-based container for event-driven monitoring is version-fragile for zero gain - 30 s worst-case latency is
+  fine for a maintenance action.
 - **hd-idle restart effects are benign**: the run script re-reads the args file; hd-idle starts with fresh in-memory
   stats (idle timers restart) and no command is sent to any disk at startup - a drive in standby is NOT spun up by the
   restart. Minor cosmetic cost: an activity-log "running" period spanning the restart is misaccounted (hd-idle cannot

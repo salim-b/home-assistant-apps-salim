@@ -14,6 +14,10 @@
   only thing that puts a drive to sleep - this stops some WD USB bridge firmwares from waking drives shortly after an
   external spindown (an effect invisible to I/O monitoring). Bridges that do not forward APM produce a logged one-time
   failure; the standby-timer disable is honored by all tested bridges.
+- Robustness: the hd-idle-watch service compares and re-syncs both generated files (command line + drives list) every
+  cycle, so an interrupted configuration install self-heals on the next tick instead of silently skipping the drive-PM
+  treatment for affected drives; hd-idle-genargs now rejects option values containing whitespace (defense in depth
+  against hand-edited options files).
 
 ## 0.1.0
 
