@@ -4,6 +4,24 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
 
 ## Tasks
 
+- Plan: code review of the whole app + doc/comment cleanup. Comments are overly long and partially redundant
+  (hd-idle-watch/run is 57% comment lines, config.sh 57%, pmfix 42%; several topics are told in full in 3-5 places).
+  Policy: one canonical home per topic per the repo's information-placement rule, everything else becomes a short
+  reference (`see hd-idle/KNOWLEDGE.md § "<heading>"`). Sequence:
+  1. Review pass (read-only; findings logged here with file:line + severity must-fix/nice-to-have/upstream):
+     hd-idle-genargs (opt-in/opt-out semantics, quoting, exit-code contract, quiet mode), hd-idle-watch/run (atomicity,
+     change detection, pmfix --since diff), hd-idle-pmfix (smart() result classification, arg parsing), cont-init
+     config.sh (failure propagation), hd-idle/run + healthcheck, s6-rc.d structure/dependencies, apparmor.txt (rule
+     audit vs. actual file accesses), config.yaml, Dockerfile (apk pin policy).
+  2. Establish canonical homes: move "why" narratives that exist only in code comments into `KNOWLEDGE.md` (quiet-mode
+     contract, watcher restart effects, pmfix volatility rationale) if not already covered there.
+  3. Comment slimming (zero behavior change): script headers to purpose + reference; inline comments only for
+     non-obvious mechanics; deduplicate apparmor.txt/config.yaml mechanism prose against root `KNOWLEDGE.md` §AppArmor;
+     audit DOCS.md against translations/en.yaml duplication.
+  4. Fix must-fix findings (behavioral): one commit each, lab-verified (`mise run lab hd-idle`), CHANGELOG under 0.1.3.
+  5. Final gates: `mise run check`, `mise run lab hd-idle`, dangling-reference sweep (every "see X" resolves), move
+     resolved items down.
+
 - Upstream: hd-idle's `-s 1` re-resolves only *unresolved* device entries and never re-verifies already-resolved ones
   (`resolveSymlinks()` skips entries with a populated `Name`). A small upstream change (re-verify resolved symlinks each
   cycle, update entries whose resolution changed) would let us remove the app's `hd-idle-watch` service (see
