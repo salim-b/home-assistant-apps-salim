@@ -80,6 +80,11 @@ lab_runtime_check() {
     || { echo "hd-idle config dump missing from the app log (daemon never started?)"; return 1; }
   docker logs "$app" 2>&1 | grep -q "Detected sd\* disks" \
     || { echo "config.sh disk inventory missing from the app log"; return 1; }
+  if docker logs "$app" 2>&1 | grep -q "./run: line"; then
+    echo "a run script crashed during boot (raw './run: line N:' error in the app log)"; return 1
+  fi
+  docker logs "$app" 2>&1 | grep -q "Configuration mode:" \
+    || { echo "configuration mode statement missing from the app log"; return 1; }
   echo "hd-idle up (process, /proc/diskstats, config dump, drive inventory OK)"
 
   lab_preflight

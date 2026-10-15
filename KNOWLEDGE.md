@@ -214,6 +214,16 @@ crash-loops at preinit while the supervisor still reports the app state as "star
 symptom is invisible to health checks (the container never reaches them), so any change under
 `rootfs/etc/s6-overlay/s6-rc.d/` or `user-bundles.d/` must be lab-booted (`mise run lab <app>`) before deploy.
 
+**User-bundle services must declare a `dependencies.d/base` dependency** (empty *file*, per s6-overlay's MOVING-TO-V3
+guidance; see the nfs-server app's services): s6-rc brings the user bundle up in dependency order, and without a
+dependency on the built-in `base` bundle a longrun can start BEFORE `legacy-cont-init` (the compat oneshot running
+`/etc/cont-init.d/*`) has completed — device-verified 2026-10-15: the hd-idle app's daemon started before its cont-init
+phase wrote the generated configuration and crashed twice
+(`./run: line 9: /etc/hd-idle.args: No such file or directory`) until s6-supervise's restart loop finally started it;
+the lab missed it because its checks only grepped positive markers that also exist after the self-healing restart. Empty
+dependency *directories* are equally broken in a subtler way: git does not track them, so they silently vanish from the
+image.
+
 ## Testing: hardware-behavior checks in the lab
 
 The lab boots app containers `--privileged` **on the lab host**, so host-side hardware state interacts with tests:

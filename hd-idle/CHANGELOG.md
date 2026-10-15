@@ -2,6 +2,17 @@
 
 # Changelog
 
+## 0.1.4
+
+- Fix: the hd-idle and hd-idle-watch services now start only after the boot-time configuration phase completed (s6-rc
+  dependency on the built-in base bundle, like the nfs-server app's services). Previously the daemon could start before
+  the generated configuration existed, crash on startup (`./run: line 9: /etc/hd-idle.args: No such file or directory`)
+  and only start once s6 restarted it - a raw error line in the app log on every boot, and a slightly late daemon.
+- Log quality: the boot log now states the configuration mode prominently; the "no drives configured" message is phrased
+  per mode - in `opt-out` mode it explains that unlisted drives follow the global defaults but cannot actually be
+  reached (Home Assistant OS grants device access per listed drive only), instead of the misleading "will not spin down
+  anything"; the daemon start line includes the mode.
+
 ## 0.1.3
 
 - Fix: the AppArmor profile now grants `CAP_SYS_RAWIO` (`capability sys_rawio,` in the top and the daemon sub-profile).

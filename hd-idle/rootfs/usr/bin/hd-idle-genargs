@@ -45,6 +45,13 @@ DEFAULT_COMMAND=$(bashio::config 'default_command_type')
 DEFAULT_POWER=$(bashio::config 'default_power_condition')
 DISKS=$(bashio::config 'disks')
 
+## Prominent mode statement at the top of the boot log (the mode cannot change mid-run, so quiet ticks need no
+## repeat): the effective drive-management semantics differ fundamentally between the modes.
+case "${MODE}" in
+  opt-in) qlog_info "Configuration mode: opt-in - only the listed drives are spun down." ;;
+  opt-out) qlog_info "Configuration mode: opt-out - unlisted drives follow the global defaults; drive entries override them per drive, and idle-0 entries exclude." ;;
+esac
+
 ## Defense in depth: the supervisor schema already validates these; cheap re-checks keep a hand-edited options.json
 ## from producing a bogus command line (every emitted token must be space-free - the run script word-splits the file).
 case "$MODE" in
@@ -331,7 +338,20 @@ while IFS= read -r disk; do
 done < <(echo "${DISKS}")
 
 if [ "${N_DRIVES}" -eq 0 ]; then
-  qlog_info "No drives configured - hd-idle will not spin down anything (${MODE} mode)."
+  case "${MODE}" in
+    opt-in)
+      qlog_info "No drives configured - hd-idle will not spin down anything (opt-in mode: only listed drives are ever touched)."
+      ;;
+    *)
+      if [ "${DEFAULT_IDLE}" = "0" ]; then
+        qlog_info "No drives configured, and the global default idle time is 0 - nothing is spun down."
+      else
+        qlog_warning "No drives configured (opt-out mode): unlisted drives follow the global defaults (idle ${DEFAULT_IDLE} s, command type ${DEFAULT_COMMAND}), but Home Assistant OS grants device access per listed drive only - their spindown attempts will fail with 'operation not permitted' once per idle cycle. Add the drives you want managed to the drive list."
+      fi
+      ;;
+  esac
+elif [ "${MODE}" = "opt-out" ]; then
+  qlog_info "Unlisted drives follow the global defaults; device access is granted per listed drive only, so unlisted drives cannot actually be spun down (their spindown attempts fail with 'operation not permitted')."
 fi
 
 ## ---------------------------------------------------------------------------
