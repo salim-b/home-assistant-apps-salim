@@ -12,63 +12,43 @@
 
 ## 0.5.1
 
-- Reject duplicate share entries at startup: one option set applies per
-  path and network pair (the kernel keeps a single export cache entry for
-  it and silently applies the last `/etc/exports` line), so a second entry
-  for the same path and network is now a configuration error with an
-  explanatory message - identical duplicates (redundant) and same-path
-  same-network entries with conflicting options alike. The same path with
-  *different* networks remains valid (per-network options). The app
-  configuration schema cannot express this cross-entry constraint
-  (supervisor options DSL has no uniqueness construct).
+- Reject duplicate share entries at startup: one option set applies per path and network pair (the kernel keeps a single
+  export cache entry for it and silently applies the last `/etc/exports` line), so a second entry for the same path and network is now
+  a configuration error with an explanatory message - identical duplicates (redundant) and same-path same-network
+  entries with conflicting options alike. The same path with *different* networks remains valid (per-network options).
+  The app configuration schema cannot express this cross-entry constraint (supervisor options DSL has no uniqueness
+  construct).
 
 ## 0.5.0
 
-- NFSv4 client state recovery: the app now runs the client-recovery tracker
-  daemon (`nfsdcld`, part of the already-installed `nfs-utils` package) with
-  its persistent sqlite store on the app's data volume, and mounts the
-  per-network-namespace rpc_pipefs upcall channel it needs. NFSv4 clients
-  that are connected across an app (re)start keep their state - open files,
-  byte-range locks and delegations - reclaiming it from the tracker's
-  records during the grace period, instead of losing it (previously, client
-  recovery tracking could not work in a container).
-- The grace period is only paid when there is client state to reclaim:
-  after a boot with no recorded clients the server skips it entirely (the
-  kernel's own fast path), and it ends early once all recorded clients have
-  reclaimed. The default `grace_time` therefore grows from 10 seconds to the
-  `lease_time` value (matching the kernel's 1:1 default ratio): idle clients
-  - their state-manager renewals fire at ~lease/3 intervals - now get a full
-  grace window to recover in, while fresh boots and restarts without
-  connected clients stay instant.
+- NFSv4 client state recovery: the app now runs the client-recovery tracker daemon (`nfsdcld`, part of the already-installed `nfs-utils`
+  package) with its persistent sqlite store on the app's data volume, and mounts the per-network-namespace rpc_pipefs
+  upcall channel it needs. NFSv4 clients that are connected across an app (re)start keep their state - open files,
+  byte-range locks and delegations - reclaiming it from the tracker's records during the grace period, instead of losing
+  it (previously, client recovery tracking could not work in a container).
+- The grace period is only paid when there is client state to reclaim: after a boot with no recorded clients the server
+  skips it entirely (the kernel's own fast path), and it ends early once all recorded clients have reclaimed. The
+  default `grace_time` therefore grows from 10 seconds to the `lease_time` value (matching the kernel's 1:1 default ratio): idle clients
+  - their state-manager renewals fire at ~lease/3 intervals - now get a full grace window to recover in, while fresh
+    boots and restarts without connected clients stay instant.
 
 ## 0.4.0
 
-- AppArmor support: ships a custom, tightened AppArmor profile (`apparmor: true`
-  instead of disabled) - single top-level profile with per-binary sub-profiles
-  for `exportfs`, `rpc.nfsd` and `rpc.mountd`, modeled on the official dev-docs
-  template and the shipped dnsmasq app's profile:
-  - the nfsd filesystem mount is restricted to the `nfsd` filesystem type
-    (exact source string and mountpoint); the per-share bind-mount mirrors and
-    their unmount are scoped accordingly
-  - capabilities are granted explicitly and minimally (`sys_admin` for the
-    mounts; `net_bind_service`/`setgid`/`setuid`/`dac_override` in the daemon
-    sub-profiles) - note that AppArmor mediates capabilities even when the
-    corresponding operation rule (e.g. the mount rule) already passes
-  - network access is mediated (a profile without any network rules would
-    leave it unmediated entirely): allowlists for inet/inet6 stream+dgram
-    (supervisor API, DNS, the healthcheck probe, RPC sockets) plus
-    `netlink raw` for address detection; `rpc.nfsd` gets a blanket network
-    deny (it only configures the kernel via procfs and creates no sockets)
-  - verified on-device in enforcing mode: full boot, NFS client roundtrips
-    (writable / read-only / pseudo-root exports) and a fresh reboot with the
-    nfsd kernel module unloaded
-- Drop the app-level module loading: the kernel's mount-time autoload loads
-  the nfsd module itself (in kernel context, outside the AppArmor label -
-  device-verified by rebooting with the module unloaded). The app no longer
-  runs `modprobe`, and the configuration no longer maps `/lib/modules` into
-  the app or grants the `SYS_MODULE` capability (`kernel_modules` removed).
-- Slim the image: drop the unused tempio download (the app's rootfs contains
-  no templates for it to render).
+- AppArmor support: ships a custom, tightened AppArmor profile (`apparmor: true` instead of disabled) - single top-level profile with
+  per-binary sub-profiles for `exportfs`, `rpc.nfsd` and `rpc.mountd`, modeled on the official dev-docs template and the shipped dnsmasq app's profile:
+  - the nfsd filesystem mount is restricted to the `nfsd` filesystem type (exact source string and mountpoint); the per-share
+    bind-mount mirrors and their unmount are scoped accordingly
+  - capabilities are granted explicitly and minimally (`sys_admin` for the mounts; `net_bind_service`/`setgid`/`setuid`/`dac_override` in the daemon sub-profiles) - note that
+    AppArmor mediates capabilities even when the corresponding operation rule (e.g. the mount rule) already passes
+  - network access is mediated (a profile without any network rules would leave it unmediated entirely): allowlists for
+    inet/inet6 stream+dgram (supervisor API, DNS, the healthcheck probe, RPC sockets) plus `netlink raw` for address detection; `rpc.nfsd` gets
+    a blanket network deny (it only configures the kernel via procfs and creates no sockets)
+  - verified on-device in enforcing mode: full boot, NFS client roundtrips (writable / read-only / pseudo-root exports)
+    and a fresh reboot with the nfsd kernel module unloaded
+- Drop the app-level module loading: the kernel's mount-time autoload loads the nfsd module itself (in kernel context,
+  outside the AppArmor label - device-verified by rebooting with the module unloaded). The app no longer runs `modprobe`, and the
+  configuration no longer maps `/lib/modules` into the app or grants the `SYS_MODULE` capability (`kernel_modules` removed).
+- Slim the image: drop the unused tempio download (the app's rootfs contains no templates for it to render).
 
 ## 0.3.3
 

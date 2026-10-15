@@ -23,8 +23,13 @@ code-block-line-length = 0
 # A line whose only overflow is an unbreakable inline code span must not
 # fail the check (nothing to wrap without rewriting the code).
 code-spans = false
-# rumdl fmt wraps overlong prose lines (default mode: word boundaries,
-# structure-preserving - no joining of short lines, no sentence reshaping).
-# Never rewrites a line the check itself forgives (URL-only overruns etc.).
+# `normalize` reflow: fmt wraps ALL paragraph prose to consistently fill
+# 120 - overlong lines are wrapped AND short wrapped lines are joined, so
+# every paragraph ends up uniformly wrapped (rendered text unchanged: soft
+# breaks render as spaces). One-time normalization churn for previously
+# hard-wrapped files; afterwards, run fmt instead of hand-wrapping.
+# Never rewrites a line the check itself forgives (URL/code-span-only
+# overruns etc.).
 reflow = true
+reflow-mode = "normalize"
 reflow-length-exemptions = true
