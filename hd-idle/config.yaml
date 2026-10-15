@@ -14,19 +14,9 @@ arch:
   - amd64
 startup: services
 init: false
-# CAP_SYS_RAWIO is required for hd-idle's `ata` command type: the kernel only
-# allows SCSI passthrough ioctls (SG_IO) without CAP_SYS_RAWIO for the
-# read-safe command list - START STOP UNIT (the `scsi` path) is in it, ATA
-# PASS-THROUGH (the `ata` path, needed for SATA disks and some USB bridges)
-# is not (drivers/scsi/scsi_ioctl.c scsi_cmd_allowed(); see
-# hd-idle/KNOWLEDGE.md). The AppArmor profile must grant the capability as
-# well (`capability sys_rawio,` in apparmor.txt): AppArmor mediates
-# capable() checks themselves (security_capable hook), so the container
-# merely carrying the cap is not sufficient. Device-node access itself is
-# granted per drive via
-# the supervisor's device-type option fields (see the disks schema below),
-# which also refuses devices the system uses - the system disk cannot be
-# granted to the app even if a user configured it.
+# CAP_SYS_RAWIO is required for hd-idle's `ata` command type (non-read-safe SCSI passthrough), and the AppArmor
+# profile must grant it as well - AppArmor mediates capable() checks (see apparmor.txt and hd-idle/KNOWLEDGE.md
+# §"SG_IO privileges"). Per-drive device-node access is granted via the device-type option fields below.
 privileged:
   - SYS_RAWIO
 options:

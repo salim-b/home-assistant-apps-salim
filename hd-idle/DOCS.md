@@ -8,23 +8,18 @@ restarts the app, which re-validates the configuration and regenerates the hd-id
 
 ### Configuration modes
 
-**Opt-in** (default): only the listed drives are spun down, each with its own idle time (required) and optional command
-type / power condition. All other disks - including anything that appears on the system later - are never touched. This
-is the recommended, fail-safe mode.
-
-**Opt-out**: all monitored drives follow the global defaults (**Default idle time**, **Default command type**, **Default
-power condition**). Drive entries override these per drive, and an entry with idle time `0` excludes that drive.
-Important on Home Assistant OS: device access is only granted for drives listed in the **Drives** list, so drives
-without a list entry cannot actually be spun down - they produce a warning in the app log once per idle cycle. List
-every drive you want spun down (leaving its other fields empty to follow the defaults) and use `idle: 0` entries for
-exclusions.
+**Opt-in** (default, recommended, fail-safe): only the listed drives are spun down, each with its own settings; all
+other disks - including anything that appears on the system later - are never touched. **Opt-out**: all monitored drives
+follow the global defaults, drive entries override them per drive, and an entry with idle time `0` excludes that drive.
+See the **Configuration mode** field description in the options UI for the details and an important Home Assistant OS
+caveat. In `opt-out` mode, list every drive you want spun down (leaving its other fields empty to follow the defaults)
+and use `idle: 0` entries for exclusions.
 
 ### Selecting drives
 
-The drive dropdown lists the system's block devices by their stable `/dev/disk/by-id` paths - these survive re-plugging
-and reboots, even when the kernel name (`/dev/sda`, `/dev/sdb`, ...) changes. Select the **disk itself**, never a
-partition (by-id paths ending in `-part...`): the app needs the whole disk, and the startup validation rejects partition
-entries with an explanatory message.
+Pick each drive from the dropdown, which lists the system's block devices by their stable `/dev/disk/by-id` paths (these
+survive re-plugging and reboots, even when the kernel name changes); select the **disk itself**, never a partition. See
+the **Drives** field description in the options UI for the details.
 
 On startup the app logs an inventory of all detected `sd*` disks (model and by-id path) and the mapping of every
 configured drive to its kernel name, so log lines like `sda spindown` can be attributed:
@@ -35,25 +30,16 @@ Drive /dev/disk/by-id/usb-WD_Elements_1234567890AB-0:0 -> sda
 
 ### Drive power management
 
-Drives run their own power management: an APM level and an internal standby timer. On Home Assistant OS, both can
-conflict with hd-idle - some USB bridge firmwares wake the drive again shortly after an external spindown, an effect
-invisible to hd-idle's I/O monitoring (no host I/O occurs). The app therefore disables the drives' own APM and standby
-timer for every managed drive by default (**Disable drive power management**); the settings are volatile, so they are
-re-applied at every app start and whenever a drive (re)appears. Bridges that do not forward a feature make the
-corresponding command fail - logged once, harmless (most WD USB bridges do not forward APM at all, but honor the
-standby-timer disable).
+Drives run their own power management (an APM level and an internal standby timer) that can conflict with hd-idle - some
+USB bridge firmwares wake the drive again shortly after an external spindown, invisibly to the app's I/O monitoring. The
+**Disable drive power management** option (on by default) disables both for every managed drive; see its field
+description in the options UI for the details.
 
 ### Command types
 
-hd-idle can send the spin-down command via two APIs:
-
-- **`scsi`** (default): a SCSI START STOP UNIT command. Works for everything behind the SCSI translation layer -
-  typically all USB drives.
-- **`ata`**: the native ATA STANDBY command (what `hdparm -y` does). Needed for SATA drives and some USB bridge chips
-  (e.g. JMicron controllers); it requires elevated privileges, which the app requests. If a USB drive refuses to spin
-  down with `scsi`, try `ata`.
-
-The **power condition** only matters for real SCSI/SAS drives (rare on Home Assistant); leave it at `0`.
+The spin-down command is sent via one of two APIs - **`scsi`** (default) or **`ata`**; see the **Command type** and
+**Power condition** field descriptions in the options UI for the details and when to use which. If a USB drive refuses
+to spin down with `scsi`, try `ata`.
 
 ### System disk protection
 

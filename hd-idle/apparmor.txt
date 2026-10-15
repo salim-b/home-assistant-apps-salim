@@ -9,29 +9,17 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
   ## mediation is opt-in per class, HAOS produces no AppArmor audit logs).
   ## See hd-idle/KNOWLEDGE.md and the repository-root KNOWLEDGE.md.
 
-  # Generic file access, signals (s6 supervision, bash job control).
-  # `file,` is the upstream HA convention (docs template + dnsmasq + the
-  # nfs-server app): tightening file rules is impractical because HAOS
-  # produces no AppArmor audit/denial logs - silent breakage risk. The
-  # profile's confinement value sits in the non-file classes (network,
-  # capability).
+  # Generic file access, signals (s6 supervision, bash job control). `file,` is the upstream HA convention: tightening
+  # file rules is impractical without AppArmor audit logs (repository-root KNOWLEDGE.md §AppArmor) - the confinement
+  # value sits in the non-file classes (network, capability).
   file,
   signal,
 
-  # CAP_SYS_RAWIO for SCSI passthrough: the kernel only allows non-read-
-  # safe SCSI commands (ATA PASS-THROUGH - the `ata` spindown path and
-  # smartctl's ATA commands) when capable(CAP_SYS_RAWIO) holds
-  # (drivers/scsi/scsi_ioctl.c scsi_cmd_allowed(); read-safe commands like
-  # START STOP UNIT - the `scsi` path - need no capability). AppArmor
-  # MEDIATES THAT CHECK: the security_capable LSM hook runs
-  # apparmor_capable() after the credential check, so a profile without a
-  # `capability` rule denies the check itself - the container may carry the
-  # cap (verified via CapEff), but capable() still returns false and the
-  # kernel falls through to `return open_for_write` (EPERM for hd-idle's
-  # O_RDONLY fds). Before this rule every ata-path SG_IO failed with
-  # "operation not permitted" while the `scsi` path worked via the kernel's
-  # read-safe list; HAOS logs no AppArmor denials, so the root cause
-  # surfaced only through source analysis.
+  # CAP_SYS_RAWIO for SCSI passthrough: the kernel gates non-read-safe SCSI commands (ATA PASS-THROUGH - the `ata`
+  # spindown path and smartctl's ATA commands; read-safe commands like START STOP UNIT need no capability) behind
+  # capable(CAP_SYS_RAWIO), and AppArmor mediates capable() checks themselves - without this rule every ata-path
+  # SG_IO fails with EPERM even though the container carries the cap (device-verified; full story:
+  # hd-idle/KNOWLEDGE.md §"SG_IO privileges").
   capability sys_rawio,
 
   # Network: mediation is enabled by the PRESENCE of any network rule. The
@@ -86,12 +74,9 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
   /etc/cont-init.d/config.sh rix,
   /etc/s6-overlay/scripts/* rix,
 
-  # Drive power-management treatment (hd-idle-pmfix, option disable_drive_pm):
-  # smartctl issues the ATA SET FEATURES commands (APM level and standby
-  # timer - non-read-safe SCSI commands, hence the capability rule above).
-  # Read-only sysfs coverage beyond the block/class dirs above: kept broad
-  # per the header note above (no AppArmor denial logs on HAOS to tighten
-  # file rules safely).
+  # Drive power-management treatment (hd-idle-pmfix, option disable_drive_pm): smartctl issues the ATA SET FEATURES
+  # commands (non-read-safe SCSI commands, hence the capability rule above). The sysfs coverage is kept broad per the
+  # header note above.
   /usr/sbin/smartctl rix,
   /sys/devices/{,**} r,
 
@@ -104,10 +89,7 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
     #include <abstractions/base>
 
     file,
-    # CAP_SYS_RAWIO for the daemon's ata path: see the top profile
-    # (AppArmor mediates the capable() check the kernel's SG_IO permission
-    # gate relies on - without this rule every ATA PASS-THROUGH fails with
-    # EPERM even though the container carries the capability).
+    # CAP_SYS_RAWIO for the daemon's ata path: see the top profile (hd-idle/KNOWLEDGE.md §"SG_IO privileges").
     capability sys_rawio,
     signal (send) set=(kill,term,int,hup,cont),
     # Official docs template: scope receive to the app's own top profile

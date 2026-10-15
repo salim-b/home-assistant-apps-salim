@@ -2,35 +2,15 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-## Disable the drives' own power management (APM + internal standby timer)
-## for every managed drive - the app's drive-PM treatment (option
-## disable_drive_pm, enabled by default).
-##
-## Why: drives (and some WD USB bridge firmwares) run their own power
-## policies that can wake a drive again shortly after an external
-## spindown - host-invisibly (no /proc/diskstats activity, see
-## hd-idle/KNOWLEDGE.md). Disabling the drive's own APM level and standby
-## timer makes hd-idle's configured idle time the only spindown influence.
-## (Empirical per-bridge matrix in hd-idle/KNOWLEDGE.md: most WD USB
-## bridges do not forward APM at all - the command fails and is logged,
-## harmlessly - while ALL tested bridges honor the standby-timer disable.)
+## Disable the drives' own power management (APM level + internal standby timer) for every managed drive - the app's
+## drive-PM treatment (option disable_drive_pm, default on). Why, per-bridge reality, volatility, and the known
+## same-kernel-name gap: hd-idle/KNOWLEDGE.md §"Drive-PM treatment"; user-facing behavior: DOCS.md.
 ##
 ## Usage: hd-idle-pmfix <drives-file> [--since <old-drives-file>]
-##
-## <drives-file> is the machine-readable companion of the hd-idle command
-## line (written by hd-idle-genargs next to the args file; one
-## "<kernel-name> <idle> <command-type>" line per drive). Only drives with
-## idle != 0 are treated (idle-0 entries are exclusions). With --since,
-## only drives NEW or CHANGED relative to the old file are treated (the
-## treatment state persists while a drive keeps power; re-issuing the
-## commands to an already-treated drive risks needless bridge-mediated
-## motor starts - device-verified for redundant STOP commands).
-##
-## The settings are VOLATILE (reset on drive power cycle): the treatment is
-## applied at app start and, via the watcher, on drive (re)appearance.
-## Known gap (see hd-idle/TODO.md): a drive that reconnects under the SAME
-## kernel name (power-cycled by its bridge, name unchanged) is invisible to
-## the --since diff and is re-treated only at the next app restart.
+## <drives-file>: one "<kernel-name> <idle> <command-type>" line per drive (written by hd-idle-genargs next to the
+## args file; format: hd-idle/KNOWLEDGE.md §"Drive-PM treatment"). Only drives with idle != 0 are treated. With
+## --since, only drives whose line is NEW or CHANGED relative to the old file are treated (re-treating an
+## already-treated drive risks bridge-mediated motor starts).
 
 DRIVES_FILE="${1:-/etc/hd-idle.drives}"
 SINCE_FILE=""

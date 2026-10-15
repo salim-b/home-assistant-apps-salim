@@ -1,10 +1,6 @@
 #!/bin/bash
-# Docker HEALTHCHECK probe for the hd-idle app.
-#
-# hd-idle is a long-running daemon polling /proc/diskstats; it exits itself
-# (log.Fatal, then s6 restarts it) if the stats file becomes unreadable.
-# Pure-shell process check: /proc/*/comm carries the daemon's kernel name
-# ("hd-idle"); no pgrep dependency needed.
+# Docker HEALTHCHECK probe: hd-idle exits itself (log.Fatal, then s6 restarts it) if /proc/diskstats becomes
+# unreadable - check the stats file and the daemon process (plain /proc/*/comm scan, no pgrep dependency).
 set -euo pipefail
 
 [ -r /proc/diskstats ]

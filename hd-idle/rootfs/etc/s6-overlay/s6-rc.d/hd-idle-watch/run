@@ -2,33 +2,10 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-## Drive re-resolution watcher (longrun service).
-##
-## hd-idle resolves device entries ONCE at startup and only re-resolves
-## entries that are still unresolved (its -s 1 never re-checks entries whose
-## symlink already resolved - upstream behavior, see hd-idle/KNOWLEDGE.md).
-## Kernel names are not stable across re-plugs (ports/hubs/enumeration
-## order), so a moved drive would otherwise keep its stale -a <name> entry:
-## hd-idle would watch (and spin down) the wrong name or none, until an app
-## restart fixed it. The supervisor offers no callback for this (its
-## hardware events only re-grant cgroup device rules to the running
-## container) - hence this in-container watcher:
-##
-## - periodically regenerate the hd-idle command line with the shared
-##   generator (/usr/bin/hd-idle-genargs --quiet) from the CURRENT options
-##   and the CURRENT device resolution (readlink -f of the configured
-##   by-id paths);
-## - install it and restart just the hd-idle service (s6-svc -r) when the
-##   generated configuration actually changed (a plain comparison, so
-##   unrelated churn never triggers a restart).
-##
-## hd-idle restart effects are benign: it re-reads /etc/hd-idle.args from
-## the run script and starts with fresh in-memory stats - idle timers
-## restart, and no immediate command is sent to any disk, so a drive in
-## standby is NOT spun up by the restart.
-##
-## First sleep: the boot-time generation (cont-init config.sh) already
-## wrote the args file; the first cycle only compares against it.
+## Drive re-resolution watcher (longrun service): kernel names are not stable across re-plugs and hd-idle's -s 1 never
+## re-verifies already-resolved entries, so a moved drive would keep its stale entry until an app restart. This watcher
+## regenerates the command line quietly every 30 s and restarts just the hd-idle service when it actually changed.
+## Problem, design, restart effects, failure class: hd-idle/KNOWLEDGE.md §"Automatic drive re-resolution".
 
 INTERVAL=30
 ARGS_FILE=/etc/hd-idle.args
@@ -37,19 +14,9 @@ CAND_FILE=/tmp/hd-idle-args.new
 while true; do
   sleep "${INTERVAL}"
 
-  ## Regenerate from current options + current device resolution. Mid-run,
-  ## the options themselves cannot change: the supervisor validates new
-  ## options against the schema (device-path existence included) at save
-  ## time and only hands them to the app at its next (re)start - so the
-  ## config-content rejections (partition/system-disk/duplicate/missing
-  ## idle) all fired at boot already. Realistic mid-run failure sources are
-  ## the exotic duplicate-after-replug case (two configured symlink names
-  ## of one physical drive, e.g. an ata-* and a usb-* by-id link, where one
-  ## was detached at boot and only resolves once the drive is plugged in)
-  ## and unforeseen transient system states - hence keeping the known-good
-  ## configuration instead of aborting (the persistent source of truth is
-  ## options.json on /data; the run script re-reads the args file on every
-  ## (re)start, so nothing needs re-installing here).
+  ## Regenerate from current options + current device resolution. Mid-run regeneration failures are nearly impossible
+  ## by construction; the keep-current guard is cheap insurance (analysis: hd-idle/KNOWLEDGE.md
+  ## §"Automatic drive re-resolution").
   if ! /usr/bin/hd-idle-genargs --quiet "${CAND_FILE}"; then
     bashio::log.warning "hd-idle configuration regeneration failed - keeping the current configuration."
     continue

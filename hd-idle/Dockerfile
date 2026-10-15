@@ -2,19 +2,10 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/base:3.24
 FROM ${BUILD_FROM}
 
-# hd-idle (a static Go binary) from the Alpine community repo, version
-# PINNED (full pkgver-pkgrel, DL3018-compliant): the app's argument
-# generation encodes hd-idle's CLI semantics (see rootfs/usr/bin/hd-idle-genargs
-# and hd-idle/KNOWLEDGE.md), so package changes must be explicit app changes -
-# each new package version becomes an app release (bump pin + config.yaml
-# version + changelog). Alpine stable branches repoint package versions
-# (pkgrel bumps; the binary index then serves only the current one, so a
-# stale pin would break the build): validate.py's apk-drift check (running
-# in the daily CI cron) flags the mismatch with that workflow. This differs
-# deliberately from nfs-server's floating nfs-utils - the policy background
-# is in the repository-root KNOWLEDGE.md (apk package version policy).
-# smartmontools: powers the drive-PM treatment (hd-idle-pmfix, option
-# disable_drive_pm - see hd-idle/KNOWLEDGE.md).
+# hd-idle (a static Go binary) and smartmontools (powers hd-idle-pmfix, see hd-idle/KNOWLEDGE.md), versions PINNED
+# (full pkgver-pkgrel): the app's argument generation encodes hd-idle's CLI semantics, so package changes must be
+# explicit app releases (bump pin + config.yaml version + changelog). Policy background and the apk-drift check:
+# repository-root KNOWLEDGE.md (apk package version policy).
 RUN apk add --no-cache \
   hd-idle=1.22-r7 \
   smartmontools=7.5-r0

@@ -2,18 +2,10 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-## hd-idle daemon (longrun service).
-##
-## hd-idle is configured exclusively via command line arguments - there is no
-## config file (see hd-idle/KNOWLEDGE.md); cont-init config.sh generated and
-## validated the argument list, and the hd-idle-watch longrun may regenerate
-## it later and restart this service when drive paths move (moved drives
-## change their kernel names). `exec` makes hd-idle this service's process:
-## s6 signals it directly on stop, and its stdout (spin-down/spin-up events
-## like "sdi spindown", debug lines in debug mode) lands in the app log.
-## -s 1 (runtime symlink resolution) is always included so detached-then-
-## reattached drives configured by stable by-id paths get picked up without
-## an app restart.
+## hd-idle daemon (longrun service). Reads the generated argument list (/etc/hd-idle.args: written by cont-init
+## config.sh, regenerated + restarted by hd-idle-watch when drive paths move; see hd-idle/KNOWLEDGE.md). `exec` makes
+## hd-idle this service's process: s6 signals it directly on stop, and its stdout (spin-down/spin-up events, debug
+## lines) lands in the app log.
 read -r -a HD_IDLE_ARGS </etc/hd-idle.args
 bashio::log.info "Starting hd-idle: /usr/sbin/hd-idle ${HD_IDLE_ARGS[*]}"
 exec /usr/sbin/hd-idle "${HD_IDLE_ARGS[@]}"
