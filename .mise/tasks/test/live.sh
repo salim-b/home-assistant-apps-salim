@@ -137,6 +137,7 @@ fi
 # `set -e`, and a trap installed later would never fire (device-verified:
 # the first device run left the test options active because of this).
 restore_options() {
+  local suspicious test_keys tkey
   [ "${usage_test_options:-false}" = "true" ] || return 0
   if ssh "${SSH_OPTS[@]}" "$host" "test -f '$backup'" 2>/dev/null; then
     echo "-- restoring original app options"
@@ -146,10 +147,29 @@ restore_options() {
          -X POST --data-binary @- http://supervisor/addons/$local_slug/options") \
       && echo "$restore_result" | jq -e '.result == "ok"' >/dev/null 2>&1; then
       # Refuse to delete the backup if it turns out to contain the test
-      # options (a previous failed run may have saved them as the "original")
-      if [ -f "$LIVE_TEST_OPTIONS_FILE" ] \
-        && [ "$(ssh "${SSH_OPTS[@]}" "$host" "jq -c '.shares // []' '$backup'")" \
-          = "$(yq -o json '.shares // []' "$LIVE_TEST_OPTIONS_FILE" | jq -c .)" ]; then
+      # options (a previous failed run may have saved them as the
+      # "original"): suspicious when EVERY top-level key overridden by the
+      # test options file carries exactly the test value in the backup.
+      # Generic key comparison - no app-specific field name (like the
+      # nfs-server shares) may be hardwired here, or apps without that key
+      # would always compare equal and never get their options restored.
+      suspicious=0
+      if [ -f "$LIVE_TEST_OPTIONS_FILE" ]; then
+        test_keys=$(yq '. | keys | .[]' "$LIVE_TEST_OPTIONS_FILE")
+        if [ -n "$test_keys" ]; then
+          suspicious=1
+          while IFS= read -r tkey; do
+            [ -n "$tkey" ] || continue
+            if [ "$(ssh "${SSH_OPTS[@]}" "$host" \
+                "jq -c --arg k '$tkey' '.[\$k] // \"<key-missing>\"' '$backup'")" \
+              != "$(yq -o json ".$tkey" "$LIVE_TEST_OPTIONS_FILE" | jq -c .)" ]; then
+              suspicious=0
+              break
+            fi
+          done <<<"$test_keys"
+        fi
+      fi
+      if [ "$suspicious" = 1 ]; then
         echo "WARNING: the device backup contains the TEST options — not applying them as" >&2
         echo "         'original'. Restore your real options via the app options UI; the" >&2
         echo "         backup stays at $backup for reference." >&2
@@ -177,7 +197,11 @@ wait_started
 LIVE_SHARES=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \
   | jq -c '.data.options.shares // []') || LIVE_SHARES="[]"
 export LIVE_SHARES
-if [ "$(jq length <<<"$LIVE_SHARES")" -gt 0 ] && [ "$(declare -f live_runtime_check)" != "" ]; then
+# No gate on LIVE_SHARES here: that key is app-specific (nfs-server). A hook
+# decides itself whether its checks make sense with the device's current
+# options (the nfs-server hook refuses to roundtrip without a /share/nfs
+# share; the hd-idle hook has no shares at all).
+if [ "$(declare -f live_runtime_check)" != "" ]; then
   live_runtime_check
 fi
 

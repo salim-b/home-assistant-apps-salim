@@ -74,9 +74,10 @@ essentials:
   (`.mise/tasks/test/live/<app>.yaml`, top-level key override) to the device app for the run — options are user data and
   are NOT refreshed from config.yaml defaults on update/rebuild — with an options backup restored on exit. App-specific
   checks live in the per-app hook `.mise/tasks/test/live/<app>.sh` (contract: `live_prepare`, `live_runtime_check`,
-  `LIVE_*` vars — analogous to the lab hooks); apps without a hook get deploy + state-wait only. Restriction: native
-  mise depends-arg forwarding is not implemented in any released mise (docs describe it; verified up to 2026.10.6) — the
-  task forwards via its run script instead.
+  `LIVE_*` vars — analogous to the lab hooks); apps without a hook get deploy + state-wait only. Hooks may define their
+  own env knobs (e.g. hd-idle's `LIVE_HDIDLE_LABEL_GLOB` selects the drives to exercise by filesystem label and
+  generates the test options on the fly). Restriction: native mise depends-arg forwarding is not implemented in any
+  released mise (docs describe it; verified up to 2026.10.6) — the task forwards via its run script instead.
 
 ## Workflow rules
 
