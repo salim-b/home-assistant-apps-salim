@@ -27,11 +27,11 @@
 
 ## 0.1.2
 
-*Unreleased development version*
+Development version, never published - consumed by a transitory test build during the 0.1.3 branch's development.
 
 ## 0.1.1
 
-*Unreleased development version*
+Development version, never published - consumed by a transitory test build during the 0.1.3 branch's development.
 
 ## 0.1.0
 
