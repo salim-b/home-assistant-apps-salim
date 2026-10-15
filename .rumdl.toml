@@ -5,6 +5,11 @@
 # against rumdl's published JSON schema (see .mise/tasks/validate.py).
 
 [global]
+# AI_POLICY.md is the Open Home Foundation's policy text, kept verbatim for
+# upstream syncs - not this repo's prose to style: excluded from linting
+# entirely.
+exclude = ["AI_POLICY.md"]
+
 # Line length enforced (MD013, see its section below). READMEs ignore MD033:
 # badges/my.home-assistant.io embeds are conventional GitHub README content.
 [per-file-ignores]
