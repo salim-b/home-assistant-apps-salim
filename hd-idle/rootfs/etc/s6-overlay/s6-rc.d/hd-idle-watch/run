@@ -22,8 +22,14 @@ while true; do
     continue
   fi
 
-  if cmp -s "${ARGS_FILE}" "${CAND_FILE}"; then
-    rm -f "${CAND_FILE}"
+  ## Compare BOTH generated files: an interrupted install (crash between the mv calls below) can leave the drives file
+  ## stale behind the args file, and this comparison is what re-syncs it (and re-runs the treatment) on the next tick.
+  DRIVES_FILE="${ARGS_FILE%.args}.drives"
+  case "${ARGS_FILE}" in *.args) ;; *) DRIVES_FILE="${ARGS_FILE}.drives" ;; esac
+  CAND_DRIVES_FILE="${CAND_FILE%.args}.drives"
+  case "${CAND_FILE}" in *.args) ;; *) CAND_DRIVES_FILE="${CAND_FILE}.drives" ;; esac
+  if cmp -s "${ARGS_FILE}" "${CAND_FILE}" && cmp -s "${DRIVES_FILE}" "${CAND_DRIVES_FILE}"; then
+    rm -f "${CAND_FILE}" "${CAND_DRIVES_FILE}"
     continue
   fi
 
@@ -35,10 +41,6 @@ while true; do
   ## that are NEW or CHANGED relative to it get the (possibly
   ## wake-causing) treatment re-applied; unchanged drives keep their
   ## volatile settings.
-  DRIVES_FILE="${ARGS_FILE%.args}.drives"
-  case "${ARGS_FILE}" in *.args) ;; *) DRIVES_FILE="${ARGS_FILE}.drives" ;; esac
-  CAND_DRIVES_FILE="${CAND_FILE%.args}.drives"
-  case "${CAND_FILE}" in *.args) ;; *) CAND_DRIVES_FILE="${CAND_FILE}.drives" ;; esac
   cp "${DRIVES_FILE}" "${DRIVES_FILE}.prev" 2>/dev/null || true
   mv -f "${CAND_FILE}" "${ARGS_FILE}"
   mv -f "${CAND_DRIVES_FILE}" "${DRIVES_FILE}"

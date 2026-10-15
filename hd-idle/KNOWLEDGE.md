@@ -199,8 +199,10 @@ drives whose line is NEW or CHANGED are treated.
   supervisor 2026.10.1). The fix is entirely app-internal; no HAOS interaction is involved.
 - **Design**: the arg generation lives in a shared helper (`/usr/bin/hd-idle-genargs`, used by cont-init config.sh and
   the watcher). The `hd-idle-watch` longrun polls every 30 s: regenerate the command line with `hd-idle-genargs --quiet`
-  into a candidate file, `cmp` it against `/etc/hd-idle.args`, and only on an actual difference install the new file and
-  restart just the hd-idle service (`s6-svc -r /run/service/hd-idle`). Unrelated churn therefore never triggers a
+  into candidate files, compare BOTH generated files (args + drives) against the installed ones, and only on an actual
+  difference install them and restart just the hd-idle service (`s6-svc -r /run/service/hd-idle`) - the args file is
+  installed last (commit point), so an interrupted install leaves the drives file stale behind it and the next tick's
+  comparison re-syncs it. Unrelated churn therefore never triggers a
   restart, and `--quiet` makes unchanged 30-s ticks produce **no log output at all** (warnings/errors still surface; the
   new command line is logged by the hd-idle run script after each restart). Polling (not udev events) because mapping
   the host's `/run/udev` socket (`with_udev`) into an Alpine-based container for event-driven monitoring is
