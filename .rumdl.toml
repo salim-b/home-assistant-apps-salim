@@ -1,8 +1,9 @@
 # rumdl configuration - Markdown linter (https://github.com/rvben/rumdl)
 #
-# Runs as part of `mise run lint` (all git-tracked .md files); `mise exec
-# rumdl -- rumdl fmt .` applies auto-fixes. The config is schema-validated
-# against rumdl's published JSON schema (see .mise/tasks/validate.py).
+# Second, markdownlint-rules-rich linter behind panache (see panache.toml),
+# which owns ALL markdown autoformatting. Runs as part of `mise run lint`
+# (all git-tracked .md files); the config is schema-validated against
+# rumdl's published JSON schema (see .mise/tasks/validate.py).
 
 [global]
 # AI_POLICY.md is the Open Home Foundation's policy text, kept verbatim for
@@ -23,13 +24,8 @@ code-block-line-length = 0
 # A line whose only overflow is an unbreakable inline code span must not
 # fail the check (nothing to wrap without rewriting the code).
 code-spans = false
-# `normalize` reflow: fmt wraps ALL paragraph prose to consistently fill
-# 120 - overlong lines are wrapped AND short wrapped lines are joined, so
-# every paragraph ends up uniformly wrapped (rendered text unchanged: soft
-# breaks render as spaces). One-time normalization churn for previously
-# hard-wrapped files; afterwards, run fmt instead of hand-wrapping.
-# Never rewrites a line the check itself forgives (URL/code-span-only
-# overruns etc.).
-reflow = true
-reflow-mode = "normalize"
-reflow-length-exemptions = true
+# Panache (see panache.toml) owns prose wrapping, so rumdl's own reflow
+# stays off - its documented default (`reflow = false`). MD013 remains as
+# a pure width check: flag lines over the limit, never rewrite them.
+# Without this, rumdl would enforce ITS normalized fill state, which
+# disagrees with panache's packing.
