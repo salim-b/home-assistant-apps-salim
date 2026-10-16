@@ -18,7 +18,9 @@ done)
 echo "== shellcheck / bash -n (${#scripts[@]} scripts) =="
 [ ${#scripts[@]} -gt 0 ] || { echo "no scripts found"; exit 1; }
 for f in "${scripts[@]}"; do
-  shellcheck "$f" || fails=$((fails + 1))
+  # -x: follow `source` lines - tasks sharing .mise/tasks/lib/ helpers would
+  # otherwise fail with SC1091 (not following)
+  shellcheck -x "$f" || fails=$((fails + 1))
   case "$(head -1 "$f")" in *bash*) bash -n "$f" || fails=$((fails + 1));; esac
 done
 

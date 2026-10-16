@@ -48,6 +48,15 @@ Note that the task comments out the top-level `image:` key in the *device-side* 
 key set, the Supervisor would pull that image from GHCR instead of building locally from your working tree — see the
 [dev docs](https://developers.home-assistant.io/docs/add-ons/testing/#remote-development).
 
+To switch a device from the locally installed app to the published registry version (after merging), use
+`deploy-registry`. It uninstalls the local copy and installs/updates the app-repository install (discovered via the
+device's store listing); when the old install has options, the task refuses to run without `--migrate-config` (carry
+them over, filtered to the target version's schema) or `--discard-config`:
+
+```sh
+mise run deploy-registry hd-idle root@homeassistant.local --migrate-config
+```
+
 If the app is already installed on the device **from an app repository** (i.e. not as a local app — such installs have a
 hashed store slug like `f8b2d53d_nfs`), the task refuses: a second installation would conflict on the app's published
 port. Uninstall that copy first (the error message shows the exact command) or pass `--replace` to have the task

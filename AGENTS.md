@@ -69,6 +69,10 @@ essentials:
   and ensures it runs. Comments out the top-level `image:` key in the *device copy* so the Supervisor builds locally
   instead of pulling from GHCR. Refuses when the app is already installed from an app repository (hashed store slug,
   e.g. `f8b2d53d_nfs` — port conflict); `--replace` uninstalls that copy first.
+- `mise run deploy-registry <app> <host>` — switch a device to the app's latest registry/store version: uninstalls the
+  local `/local_apps` copy (if any) and installs/updates the app-repository install (hashed store slug, discovered from
+  the device's store listing). Config migration is deliberate: the task aborts when the old install has options and
+  neither `--migrate-config` (carry them over, filtered to the target's schema) nor `--discard-config` is given.
 - `mise run test:live <app> <host>` — deploy (forwarding `--replace`) plus live checks: per-share NFS client roundtrips
   from this machine (rw roundtrip / ro assertion / pseudo-root browse). `--test-options` applies the app's test options
   (`.mise/tasks/test/live/<app>.yaml`, top-level key override) to the device app for the run — options are user data and
