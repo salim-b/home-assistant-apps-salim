@@ -24,8 +24,6 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
   udev subsystem only); users can pick a `-partN` entry, which our startup validation rejects with an explanatory
   message. Consider an upstream suggestion for a finer filter (e.g. `type=disk`) if the UX annoys real users.
 
-- Design a better logo. Maybe a HDD that sleeps/snores ("zzzz")?
-
 - Upstream: file a feature request for per-drive (and/or global) disabling of the drives' own power management - the ATA
   SET FEATURES APM level and standby timer equivalents (`hdparm -B off` / `smartctl -d sat -s apm,off` and
   `-s standby,off`). hd-idle v1.22 only issues standby commands and has zero APM/standby-timer code (verified in
@@ -38,6 +36,55 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
   drive action) for such a bridge under one host stack while `ata` worked - worth including in the request the
   observation that a "command failed/no-op" signal would help (hd-idle currently marks drives spun down even when the
   command has no effect).
+
+- Design a better logo. Maybe a HDD that sleeps/snores ("zzzz")?
+
+- Re-assess [`rust-idle`](https://github.com/Piezoid/rust-idle) as an alternative/supplement to hd-idle once a new
+  version is released (if that ever happens – the last release is 2022-05). Facts below verified against the repo tip
+  (commit 288d283, 2024-09-08) in 2026-10. The spindown command path decides most of the comparison:
+  `src/sys.rs::spindown_disk()` issues a SCSI START STOP UNIT (0x1B, fixed power condition 0) via SG_IO on the
+  `/dev/sdX` node, and that is its only spindown mechanism - the explicit "//TODO: implement for ATA/USB devices"
+  comment sits right above it; there is no ATA path at all (no ATA PASS-THROUGH, no hdparm-style HDIO commands, no
+  per-device command type).
+
+  - Pros (honest): the one feature hd-idle lacks entirely - optional `syncfs()` + BLKFLSBUF of the drive's filesystems
+    right before the spindown and/or on spin-up detection (the `s`/`S` config flags), flushing dirty pages so late
+    writeback cannot wake the drive again; runtime auto-adoption of newly appeared drives with the current default flags
+    (but per-drive configs resolve by kernel name once at startup, so a drive re-appearing under a NEW name drops to the
+    defaults - including drives explicitly excluded with idle 0, a worse failure mode than hd-idle's stale-name behavior
+    for our exclusion semantics); no `-I` equivalent at all (hd-idle's re-assertion flag is a wear generator on bridges
+    where redundant STOP commands half-start the motor, per `KNOWLEDGE.md` §`Drive-PM treatment`, so its absence is no
+    loss); genuinely tiny (2 dependency crates, zero-allocation steady state, ~71 kB binary with nightly build-std per
+    upstream claim vs the ~1.6 MB stripped Go binary - against the resolved long-running-footprint review below this
+    amounts to a small RSS saving at best); permissive MIT license (vs GPL-3.0-only) should forking ever become the
+    path; its only command (START STOP UNIT) is in the kernel's read-safe list, so a rust-idle-based app would need no
+    SYS_RAWIO (security rating +1) - but only as long as no drive-PM treatment (smartctl ATA SET FEATURES) is ported,
+    which is precisely the feature this app's users rely on.
+
+  - Cons (honest): effectively unmaintained (last commit 2024-09-08, a single v0.1.0 release 2022-05 while Cargo.toml
+    already says 0.1.1, 3 stars, no open issues; the author frames the project as an exercise "to see how well rust
+    fares"; contrast: hd-idle upstream is active, last commit 2026-06), with README-vs-code drift (the "monitors
+    partitions" feature line is stale since the 2024-09-08 "track disks, not partitions" commit switched to disk-level
+    counters); its SCSI-only path is exactly the one our testing found to be a silent no-op on some WD USB bridges
+    (`KNOWLEDGE.md` §`Drive-PM treatment`) while hd-idle's `ata` path worked there - on this app's primary target
+    hardware rust-idle cannot spin the drives down at all; fixed power condition 0 (real SCSI/SAS disks need 2 or 3, see
+    the hd-idle README); no activity logfile with running/stopped statistics and no single-shot mode (the lab smoke test
+    and manual diagnostics use both); disk-level activity counters - the opposite of hd-idle's partition/dm attribution,
+    chosen upstream precisely because monitoring daemons dirty disk-level counters (smartd/udisks false positives);
+    tested on x86_64 only per README while aarch64 is the main HA device target; no Alpine package (AUR only), so the
+    app image would have to build from source - a cargo toolchain in the Docker build and a crates.io supply chain
+    instead of the apk-pinning + drift-check policy (nightly toolchain pin + `-Z build-std` per build.sh for the
+    advertised size; a plain stable cargo build also works but yields a larger binary); no skew/suspend-detection state
+    reset (after host resume it can keep believing an actually-spinning drive is idle - the same stale-belief class the
+    WD-bridge findings document for hd-idle).
+
+  - Current assessment: not worth replacing the hd-idle CLI here, and given the dormancy plus the SCSI-only path
+    probably not worth a separate app right now either - the wins are marginal (sync flags, smaller daemon) while
+    everything else is regression on this app's target hardware. Should it ever be pursued despite that, it belongs in a
+    SEPARATE app (own config.yaml, device options, AppArmor profile), never as a CLI swap in this one - the app-side
+    machinery (hd-idle-genargs/hd-idle-watch/hd-idle-pmfix) is built around hd-idle's CLI semantics. One thing survives
+    this assessment regardless: the sync-before-spindown/spin-up idea is a legitimate hd-idle upstream feature request
+    (could be folded into the upstream items in this section).
 
 ## Resolved
 
