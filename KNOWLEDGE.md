@@ -198,6 +198,14 @@ Version-sensitive gotchas learned while implementing:
   resolves (the APKINDEX), not the APKBUILD source.
 - The GitHub aports mirror (alpinelinux/aports) names stable branches `3.24-stable` (no `v` prefix, unlike the GitLab
   branches); raw fetches there are for source inspection only — version checks use dl-cdn.
+- **The binary-index repush is per-arch and can skew between the arches**: verified 2026-10-16 — after the Go 1.26.5
+  rebuild above, the v3.24 aarch64 APKINDEX began serving `1.22-r8` (package built 2026-10-14) while x86_64 still served
+  `1.22-r7`; the daily cron flagged the drift the same day. In such a window the arches' indexes disagree, so *no* pin
+  passes `validate_apk_pins` (strict per-arch equality). Bump to the newest index version anyway: the repointed arch no
+  longer serves the old package, so a cold-cache build of the stale pin breaks there (the builder's layer cache can mask
+  this for a while), while the lagging arch's mismatch is transient and self-heals when its repush lands — pinning the
+  older version instead would leave both arches failing once the lagging arch repushes. During the window, a red check
+  on the lagging arch is accurate signal: that arch's cold-cache builds cannot yet resolve the new pin.
 
 ## HA base image: shell gotchas
 
