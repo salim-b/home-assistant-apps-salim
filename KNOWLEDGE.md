@@ -54,8 +54,8 @@ such apps outright (`UnsupportedReason.APPARMOR`).
   ("Option 'X' does not exist in the schema") on each options read until the user re-saves the options — device-verified
   2026-10-16 (hd-idle 0.1.5 dropping `mode`; the stale key never broke the boot, only warned). A fresh options POST
   replaces the whole set and silently DROPS keys unknown to the schema (device-verified 2026-10-16: full valid set +
-  bogus keys → ok, bogus keys not stored; a set missing required keys → rejected); a migration tool therefore filters
-  to the target's schema keys to make the drops explicit and reported.
+  bogus keys → ok, bogus keys not stored; a set missing required keys → rejected); a migration tool therefore filters to
+  the target's schema keys to make the drops explicit and reported.
 
 ## Supervisor: device access
 
