@@ -68,9 +68,9 @@ essentials:
   (removing the old copy), reloads the store, then installs/updates/rebuilds depending on installed vs. local version,
   and ensures it runs. Comments out the top-level `image:` key in the *device copy* so the Supervisor builds locally
   instead of pulling from GHCR. Refuses when the app is already installed from an app repository (hashed store slug,
-  e.g. `f8b2d53d_nfs` — port conflict); `--replace` uninstalls that copy first. `--config` decides the options' fate:
-  `reset` wipes the local install's options (it runs with the app's default options afterwards), `migrate` carries a
-  replaced repository copy's options over (filtered to the app's schema), unset keeps the options as they are (a
+  e.g. `f8b2d53d_nfs-server` — port conflict); `--replace` uninstalls that copy first. `--config` decides the options'
+  fate: `reset` wipes the local install's options (it runs with the app's default options afterwards), `migrate` carries
+  a replaced repository copy's options over (filtered to the app's schema), unset keeps the options as they are (a
   replaced copy's options are not carried over). Options an uninstall would orphan are archived to a local backup file
   (path printed) — stored options do not survive an uninstall, so the backup is the only surviving copy.
 - `mise run deploy-registry <app> <host>` — switch a device to the app's latest registry/store version: uninstalls the

@@ -2,10 +2,10 @@
 
 ## Configuration
 
-NFS shares are configured in the app's [settings](/config/app/f8b2d53d_nfs/config): Each **NFS shares** entry exports
-one directory of the Home Assistant host to a set of allowed clients. An entry consists of the directory's **Path**, the
-allowed client **Network** and the NFS export **Options** – see the field descriptions in the configuration dialog for
-details and examples.
+NFS shares are configured in the app's [settings](/config/app/f8b2d53d_nfs-server/config): Each **NFS shares** entry
+exports one directory of the Home Assistant host to a set of allowed clients. An entry consists of the directory's
+**Path**, the allowed client **Network** and the NFS export **Options** – see the field descriptions in the
+configuration dialog for details and examples.
 
 Saving configuration changes restarts the app, which then exports the configured shares.
 

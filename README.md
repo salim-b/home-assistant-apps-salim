@@ -41,7 +41,7 @@ mise run deploy nfs-server root@homeassistant.local
 
 # get app logs (`--follow` continuously prints new log entries until you abort;
 # app slug is `local_<config.yaml slug>`)
-ssh root@homeassistant.local 'ha apps logs --follow local_nfs'
+ssh root@homeassistant.local 'ha apps logs --follow local_nfs-server'
 ```
 
 Note that the task comments out the top-level `image:` key in the *device-side* copy of `config.yaml`: with an `image`
@@ -60,9 +60,9 @@ mise run deploy-registry hd-idle root@homeassistant.local --config migrate
 ```
 
 If the app is already installed on the device **from an app repository** (i.e. not as a local app — such installs have a
-hashed store slug like `f8b2d53d_nfs`), the task refuses: a second installation would conflict on the app's published
-port. Uninstall that copy first (the error message shows the exact command) or pass `--replace` to have the task
-uninstall it automatically.
+hashed store slug like `f8b2d53d_nfs-server`), the task refuses: a second installation would conflict on the app's
+published port. Uninstall that copy first (the error message shows the exact command) or pass `--replace` to have the
+task uninstall it automatically.
 
 For a full end-to-end test, run `test:live` (for the `nfs-server` app, this includes an NFS client roundtrip against the
 running app). It deploys the app, forwarding `--replace`/`--test-options`:

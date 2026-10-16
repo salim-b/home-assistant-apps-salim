@@ -34,7 +34,7 @@ server.
 ## Documentation
 
 For usage, configuration, security notes and client mounting instructions, see the
-[**Documentation**](/config/app/f8b2d53d_nfs/documentation).
+[**Documentation**](/config/app/f8b2d53d_nfs-server/documentation).
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg

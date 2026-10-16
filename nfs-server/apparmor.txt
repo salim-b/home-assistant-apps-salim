@@ -128,8 +128,8 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     signal (send) set=(kill,term,int,hup,cont),
     # Official docs template: scope receive to the app's own top profile
     # (the supervisor renames it to the installed slug on the device, e.g.
-    # local_nfs — the *_nfs glob covers repo installs too).
-    signal (receive) peer=*_nfs,
+    # local_nfs-server — the *_nfs-server glob covers repo installs too).
+    signal (receive) peer=*_nfs-server,
 
     # inet/inet6 stream+dgram: in case exportfs attempts RPC-based cache
     # flushes toward mountd/rpcbind; everything else (raw etc.) is denied
@@ -161,8 +161,8 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     signal (send) set=(kill,term,int,hup,cont),
     # Official docs template: scope receive to the app's own top profile
     # (the supervisor renames it to the installed slug on the device, e.g.
-    # local_nfs — the *_nfs glob covers repo installs too).
-    signal (receive) peer=*_nfs,
+    # local_nfs-server — the *_nfs-server glob covers repo installs too).
+    signal (receive) peer=*_nfs-server,
 
     capability net_bind_service,
     capability setgid,
@@ -199,8 +199,8 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     signal (send) set=(kill,term,int,hup,cont),
     # Official docs template: scope receive to the app's own top profile
     # (the supervisor renames it to the installed slug on the device, e.g.
-    # local_nfs — the *_nfs glob covers repo installs too).
-    signal (receive) peer=*_nfs,
+    # local_nfs-server — the *_nfs-server glob covers repo installs too).
+    signal (receive) peer=*_nfs-server,
 
     capability net_bind_service,
     capability setgid,
@@ -238,8 +238,8 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     signal (send) set=(kill,term,int,hup,cont),
     # Official docs template: scope receive to the app's own top profile
     # (the supervisor renames it to the installed slug on the device, e.g.
-    # local_nfs — the *_nfs glob covers repo installs too).
-    signal (receive) peer=*_nfs,
+    # local_nfs-server — the *_nfs-server glob covers repo installs too).
+    signal (receive) peer=*_nfs-server,
 
     # setpcap: nfsdcld prunes its own capability set at startup (prctl
     # PR_CAPBSET_DROP for every capability + a final capset zeroing all

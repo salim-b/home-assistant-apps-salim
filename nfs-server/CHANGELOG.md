@@ -2,6 +2,15 @@
 
 # Changelog
 
+## 0.6.0
+
+- Rename: the app's slug changed from `nfs` to `nfs-server` to match the app folder and image name. The slug surfaces in
+  the installed slug, container and DNS names, the AppArmor profile name and the app's UI URLs (`/config/app/...`). The
+  AppArmor profile's signal-receive peer globs (`*_nfs` → `*_nfs-server`) were adjusted to the new installed-slug form.
+- Upgrade note: the Supervisor treats the renamed slug as a new app — existing installs must be uninstalled and
+  reinstalled, and stored options do not survive an uninstall. Note your options before uninstalling. NFS clients are
+  unaffected (they mount the host's IP on port 2049, not the app slug).
+
 ## 0.5.4
 
 - Maintainability: code comments slimmed to purpose + references (the narratives now live in `KNOWLEDGE.md`, their

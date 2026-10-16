@@ -40,7 +40,7 @@ echo "== deploying $app v$version to $host (store slug: $local_slug) =="
 
 # Apps installed from app repositories get the slug '<repo-hash>_<app-slug>'
 # (repo hash = first 8 hex chars of the sha1 over the lowercased repository
-# URL, supervisor store/utils.py get_hash_from_repository — f8b2d53d_nfs for
+# URL, supervisor store/utils.py get_hash_from_repository — f8b2d53d_nfs-server for
 # this repo). A second installation alongside the local one would conflict on
 # the published port, so refuse (or --replace) when one exists. Matching by
 # slug suffix instead of reproducing the hash keeps working when the app
