@@ -94,6 +94,23 @@ lab_runtime_check() {
     return 0
   fi
 
+  ## Drive-PM treatment plumbing (per-drive override): the drives file
+  ## carries the effective per-drive flag in a 4th column (1 = treat, 0 =
+  ## leave the drive's own power management alone); the fixture adapter
+  ## sets disable_drive_pm=no on the FIRST drive so the override is
+  ## exercised end to end (pm-flag 0 in the file, hd-idle-pmfix logs the
+  ## skip at boot).
+  if ! docker exec "$app" sh -c "awk 'NF > 0 && NF != 4 { exit 1 }' /etc/hd-idle.drives"; then
+    echo "   FAIL: /etc/hd-idle.drives lines are not 4 columns (pm-flag column missing)"
+    return 1
+  fi
+  pm_skip="${drives%%,*}"
+  docker exec "$app" grep -qx "${pm_skip} .* 0" /etc/hd-idle.drives ||
+    { echo "   FAIL: override drive ${pm_skip} has no pm-flag 0 in the drives file"; return 1; }
+  docker logs "$app" 2>&1 | grep -q "drive-PM treatment disabled for this drive" ||
+    { echo "   FAIL: no hd-idle-pmfix skip log for the per-drive override drive"; return 1; }
+  echo "   PASS: per-drive drive-PM override (4-column drives file, override drive skipped by hd-idle-pmfix)"
+
   ## Spindown smoke test (read-only on the drives).
   ##
   ## hd-idle -t quirks (verified, see hd-idle/KNOWLEDGE.md):

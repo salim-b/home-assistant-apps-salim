@@ -1,6 +1,6 @@
 # https://developers.home-assistant.io/docs/apps/configuration#app-configuration
 name: hd-idle
-version: "0.1.5"
+version: "0.1.6"
 slug: hd-idle
 description: Spin down idle hard disks (USB, SATA) automatically using hd-idle
 # Generic (multi-arch) image name; CI builds & publishes per-arch images
@@ -20,8 +20,9 @@ init: false
 privileged:
   - SYS_RAWIO
 options:
-  # Every listed drive is managed: it follows the global defaults wherever its own fields are left empty, and an
-  # idle time of 0 never spins it down. Unlisted drives are never touched (hd-idle's global idle is pinned to 0).
+  # Every listed drive is managed: it follows the global defaults wherever its own fields are left empty (idle,
+  # command type, power condition, and the drive-PM treatment override), and an idle time of 0 never spins it down.
+  # Unlisted drives are never touched (hd-idle's global idle is pinned to 0).
   disks: []
   default_idle: 600
   default_command_type: scsi
@@ -44,6 +45,11 @@ schema:
       idle: "int(0,)?"
       command_type: "list(scsi|ata)?"
       power_condition: "int(0,15)?"
+      # Per-drive override of the global disable_drive_pm: yes = disable this drive's own power management, no =
+      # keep it, empty = follow the global setting. Rendered as a per-drive dropdown like the other override fields
+      # (an optional bool would be indistinguishable from "off" in the UI when untouched); emitted as the drives
+      # file's pm-flag column, hd-idle-pmfix decides per drive from it.
+      disable_drive_pm: "list(yes|no)?"
   # Global defaults, filling the per-drive fields that are left empty.
   # default_idle only applies to LISTED drives (unlisted drives are never
   # touched - the global idle stays pinned to 0); default_command_type and
@@ -52,6 +58,8 @@ schema:
   default_idle: "int(0,)?"
   default_command_type: "list(scsi|ata)"
   default_power_condition: "int(0,15)"
+  # disable_drive_pm is the DEFAULT for drives whose own disable_drive_pm field is empty; an explicit per-drive
+  # yes/no overrides it (schema note above the disks entry).
   disable_drive_pm: "bool?"
   debug: "bool?"
   activity_log: "bool?"

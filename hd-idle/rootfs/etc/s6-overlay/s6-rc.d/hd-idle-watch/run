@@ -44,10 +44,10 @@ while true; do
   cp "${DRIVES_FILE}" "${DRIVES_FILE}.prev" 2>/dev/null || true
   mv -f "${CAND_FILE}" "${ARGS_FILE}"
   mv -f "${CAND_DRIVES_FILE}" "${DRIVES_FILE}"
-  if [ "$(bashio::config 'disable_drive_pm' true)" = "true" ]; then
-    /usr/bin/hd-idle-pmfix "${DRIVES_FILE}" --since "${DRIVES_FILE}.prev" ||
-      bashio::log.warning "hd-idle-pmfix failed - the drives' power management stays as is."
-  fi
+  ## Unconditional: the drives file's pm-flag column carries the EFFECTIVE per-drive decision (global
+  ## disable_drive_pm as the default, per-drive yes/no overrides); pmfix skips drives whose flag is 0.
+  /usr/bin/hd-idle-pmfix "${DRIVES_FILE}" --since "${DRIVES_FILE}.prev" ||
+    bashio::log.warning "hd-idle-pmfix failed - the drives' power management stays as is."
   if ! s6-svc -r /run/service/hd-idle; then
     bashio::log.warning "Restarting the hd-idle service failed - it will pick up the new configuration on its next restart."
   fi

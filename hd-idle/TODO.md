@@ -41,6 +41,16 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
 
 ## Resolved
 
+- Per-drive drive-PM treatment override (2026-10-16, v0.1.6): each drive-list entry gained a `disable_drive_pm` yes/no
+  field (empty = follow the global option), emitted as the drives file's fourth column; hd-idle-pmfix decides per drive
+  from it and runs unconditionally (a global-only bashio gate could not express per-drive overrides). A `list(yes|no)?`
+  dropdown instead of a `bool?` because an untouched optional checkbox is visually indistinguishable from an explicit
+  "off" while unset - and jq's `// empty` cannot distinguish absent from an explicit false (both: `KNOWLEDGE.md`
+  §`bashio option parsing`). Verified via a genargs/pmfix decision-matrix run against the pinned base image (options
+  stubbed by seeding bashio's options cache; see the repository-root `KNOWLEDGE.md` base-image gotchas) and the lab boot
+  with a configured override drive; the lab spindown smoke test itself needs a real spindownable drive and stays a
+  device-side check.
+
 - Configuration mode switch dropped (2026-10-16, v0.1.5): single mode - listed drives follow the global defaults where
   their fields are empty (default_idle alive for all listed drives; the former opt-in idle-less rejection is gone), the
   global idle is pinned to 0 so unlisted and runtime-appearing drives are never touched (the former opt-out EPERM churn

@@ -2,6 +2,20 @@
 
 # Changelog
 
+## 0.1.6
+
+- New: the **Disable drive power management** setting can now be overridden per drive. Each entry in the drive list
+  gained its own **Disable drive power management** field (`yes` = disable this drive's own power management, `no` =
+  keep it, empty = follow the global setting, which stays the default). Useful for mixed setups: only some bridges need
+  the treatment (drives whose bridge filters the APM feature page log a failure for every treated drive), or one drive
+  must keep its own power management. As with switching the global setting off, a per-drive `no` does not actively
+  re-enable the drive's power management - the previously applied volatile settings persist until the drive is
+  power-cycled.
+- Internals: the generated drives file (`/etc/hd-idle.drives`) gained a fourth column - the effective per-drive
+  treatment flag (1 = treat, 0 = leave the drive's own power management alone). hd-idle-pmfix now decides per drive from
+  this column and runs unconditionally at boot and on drive changes (the former global on/off gate could not express
+  per-drive overrides); its log explains every skipped drive.
+
 ## 0.1.5
 
 - Change: the **Configuration mode** option is removed. The app now manages exactly the listed drives, and every listed

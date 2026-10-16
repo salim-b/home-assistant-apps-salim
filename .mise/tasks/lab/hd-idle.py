@@ -16,8 +16,16 @@ def lab_adapt_fixture(options):
         if d
     ]
     adapted = dict(options)
-    adapted["disks"] = [
+    entries = [
         {"device": d, "idle": 30, "command_type": "scsi", "power_condition": 0}
         for d in drives
     ]
+    ## The FIRST drive carries an explicit per-drive power-management
+    ## override (disable_drive_pm=no) so the lab exercises the override end
+    ## to end: genargs emits pm-flag 0 for it and hd-idle-pmfix logs the
+    ## skip at boot (both asserted by the lab hook). All other drives
+    ## inherit the global default (pm-flag 1).
+    if entries:
+        entries[0]["disable_drive_pm"] = "no"
+    adapted["disks"] = entries
     return adapted

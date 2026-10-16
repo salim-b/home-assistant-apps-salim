@@ -213,6 +213,17 @@ Version-sensitive gotchas learned while implementing:
   *before* the command's own redirections are in effect — `echo x > /some/ro/path 2>/dev/null` still prints
   `sh: can't create /some/ro/path: …`. To suppress (or capture) the shell's diagnostic, run the attempt in a subshell:
   `out=$( (echo x > /some/ro/path) 2>&1 )` captures message *and* exit code.
+- **`with-contenv` wipes the inherited environment unless `S6_KEEP_ENV=1`**: the s6-overlay shebang helper runs
+  `emptyenv -p` and then imports only `/run/s6/container_environment` (the variables the supervisor/s6 boot provides).
+  Anything exported by a calling shell or `docker run -e` is erased — unless `S6_KEEP_ENV=1` is set, which makes
+  `with-contenv` pass the inherited environment through untouched (production s6-rc boots are unaffected: there the env
+  arrives via `container_environment` either way).
+- **Stubbing `bashio::config` in bare-container script tests**: `bashio::config` fetches the app options from the
+  Supervisor API (`bashio::app.config` → `GET /addons/self/options/config`), backed by a file cache — it never reads
+  `/data/options.json`. Seeding `${CACHE_DIR}/addons.self.options.config.cache` (env override `CACHE_DIR`; the key is
+  fixed, `bashio::cache` appends `.cache` and validates `^[A-Za-z0-9._-]+$`) with the crafted options JSON stubs the API
+  exactly (the cache stores the raw response). Requires the `S6_KEEP_ENV=1` gotcha above, since `CACHE_DIR` is an
+  inherited variable. (Used for the hd-idle per-drive-PM decision-matrix tests, 2026-10.)
 
 ## s6-overlay: user bundles live OUTSIDE s6-rc.d
 

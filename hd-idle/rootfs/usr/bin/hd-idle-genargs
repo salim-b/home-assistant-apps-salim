@@ -44,6 +44,15 @@ DEFAULT_COMMAND=$(bashio::config 'default_command_type')
 DEFAULT_POWER=$(bashio::config 'default_power_condition')
 DISKS=$(bashio::config 'disks')
 
+## Drive-PM treatment: the global option is the DEFAULT for drives whose own disable_drive_pm field is empty
+## (per-drive yes/no in the disks list overrides it). The EFFECTIVE flag is emitted as the drives file's pm-flag
+## column and hd-idle-pmfix decides per drive from it - config.sh and the watcher run pmfix unconditionally, the
+## drives file is the single source of truth for the effective per-drive decision.
+GLOBAL_PM=0
+if [ "$(bashio::config 'disable_drive_pm' true)" = "true" ]; then
+  GLOBAL_PM=1
+fi
+
 ## Defense in depth: the supervisor schema already validates these; cheap re-checks keep a hand-edited options.json
 ## from producing a bogus command line (every emitted token must be space-free - the run script word-splits the file).
 [[ "${DEFAULT_IDLE}" =~ ^[0-9]+$ ]] ||
@@ -237,8 +246,9 @@ case "${ARGS_FILE}" in
   *) DRIVES_FILE="${ARGS_FILE}.drives" ;;
 esac
 DRIVES_LINES=()
+## System disks are exclusion entries (idle 0): never treatment targets, hence pm-flag 0.
 for disk in ${SYSTEM_SD_DISKS}; do
-  DRIVES_LINES+=("${disk} 0 ${DEFAULT_COMMAND}")
+  DRIVES_LINES+=("${disk} 0 ${DEFAULT_COMMAND} 0")
 done
 
 for disk in ${SYSTEM_SD_DISKS}; do
@@ -260,6 +270,16 @@ while IFS= read -r disk; do
   require_space_free 'idle' "${IDLE}"
   require_space_free 'command_type' "${COMMAND_TYPE}"
   require_space_free 'power_condition' "${POWER_CONDITION}"
+  ## Per-drive drive-PM override (yes/no): read with `// empty` like the other optional fields (the values are
+  ## strings, so jq's falsy-true pitfall for booleans does not apply). Unknown values (hand-edited options.json -
+  ## the supervisor schema blocks them at save time) fall back to the global default like an empty value.
+  PM_OVERRIDE=$(bashio::jq "${disk}" '.disable_drive_pm // empty')
+  require_space_free 'disable_drive_pm' "${PM_OVERRIDE}"
+  DRIVE_PM="${GLOBAL_PM}"
+  case "${PM_OVERRIDE}" in
+    yes) DRIVE_PM=1 ;;
+    no) DRIVE_PM=0 ;;
+  esac
   ## Partition selection would grant cgroup access for the partition node
   ## only, while hd-idle opens the disk node -> always broken, reject it.
   if [[ "${DEV}" == *-part[0-9]* ]]; then
@@ -306,8 +326,9 @@ while IFS= read -r disk; do
     ARGS+=(-p "${POWER_CONDITION}")
   fi
 
-  ## Effective per-drive values for the drives-file line (format: hd-idle/KNOWLEDGE.md §"Drive-PM treatment").
-  DRIVES_LINES+=("${EMIT_NAME} ${EFFECTIVE_IDLE} ${COMMAND_TYPE:-${DEFAULT_COMMAND}}")
+  ## Effective per-drive values for the drives-file line (format: hd-idle/KNOWLEDGE.md §"Drive-PM treatment");
+  ## the 4th column is the effective drive-PM treatment flag.
+  DRIVES_LINES+=("${EMIT_NAME} ${EFFECTIVE_IDLE} ${COMMAND_TYPE:-${DEFAULT_COMMAND}} ${DRIVE_PM}")
 done < <(echo "${DISKS}")
 
 if [ "${N_DRIVES}" -eq 0 ]; then

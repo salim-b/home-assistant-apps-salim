@@ -27,6 +27,14 @@ reads the `disks` option with
 (verified against the v3.24 base image's bashio). If a bashio update ever changed the return shape (e.g. to
 pretty-printed arrays), every drive entry would fail to parse - a lab boot with configured drives catches it.
 
+Optional per-entry fields are read with `'<field> // empty'` (jq prints the empty string for absent keys). That idiom is
+only valid for STRING-typed fields: jq's alternative operator treats `false` as empty too, so an optional BOOLEAN field
+could not distinguish "absent" from an explicit "false" (verified against the v3.24 base image: absent -> "null", false
+-> "false", true -> "true"). Together with the UI showing an untouched optional checkbox as unchecked -
+indistinguishable from an explicit "off" - that is why the per-drive `disable_drive_pm` override is a `list(yes|no)?`
+dropdown instead of a `bool?`: the dropdown's empty state visibly means "follow the global setting", matching the app's
+other per-drive override fields.
+
 ## hd-idle CLI semantics relied upon by config.sh
 
 Verified against the v1.22 source (`main.go`, `hdidle.go`):
@@ -185,9 +193,10 @@ drives audibly spinning while `smartctl -n standby` and the app's diagnostics re
 ## Drive-PM treatment (disable_drive_pm) - per-bridge reality
 
 `hd-idle-pmfix` disables the drives' own power management (ATA SET FEATURES: APM level off + standby timer off) for
-every managed drive at boot and on drive (re)appearance (the watcher re-applies to NEW/CHANGED drives only - redundant
-treatment of sleeping drives risks bridge-mediated motor starts). Device-verified per-bridge matrix (a test device, five
-WD USB bridges, 2026-10-15):
+every managed drive whose EFFECTIVE pm-flag is 1 (the global `disable_drive_pm` option as the default, per-drive
+`disable_drive_pm` yes/no overrides) at boot and on drive (re)appearance (the watcher re-applies to NEW/CHANGED drives
+only - redundant treatment of sleeping drives risks bridge-mediated motor starts). Device-verified per-bridge matrix (a
+test device, five WD USB bridges, 2026-10-15):
 
 - **`standby,off`: honored by ALL five bridges** (My Book 1110/1230/25EE, Elements 107C, Ext HDD 1021) - the universally
   deliverable part.
@@ -208,9 +217,14 @@ WD USB bridges, 2026-10-15):
 
 The drives file (`/etc/hd-idle.drives`, written by hd-idle-genargs next to the args file - the derivation of its name
 from the args-file path is mirrored in the hd-idle-watch run script) is pmfix's machine-readable interface: one
-`<kernel-name> <idle> <command-type>` line per drive with EFFECTIVE values (exclusions carry idle 0, entries without
-explicit values carry the inherited defaults). pmfix treats only idle != 0 entries; with `--since <old-file>` only
-drives whose line is NEW or CHANGED are treated.
+`<kernel-name> <idle> <command-type> <pm-flag>` line per drive with EFFECTIVE values (exclusions carry idle 0 and
+pm-flag 0, entries without explicit values carry the inherited defaults; pm-flag: 1 = disable the drive's own power
+management, 0 = leave it alone - the effective value of the global `disable_drive_pm` option overridden by the per-drive
+`disable_drive_pm` field). pmfix treats only idle != 0 AND pm-flag 1 entries; config.sh and the watcher run it
+unconditionally (the former global bashio gate could not express per-drive overrides - the drives file is the single
+source of truth for the effective per-drive decision); with `--since <old-file>` only drives whose line is NEW or
+CHANGED are treated (a flipped pm-flag line counts as CHANGED, so a newly overridden drive is treated exactly once, and
+an unchanged override stays skipped).
 
 ## Automatic drive re-resolution (hd-idle-watch)
 
