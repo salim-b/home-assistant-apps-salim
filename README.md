@@ -52,7 +52,8 @@ To switch a device from the locally installed app to the published registry vers
 `deploy-registry`. It uninstalls the local copy and installs/updates the app-repository install (discovered via the
 device's store listing); `--config` decides what happens to the previous install's options — `migrate` carries them over
 (filtered to the target version's schema), `reset` wipes them (the app then runs with its default options), and unset
-discards them (the default). Whenever options are discarded or reset, they are backed up to a local file first:
+keeps them (an update preserves the options; after a switch the store install runs with its own previously stored
+options if any, else the app's defaults). Options an uninstall would orphan are archived to a local backup file:
 
 ```sh
 mise run deploy-registry hd-idle root@homeassistant.local --config migrate

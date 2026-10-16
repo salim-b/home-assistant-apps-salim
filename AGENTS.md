@@ -69,15 +69,18 @@ essentials:
   and ensures it runs. Comments out the top-level `image:` key in the *device copy* so the Supervisor builds locally
   instead of pulling from GHCR. Refuses when the app is already installed from an app repository (hashed store slug,
   e.g. `f8b2d53d_nfs` — port conflict); `--replace` uninstalls that copy first. `--config` decides the options' fate:
-  `reset` wipes the local install's options (it runs with the app's default options afterwards), `migrate` carries a
-  replaced repository copy's options over (filtered to the app's schema), unset keeps the local install's options as
-  they are. Options that die with an uninstall or a reset are always backed up to a local file first (path printed).
+  `reset` wipes the local install's options (it runs with the app's default options afterwards; also overwrites anything
+  a fresh install resurrects from the local slug's earlier stored options), `migrate` carries a replaced repository
+  copy's options over (filtered to the app's schema), unset keeps the options as they are (a replaced copy's options are
+  not carried over — they remain in its app data). Options an uninstall would orphan are archived to a local backup file
+  (path printed).
 - `mise run deploy-registry <app> <host>` — switch a device to the app's latest registry/store version: uninstalls the
   local `/local_apps` copy (if any) and installs/updates the app-repository install (hashed store slug, discovered from
-  the device's store listing). `--config` decides the previous options' fate: `migrate` carries them over (filtered to
-  the target's schema), `reset` wipes them (the registry install runs with the app's default options; on an update the
-  existing registry install's options are wiped), unset = discard (default). Discarded/reset options are always backed
-  up to a local file first (path printed).
+  the device's store listing). `--config` decides the previous options' fate: `migrate` carries the local copy's options
+  over (filtered to the target's schema; an update keeps its options anyway), `reset` wipes the target install's options
+  (the app then runs with the repo's default options; also overwrites what a reinstall resurrects), unset = keep (an
+  update preserves the options; after a switch the store install runs with its own previously stored options if any,
+  else the app's defaults). Options an uninstall would orphan are archived to a local backup file (path printed).
 - `mise run test:live <app> <host>` — deploy (forwarding `--replace`) plus live checks: per-share NFS client roundtrips
   from this machine (rw roundtrip / ro assertion / pseudo-root browse). `--test-options` applies the app's test options
   (`.mise/tasks/test/live/<app>.yaml`, top-level key override) to the device app for the run — options are user data and

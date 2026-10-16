@@ -6,7 +6,7 @@
 #USAGE }
 #USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to root), e.g. root@homeassistant.local or just homeassistant.local"
 #USAGE flag "--replace" help="Uninstall an existing repository-installed copy of this app before deploying"
-#USAGE flag "--config <mode>" help="Fate of the options: reset (wipe the local install's options - it runs with the app's default options afterwards), migrate (with --replace: carry the repository-installed copy's options over to the local install), or unset = keep the local install's options as they are (a replaced copy's options are backed up locally and dropped)" {
+#USAGE flag "--config <mode>" help="Fate of the options: reset (wipe the local install's options - it runs with the app's config.yaml default options afterwards; also overwrites anything a fresh install resurrects from the local slug's earlier stored options), migrate (with --replace: carry the repository-installed copy's options over to the local install), or unset = keep (default: the local install's options survive update/rebuild untouched; a replaced copy's options are not carried over - they remain in its app data). Any options an uninstall would orphan are archived to a local backup file (path printed)." {
 #USAGE   choices "migrate" "reset"
 #USAGE }
 set -euo pipefail
@@ -118,18 +118,20 @@ fi
 # posting (idempotent; both apps tolerate restarts fine). Reset posts the
 # app's config.yaml DEFAULTS, not {}: a fresh options POST is validated
 # against the schema and {} is rejected for schemas with required option
-# keys (device-verified 2026-10-16) - the defaults always satisfy it.
-if [ "${CONFIG_MODE}" = "reset" ] && [ -n "${installed_version:-}" ]; then
+# keys (device-verified 2026-10-16) - the defaults always satisfy it. The
+# reset POST also runs on a FRESH install: uninstall keeps an app's config
+# folder, so a reinstall resurrects the slug's earlier stored options -
+# 'fresh' is only defaults when nothing is stored (device-verified 2026-10-16,
+# 'ha apps uninstall --help': config kept unless --remove-config).
+if [ "${CONFIG_MODE}" = "reset" ]; then
   old=$(ha_app_options "$local_slug")
   if [ -n "$old" ] && [ "$old" != "{}" ]; then
     echo "-- --config reset: previous options backed up locally: $(ha_backup_options "$app" "$old")"
-    ha_post_options "$local_slug" "$(yq -o json '.options' "$app/config.yaml" | jq -c .)" ||
-      { echo "ERROR: resetting the options failed (the previous options are backed up above)" >&2; exit 1; }
-    echo "-- --config reset: options set to the app's default options"
-    ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps restart $local_slug"
-  else
-    echo "-- --config reset: the local install has no options - nothing to reset"
   fi
+  ha_post_options "$local_slug" "$(yq -o json '.options' "$app/config.yaml" | jq -c .)" ||
+    { echo "ERROR: resetting the options failed (the previous options are backed up above)" >&2; exit 1; }
+  echo "-- --config reset: options set to the app's default options"
+  ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps restart $local_slug"
 fi
 if [ "${CONFIG_MODE}" = "migrate" ] && [ -n "${MIGRATE_OPTIONS:-}" ]; then
   echo "-- --config migrate: applying the replaced copy's options (filtered to the app's schema)"
