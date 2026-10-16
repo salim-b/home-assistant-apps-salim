@@ -52,7 +52,10 @@ such apps outright (`UnsupportedReason.APPARMOR`).
   (`bashio::config '<key>' <default>`), and changing a default is not a behavior change for existing users. Options
   REMOVED from the schema stay in stored options.json and are simply inert: the supervisor logs a one-line warning
   ("Option 'X' does not exist in the schema") on each options read until the user re-saves the options — device-verified
-  2026-10-16 (hd-idle 0.1.5 dropping `mode`; the stale key never broke the boot, only warned).
+  2026-10-16 (hd-idle 0.1.5 dropping `mode`; the stale key never broke the boot, only warned). A fresh options POST
+  replaces the whole set and silently DROPS keys unknown to the schema (device-verified 2026-10-16: full valid set +
+  bogus keys → ok, bogus keys not stored; a set missing required keys → rejected); a migration tool therefore filters
+  to the target's schema keys to make the drops explicit and reported.
 
 ## Supervisor: device access
 

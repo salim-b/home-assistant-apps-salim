@@ -153,12 +153,16 @@ else
   ha_retry 900 ssh "${SSH_OPTS[@]}" "$host" "ha apps install $store_slug"
 
   if [ -n "$old_options" ] && [ "$old_options" != "null" ] && [ -n "${local_version:-}" ]; then
-    # Carry the options over, filtered to the target's schema keys: options
-    # REMOVED from a newer app version's schema are inert when already
-    # STORED (the supervisor only warns), but a fresh options POST containing
-    # unknown keys is rejected - so migrate only what the target still knows.
+    # Carry the options over, filtered to the target's schema keys: a fresh
+    # options POST REPLACES the whole set and the supervisor silently DROPS
+    # keys unknown to the target's schema (device-verified 2026-10-16: a full
+    # valid set plus bogus keys stores without them, result ok; a set missing
+    # required keys is rejected) - while keys REMOVED from the schema that are
+    # already STORED are inert (one-line warning on each read). The filter
+    # makes the drops explicit and reported instead of silent.
     echo "-- migrating the previous options (filtered to the target schema)"
-    schema_keys=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" | jq -c '[.data.schema | keys[]]')
+    schema_keys=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" |
+      jq -c 'if (.data.schema | type) == "array" then [.data.schema[] | .name] else [.data.schema | keys[]] end')
     filtered=$(jq -c --argjson keys "$schema_keys" 'with_entries(select(.key as $k | $keys | index($k)))' <<<"$old_options")
     dropped=$(jq -r --argjson keys "$schema_keys" 'to_entries | map(select(.key as $k | $keys | index($k) | not) | .key) | join(", ")' <<<"$old_options")
     [ -n "$dropped" ] && echo "   (dropped, unknown to the target's schema: $dropped)"
@@ -179,14 +183,26 @@ else
 fi
 
 # --- ensure running ----------------------------------------------------------
+# 'ha apps install' never auto-starts the app (updates/rebuilds only restart
+# when it was running): start it when the state check finds it not running,
+# then verify again.
 sleep 3
 state=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" | jq -r '.data.state // empty')
 case "$state" in
   started | startup) ;;
   *)
-    echo "WARNING: the app state is '$state' (expected 'started') - check the app log:" >&2
-    echo "         ssh $host 'ha apps logs $store_slug'" >&2
-    exit 1
+    echo "-- app is not running (state: $state) - starting it"
+    ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps start $store_slug"
+    sleep 10
+    state=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" | jq -r '.data.state // empty')
+    case "$state" in
+      started | startup) ;;
+      *)
+        echo "WARNING: the app state is '$state' even after a start attempt - check the app log:" >&2
+        echo "         ssh $host 'ha apps logs $store_slug'" >&2
+        exit 1
+        ;;
+    esac
     ;;
 esac
 final_version=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" | jq -r '.data.version')
