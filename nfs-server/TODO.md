@@ -4,6 +4,11 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
 
 ## Tasks
 
+- Comment-slimming pass (same treatment as hd-idle got in October 2026): cld/run is 88% comment lines, mountd/run 72%,
+  the healthcheck 66% - several blocks duplicate `KNOWLEDGE.md` (the 1-s upcall race, the pseudo-root design, the mountd
+  rationale). Establish the canonical homes first where a topic has no doc yet, then trim each script to purpose +
+  reference; zero behavior change (comment-stripped diff check); lab-verified.
+
 - ~~Create upstream PR in HA to render app configuration labels as Markdown blocks instead of plain text.~~
 
   *Submitted [`home-assistant/frontend#54839`](https://github.com/home-assistant/frontend/pull/54839) which got
