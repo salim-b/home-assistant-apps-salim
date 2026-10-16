@@ -6,17 +6,15 @@ bashio::log.info "Updating NFS exports table..."
 exportfs -a
 
 bashio::log.info "Starting nfsd service..."
-# NOTE: we accept NFS requests only on the app's IP address (for security hardening)
+# Accept NFS requests only on the app's own IP (security hardening).
 APP_IP=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
-# NOTE: rpc.nfsd writes its default version set (NFSv3+NFSv4) to the kernel,
-# hence `--no-nfs-version 3` is what keeps this setup NFSv4-only (see
-# KNOWLEDGE.md in the app's source repository).
-# NOTE: the NFSv4 grace period defaults to the lease time here (the kernel's
-# own default ratio is 1:1). The app's client-recovery tracking (nfsdcld; see
-# cont-init.d/config.sh and s6-rc.d/cld) makes this costless in the common
-# cases: a fresh boot with no recorded clients skips the grace entirely (the
-# kernel's skip path), and it ends early once all recorded clients have
-# reclaimed. When set, a user-configured `grace_time` overrides the default.
+# --no-nfs-version 3 keeps the setup NFSv4-only (rpc.nfsd writes its default
+# version set to the kernel; semantics + the -N/-V 2/4-only quirk:
+# nfs-server/KNOWLEDGE.md §"rpc.nfsd is not a daemon").
+# The grace/lease ratio (grace defaults to the lease time): with the shipped
+# nfsdcld recovery tracking the grace is only paid when client records exist
+# (see nfs-server/KNOWLEDGE.md §"The grace period..."); a user-configured
+# grace_time overrides the default.
 NFSD_CMD="rpc.nfsd \
   --no-nfs-version 3 \
   --no-udp \
@@ -28,8 +26,8 @@ NFSD_CMD="rpc.nfsd \
 bashio::log.info "Executing nfsd with: ${NFSD_CMD}"
 # shellcheck disable=SC2086
 if ${NFSD_CMD}; then
-  # rpc.nfsd exits after configuring the in-kernel server - hence the
-  # s6-rc `oneshot` (see KNOWLEDGE.md in the app's source repository).
+  # rpc.nfsd exits after configuring the in-kernel server - hence the s6-rc oneshot
+  # (nfs-server/KNOWLEDGE.md §"rpc.nfsd is not a daemon").
   bashio::log.info "NFS server started (kernel threads running)."
 
   # Verify and log the version set rpc.nfsd configured.

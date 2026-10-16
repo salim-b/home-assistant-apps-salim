@@ -10,8 +10,7 @@ rpc.nfsd 0 || true
 bashio::log.info "Unexporting NFS shares..."
 exportfs -au || true
 
-## Tear down the pseudo file system root bind mounts (per-share mirrors;
-## deepest paths first, mirrors may nest)
+## Tear down the pseudo file system root bind mounts (per-share mirrors; deepest paths first - mirrors may nest)
 PSEUDO_ROOT="/data/pseudo_root"
 bashio::log.info "Unmounting the share mirrors under the pseudo file system root..."
 SHARES=$(bashio::config 'shares' || true)
@@ -29,8 +28,6 @@ if bashio::var.has_value "${SHARES}"; then
     done
 fi
 
-## NOTE: the rpc_pipefs mount (client-recovery upcall channel,
-## /var/lib/nfs/rpc_pipefs) is deliberately NOT unmounted here: the cld
-## daemon still holds its upcall pipe open at this point (services stop in
-## dependency-reverse order), the umount would fail with EBUSY, and the
-## mount evaporates with the container's mount namespace anyway.
+## The rpc_pipefs mount (client-recovery upcall channel) is deliberately NOT unmounted: the cld daemon still holds its
+## upcall pipe open here (services stop in dependency-reverse order, so EBUSY), and the mount evaporates with the
+## container's mount namespace anyway.

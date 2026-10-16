@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.5.4
+
+- Maintainability: code comments slimmed to purpose + references (the narratives now live in `KNOWLEDGE.md`, their
+  single canonical home) - no behavior change (the comment-stripped scripts are byte-identical).
+
 ## 0.5.3
 
 - Minor documentation fix.

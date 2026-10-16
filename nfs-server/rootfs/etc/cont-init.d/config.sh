@@ -2,14 +2,9 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-## Make the kernel's nfsd control filesystem available at /proc/fs/nfsd.
-##
-## /proc/fs/nfsd is just an (empty) mountpoint which the kernel provides in
-## every procfs instance; the actual control files (e.g. `versions`, `threads`)
-## only exist once the `nfsd` filesystem is mounted there. Mounting it also
-## autoloads the `nfsd` kernel module on hosts that ship it (the kernel's
-## request_module runs in kernel context, outside the AppArmor label — no
-## explicit modprobe needed; verified on HAOS 18.3, see KNOWLEDGE.md).
+## Mount the kernel's nfsd control filesystem at /proc/fs/nfsd (the control files exist only once it is mounted; the
+## mount also autoloads the nfsd kernel module in kernel context - no modprobe needed, see the repository-root
+## KNOWLEDGE.md §AppArmor).
 if [ ! -e /proc/fs/nfsd/versions ]; then
   bashio::log.info "Mounting nfsd filesystem..."
   if ! mount -t nfsd nfsd /proc/fs/nfsd; then
@@ -20,17 +15,10 @@ if [ ! -e /proc/fs/nfsd/versions ]; then
   fi
 fi
 
-## Mount rpc_pipefs in this network namespace - the upcall channel for the
-## client-recovery tracker (cld): the kernel creates the nfsdcld upcall pipe
-## inside the rpc_pipefs instance registered for the netns the server runs in
-## (fs/nfsd/nfs4recover.c consults rpc_get_sb_net(net)), so one must exist
-## here. Without it (or without the cld daemon, s6-rc service 'cld') the
-## tracker cannot initialize: the legacy trackers the kernel would fall back
-## to refuse to work in a container, and connected clients lose their NFSv4
-## state (opens, locks, delegations) across app restarts.
-## Not fatal: without it the app runs as before, only without cross-restart
-## client state recovery.
-## (NFSv4 recovery tracking in the container: see nfs-server/KNOWLEDGE.md.)
+## Mount rpc_pipefs in this network namespace: the kernel creates the cld tracker's upcall pipe inside the rpc_pipefs
+## instance registered for the server's netns, so one must exist here for NFSv4 client state recovery (design, fallback
+## behavior, verification: nfs-server/KNOWLEDGE.md §"NFSv4 client state recovery..."). Non-fatal: without it the app
+## runs degraded (no cross-restart client state recovery).
 RPC_PIPEFS_DIR=/var/lib/nfs/rpc_pipefs
 mkdir -p "${RPC_PIPEFS_DIR}"
 if ! grep -qsE " on ${RPC_PIPEFS_DIR//\//\\/} rpc_pipefs " /proc/mounts; then
@@ -48,19 +36,10 @@ mkdir -p /data/nfsdcld
 ## start (see /etc/s6-overlay/scripts/nfsd-start and KNOWLEDGE.md in the app's
 ## source repository for why direct writes to /proc/fs/nfsd/* don't work).
 
-## Validate each share configuration and generate /etc/exports from it.
-##
-## Design (see KNOWLEDGE.md for the background):
-## - The kernel's nfsd resolves NFSv4 paths via export-cache upcalls, which
-##   are serviced by rpc.mountd - the app therefore runs a mountd service
-##   (s6-rc 'mountd'), even though v4 clients never talk to it directly.
-## - mountd would auto-create the pseudo file system root from the export
-##   paths at `/`, but the container's overlayfs root is not NFS-exportable.
-##   Hence the app builds its own pseudo file system root on `/data` (the app's
-##   persistent host (ext4) volume) with bind mounts of `/share` and `/media`, so
-##   client paths stay unchanged (`/share/nfs` etc.), and exports every share
-##   from its mirrored path with a distinct fsid (numeric fsids keep the
-##   filehandle mapping unambiguous for the bind-mounted trees).
+## Generate /etc/exports from the share configuration: bind-mount every share path under the app's own pseudo file
+## system root on /data (the container's overlayfs root is not NFS-exportable) and export the mirrors with distinct
+## numeric fsids. Why mountd is needed at all and the pseudo-root design incl. the fsid ambiguity:
+## nfs-server/KNOWLEDGE.md §"NFSv4 needs rpc.mountd...".
 bashio::log.info "Configuring NFS shares..."
 : >/etc/exports
 
@@ -96,24 +75,19 @@ while IFS= read -r share; do
   network=$(bashio::jq "$share" '.network')
   options=$(bashio::jq "$share" '.options')
 
-  ## Only directories mapped into the app can be exported: unmapped paths
-  ## would either be created in the app's ephemeral filesystem (losing all
-  ## data on restart) or are plain unusable for clients.
+  ## Only directories mapped into the app can be exported (ephemeral or unusable otherwise).
   if [[ "${path}" != /share && "${path}" != /share/* &&
     "${path}" != /media && "${path}" != /media/* ]]; then
     bashio::log.fatal "Share path ${path} is outside of /share/ or /media/: only directories mapped into the app can be exported."
     bashio::exit.nok
   fi
-  ## Must be a clean absolute path: it is used verbatim as the client-visible
-  ## export path and concatenated with the pseudo file system root below;
-  ## empty path components (leading/trailing or consecutive slashes) and the
-  ## filesystem root are not usable export paths.
+  ## Clean absolute path only: used verbatim as the client-visible export path and concatenated with the pseudo root
+  ## below; empty components (leading/trailing/consecutive slashes) and the filesystem root are not usable.
   if [[ ! "${path}" =~ ^/[^/]+(/[^/]+)*$ ]]; then
     bashio::log.fatal "Share path '${path}' must be an absolute path without empty components (e.g. /share/nfs)."
     bashio::exit.nok
   fi
-  ## /etc/exports entries are whitespace-separated; also NFS exports must
-  ## be directories (files cannot be export points).
+  ## /etc/exports is whitespace-separated; NFS exports must be directories.
   if [[ "${path}" =~ [[:space:]] ]] || [[ "${network}" =~ [[:space:]] ]] ||
     [[ "${options}" =~ [[:space:]] ]]; then
     bashio::log.fatal "Share path, network and options must not contain whitespace (got: '${path} | ${network} | ${options}')."
@@ -124,10 +98,9 @@ while IFS= read -r share; do
     bashio::exit.nok
   fi
 
-  ## One export option set can apply per (path, network) pair - the kernel
-  ## keeps a single export cache entry for it and the last /etc/exports
-  ## line wins silently (see nfs-server/KNOWLEDGE.md). The same path may
-  ## legitimately appear with *different* networks (per-network options).
+  ## One option set applies per (path, network) pair: the kernel keeps a single export cache entry and the last
+  ## /etc/exports line wins silently (nfs-server/KNOWLEDGE.md §"Export-cache and fsid semantics..."). The same path
+  ## with *different* networks is legitimate (per-network options).
   share_key="${path}|${network}"
   if [[ -n "${SEEN_SHARES[${share_key}]+x}" ]]; then
     if [ "${SEEN_SHARES[${share_key}]}" = "${options}" ]; then
@@ -162,13 +135,9 @@ while IFS= read -r share; do
   FSID=$((FSID + 1))
 done < <(echo "${SHARES}")
 
-## Export the pseudo file system root itself: read-only walk access for all
-## client networks (the per-share entries control access to the share
-## contents). No crossmnt: that flag is about (NFSv3) traversal through
-## export points to mounts beneath them - NFSv4 clients switch the export at
-## mountpoint crossings regardless (nfsd_cross_mnt consults the export cache
-## for any v4 client), and the pseudo entries rpc.mountd synthesizes for the
-## path components carry crossmnt anyway.
+## Export the pseudo file system root itself: read-only walk access for all client networks (the per-share entries
+## control the share contents). No crossmnt needed - NFSv4 clients switch exports at mountpoint crossings regardless
+## (nfs-server/KNOWLEDGE.md §"NFSv4 needs rpc.mountd...", consequences).
 for network in "${!ROOT_NETWORKS[@]}"; do
   echo "${PSEUDO_ROOT} ${network}(fsid=0,ro,no_subtree_check)" >>/etc/exports
 done

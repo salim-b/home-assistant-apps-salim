@@ -4,6 +4,12 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
 
 ## Tasks
 
+- Comment-slimming pass, the same treatment hd-idle got in October 2026 - **done (0.5.4, 2026-10-16)**: every topic
+  already had its canonical `KNOWLEDGE.md` home - no new sections needed; all six scripts slimmed to purpose + reference
+  (cld/run 24→6, mountd/run 8→5, healthcheck 8→4, nfsd-start 16→14, nfsd-stop 12→9, config.sh 67→36 comment lines; the
+  small files' shebang/scaffold `#` lines dominate their remaining ratios). Zero behavior verified via comment-stripped
+  diffs.
+
 - Comment-slimming pass (same treatment as hd-idle got in October 2026): cld/run is 88% comment lines, mountd/run 72%,
   the healthcheck 66% - several blocks duplicate `KNOWLEDGE.md` (the 1-s upcall race, the pseudo-root design, the mountd
   rationale). Establish the canonical homes first where a topic has no doc yet, then trim each script to purpose +
