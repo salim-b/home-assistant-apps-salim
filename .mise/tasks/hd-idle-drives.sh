@@ -133,5 +133,9 @@ EOF
   printf '%s\n' "${rows[@]}"
 } >"${OUT_FILE}"
 
-echo "-- wrote ${OUT_FILE} ($(printf '%s\n' "${rows[@]}" | wc -l) drive(s) on $host)"
-printf '%s\n' "${rows[@]}"
+## Panache owns ALL markdown formatting in this repo; its repo-wide pass skips gitignored files, so the task
+## formats its output explicitly (in place - a formatter failure fails the task, per set -e).
+panache format "${OUT_FILE}"
+
+echo "-- wrote ${OUT_FILE} (${#rows[@]} drive(s) on $host)"
+cat "${OUT_FILE}"
