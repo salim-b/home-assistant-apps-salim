@@ -10,7 +10,8 @@
   are never spun down: Home Assistant OS grants device access per listed drive only, so spinning down unlisted drives
   was never realizable - previously the daemon attempted it once per idle cycle and logged 'operation not permitted'
   each time. The former opt-in rejection of entries without an idle time is gone (the default idle time fills them). A
-  stored `mode` key from an older version is simply ignored.
+  stored `mode` key from an older version is simply ignored (the supervisor logs a harmless one-line warning about the
+  stale key; re-saving the options clears it). Migration device-verified 2026-10-16.
 
 ## 0.1.4
 

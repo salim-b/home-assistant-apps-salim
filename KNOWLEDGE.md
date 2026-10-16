@@ -49,7 +49,10 @@ such apps outright (`UnsupportedReason.APPARMOR`).
   `app.save_persist()`).
 - Installed options are **user data**: config.yaml default changes do NOT reach existing installs (options.json is
   written at first install and at save time only) - new options therefore need absent-key handling in app code
-  (`bashio::config '<key>' <default>`), and changing a default is not a behavior change for existing users.
+  (`bashio::config '<key>' <default>`), and changing a default is not a behavior change for existing users. Options
+  REMOVED from the schema stay in stored options.json and are simply inert: the supervisor logs a one-line warning
+  ("Option 'X' does not exist in the schema") on each options read until the user re-saves the options — device-verified
+  2026-10-16 (hd-idle 0.1.5 dropping `mode`; the stale key never broke the boot, only warned).
 
 ## Supervisor: device access
 
