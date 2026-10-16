@@ -26,71 +26,104 @@ local_slug="local_${slug}"
 
 echo "== switching $app to the registry version on $host =="
 
-ha() { # ha <args...> via ssh (retrying transient supervisor failures)
-  ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha $*"
+# --- derive the repository URL (git remote origin; fallback: config.yaml url:)
+repo_url=$(git remote get-url origin 2>/dev/null || true)
+if [ -n "$repo_url" ]; then
+  case "$repo_url" in
+    git@github.com:*) repo_url="https://github.com/${repo_url#git@github.com:}" ;;
+  esac
+  repo_url=${repo_url%.git}
+else
+  # https://github.com/<owner>/<repo>/tree/<branch>/<app> -> repo URL
+  repo_url=$(yq -r '.url // ""' "$app/config.yaml" | sed 's|/tree/.*||')
+fi
+[ -n "$repo_url" ] || {
+  echo "ERROR: cannot determine the app repository URL (no git remote 'origin', no url in $app/config.yaml)." >&2
+  exit 1
 }
 
-# --- discover the installs --------------------------------------------------
-# Store/repo installs get the slug '<repo-hash>_<app-slug>'; matching by
-# suffix keeps working when the app moves between repositories (the same
-# approach the deploy task uses). The repo hash (supervisor store/utils.py
-# get_hash_from_repository) could be derived from the repository URL, but
-# discovery from the device's store listing needs no URL-normalization
-# guesses.
-store_apps=$(ha store apps --raw-json | jq -c '.data')
+sup_get() { # sup_get <api-path>: supervisor REST GET (read-only), raw JSON
+  ssh "${SSH_OPTS[@]}" "$host" \
+    "curl -s -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" http://supervisor/$1"
+}
 
-store_entry=$(echo "$store_apps" | jq -c --arg slug "$slug" \
-  '[.addons[] | select((.slug | split("_")) | last) == $slug] | .[0] // empty')
-if [ -z "$store_entry" ] || [ "$store_entry" = "null" ]; then
-  echo "ERROR: no app with slug '$slug' in any app repository on $host." >&2
-  echo "       Add this repository to the device's app repositories first (or check the slug)." >&2
+# --- check the repository is added on the device -----------------------------
+repos=$(sup_get store/repositories)
+if ! echo "$repos" | jq -e '.result == "ok"' >/dev/null 2>&1; then
+  echo "ERROR: could not read the store repositories on $host: $repos" >&2
   exit 1
 fi
-store_slug=$(echo "$store_entry" | jq -r '.slug')
-store_version=$(echo "$store_entry" | jq -r '.version')
-
-installed=$(echo "$store_apps" | jq -c --arg slug "$slug" --arg local "$local_slug" \
-  '[.addons[] | select(.installed == true and ((.slug | split("_")) | last) == $slug)]')
-local_installed=$(echo "$installed" | jq -c --arg s "$local_slug" '[.[] | select(.slug == $s)] | .[0] // empty')
-repo_installed=$(echo "$installed" | jq -c '[.[] | select(.slug != "'"$local_slug"'")] | .[0] // empty')
-
-echo "-- store: $store_slug (latest version $store_version)"
-if [ -n "$local_installed" ] && [ "$local_installed" != "null" ]; then
-  echo "-- locally installed: $(echo "$local_installed" | jq -r .slug) (version $(echo "$local_installed" | jq -r .version))"
+repo_entry=$(echo "$repos" | jq -c --arg url "$repo_url" \
+  '[.data[] | select(((.url // "") | sub("/$";"") | ascii_downcase) == ($url | ascii_downcase))] | .[0] // empty')
+if [ -z "$repo_entry" ] || [ "$repo_entry" = "null" ]; then
+  echo "ERROR: the app repository is not added on $host:" >&2
+  echo "       $repo_url" >&2
+  echo "       Add it first, e.g.:  ssh $host 'ha store add $repo_url'" >&2
+  echo "       (or in the Home Assistant UI: Settings > Apps > App repositories), then re-run." >&2
+  exit 1
 fi
-if [ -n "$repo_installed" ] && [ "$repo_installed" != "null" ]; then
-  echo "-- repository-installed: $(echo "$repo_installed" | jq -r .slug) (version $(echo "$repo_installed" | jq -r .version))"
-fi
+repo_slug=$(echo "$repo_entry" | jq -r '.slug')
+echo "-- repository on device: $repo_slug ($repo_url)"
 
-# --- decide what to do ------------------------------------------------------
+# --- discover the store entry + installed copies (one listing) ---------------
+# Store/repo installs get the exact slug '<repo-hash>_<app-slug>'; the local
+# repo install is 'local_<app-slug>'. Exact matches - no suffix guessing.
+store=$(sup_get store/addons)
+if ! echo "$store" | jq -e '.result == "ok"' >/dev/null 2>&1; then
+  echo "ERROR: could not read the store listing on $host: $store" >&2
+  exit 1
+fi
+store_slug="${repo_slug}_${slug}"
+
+store_entry=$(echo "$store" | jq -c --arg s "$store_slug" \
+  '[.data.addons[] | select(.slug == $s)] | .[0] // empty')
+if [ -z "$store_entry" ] || [ "$store_entry" = "null" ]; then
+  echo "ERROR: the app '${slug}' (expected store slug: $store_slug) is not available in repository $repo_url on $host." >&2
+  echo "       Is the app pushed to the repository's default branch? Refresh the store and re-run:" >&2
+  echo "         ssh $host 'ha store reload'" >&2
+  exit 1
+fi
+store_version=$(echo "$store_entry" | jq -r '.version_latest')
+
+installed=$(echo "$store" | jq -c --arg store "$store_slug" --arg local "$local_slug" \
+  '[.data.addons[] | select(.installed == true and (.slug == $store or .slug == $local))]')
+local_installed=$(echo "$installed" | jq -c --arg s "$local_slug" 'map(select(.slug == $s)) | .[0] // empty')
+repo_installed=$(echo "$installed" | jq -c --arg s "$store_slug" 'map(select(.slug == $s)) | .[0] // empty')
+
+echo "-- registry: $store_slug (latest version $store_version)"
+[ -n "$local_installed" ] && [ "$local_installed" != "null" ] &&
+  echo "-- locally installed: $local_slug (version $(echo "$local_installed" | jq -r '.version'))"
+[ -n "$repo_installed" ] && [ "$repo_installed" != "null" ] &&
+  echo "-- repository-installed: $store_slug (version $(echo "$repo_installed" | jq -r '.version'))"
+
+# --- decide what to do -------------------------------------------------------
 if [ -n "$repo_installed" ] && [ "$repo_installed" != "null" ]; then
-  target_slug=$(echo "$repo_installed" | jq -r .slug)
-  target_version=$(echo "$repo_installed" | jq -r .version)
   if [ -n "$local_installed" ] && [ "$local_installed" != "null" ]; then
     echo "ERROR: both a local and a repository-installed copy exist - they would conflict on the app's published" >&2
-    echo "       port. Uninstall one first, e.g.: ssh $host 'ha apps uninstall $(echo "$local_installed" | jq -r .slug)'" >&2
+    echo "       port. Uninstall one first, e.g.: ssh $host 'ha apps uninstall $local_slug'" >&2
     exit 1
   fi
-  if [ "$target_version" = "$store_version" ]; then
-    echo "-- already the latest registry version ($target_version); nothing to do"
+  installed_version=$(echo "$repo_installed" | jq -r '.version')
+  if [ "$installed_version" = "$store_version" ]; then
+    echo "-- already the latest registry version ($installed_version); nothing to do"
     exit 0
   fi
-  echo "-- updating the registry install ($target_version -> $store_version)"
-  ha apps update "$target_slug"
+  echo "-- updating the registry install ($installed_version -> $store_version)"
+  ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps update $store_slug"
 else
   # Switching from a local copy (or fresh install). Registry installs of a
   # version OLDER than the local copy warn but proceed (an explicit request).
   [ -n "$local_installed" ] && [ "$local_installed" != "null" ] &&
-    local_version=$(echo "$local_installed" | jq -r .version) || local_version=""
-  if [ -n "$local_version" ] && [ "$(printf '%s\n' "$local_version" "$store_version" | sort -V | head -1)" != "$store_version" ] &&
-    [ "$local_version" != "$store_version" ]; then
+    local_version=$(echo "$local_installed" | jq -r '.version') || local_version=""
+  if [ -n "$local_version" ] && [ "$local_version" != "$store_version" ] &&
+    [ "$(printf '%s\n' "$local_version" "$store_version" | sort -V | head -1)" != "$store_version" ]; then
     echo "   WARNING: the registry version ($store_version) is OLDER than the locally installed $local_version - proceeding as requested."
   fi
 
-  # --- config migration -----------------------------------------------------
+  # --- config migration ------------------------------------------------------
   old_options=""
   if [ -n "$local_version" ]; then
-    old_options=$(ha apps info "$local_slug" --raw-json | jq -c '.data.options // empty')
+    old_options=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" | jq -c '.data.options // empty')
     if [ -n "$old_options" ] && [ "$old_options" != "null" ] && [ "$old_options" != "{}" ]; then
       if [ "${usage_migrate_config:-false}" != "true" ] && [ "${usage_discard_config:-false}" != "true" ]; then
         echo "ERROR: the locally installed copy has options (user data). Refusing to discard them silently:" >&2
@@ -108,19 +141,24 @@ else
   fi
 
   if [ -n "$local_version" ]; then
+    # Back the options up locally before touching the install: a failed
+    # registry install must not lose the user's options.
+    backup=$(mktemp "${TMPDIR:-/tmp}/deploy-registry-${app}-options-backup.XXXXXX.json")
+    printf '%s' "$old_options" >"$backup"
+    echo "-- previous options backed up locally: $backup"
     echo "-- uninstalling the local copy ($local_slug)"
-    ha apps uninstall "$local_slug"
+    ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps uninstall $local_slug"
   fi
   echo "-- installing the registry version ($store_slug, $store_version)"
   ha_retry 900 ssh "${SSH_OPTS[@]}" "$host" "ha apps install $store_slug"
 
-  if [ -n "$old_options" ] && [ "$old_options" != "null" ]; then
+  if [ -n "$old_options" ] && [ "$old_options" != "null" ] && [ -n "${local_version:-}" ]; then
     # Carry the options over, filtered to the target's schema keys: options
     # REMOVED from a newer app version's schema are inert when already
     # STORED (the supervisor only warns), but a fresh options POST containing
     # unknown keys is rejected - so migrate only what the target still knows.
     echo "-- migrating the previous options (filtered to the target schema)"
-    schema_keys=$(ha apps info "$store_slug" --raw-json | jq -c '[.data.schema | keys[]]')
+    schema_keys=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" | jq -c '[.data.schema | keys[]]')
     filtered=$(jq -c --argjson keys "$schema_keys" 'with_entries(select(.key as $k | $keys | index($k)))' <<<"$old_options")
     dropped=$(jq -r --argjson keys "$schema_keys" 'to_entries | map(select(.key as $k | $keys | index($k) | not) | .key) | join(", ")' <<<"$old_options")
     [ -n "$dropped" ] && echo "   (dropped, unknown to the target's schema: $dropped)"
@@ -132,7 +170,7 @@ else
            -X POST --data-binary @- http://supervisor/addons/$store_slug/options")
       if ! echo "$result" | jq -e '.result == "ok"' >/dev/null 2>&1; then
         echo "ERROR: the supervisor rejected the migrated options: $result" >&2
-        echo "       (the app is installed but may run with defaults; compare and POST the options manually)" >&2
+        echo "       (the app is installed but runs with defaults; the previous options are in $backup)" >&2
         exit 1
       fi
       echo "-- options migrated"
@@ -140,9 +178,9 @@ else
   fi
 fi
 
-# --- ensure running ---------------------------------------------------------
+# --- ensure running ----------------------------------------------------------
 sleep 3
-state=$(ha apps info "$store_slug" --raw-json | jq -r '.data.state // empty')
+state=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" | jq -r '.data.state // empty')
 case "$state" in
   started | startup) ;;
   *)
@@ -151,5 +189,5 @@ case "$state" in
     exit 1
     ;;
 esac
-final_version=$(ha apps info "$store_slug" --raw-json | jq -r '.data.version')
+final_version=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" | jq -r '.data.version')
 echo "== $app now runs the registry version $final_version (state: $state) =="
