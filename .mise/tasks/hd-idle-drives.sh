@@ -117,6 +117,10 @@ if [ "${#rows[@]}" -eq 0 ]; then
   exit 1
 fi
 
+## Alphabetical by label (the first table column): sort the assembled rows - they share the table prefix,
+## so sorting the row strings sorts by the label cell.
+mapfile -t rows < <(printf '%s\n' "${rows[@]}" | sort)
+
 {
   printf '# Drive cheat sheet (local, not committed)\n\n'
   printf 'All drives on %s with at least one labeled filesystem, except the system disk(s) (any disk\n' "$host"
