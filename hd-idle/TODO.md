@@ -41,6 +41,13 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
 
 ## Resolved
 
+- Configuration mode switch dropped (2026-10-16, v0.1.5): single mode - listed drives follow the global defaults where
+  their fields are empty (default_idle alive for all listed drives; the former opt-in idle-less rejection is gone), the
+  global idle is pinned to 0 so unlisted and runtime-appearing drives are never touched (the former opt-out EPERM churn
+  is gone), system-disk pins kept as defense in depth, and detached-at-boot drives carry their effective idle in the
+  passthrough entry (no watcher restart needed for the value). A stored mode key is inert (one-line supervisor warning,
+  device-verified; see the repository-root KNOWLEDGE.md options bullet). Migration device-verified.
+
 - Long-running footprint review (2026-10-15): taken - the genargs inventory walk (boot-time UX) is now guarded off in
   quiet mode (~290 process spawns per watcher tick eliminated, dominant churn source) and the healthcheck scans /proc
   with the read builtin (one spawn per checked PID eliminated); lab-verified, no behavior change (the inventory log line

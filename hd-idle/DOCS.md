@@ -54,8 +54,9 @@ The drive(s) Home Assistant runs from are excluded from spin-down by three indep
 
 Drives are granted device access dynamically by the supervisor - including when re-attached later, without an app
 restart. A drive that is detached when the app starts is passed to hd-idle for runtime resolution (by-id symlinks are
-re-resolved once the drive appears). The app also periodically re-resolves its configured drives: after moving drives
-between ports or machines - which changes their kernel names (`/dev/sda`, `/dev/sdb`, ...) - hd-idle is restarted
+re-resolved once the drive appears) - and hd-idle applies its configured idle time to it immediately upon resolution,
+without waiting for a configuration restart. The app also periodically re-resolves its configured drives: after moving
+drives between ports or machines - which changes their kernel names (`/dev/sda`, `/dev/sdb`, ...) - hd-idle is restarted
 automatically with the updated configuration (within about half a minute); no manual restart is needed.
 
 ## Activity log and debugging
