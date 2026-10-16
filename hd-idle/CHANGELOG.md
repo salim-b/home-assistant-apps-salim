@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.1.7
+
+- Internals: bumped the pinned hd-idle package to Alpine's current build (1.22-r8 - a Go 1.26.5 toolchain rebuild of the
+  same upstream 1.22 release; no functional or CLI changes, so the app's generated arguments are unaffected).
+
 ## 0.1.6
 
 - New: the **Disable drive power management** setting can now be overridden per drive. Each entry in the drive list
