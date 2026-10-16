@@ -34,4 +34,9 @@ facts live in the repository-root `KNOWLEDGE.md`.
   (`dependencies.d/base` on every service); its comment-slimming pass is planned in nfs-server/TODO.md. New task
   `deploy-registry` shipped (see its header for the spec; config migration is opt-in with schema-key filtering). The lab
   boot marker (`legacy-services successfully started`) remains valid under the new s6 ordering. Hygiene and cross-app
-  conventions checked clean.
+  conventions checked clean. Follow-up (2026-10-16): both deploy tasks now take `--config migrate|reset` (mise usage
+  `choices`-typed). reset wipes the target install's options (the repo config.yaml defaults are POSTed, not `{}` - a
+  fresh POST is schema-validated and rejected for required keys, device-verified), migrate is unchanged, and unset =
+  discard is now the default on deploy-registry (the deliberate refusal is gone). Every option set that dies with an
+  uninstall, a discard or a reset is backed up to a local file first (path printed). Shared HA-API helpers (options
+  read/POST, schema keys incl. the array-form shape, filter, backup) live in `.mise/tasks/lib/ssh-ha.sh`.

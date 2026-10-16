@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2029  # remote commands intentionally embed client-side values
-#MISE description="Switch a device to the app's latest registry/store version: tear down any locally installed copy, optionally migrate its config (opt-in)"
+#MISE description="Switch a device to the app's latest registry/store version: tear down any locally installed copy; --config decides the previous options' fate (migrate|reset, default discard)"
 #USAGE arg "<app>" help="App to switch to the registry version (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
 #USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to root), e.g. root@homeassistant.local or just homeassistant.local"
-#USAGE flag "--migrate-config" help="Carry the previous install's options to the registry install (key-filtered to the target's schema)"
-#USAGE flag "--discard-config" help="Drop the previous install's options when switching"
+#USAGE flag "--config <mode>" help="Fate of the previous install's options: migrate (carry them to the registry install, filtered to the target's schema), reset (wipe them - the registry install runs with the app's default options), or unset = discard (default). Whenever options are discarded or reset they are backed up to a local file first (path printed)." {
+#USAGE   choices "migrate" "reset"
+#USAGE }
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 
@@ -15,6 +16,15 @@ host="${usage_host?}"
 # Bare host (no user@) defaults to root: HAOS device access is root-based
 case "$host" in *@*) ;; *) host="root@$host" ;; esac
 SSH_OPTS=(-o ConnectTimeout=10)
+
+CONFIG_MODE="${usage_config:-}"
+case "${CONFIG_MODE}" in
+  "" | migrate | reset) ;;
+  *)
+    echo "ERROR: invalid --config value '${CONFIG_MODE}' (valid: migrate, reset)" >&2
+    exit 1
+    ;;
+esac
 
 # shellcheck source=.mise/tasks/lib/ssh-ha.sh
 source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
@@ -66,8 +76,9 @@ repo_slug=$(echo "$repo_entry" | jq -r '.slug')
 echo "-- repository on device: $repo_slug ($repo_url)"
 
 # --- discover the store entry + installed copies (one listing) ---------------
-# Store/repo installs get the exact slug '<repo-hash>_<app-slug>'; the local
-# repo install is 'local_<app-slug>'. Exact matches - no suffix guessing.
+# Store/repo installs get the exact slug '<repo-hash>_<app-slug>' (the addon
+# entries carry their owning repository's slug); the local repo install is
+# 'local_<app-slug>'. Exact matches - no suffix guessing.
 store=$(sup_get store/addons)
 if ! echo "$store" | jq -e '.result == "ok"' >/dev/null 2>&1; then
   echo "ERROR: could not read the store listing on $host: $store" >&2
@@ -96,6 +107,11 @@ echo "-- registry: $store_slug (latest version $store_version)"
 [ -n "$repo_installed" ] && [ "$repo_installed" != "null" ] &&
   echo "-- repository-installed: $store_slug (version $(echo "$repo_installed" | jq -r '.version'))"
 
+# The app's default options, from the repo's config.yaml: the reset target.
+# (POSTing {} would be rejected for schemas with required option keys -
+# device-verified 2026-10-16; the defaults always satisfy the schema.)
+default_options=$(yq -o json '.options' "$app/config.yaml" | jq -c .)
+
 # --- decide what to do -------------------------------------------------------
 if [ -n "$repo_installed" ] && [ "$repo_installed" != "null" ]; then
   if [ -n "$local_installed" ] && [ "$local_installed" != "null" ]; then
@@ -104,12 +120,28 @@ if [ -n "$repo_installed" ] && [ "$repo_installed" != "null" ]; then
     exit 1
   fi
   installed_version=$(echo "$repo_installed" | jq -r '.version')
-  if [ "$installed_version" = "$store_version" ]; then
+  if [ "$installed_version" = "$store_version" ] && [ "${CONFIG_MODE}" != "reset" ]; then
     echo "-- already the latest registry version ($installed_version); nothing to do"
     exit 0
   fi
-  echo "-- updating the registry install ($installed_version -> $store_version)"
-  ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps update $store_slug"
+  if [ "$installed_version" = "$store_version" ]; then
+    echo "-- already the latest registry version ($installed_version); applying --config reset"
+  else
+    echo "-- updating the registry install ($installed_version -> $store_version)"
+    ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps update $store_slug"
+  fi
+  if [ "${CONFIG_MODE}" = "reset" ]; then
+    old=$(ha_app_options "$store_slug")
+    if [ -n "$old" ] && [ "$old" != "{}" ]; then
+      echo "-- previous options backed up locally: $(ha_backup_options "$app" "$old")"
+      ha_post_options "$store_slug" "$default_options" ||
+        { echo "ERROR: resetting the options failed (the previous options are backed up above)" >&2; exit 1; }
+      echo "-- --config reset: options set to the app's default options"
+      ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps restart $store_slug"
+    else
+      echo "-- --config reset: the install has no options - nothing to reset"
+    fi
+  fi
 else
   # Switching from a local copy (or fresh install). Registry installs of a
   # version OLDER than the local copy warn but proceed (an explicit request).
@@ -120,63 +152,52 @@ else
     echo "   WARNING: the registry version ($store_version) is OLDER than the locally installed $local_version - proceeding as requested."
   fi
 
-  # --- config migration ------------------------------------------------------
+  # --- the previous options' fate (--config) ---------------------------------
   old_options=""
+  backup_note="none"
   if [ -n "$local_version" ]; then
-    old_options=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" | jq -c '.data.options // empty')
-    if [ -n "$old_options" ] && [ "$old_options" != "null" ] && [ "$old_options" != "{}" ]; then
-      if [ "${usage_migrate_config:-false}" != "true" ] && [ "${usage_discard_config:-false}" != "true" ]; then
-        echo "ERROR: the locally installed copy has options (user data). Refusing to discard them silently:" >&2
-        echo "       re-run with --migrate-config to carry them to the registry install," >&2
-        echo "       or with --discard-config to drop them." >&2
-        exit 1
-      fi
-      if [ "${usage_discard_config:-false}" = "true" ]; then
-        echo "-- discarding the local copy's options (--discard-config)"
-        old_options=""
-      fi
+    old_options=$(ha_app_options "$local_slug")
+    if [ -n "$old_options" ] && [ "$old_options" != "{}" ] && [ "$old_options" != "null" ]; then
+      backup_note="backed up locally: $(ha_backup_options "$app" "$old_options")"
+      echo "-- previous options backed up locally: ${backup_note#backed up locally: }"
     else
       old_options=""
     fi
   fi
+  case "${CONFIG_MODE}" in
+    migrate)
+      [ -n "$old_options" ] || echo "-- (no previous options to migrate)"
+      ;;
+    reset)
+      echo "-- --config reset: the registry install starts with the app's default options (previous options: $backup_note)"
+      old_options=""
+      ;;
+    *)
+      # unset = discard (the default): fresh install, defaults apply.
+      [ -n "$old_options" ] &&
+        echo "-- --config unset: the previous options are discarded (default; $backup_note)"
+      old_options=""
+      ;;
+  esac
 
   if [ -n "$local_version" ]; then
-    # Back the options up locally before touching the install: a failed
-    # registry install must not lose the user's options.
-    backup=$(mktemp "${TMPDIR:-/tmp}/deploy-registry-${app}-options-backup.XXXXXX.json")
-    printf '%s' "$old_options" >"$backup"
-    echo "-- previous options backed up locally: $backup"
     echo "-- uninstalling the local copy ($local_slug)"
     ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps uninstall $local_slug"
   fi
   echo "-- installing the registry version ($store_slug, $store_version)"
   ha_retry 900 ssh "${SSH_OPTS[@]}" "$host" "ha apps install $store_slug"
 
-  if [ -n "$old_options" ] && [ "$old_options" != "null" ] && [ -n "${local_version:-}" ]; then
-    # Carry the options over, filtered to the target's schema keys: a fresh
-    # options POST REPLACES the whole set and the supervisor silently DROPS
-    # keys unknown to the target's schema (device-verified 2026-10-16: a full
-    # valid set plus bogus keys stores without them, result ok; a set missing
-    # required keys is rejected) - while keys REMOVED from the schema that are
-    # already STORED are inert (one-line warning on each read). The filter
-    # makes the drops explicit and reported instead of silent.
+  if [ "${CONFIG_MODE}" = "migrate" ] && [ -n "$old_options" ]; then
     echo "-- migrating the previous options (filtered to the target schema)"
-    schema_keys=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" |
-      jq -c 'if (.data.schema | type) == "array" then [.data.schema[] | .name] else [.data.schema | keys[]] end')
-    filtered=$(jq -c --argjson keys "$schema_keys" 'with_entries(select(.key as $k | $keys | index($k)))' <<<"$old_options")
-    dropped=$(jq -r --argjson keys "$schema_keys" 'to_entries | map(select(.key as $k | $keys | index($k) | not) | .key) | join(", ")' <<<"$old_options")
+    filtered=$(ha_filter_options "$old_options" "$store_slug")
+    dropped=$(jq -r --argjson keys "$(ha_schema_keys "$store_slug")" \
+      'to_entries | map(select(.key as $k | $keys | index($k) | not) | .key) | join(", ")' <<<"$old_options")
     [ -n "$dropped" ] && echo "   (dropped, unknown to the target's schema: $dropped)"
     if [ "$filtered" = "{}" ]; then
       echo "-- (no options left after filtering - nothing to migrate)"
     else
-      result=$(printf '{"options": %s}' "$filtered" | ssh "${SSH_OPTS[@]}" "$host" \
-        "curl -s -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" -H 'Content-Type: application/json' \
-           -X POST --data-binary @- http://supervisor/addons/$store_slug/options")
-      if ! echo "$result" | jq -e '.result == "ok"' >/dev/null 2>&1; then
-        echo "ERROR: the supervisor rejected the migrated options: $result" >&2
-        echo "       (the app is installed but runs with defaults; the previous options are in $backup)" >&2
-        exit 1
-      fi
+      ha_post_options "$store_slug" "$filtered" ||
+        { echo "ERROR: migrating the options failed (the previous options are backed up above)" >&2; exit 1; }
       echo "-- options migrated"
     fi
   fi

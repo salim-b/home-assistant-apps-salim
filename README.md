@@ -50,11 +50,12 @@ key set, the Supervisor would pull that image from GHCR instead of building loca
 
 To switch a device from the locally installed app to the published registry version (after merging), use
 `deploy-registry`. It uninstalls the local copy and installs/updates the app-repository install (discovered via the
-device's store listing); when the old install has options, the task refuses to run without `--migrate-config` (carry
-them over, filtered to the target version's schema) or `--discard-config`:
+device's store listing); `--config` decides what happens to the previous install's options — `migrate` carries them over
+(filtered to the target version's schema), `reset` wipes them (the app then runs with its default options), and unset
+discards them (the default). Whenever options are discarded or reset, they are backed up to a local file first:
 
 ```sh
-mise run deploy-registry hd-idle root@homeassistant.local --migrate-config
+mise run deploy-registry hd-idle root@homeassistant.local --config migrate
 ```
 
 If the app is already installed on the device **from an app repository** (i.e. not as a local app — such installs have a
