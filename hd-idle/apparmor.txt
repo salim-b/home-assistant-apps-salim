@@ -73,9 +73,9 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
   # Runtime check scripts
   /etc/cont-init.d/config.sh rix,
 
-  # Drive power-management treatment (hd-idle-pmfix, option disable_drive_pm): smartctl issues the ATA SET FEATURES
-  # commands (non-read-safe SCSI commands, hence the capability rule above). The sysfs coverage is kept broad per the
-  # header note above.
+  # Drive power-management treatment (hd-idle-pmfix, options disable_drive_pm / per-drive disable_drive_pm):
+  # smartctl issues the ATA SET FEATURES commands (non-read-safe SCSI commands, hence the capability rule above).
+  # The sysfs coverage is kept broad per the header note above.
   /usr/sbin/smartctl rix,
   /sys/devices/{,**} r,
 

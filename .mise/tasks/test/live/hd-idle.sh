@@ -24,7 +24,10 @@
 #   to its preferred /dev/disk/by-id path (usb-*, then ata-*, then wwn-*,
 #   then anything else) and configured with a 30 s idle (as
 #   in the lab fixture) so the daemon exercises its natural spindown path
-#   within the check window. Without the variable, the repo's test options
+#   within the check window. The FIRST discovered drive additionally carries
+#   an explicit per-drive drive-PM override (disable_drive_pm=no) so the
+#   override is exercised end to end - hd-idle-pmfix must skip exactly that
+#   drive (asserted in live_runtime_check). Without the variable, the repo's test options
 #   file (a safe no-op: no drives) is applied unchanged. Note that
 #   a match-everything glob (e.g. '*') includes every labeled disk -
 #   choose the glob deliberately.
@@ -44,7 +47,7 @@ live_prepare() {
   local glob="$LIVE_HDIDLE_LABEL_GLOB" raw kind name disk rank lb byid
   local -A disk_labels=() disk_byid=() byid_rank=()
   local included=() included_sorted=() labels=() ok
-  local disks_json="[]" disks_map="{}" tmpfile
+  local disks_json="[]" disks_map="{}" tmpfile pm_override_disk
 
   echo "-- discovering drives on the device (label glob: $glob)"
   ## Partition -> parent disk via sysfs; by-id links -> kernel names.
@@ -132,10 +135,19 @@ live_prepare() {
       '. + {($d): {label: $l, device: $dev}}' <<<"$disks_map")
   done
 
+  ## Per-drive drive-PM override: the FIRST discovered drive carries an
+  ## explicit disable_drive_pm=no so the override is exercised end to end on
+  ## the device (hd-idle-pmfix must skip exactly that drive - asserted in
+  ## live_runtime_check; the drives file itself is not reachable over SSH,
+  ## HAOS ships no docker CLI). keys[0] == the first inserted (sorted) drive.
+  pm_override_disk=$(jq -r 'keys[0]' <<<"$disks_map")
+  disks_json=$(jq -c '.[0].disable_drive_pm = "no"' <<<"$disks_json")
+  disks_map=$(jq -c --arg d "$pm_override_disk" '.[$d].pm_override = true' <<<"$disks_map")
+
   tmpfile=$(mktemp "${TMPDIR:-/tmp}/hd-idle-live-options.XXXXXX")
   jq -n --argjson disks "$disks_json" '{disks: $disks}' >"$tmpfile"
   echo "-- generated test options (30s idle, scsi):"
-  jq -r 'to_entries[] | "   \(.value.device) (\(.key), label \(.value.label))"' <<<"$disks_map"
+  jq -r 'to_entries[] | "   \(.value.device) (\(.key), label \(.value.label)\(if .value.pm_override == true then ", drive-PM override: no" else "" end))"' <<<"$disks_map"
 
   ## Hand the generated file to the harness's option-application and
   ## restore steps (it must outlive the run: restore_options() re-reads it
@@ -229,6 +241,34 @@ live_runtime_check() {
           echo "   PASS: hd-idle manages exactly the ${drive_count} discovered drive(s): ${managed_arr[*]}"
           if [ -n "$declared_excluded" ]; then
             echo "   (excluded via idle-0 entries: ${declared_excluded%- })"
+          fi
+          ## Per-drive drive-PM override plumbing (boot log; the drives file
+          ## itself is not reachable over SSH - HAOS ships no docker CLI):
+          ## pmfix must have skipped EXACTLY the override drive and attempted
+          ## the treatment for every other managed drive.
+          pm_override_disk=$(jq -r 'to_entries[] | select(.value.pm_override == true) | .key' <<<"$disks_json")
+          if [ -n "$pm_override_disk" ]; then
+            if ! grep -qF "Drive ${pm_override_disk}: drive-PM treatment disabled for this drive" <<<"$tail_log"; then
+              echo "   FAIL: no hd-idle-pmfix skip log for the override drive ${pm_override_disk}" >&2
+              return 1
+            fi
+            if grep -qF "Drive ${pm_override_disk}: APM disable" <<<"$tail_log"; then
+              echo "   FAIL: the override drive ${pm_override_disk} received the drive-PM treatment despite disable_drive_pm=no" >&2
+              return 1
+            fi
+            pm_skip_count=$(grep -cF "drive-PM treatment disabled for this drive" <<<"$tail_log" || true)
+            if [ "$pm_skip_count" != "1" ]; then
+              echo "   FAIL: expected exactly one hd-idle-pmfix skip line (the override drive), got ${pm_skip_count}" >&2
+              return 1
+            fi
+            for disk in "${!labels_by_disk[@]}"; do
+              if [ "$disk" = "$pm_override_disk" ]; then continue; fi
+              if ! grep -qF "Drive ${disk}: APM disable" <<<"$tail_log"; then
+                echo "   FAIL: no hd-idle-pmfix treatment attempt logged for ${disk}" >&2
+                return 1
+              fi
+            done
+            echo "   PASS: per-drive drive-PM override (hd-idle-pmfix skipped ${pm_override_disk} only)"
           fi
         else
           if grep -q "No drives configured" <<<"$tail_log"; then

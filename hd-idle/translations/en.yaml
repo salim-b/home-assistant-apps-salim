@@ -37,6 +37,17 @@ configuration:
           Value sent with the SCSI spin-down command (`0`-`15`). `0` is
           right for nearly all drives. Only real SCSI/SAS drives need other
           values. An empty value uses the default power condition.
+      disable_drive_pm:
+        name: Disable drive power management
+        description: >-
+          Per-drive override of the global "Disable drive power management"
+          setting: `yes` disables this drive's own power management (the
+          Advanced Power Management (APM) level and the built-in standby
+          timer, see the global setting for why), `no` keeps the drive's
+          own power management. An empty value follows the global setting.
+          Note: switching this off (here or globally) does not re-enable
+          the drive's power management right away - settings applied
+          earlier are volatile but persist until the drive is power-cycled.
   default_idle:
     name: Default idle time (seconds)
     description: >-
@@ -64,6 +75,9 @@ configuration:
       to sleep. The settings are volatile: they are re-applied at app start
       and whenever a drive (re)appears. A drive or bridge that does not
       support one of the commands logs a one-time failure - harmless.
+      Individual drives can override this setting with their own Disable
+      drive power management field in the drive list; drives without their
+      own setting follow this one.
   debug:
     name: Debug mode
     description: >-

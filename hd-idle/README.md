@@ -9,8 +9,8 @@ Spin down idle USB and SATA hard disk drives automatically.
 - **Automatic spin-down**: Runs [hd-idle](https://github.com/adelolmo/hd-idle), which watches I/O activity per disk
   (`/proc/diskstats`) and sends SCSI/ATA standby commands to hard disk drives that have been idle for their configured
   time.
-- **Per-drive configuration**: Every managed drive gets its own idle time, command type and power condition, selected
-  from a dropdown of the system's drives by their stable `/dev/disk/by-id` paths.
+- **Per-drive configuration**: Every managed drive gets its own idle time, command type, power condition and
+  power-management treatment, selected from a dropdown of the system's drives by their stable `/dev/disk/by-id` paths.
 - **Drive list with global defaults**: list each drive once - it follows the global default idle time unless configured
   individually (`0` = never spin down). Unlisted drives are never touched.
 - **Hotplug-aware**: Drives are granted device access dynamically (including after re-plugging), and disk IDs are
