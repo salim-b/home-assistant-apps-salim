@@ -6,7 +6,7 @@
 #USAGE }
 #USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to root), e.g. root@homeassistant.local or just homeassistant.local"
 #USAGE flag "--replace" help="Uninstall an existing repository-installed copy of this app before deploying"
-#USAGE flag "--config <mode>" help="Fate of the options: reset (wipe the local install's options - it runs with the app's config.yaml default options afterwards; also overwrites anything a fresh install resurrects from the local slug's earlier stored options), migrate (with --replace: carry the repository-installed copy's options over to the local install), or unset = keep (default: the local install's options survive update/rebuild untouched; a replaced copy's options are not carried over - they remain in its app data). Any options an uninstall would orphan are archived to a local backup file (path printed)." {
+#USAGE flag "--config <mode>" help="Fate of the options: reset (wipe the local install's options - it runs with the app's config.yaml default options afterwards), migrate (with --replace: carry the repository-installed copy's options over to the local install), or unset = keep (default: the local install's options survive update/rebuild untouched; a replaced copy's options are not carried over - options do not survive an uninstall, so the backup file keeps the only copy)." {
 #USAGE   choices "migrate" "reset"
 #USAGE }
 set -euo pipefail
@@ -119,10 +119,10 @@ fi
 # app's config.yaml DEFAULTS, not {}: a fresh options POST is validated
 # against the schema and {} is rejected for schemas with required option
 # keys (device-verified 2026-10-16) - the defaults always satisfy it. The
-# reset POST also runs on a FRESH install: uninstall keeps an app's config
-# folder, so a reinstall resurrects the slug's earlier stored options -
-# 'fresh' is only defaults when nothing is stored (device-verified 2026-10-16,
-# 'ha apps uninstall --help': config kept unless --remove-config).
+# reset POST runs on every install state: options never survive an
+# uninstall (device-verified 2026-10-16), so a fresh install already has
+# the defaults (the POST is a no-op there) and an existing install gets
+# its options wiped deterministically.
 if [ "${CONFIG_MODE}" = "reset" ]; then
   old=$(ha_app_options "$local_slug")
   if [ -n "$old" ] && [ "$old" != "{}" ]; then

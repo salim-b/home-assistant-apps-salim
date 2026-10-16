@@ -5,7 +5,7 @@
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
 #USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to root), e.g. root@homeassistant.local or just homeassistant.local"
-#USAGE flag "--config <mode>" help="Fate of the previous install's options: migrate (carry the local copy's options to the registry install, filtered to the target's schema - applies to the local->store switch; an update keeps its options anyway), reset (wipe the target install's options - the app then runs with the repo's config.yaml defaults; also overwrites anything a reinstall would resurrect from the store install's earlier stored options), or unset = keep (default: an update preserves the options; after a local->store switch the store install runs with its own previously stored options if any, else the app's defaults - the local copy's options are not carried over). Any options an uninstall would orphan are archived to a local backup file (path printed)." {
+#USAGE flag "--config <mode>" help="Fate of the previous install's options: migrate (carry the local copy's options to the registry install, filtered to the target's schema - applies to the local->store switch; an update keeps its options anyway), reset (wipe the target install's options - the app then runs with the repo's config.yaml defaults), or unset = keep (default: an update preserves the options; a local->store switch starts the store install with the app's defaults - stored options do not survive an uninstall, so the local copy's options would be lost without --config migrate; any orphaned set is archived to a local backup file, path printed)." {
 #USAGE   choices "migrate" "reset"
 #USAGE }
 set -euo pipefail
@@ -169,20 +169,21 @@ else
       [ -n "$old_options" ] || echo "-- (no previous options to migrate)"
       ;;
     reset)
-      ## The reset POST happens after the install below: a fresh install is
-      ## NOT defaults when the store install's own earlier options are stored
-      ## on the device (uninstall keeps the config folder; a reinstall
-      ## resurrects them) - the POST overwrites whatever it resurrects.
+      ## The reset POST happens after the install below - a fresh install
+      ## already carries the app's default options (stored options do not
+      ## survive an uninstall, device-verified 2026-10-16), so the POST is a
+      ## no-op there and the deterministic guard for anything else.
       echo "-- --config reset: the registry install will run with the app's default options (previous options: $backup_note)"
       old_options=""
       ;;
     *)
-      ## unset = keep (the default): the local copy's options are not carried
-      ## over, but they are not destroyed either - the uninstall keeps them in
-      ## the local slug's app data (unless purged with --remove-config), and
-      ## the store install resurrects ITS OWN previously stored options if any.
+      ## unset = keep (the default): an UPDATE preserves the options. On the
+      ## local->store switch the local copy's options are NOT carried over -
+      ## and they do not survive its uninstall either (device-verified: the
+      ## supervisor purges an app's options on uninstall; only the backup
+      ## file keeps a copy) - the fresh store install runs the app defaults.
       [ -n "$old_options" ] &&
-        echo "-- options not carried over (they remain in $local_slug's app data; $backup_note)"
+        echo "-- options not carried over (options do not survive the uninstall; $backup_note)"
       old_options=""
       ;;
   esac
@@ -209,7 +210,7 @@ else
     fi
   fi
   if [ "${CONFIG_MODE}" = "reset" ]; then
-    echo "-- --config reset: posting the app's default options (overwrites anything the install resurrected)"
+    echo "-- --config reset: posting the app's default options"
     ha_post_options "$store_slug" "$default_options" ||
       { echo "ERROR: resetting the options failed (the previous options are backed up above)" >&2; exit 1; }
   fi

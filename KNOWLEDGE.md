@@ -55,10 +55,12 @@ such apps outright (`UnsupportedReason.APPARMOR`).
   2026-10-16 (hd-idle 0.1.5 dropping `mode`; the stale key never broke the boot, only warned). A fresh options POST
   replaces the whole set and silently DROPS keys unknown to the schema (device-verified 2026-10-16: full valid set +
   bogus keys → ok, bogus keys not stored; a set missing required keys → rejected); a migration tool therefore filters to
-  the target's schema keys to make the drops explicit and reported. `ha apps uninstall` KEEPS the app's config folder
-  unless `--remove-config` is passed (CLI help, device-verified 2026-10-16) — reinstalling the same slug resurrects the
-  stored options, so a "fresh" install is only the app's defaults when nothing is stored under that slug; tools that
-  promise defaults after a reinstall must POST them explicitly.
+  the target's schema keys to make the drops explicit and reported. `ha apps uninstall` purges the app's OPTIONS in
+  every case (device-verified 2026-10-16 with a same-slug uninstall+reinstall: the reinstall had the app's DEFAULT
+  options, not the previously stored ones) — the `--remove-config` flag only additionally deletes the app's persistent
+  `/data` config folder. Consequently: a reinstall ("fresh install") always runs the app's default options, update and
+  rebuild preserve stored options, and a tool that keeps options across an uninstall must read + re-POST them (the
+  deploy-registry migration does).
 
 ## Supervisor: device access
 
