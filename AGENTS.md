@@ -89,6 +89,9 @@ essentials:
   own env knobs (e.g. hd-idle's `LIVE_HDIDLE_LABEL_GLOB` selects the drives to exercise by filesystem label and
   generates the test options on the fly). Restriction: native mise depends-arg forwarding is not implemented in any
   released mise (docs describe it; verified up to 2026.10.6) — the task forwards via its run script instead.
+- `mise run hd-idle-drives <host>` — regenerate the local drive cheat sheet (`hd-idle/.drives.md`, gitignored): every
+  connected drive with a labeled filesystem except the system disk(s), with stable by-id IDs (the physical
+  `ata-<MODEL>_<SERIAL>` link and the `usb-*` enclosure entry the app config references).
 
 ## Workflow rules
 
