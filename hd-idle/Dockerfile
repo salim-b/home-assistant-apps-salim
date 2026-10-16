@@ -7,7 +7,7 @@ FROM ${BUILD_FROM}
 # explicit app releases (bump pin + config.yaml version + changelog). Policy background and the apk-drift check:
 # repository-root KNOWLEDGE.md (apk package version policy).
 RUN apk add --no-cache \
-  hd-idle=1.22-r7 \
+  hd-idle=1.22-r8 \
   smartmontools=7.5-r0
 
 # Copy root filesystem

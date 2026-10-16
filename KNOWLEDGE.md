@@ -159,7 +159,7 @@ versioned release).
 
 **Our policy** splits by coupling:
 
-- **Pin** (full `pkgver-pkgrel`, e.g. `hd-idle=1.22-r7`) when the app's runtime logic encodes the package's interface:
+- **Pin** (full `pkgver-pkgrel`, e.g. `hd-idle=1.22-r8`) when the app's runtime logic encodes the package's interface:
   hd-idle's arg generator (`hd-idle/rootfs/usr/bin/hd-idle-genargs`) relies on hd-idle's CLI semantics, so every package
   change must be a deliberate app change - one app release (pin + `config.yaml` version + changelog) per package
   version.

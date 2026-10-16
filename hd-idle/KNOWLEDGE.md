@@ -15,9 +15,9 @@ immediately when set to `false`). Sources:
 [main.go](https://github.com/adelolmo/hd-idle/blob/v1.22/main.go), [v3.24
 APKBUILD](https://gitlab.alpinelinux.org/alpine/aports/-/blob/3.24-stable/community/hd-idle/APKBUILD).
 
-Alpine v3.24 ships `hd-idle 1.22-r7` (community repo; v1.22 is a GitHub tag *without* a release). The package installs
+Alpine v3.24 ships `hd-idle 1.22-r8` (community repo; v1.22 is a GitHub tag *without* a release). The package installs
 `/usr/sbin/hd-idle`, has no runtime dependencies, and is built from the same code as the v1.22 tag (`main.go` is
-byte-identical to it as of 2026-10).
+byte-identical to it as of 2026-10; pkgrel bumps so far are Go-toolchain rebuilds with an unchanged CLI).
 
 ## bashio option parsing (list-of-object options)
 
