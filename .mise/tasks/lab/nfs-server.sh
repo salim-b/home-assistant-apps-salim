@@ -23,7 +23,15 @@
 lab_docker_args+=(
   -v "$LAB_TMPDIR/share:/share"
   -v "$LAB_TMPDIR/media:/media"
+  ## Simulated drive content for the nfsd-watch replug test: bound over
+  ## /media/usb0 in-container by the runtime check. Must live on a
+  ## NFS-exportable filesystem (a plain docker bind of this host dir - the
+  ## container's overlayfs root is NOT exportable and overlay-backed mirrors
+  ## make exportfs refuse the export).
+  -v "$LAB_TMPDIR/drive-b:/mnt/drive-b"
 )
+mkdir -p "$LAB_TMPDIR/drive-b" 2>/dev/null || true
+echo b-content >"$LAB_TMPDIR/drive-b/b.txt" 2>/dev/null || true
 
 ## The fixture adaptation itself lives in .mise/tasks/lab/nfs-server.py
 ## (convention: every share's client network must point at the lab subnet
@@ -74,6 +82,95 @@ lab_runtime_check() {
     return 1
   fi
   echo "NFS roundtrip OK (rw write reached the host filesystem)"
+
+  ## nfsd-watch mirror refresh: an unplug/replug of a "drive" mounted at the /media share path must be picked up by
+  ## the watcher within its 30 s poll interval (+ margin) without an app restart - the export must switch to the new
+  ## mount's content and, on unplug, stop serving the detached superblock clone (the stale-serving hazard the
+  ## pre-watcher code had). Simulated in-container (the lab app container is privileged: a bind over the share path
+  ## = replug, its umount = unplug). The real trigger path (HAOS mounts under /media, propagated rslave into the
+  ## container) is supervisor-source-verified, see the app's KNOWLEDGE.md.
+  if ! (
+    set -e
+    ## "Replug": fresh content as a new mount object at the same path (source = the /mnt/drive-b host bind - an
+    ## NFS-exportable filesystem, unlike the container's overlay rootfs)
+    docker exec "$LAB_NET_NAME-app" mount --bind /mnt/drive-b /media/usb0 \
+      || {
+        echo "FAIL: replug simulation (in-container bind over the share path)"
+        exit 1
+      }
+    ok=0
+    ## 30 s poll interval + margin
+    for _ in {1..16}; do
+      if docker run --rm --privileged --network "$LAB_NET_NAME" local/nfslab-client:alpine3.24 sh -c "
+          mkdir -p /mnt/m && mount -t nfs4 '$LAB_APP_IP:/media/usb0' /mnt/m &&
+          grep -q b-content /mnt/m/b.txt"; then
+        ok=1
+        break
+      fi
+      sleep 3
+    done
+    [ "$ok" = 1 ] || {
+      echo "FAIL: replug content not served by the export within 48 s"
+      exit 1
+    }
+    docker logs "$LAB_NET_NAME-app" 2>&1 | grep -q "Share mount state changed" \
+      || {
+        echo "FAIL: watcher did not log the detected change"
+        exit 1
+      }
+    echo "watcher replug OK: export switched to the new mount's content within the poll interval"
+
+    ## "Unplug": remove the mount again - the mirror would keep serving the detached clone; the export must become
+    ## empty (this is also the umount-after-rpc.nfsd-0 assertion: the cycle's proven order releases the pins)
+    docker exec "$LAB_NET_NAME-app" umount /media/usb0 \
+      || {
+        echo "FAIL: unplug simulation (in-container umount of the share path)"
+        exit 1
+      }
+    ok=0
+    for _ in {1..16}; do
+      if docker run --rm --privileged --network "$LAB_NET_NAME" local/nfslab-client:alpine3.24 sh -c "
+          mkdir -p /mnt/m && mount -t nfs4 '$LAB_APP_IP:/media/usb0' /mnt/m &&
+          ! test -e /mnt/m/b.txt"; then
+        ok=1
+        break
+      fi
+      sleep 3
+    done
+    [ "$ok" = 1 ] || {
+      echo "FAIL: unplugged share still serves stale (detached-superblock) content"
+      exit 1
+    }
+    restarts=$(docker logs "$LAB_NET_NAME-app" 2>&1 | grep -c "NFS server started (kernel threads running)")
+    [ "$restarts" -ge 3 ] \
+      || {
+        echo "FAIL: expected >=3 nfsd starts (boot + 2 watcher cycles), got $restarts"
+        exit 1
+      }
+    echo "watcher unplug OK: stale content no longer served, kernel server cycled twice (empty export now)"
+
+    ## The other share must be unaffected by the cycles
+    if ! docker run --rm --privileged --network "$LAB_NET_NAME" local/nfslab-client:alpine3.24 sh -c "
+        mkdir -p /mnt/t && mount -t nfs4 '$LAB_APP_IP:/share/nfs' /mnt/t &&
+        grep -q host-file /mnt/t/hostfile.txt"; then
+      echo "FAIL: /share/nfs roundtrip broke after the watcher cycles"
+      exit 1
+    fi
+    echo "/share/nfs unaffected by the watcher cycles"
+
+    ## Quiet ticks: a full poll interval without mount changes must not restart the server
+    n1=$(docker logs "$LAB_NET_NAME-app" 2>&1 | grep -c "Share mount state changed")
+    sleep 35
+    n2=$(docker logs "$LAB_NET_NAME-app" 2>&1 | grep -c "Share mount state changed")
+    [ "$n1" = "$n2" ] \
+      || {
+        echo "FAIL: watcher restarted the server without a mount change ($n1 -> $n2)"
+        exit 1
+      }
+    echo "watcher quiet-tick OK (no restart without a change)"
+  ); then
+    return 1
+  fi
 
   ## Client-state reclaim across an app restart (the recovery tracker's
   ## actual feature): hold an exclusive flock from a dedicated client,
