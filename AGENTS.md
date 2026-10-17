@@ -49,7 +49,12 @@ For interactive supervisor-integrated testing use the devcontainer (`.devcontain
 Run `mise tasks ls --local` for the task list (the `--local` flag excludes global tasks from your mise user config); the
 essentials:
 
-- `mise run check` — lint + validate; **always run before finishing a change**.
+- `mise run check` — lint + validate; **always run before finishing a change**. Lint is hk (`hk.pkl`): `hk check --all`
+  lints every tracked file — the full gate CI and `mise run lint` use — while plain `hk check` lints just the modified
+  files for fast local feedback (untracked files are never selected; `HK_STASH_UNTRACKED=0` in mise.toml \[env\]).
+  Enable the git hooks once per clone with `mise run hooks` (after `mise install --locked`): pre-commit auto-fixes
+  (panache format, final newlines) and gates the commit, commit-msg enforces Conventional Commits; escape hatch
+  `HK=0 git commit`.
 - `mise run build` — build app images (native arch + cross-check) and assert image metadata.
 - `mise run lab` — full-fidelity boot lab: fake Supervisor API serving the app's default options (adapted to the lab
   network), boots the app container (complete s6-rc tree), then an app-provided runtime check, then graceful stop. **Run
@@ -131,19 +136,20 @@ essentials:
 
 ## Tool notes
 
-- Markdown: panache (`panache.toml`) owns ALL formatting — `mise run fmt` reflows prose to the 120-char width,
-  `panache format --check .` + `panache lint .` gate it in `mise run lint` (the lint adds semantic checks: references,
-  heading hierarchy, ...). Don't hand-wrap prose: write it naturally and let `fmt` shape it. rumdl (`.rumdl.toml`,
-  schema-validated by validate.py) stays as the markdownlint-rules-rich second linter — its own reflow is disabled
-  (panache's and rumdl's fill states disagree), so its MD013 is a pure width check: code blocks exempt, lines whose only
-  overrun is an unbreakable code span forgiven. Both exclude `AI_POLICY.md` (upstream-verbatim). rumdl never rewrites
-  files: its fix allow-list is pinned to an inert `all` sentinel (`.rumdl.toml`, behavioral canary in validate.py) —
-  formatting fixes go through panache (`mise run fmt`), non-format rumdl findings are fixed by hand. Known edges:
-  panache's reflow is non-idempotent on a multi-line ~~strikethrough~~ list item (indent grows every run) — keep struck
-  spans on a single line (shorten the wording; MD013 caps it at 120; upstream report tracked in the repo-root
-  `TODO.md`). And don't let prose wrap so that a line starts with an ordered-list marker (`4)`, `2026.` — a
-  parenthetical ending in digits does this at wrap boundaries): CommonMark renders such a line as prose, panache formats
-  it as a nested list, and the two disagree.
+- Markdown: panache (`panache.toml`) owns ALL formatting — `mise run fmt` reflows prose to the 120-char width, hk's
+  panache-format/panache-lint steps gate it in `mise run lint` (`panache format --check` + `panache lint` over tracked
+  .md files, excluding `AI_POLICY.md` and `**/LICENSE.md`; the lint adds semantic checks: references, heading hierarchy,
+  ...). Don't hand-wrap prose: write it naturally and let `fmt` shape it. rumdl (`.rumdl.toml`, schema-validated by
+  validate.py) stays as the markdownlint-rules-rich second linter — its own reflow is disabled (panache's and rumdl's
+  fill states disagree), so its MD013 is a pure width check: code blocks exempt, lines whose only overrun is an
+  unbreakable code span forgiven. Both exclude `AI_POLICY.md` (upstream-verbatim). rumdl never rewrites files: its fix
+  allow-list is pinned to an inert `all` sentinel (`.rumdl.toml`, behavioral canary in validate.py) — formatting fixes
+  go through panache (`mise run fmt`), non-format rumdl findings are fixed by hand. Known edges: panache's reflow is
+  non-idempotent on a multi-line ~~strikethrough~~ list item (indent grows every run) — keep struck spans on a single
+  line (shorten the wording; MD013 caps it at 120; upstream report tracked in the repo-root `TODO.md`). And don't let
+  prose wrap so that a line starts with an ordered-list marker (`4)`, `2026.` — a parenthetical ending in digits does
+  this at wrap boundaries): CommonMark renders such a line as prose, panache formats it as a nested list, and the two
+  disagree.
 - mise tasks: file tasks in `.mise/tasks/` with proper suffixes (`.sh`, `.py`, … — mise resolves the short names, e.g.
   `mise run lint`) and `#MISE`/`#USAGE` headers. Task arguments must be documented and typed via usage specs (never bare
   `$1` handling unless `raw_args = true`). Required args are declared `arg "<name>"` (mise errors before the task starts
