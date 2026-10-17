@@ -6,8 +6,8 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   ## Conventions & references (device-enforcement-verified on HAOS 18.3 /
   ## OS Agent 1.14 / AppArmor 3.1.7 — see nfs-server/KNOWLEDGE.md):
   ## - shape modeled on the official dev-docs AppArmor template
-  ##   (developers.home-assistant.io/docs/add-ons/presentation) and the
-  ##   shipped dnsmasq app profile; sub-profile signal receive is
+  ##   (https://contributors.home-assistant.io/apps/guides/security/#apparmor)
+  ##   and the shipped dnsmasq app profile; sub-profile signal receive is
   ##   peer-scoped per the docs template.
   ## - `file,` blanket: upstream HA convention (docs template + dnsmasq).
   ##   Tightening file rules is impractical here because HAOS produces no

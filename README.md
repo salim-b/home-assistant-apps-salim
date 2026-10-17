@@ -24,7 +24,7 @@ Spins down idle USB and SATA hard disk drives automatically.
 ## Development
 
 The structure of all apps in this repository follows Home Assistant's [best
-practices](https://developers.home-assistant.io/docs/apps) as far as possible.
+practices](https://contributors.home-assistant.io/apps/) as far as possible.
 
 Non-obvious development knowledge lives in [`KNOWLEDGE.md`](./KNOWLEDGE.md) (repository-wide: supervisor behaviors,
 AppArmor, base-image gotchas, testing) and in each app's own `KNOWLEDGE.md` (e.g.
@@ -46,7 +46,7 @@ ssh root@homeassistant.local 'ha apps logs --follow local_nfs-server'
 
 Note that the task comments out the top-level `image:` key in the *device-side* copy of `config.yaml`: with an `image`
 key set, the Supervisor would pull that image from GHCR instead of building locally from your working tree — see the
-[dev docs](https://developers.home-assistant.io/docs/add-ons/testing/#remote-development).
+[dev docs](https://contributors.home-assistant.io/apps/guides/testing/#remote-development).
 
 To switch a device from the locally installed app to the published registry version (after merging), use
 `deploy-registry`. It uninstalls the local copy and installs/updates the app-repository install (discovered via the

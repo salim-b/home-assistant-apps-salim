@@ -5,7 +5,7 @@ placement rule below.
 
 ## What this repository is
 
-A [Home Assistant app repository](https://developers.home-assistant.io/docs/apps/) (formerly "add-ons"): each app is a
+A [Home Assistant app repository](https://contributors.home-assistant.io/apps/) (formerly "add-ons"): each app is a
 subdirectory with a `config.yaml`, `Dockerfile`, `rootfs/`, docs, translations, and its own `TODO.md` / `KNOWLEDGE.md`.
 Currently contains:
 

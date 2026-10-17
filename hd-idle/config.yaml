@@ -1,4 +1,4 @@
-# https://developers.home-assistant.io/docs/apps/configuration#app-configuration
+# https://contributors.home-assistant.io/apps/reference/configuration/
 name: hd-idle
 version: "0.1.7"
 slug: hd-idle
