@@ -1,0 +1,85 @@
+amends "package://github.com/jdx/hk/releases/download/v2.7.0/hk@2.7.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.7.0/hk@2.7.0#/Builtins.pkl"
+
+// Lint steps ported from the removed .mise/tasks/lint.sh. `mise run lint`
+// (hk check --all) and the pre-commit hook run the same step set; only
+// panache-format and final-newline auto-fix (fix = true on pre-commit).
+
+local scriptGlobs = List(
+  "**/*.sh",
+  "**/cont-init.d/**",
+  "**/s6-overlay/scripts/**",
+  "**/s6-rc.d/*/run",
+  "**/s6-rc.d/*/finish",
+)
+local mdGlobs = List("**/*.md", "**/*.markdown")
+// Explicit paths bypass panache's own config excludes; AI_POLICY.md is
+// upstream-verbatim, **/LICENSE.md mirrors the old walk's default exclude.
+local mdExcludes = List("AI_POLICY.md", "**/LICENSE.md")
+
+local linters = new Mapping<String, Step> {
+  ["shellcheck"] {
+    // The old lint.sh selected scripts by name glob AND a shebang-ish
+    // first line (*bash* or */sh): the glob gives candidates, the loop
+    // re-filters. -x follows `source`d helpers (.mise/tasks/lib/).
+    glob = scriptGlobs
+    check = """
+      rc=0
+      for f in {{files}}; do
+        case "$(head -1 "$f")" in
+          *bash*|*"/sh") shellcheck -x "$f" || rc=1 ;;
+        esac
+      done
+      exit $rc
+      """
+  }
+  ["bash-syntax"] {
+    glob = scriptGlobs
+    check = """
+      rc=0
+      for f in {{files}}; do
+        case "$(head -1 "$f")" in
+          *bash*) bash -n "$f" || rc=1 ;;
+        esac
+      done
+      exit $rc
+      """
+  }
+  ["actionlint"] = Builtins.actionlint
+  ["hadolint"] = Builtins.hadolint
+  // Uses --strict (warnings fail): verified clean over all tracked yaml.
+  ["yamllint"] = Builtins.yamllint
+  // Panache owns ALL markdown formatting (panache.toml). Explicit paths
+  // bypass its config excludes, hence mdExcludes. The only markdown
+  // auto-fix step.
+  ["panache-format"] {
+    glob = mdGlobs
+    exclude = mdExcludes
+    check = "panache format --check {{files}}"
+    fix = "panache format {{files}}"
+  }
+  // Semantic lint (references, heading hierarchy, ...); not auto-fixable.
+  ["panache-lint"] {
+    glob = mdGlobs
+    exclude = mdExcludes
+    check = "panache lint {{files}}"
+  }
+  // rumdl stays a check-only second linter (repo policy): never a fix step.
+  ["rumdl"] = Builtins.rumdl
+  ["final-newline"] = Builtins.newlines
+}
+
+steps = linters
+
+hooks {
+  ["pre-commit"] {
+    fix = true
+    stash = "git"
+    steps = linters
+  }
+  ["commit-msg"] {
+    steps {
+      ["conventional-commit"] = Builtins.check_conventional_commit
+    }
+  }
+}

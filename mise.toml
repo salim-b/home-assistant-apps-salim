@@ -2,8 +2,26 @@
 
 [env]
 DOCKER_BUILDKIT = "1"
+# hk: resolve mise environments in hooks (HK_MISE), evaluate hk.pkl with the
+# built-in Rust pkl evaluator (no pkl CLI dependency), and keep `hk check
+# --all` a tracked-files-only gate: untracked files are never selected, while
+# unstaged changes stay in place and ARE checked (HK_STASH=git would stash
+# them away and lint the index instead - verified with hk 2.7.0).
+HK_MISE = "1"
+HK_PKL_BACKEND = "pklr"
+HK_STASH_UNTRACKED = "0"
 
 # Task docs: https://mise.jdx.dev/tasks/ – file tasks live in `.mise/tasks/`
+[tasks.lint]
+description = "Lint all tracked files via hk (same checks as the pre-commit hook)"
+run = "hk check --all --no-fail-fast"
+
+# Per-repo hook install (git < 2.54 cannot use hk install --global). Run once
+# per clone after `mise install --locked`; escape hatch: HK=0 git commit.
+[tasks.hooks]
+description = "Install hk git hooks for this clone (per-repo; git < 2.54 cannot use the global install)"
+run = "hk install --mise"
+
 [tasks.check]
 description = "Run all pre-commit checks (lint + validate)"
 depends = ["lint", "validate"]
@@ -25,6 +43,7 @@ shellcheck = "0.11.0"
 uv = "0.12.23"
 yamllint = "1.38.0"
 yq = "4.54.1"
+hk = { version = "2.7.0", workflow = "release.yml" }
 
 [vars]
 # supervisor ref the validate task fetches schemas from (single source of
