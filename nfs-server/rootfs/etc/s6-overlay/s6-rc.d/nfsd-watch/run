@@ -1,0 +1,62 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+## Share-mount watcher (longrun): a drive's unplug/replug changes the mount object backing the configured share paths
+## while the app runs (HAOS bind-mounts /share and /media rslave - new mounts propagate into the running container),
+## but the pseudo file system root's mirrors are private bind clones outside that propagation chain: they keep serving
+## a detached superblock clone (stale data; on replug a second superblock on the same device) until they are rebound
+## and the kernel server is restarted. This watcher detects the change (nfsd-apply --check) and cycles the kernel
+## server - no manual app restart needed. Detection semantics, cycle order, restart effects (grace period, client
+## recovery via the shipped tracker) and the deliberate no-s6-rc-restart choice: nfs-server/KNOWLEDGE.md
+## §"Automatic mirror refresh (nfsd-watch)".
+
+INTERVAL=30
+PENDING_FILE=/var/lib/nfs/nfsd-restart-pending
+
+while true; do
+  sleep "$INTERVAL"
+
+  ## Detect (read-only): 0 = clean, 3 = a share's backing mount changed, 1 = check failure. Mid-run check failures
+  ## are nearly impossible by construction (options cannot change while the app runs - the supervisor validates at
+  ## save time), so like hd-idle-watch the keep-current guard is cheap insurance; a nonzero nfsd-apply always logged
+  ## its own fatal reason first.
+  RC=0
+  /usr/bin/nfsd-apply --quiet --check || RC=$?
+
+  if [ "$RC" = 1 ] && [ ! -e "$PENDING_FILE" ]; then
+    bashio::log.warning "Checking the NFS share configuration failed - keeping the current configuration."
+    continue
+  fi
+  if [ "$RC" = 0 ] && [ ! -e "$PENDING_FILE" ]; then
+    continue
+  fi
+
+  ## Change detected: cycle the kernel server in the proven nfsd-stop order (threads down FIRST - that releases the
+  ## kernel's pins on the mirrors' old superblocks, so the apply's umount succeeds), minus the nfsd-stop down
+  ## script's mirror teardown: the apply below recreates the mirrors and nfsd-start re-exports. Deliberately NOT an
+  ## s6-rc oneshot restart: s6-rc is not reentrant (a down/up cycle from inside a service deadlocks) and the nfsd
+  ## oneshot has no documented re-run guarantee; driving rpc.nfsd directly keeps s6-rc's state untouched - the
+  ## oneshot stays "up" and the container shutdown still runs its down script. Rationale: nfs-server/KNOWLEDGE.md
+  ## §"Automatic mirror refresh (nfsd-watch)".
+  if [ "$RC" = 3 ]; then
+    bashio::log.info "Share mount state changed - re-applying the NFS configuration and restarting the NFS server"
+    rpc.nfsd 0 || true
+    exportfs -au || true
+    if ! /usr/bin/nfsd-apply --quiet; then
+      bashio::log.warning "Re-applying the NFS configuration failed - retrying on the next tick."
+      continue
+    fi
+  fi
+
+  ## (Re)start the kernel server - also the retry path when a previous cycle's start failed: the pending marker
+  ## makes the retry survive the by-then-clean detection state (the mirrors were already re-applied successfully).
+  ## A failed check with a pending marker falls through here as well: getting the server up takes priority over a
+  ## mirror re-assessment, and the next tick re-checks the mirrors.
+  if /etc/s6-overlay/scripts/nfsd-start; then
+    rm -f "$PENDING_FILE"
+  else
+    touch "$PENDING_FILE"
+    bashio::log.warning "Restarting the NFS server failed - retrying on the next tick."
+  fi
+done

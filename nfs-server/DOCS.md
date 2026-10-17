@@ -55,6 +55,22 @@ it entirely, and it ends early once all recorded clients have reclaimed. The `gr
 default, which matches the `lease_time` option (keep it at or above `lease_time` so idle clients – whose state-manager
 renewals fire at ~lease/3 intervals – can still recover).
 
+## Automatic drive remount handling
+
+Drives behind NFS shares (typically USB disks mounted under `/media/`) can be unplugged and replugged while the app is
+running. The app watches its configured share paths for such mount changes and recovers on its own – no manual app
+restart needed:
+
+- **Drive replugged** (same or different device name, mounted at the same path): within about 30 seconds the affected
+  shares serve the drive's current content again. The watcher refreshes the export configuration and restarts the NFS
+  server; connected clients keep working across this via the NFSv4 state recovery described above.
+- **Drive unplugged**: the affected shares temporarily export an empty directory. The app never serves stale data from
+  the detached drive's filesystem, so once the drive is gone the old files are no longer reachable over NFS. A tick
+  message in the log notes the event; when the drive comes back the shares recover as above.
+
+If a share path no longer resolves to a mount at all (the directory is missing rather than just unmounted), the app
+exports an empty directory for it until the path reappears.
+
 ## Security notes
 
 - **Authentication**: NFSv4 with `sec=sys` has no cryptographic authentication – a client's claimed user ID is taken at

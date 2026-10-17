@@ -99,6 +99,7 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
   # Export tables and NFSv4 state
   /etc/exports rw,
+  /etc/nfsd.args rw,
   /var/lib/nfs/** rw,
   /proc/net/rpc/** rw,
 
@@ -106,8 +107,8 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   /proc/net/{,tcp,tcp6,if_inet6,dev} r,
   /proc/net/dev_mcast r,
 
-  # Process introspection (ps/grep for checks)
-  /proc/[0-9]*/{,cmdline,mounts} r,
+  # Process introspection (ps/grep for checks, mountinfo for the nfsd-watch mirror detection)
+  /proc/[0-9]*/{,cmdline,mounts,mountinfo} r,
   /proc/[0-9]*/stat r,
 
   # Runtime check scripts

@@ -1,0 +1,312 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+## Apply the NFS configuration: validate it, generate /etc/exports + /etc/nfsd.args and reconcile the pseudo file
+## system root's per-share bind mirrors with the current mount state. Shared by cont-init (boot) and the nfsd-watch
+## longrun (hd-idle-genargs pattern): a drive's unplug/replug changes the mount object backing the configured share
+## paths while the app runs (HAOS bind-mounts /share and /media rslave - new mounts propagate into the running
+## container), but the mirrors are private bind clones outside that propagation chain, so they keep serving a
+## detached superblock clone (stale data; on replug a second superblock on the same device) until they are rebound
+## and the kernel server is restarted. Detection semantics (object identity + mount-ID tracking), the cycle order,
+## the umount/bind ordering for nested mirrors and the watcher design: nfs-server/KNOWLEDGE.md
+## §"Automatic mirror refresh (nfsd-watch)".
+##
+## Usage: nfsd-apply [--boot] [--check] [--quiet]
+##   --boot   create missing share directories (with the configured uid/gid/permissions) - boot-time only
+##   --check  read-only: validate and detect mirror changes without touching anything (exit 3 = changed)
+##   --quiet  no narrative/info logs and no expected-transient warnings (per-tick silence); errors always log
+## Exit codes: 0 = success (mirror state unchanged), 3 = mirror state (would) change (with --check), 1 = failure.
+
+QUIET=0
+BOOT=0
+CHECK=0
+for arg in "$@"; do
+  case "$arg" in
+    --boot) BOOT=1 ;;
+    --check) CHECK=1 ;;
+    --quiet) QUIET=1 ;;
+    *)
+      bashio::log.fatal "Unknown nfsd-apply argument: ${arg}"
+      exit 1
+      ;;
+  esac
+done
+
+qlog_info() { [ "$QUIET" = 1 ] || bashio::log.info "$@"; }
+qlog_warning() { [ "$QUIET" = 1 ] || bashio::log.warning "$@"; }
+
+PSEUDO_ROOT=/data/pseudo_root
+EXPORTS=/etc/exports
+STATE_FILE=/var/lib/nfs/mirrors.state
+
+## "dev:ino" of a path's directory object: empty when the path is absent or not a directory. Bind mounts preserve
+## both values, so a mirror and its source carry equal keys iff the mirror serves the source's current directory
+## object. (Superblock instances are invisible to it - see covering_mount_id below.)
+dir_key() {
+  local key=""
+  if [ -d "$1" ]; then
+    key="$(stat -c '%d:%i' "$1" 2>/dev/null || true)"
+  fi
+  printf '%s' "$key"
+}
+
+## Mount ID of the mount covering $1: the deepest mountinfo mount point that is a path prefix (over-mounts stack by
+## mount ID, so the longest match wins). A re-mounted drive always gets a new ID - that is what catches an
+## unplug/replug inside one poll interval, which the dev+ino key cannot see (same device, same inode numbers).
+covering_mount_id() {
+  awk -v p="$1" '
+    BEGIN { best = 0; id = 0 }
+    {
+      mp = $5
+      if (mp == p || mp == "/" || (index(p, mp) == 1 && substr(p, length(mp) + 1, 1) == "/")) {
+        if (length(mp) >= best) { best = length(mp); id = $1 }
+      }
+    }
+    END { print id + 0 }' /proc/self/mountinfo
+}
+
+## Mountpoint check (share paths are whitespace-free - validated below, so plain grep is exact).
+is_mounted() { grep -qE " on ${1//\//\\/} " /proc/mounts; }
+
+## App options are immutable while the app runs (the supervisor validates at save time and only hands new options to
+## the app at its next start), so boot and watcher derive the same configuration from them.
+DEFAULT_UID=$(bashio::config 'default_uid')
+DEFAULT_GID=$(bashio::config 'default_gid')
+DEFAULT_PERMS=$(bashio::config 'default_permissions')
+SHARES=$(bashio::config 'shares')
+if bashio::var.is_empty "$SHARES"; then
+  bashio::exit.nok "No NFS shares configured. Please add shares in the app's configuration."
+fi
+
+if [ "$CHECK" = 0 ]; then
+  mkdir -p "$PSEUDO_ROOT"
+fi
+
+declare -A ROOT_NETWORKS=()  # unique client networks of all shares (the fsid=0 pseudo-root entries)
+declare -A SEEN_SHARES=()    # options already configured per (path|network)
+declare -a EXPORT_LINES=()   # /etc/exports lines, written at the end (never in --check)
+declare -a STATE_LINES=()    # per-share source identity, recorded for the next detection (never in --check)
+declare -A RECORDED=()       # the previous snapshot: path -> "<mount-id> <dev:ino-or-none>"
+declare -a REBIND_MIRRORS=() # mirrors whose (re)bind is deferred to the umount/bind phases below
+declare -A REBOUND=()        # dedup guard: one mirror path can back several shares (same path, different networks)
+if [ -e "$STATE_FILE" ]; then
+  while read -r sp mid key; do
+    [ "$sp" != "" ] || continue
+    RECORDED["${sp}"]="${mid} ${key}"
+  done <"$STATE_FILE"
+fi
+CHANGED=0
+FSID=1
+
+while IFS= read -r share; do
+  path=$(bashio::jq "$share" '.path')
+  network=$(bashio::jq "$share" '.network')
+  options=$(bashio::jq "$share" '.options')
+
+  ## Only directories mapped into the app can be exported (ephemeral or unusable otherwise).
+  if [[ "$path" != /share && "$path" != /share/* &&
+    "$path" != /media && "$path" != /media/* ]]; then
+    bashio::log.fatal "Share path ${path} is outside of /share/ or /media/: only directories mapped into the app can be exported."
+    bashio::exit.nok
+  fi
+  ## Clean absolute path only: used verbatim as the client-visible export path and concatenated with the pseudo root
+  ## below; empty components (leading/trailing/consecutive slashes) and the filesystem root are not usable.
+  if [[ ! "$path" =~ ^/[^/]+(/[^/]+)*$ ]]; then
+    bashio::log.fatal "Share path '${path}' must be an absolute path without empty components (e.g. /share/nfs)."
+    bashio::exit.nok
+  fi
+  ## /etc/exports is whitespace-separated; NFS exports must be directories.
+  if [[ "$path" =~ [[:space:]] ]] || [[ "$network" =~ [[:space:]] ]] \
+    || [[ "$options" =~ [[:space:]] ]]; then
+    bashio::log.fatal "Share path, network and options must not contain whitespace (got: '${path} | ${network} | ${options}')."
+    bashio::exit.nok
+  fi
+
+  ## One option set applies per (path, network) pair: the kernel keeps a single export cache entry and the last
+  ## /etc/exports line wins silently (nfs-server/KNOWLEDGE.md §"Export-cache and fsid semantics..."). The same path
+  ## with *different* networks is legitimate (per-network options).
+  share_key="${path}|${network}"
+  if [[ -n "${SEEN_SHARES[${share_key}]+x}" ]]; then
+    if [ "${SEEN_SHARES[${share_key}]}" = "$options" ]; then
+      bashio::log.fatal "Share ${path} for ${network} is configured more than once with identical settings: remove the redundant duplicate entry."
+    else
+      bashio::log.fatal "Share ${path} for ${network} is configured more than once with conflicting options ('${SEEN_SHARES[${share_key}]}' vs '${options}'): only one option set applies per path and network - keep a single entry (separate entries are only needed for different networks)."
+    fi
+    bashio::exit.nok
+  fi
+  SEEN_SHARES["${share_key}"]="$options"
+
+  ## Missing share directory: boot creates it with the configured defaults; a tick exports an empty directory
+  ## instead (a deleted path is not auto-recreated mid-run) and rebinds automatically once the path reappears.
+  if [ ! -d "$path" ]; then
+    if [ -e "$path" ]; then
+      bashio::log.fatal "Share path ${path} is not a directory: NFS exports must be directories."
+      bashio::exit.nok
+    fi
+    if [ "$BOOT" = 1 ]; then
+      qlog_info "Creating directory ${path} for NFS share"
+      if ! mkdir -p "$path"; then
+        bashio::log.fatal "Unable to create the share directory ${path}."
+        bashio::exit.nok
+      fi
+      chmod "$DEFAULT_PERMS" "$path" \
+        || {
+          bashio::log.fatal "Unable to set the configured permissions on ${path}."
+          bashio::exit.nok
+        }
+      chown "${DEFAULT_UID}:${DEFAULT_GID}" "$path" \
+        || {
+          bashio::log.fatal "Unable to set the configured ownership on ${path}."
+          bashio::exit.nok
+        }
+      bashio::log.info "Created ${path} with UID:${DEFAULT_UID} GID:${DEFAULT_GID} Permissions:${DEFAULT_PERMS}"
+    else
+      qlog_warning "Share path ${path} does not exist (e.g. its drive is detached) - exporting an empty directory until it reappears."
+    fi
+  fi
+
+  qlog_info "Exporting NFS share ${path} for ${network} with options ${options}"
+  MIRROR="${PSEUDO_ROOT}${path}"
+  SRC_KEY="$(dir_key "$path")"
+  MIR_KEY="$(dir_key "$MIRROR")"
+  SRC_ID="$(covering_mount_id "$path")"
+  RECORDED_KEY="${RECORDED[${path}]:-}"
+  MIR_MOUNTED=0
+  if is_mounted "$MIRROR"; then MIR_MOUNTED=1; fi
+
+  ## Clean = the mirror serves the source's current directory object (equal dev:ino key) AND the source's covering
+  ## mount is the one recorded at the last apply (equal mount ID catches same-object re-mounts), or the source is
+  ## absent and the mirror is already the unmounted fallback (plain directory).
+  CLEAN=0
+  if [ "$SRC_KEY" != "" ]; then
+    if [ "$SRC_KEY" = "$MIR_KEY" ] && [ "$RECORDED_KEY" = "${SRC_ID} ${SRC_KEY}" ]; then
+      CLEAN=1
+    fi
+  elif [ "$MIR_MOUNTED" = 0 ]; then
+    CLEAN=1
+  fi
+
+  if [ "$CHECK" = 1 ]; then
+    [ "$CLEAN" = 1 ] || CHANGED=1
+  elif [ "$CLEAN" = 0 ]; then
+    ## Rebind needed: the stale mirror may serve a detached superblock clone (unplug/replug). NOT done inline: the
+    ## umounts/binds run in dedicated phases after the loop because mirrors may nest and the order matters
+    ## (umounts deepest-first - umounting a parent mirror with a child mirror still mounted inside it fails with
+    ## EBUSY; binds shallowest-first - a child bind made before its parent's fresh bind would end up beneath it).
+    ## Dedup: one mirror path can back several shares (same path, different networks). The watcher only runs the
+    ## phases with the kernel server down (pins released, the proven nfsd-stop order); an absent source keeps the
+    ## mirror as the plain exportable fallback directory.
+    if [[ -z "${REBOUND[${path}]+x}" ]]; then
+      CHANGED=1
+      REBOUND["${path}"]=1
+      REBIND_MIRRORS+=("$MIRROR")
+      qlog_info "Rebinding the mirror of ${path} (${MIRROR})"
+    fi
+  fi
+
+  EXPORT_LINES+=("${MIRROR} ${network}(fsid=${FSID},${options})")
+  if [ "$CHECK" = 0 ]; then
+    STATE_LINES+=("${path} ${SRC_ID} ${SRC_KEY:-none}")
+  fi
+  ROOT_NETWORKS["${network}"]=1
+  FSID=$((FSID + 1))
+done < <(echo "$SHARES")
+
+## Export the pseudo file system root itself: read-only walk access for all client networks (the per-share entries
+## control the share contents). No crossmnt needed - NFSv4 clients switch exports at mountpoint crossings regardless
+## (nfs-server/KNOWLEDGE.md §"NFSv4 needs rpc.mountd...", consequences).
+for network in "${!ROOT_NETWORKS[@]}"; do
+  EXPORT_LINES+=("${PSEUDO_ROOT} ${network}(fsid=0,ro,no_subtree_check)")
+done
+
+if [ "$CHECK" = 1 ]; then
+  [ "$CHANGED" = 1 ] && exit 3
+  exit 0
+fi
+
+## Rebind phase 1 (umount): drop every stale mirror, deepest paths first - mirrors may nest (a share below another
+## share's path), and unmounting a parent mirror with a child mirror still mounted inside it fails with EBUSY (the
+## same deepest-first rule the nfsd-stop down script applies). Already-unmounted mirrors are skipped (idempotent
+## after a partial failure).
+if [ "${#REBIND_MIRRORS[@]}" -gt 0 ]; then
+  mapfile -t UMOUNTS < <(printf '%s\n' "${REBIND_MIRRORS[@]}" | awk '{print length, $0}' | sort -rn | cut -d' ' -f2-)
+  for mirror in "${UMOUNTS[@]}"; do
+    is_mounted "$mirror" || continue
+    if ! umount "$mirror"; then
+      bashio::log.fatal "Unable to unmount the stale mirror ${mirror}: could not rebind the share's export mirror."
+      bashio::exit.nok
+    fi
+  done
+fi
+
+## Rebind phase 2 (bind): re-create the mirrors shallowest paths first (a child's bind target must exist inside its
+## parent's fresh bind, not beneath it) from the share path's current mount state. An absent source (e.g. the drive
+## is detached) leaves the mirror as the plain exportable fallback directory.
+if [ "${#REBIND_MIRRORS[@]}" -gt 0 ]; then
+  mapfile -t BINDS < <(printf '%s\n' "${REBIND_MIRRORS[@]}" | awk '{print length, $0}' | sort -n | cut -d' ' -f2-)
+  for mirror in "${BINDS[@]}"; do
+    src="${mirror#"${PSEUDO_ROOT}"}"
+    if ! mkdir -p "$mirror"; then
+      bashio::log.fatal "Unable to create the mirror mountpoint ${mirror}."
+      bashio::exit.nok
+    fi
+    if [ -d "$src" ] && ! mount --bind "$src" "$mirror"; then
+      bashio::log.fatal "Unable to bind-mount ${src} to ${mirror}: could not create the share's export mirror."
+      bashio::exit.nok
+    fi
+  done
+fi
+
+## /etc/exports (atomic; skipped when the content is unchanged - clean watcher ticks write nothing).
+printf '%s\n' "${EXPORT_LINES[@]}" >"${EXPORTS}.tmp" \
+  || {
+    bashio::log.fatal "Unable to write the exports table."
+    bashio::exit.nok
+  }
+if cmp -s "$EXPORTS" "${EXPORTS}.tmp"; then
+  rm -f "${EXPORTS}.tmp"
+else
+  mv -f "${EXPORTS}.tmp" "$EXPORTS" \
+    || {
+      bashio::log.fatal "Unable to install the exports table."
+      bashio::exit.nok
+    }
+fi
+
+## Record the per-share source identity as the next detection baseline (only written when something changed - clean
+## ticks leave the snapshot as is). Superblock clones the watcher cannot see: none - a re-mounted source always gets
+## a new mount ID (nfs-server/KNOWLEDGE.md §"Automatic mirror refresh (nfsd-watch)").
+if [ "$CHANGED" = 1 ]; then
+  if ! { printf '%s\n' "${STATE_LINES[@]}" >"${STATE_FILE}.tmp" && mv -f "${STATE_FILE}.tmp" "$STATE_FILE"; }; then
+    bashio::log.fatal "Unable to record the mirror state."
+    bashio::exit.nok
+  fi
+fi
+
+## Generate /etc/nfsd.args: the rpc.nfsd command line consumed by the nfsd-start script (hd-idle-genargs pattern:
+## one shared generator for boot and the watcher's restarts). The server args are invariant while the app runs - the
+## supervisor validates options at save time and only hands new ones to the app at its next start - and the app IP
+## is re-detected per apply so a restart cycle always binds the current address. The version-set semantics, the
+## -N/-V quirks and the grace/lease ratio: nfs-server/KNOWLEDGE.md §"rpc.nfsd is not a daemon" / §"The grace period...".
+APP_IP=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1 | head -n 1) || true
+if [ "$APP_IP" = "" ]; then
+  bashio::log.fatal "Unable to determine the app's IP address for the NFS server bind."
+  bashio::exit.nok
+fi
+printf 'rpc.nfsd --no-nfs-version 3 --no-udp --host %s --lease-time %s --grace-time %s %s\n' \
+  "$APP_IP" \
+  "$(bashio::config 'lease_time')" \
+  "$(bashio::config 'grace_time' "$(bashio::config 'lease_time')")" \
+  "$(bashio::config 'n_threads')" >/etc/nfsd.args.tmp \
+  || {
+    bashio::log.fatal "Unable to write the nfsd command line."
+    bashio::exit.nok
+  }
+mv -f /etc/nfsd.args.tmp /etc/nfsd.args \
+  || {
+    bashio::log.fatal "Unable to install the nfsd command line."
+    bashio::exit.nok
+  }
+
+exit 0

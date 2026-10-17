@@ -183,6 +183,65 @@ Within a running container the version set lives in the kernel's network namespa
 is only reset to the kernel defaults (everything compiled-in: `+3 +4 +4.1 +4.2`) when the container – and with it the
 network namespace – is recreated.
 
+## Automatic mirror refresh (nfsd-watch)
+
+The app applies its share configuration once at boot: every share path under `/share`/`/media` gets a **bind-mount
+mirror** under `/data/pseudo_root` (the container's overlayfs root is not NFS-exportable) and an `/etc/exports` line
+with a distinct numeric fsid. Mirrors are private bind clones made at bind time — they are outside the host's mount
+propagation chain. HAOS bind-mounts `/share` and `/media` into app containers with **`rslave` propagation**
+(`supervisor/docker/app.py` binds `MountBindOptions(propagation=PropagationMode.RSLAVE)`, verified against supervisor
+ref 2026-10), so new host mounts propagate *into* the running container — but the mirrors never learn about it:
+
+- **Unplug** (HAOS unmounts the drive): the mirror keeps serving the detached superblock clone — stale data stays
+  exported over NFS, and after a replug two live superblocks would exist for one block device (a data-integrity hazard),
+  so the mirror must be dropped and re-bound.
+- **Replug at the same path**: the drive remounts on top of the path, but the mirror still binds the pre-unplug state;
+  NFS keeps serving stale content until the app restarts.
+
+`nfsd-watch` (s6-rc longrun, the `hd-idle-watch` pattern: shared apply helper + poll loop + narrow restart) closes this.
+App options are immutable while the app runs (the supervisor validates at save time and hands new options to the app
+only at its next start), so `/etc/exports` content never changes mid-run — only the *mounts under* the configured share
+paths do. `/usr/bin/nfsd-apply` is the shared generator (cont-init calls it at boot with `--boot`; the watcher
+re-invokes it), with three modes: `--boot` (create missing share directories), `--check` (read-only change detection,
+exit 3 = changed), `--quiet` (no per-tick narrative logs).
+
+**Detection** is a stateless invariant check over `/proc/self/mountinfo`: a share is clean iff the mirror serves the
+source path's current directory object (equal `dev:ino`, preserved across bind mounts) *and* the source's covering mount
+is the one recorded in the baseline state file (`/var/lib/nfs/mirrors.state`). The mount ID is essential: after a replug
+at the same path the device and inode numbers are identical (same filesystem re-mounted), but the kernel assigns every
+new mount instance a fresh mount ID — `stat`/`/proc/mounts` alone cannot see that re-mount. The watcher polls every 30
+s; no udev wiring, matching the trigger-path simplicity (a drive mount appearing under `/media` is the whole event).
+
+**The change cycle** deliberately drives the kernel server directly instead of restarting the s6-rc oneshot (s6-rc is
+not reentrant from inside a service, and a down/up would deadlock; the oneshot stays "up" and container shutdown still
+runs its down script):
+
+1. `rpc.nfsd 0` — threads down *first*, releasing the kernel's export/file-handle cache pins on the mirrors (the proven
+   `nfsd-stop` order; without it the mirror umounts fail with `EBUSY`).
+2. `exportfs -au` — unexport (without the `nfsd-stop` mirror teardown, which the next step redoes in a fresh order).
+3. `nfsd-apply` — rebind mirrors and rewrite `/etc/exports`.
+4. `/etc/s6-overlay/scripts/nfsd-start` — re-export and restart the kernel server.
+
+Mirror rebinds must respect nesting (a share path can sit inside another share's mirror): **umounts run deepest-first**
+(unmounting a parent mirror with a child mirror still mounted fails with `EBUSY` — the same rule `nfsd-stop` applies to
+its teardown) and **binds shallowest-first** (a child bind made before its parent's fresh bind would end up shadowed
+beneath it). Mirrors are deduplicated per path (a path may appear in several shares, e.g. different networks).
+
+**Failure semantics**: a failed check keeps the current configuration (like `hd-idle-watch`, options can't change
+mid-run, so a check failure is a can't-happen guarded for insurance); a failed apply or restart logs a warning and
+retries next tick — the baseline state file only advances on a successful apply, so detection is idempotent. The watcher
+logs one info line per detected change ("Share mount state changed…") and is silent on clean ticks.
+
+Grace-period interplay: each watcher cycle restarts the kernel server exactly like an app restart — connected clients
+reclaim state during the grace period via the shipped `nfsdcld` tracker (see the sections above; the tracker's store
+lives on `/data` and is untouched by the cycle).
+
+Lab verification (`.mise/tasks/lab/nfs-server.sh`, in-container simulation — the lab app runs privileged, so a bind over
+the share path stands in for a replug and its umount for an unplug; the real trigger path is
+supervisor-source-verified): replug content switch within the poll interval, unplug → empty export (the stale-serving
+regression check), quiet ticks (no restart without a change), and the unaffected-share check. Device-side verification
+of the real HAOS trigger path (rslave propagation of drive mounts under `/media`) is a TODO.
+
 ## AppArmor profile — nfs-server-specific notes
 
 (Mediation mechanics — capability mediation, errno forensics, mount-rule grammar, network opt-in, ioctl mediation,

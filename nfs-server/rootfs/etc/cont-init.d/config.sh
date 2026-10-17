@@ -63,119 +63,12 @@ mkdir -p /data/nfsdcld
 ## start (see /etc/s6-overlay/scripts/nfsd-start and KNOWLEDGE.md in the app's
 ## source repository for why direct writes to /proc/fs/nfsd/* don't work).
 
-## Generate /etc/exports from the share configuration: bind-mount every share path under the app's own pseudo file
-## system root on /data (the container's overlayfs root is not NFS-exportable) and export the mirrors with distinct
-## numeric fsids. Why mountd is needed at all and the pseudo-root design incl. the fsid ambiguity:
-## nfs-server/KNOWLEDGE.md §"NFSv4 needs rpc.mountd...".
+## Generate /etc/exports and set up the share mirrors under the app's own pseudo file system root on /data (the
+## container's overlayfs root is not NFS-exportable): shared helper, used by the nfsd-watch longrun for the same
+## apply afterwards (hd-idle-genargs pattern). Why mountd is needed at all and the pseudo-root design incl. the fsid
+## ambiguity: nfs-server/KNOWLEDGE.md §"NFSv4 needs rpc.mountd...".
 bashio::log.info "Configuring NFS shares..."
-: >/etc/exports
-
-## Get user configuration values
-DEFAULT_UID=$(bashio::config 'default_uid')
-DEFAULT_GID=$(bashio::config 'default_gid')
-DEFAULT_PERMS=$(bashio::config 'default_permissions')
-SHARES=$(bashio::config 'shares')
-if bashio::var.is_empty "$SHARES"; then
-  bashio::exit.nok "No NFS shares configured. Please add shares in the app's configuration."
+if ! /usr/bin/nfsd-apply --boot; then
+  bashio::exit.nok "Applying the NFS share configuration failed - see the log messages above."
 fi
-
-PSEUDO_ROOT="/data/pseudo_root"
-declare -A ROOT_NETWORKS=() # unique client networks of all shares
-declare -a MIRROR_PATHS=()  # for unmounting in the down script
-declare -A SEEN_SHARES=()   # options already configured per (path|network)
-FSID=1
-
-## Bind-mount $1 at $2 if not already mounted (idempotent)
-bind_mount() {
-  if ! grep -qE " on ${2//\//\\/} " /proc/mounts; then
-    ERRFILE="$(mktemp)"
-    if ! mkdir -p "${2}" 2>"$ERRFILE"; then
-      bashio::log.fatal "Unable to create the share's export mirror directory ${2}. mkdir's error output:"
-      log_captured_stderr "$ERRFILE"
-      rm -f "$ERRFILE"
-      bashio::exit.nok
-    fi
-    if ! mount --bind "${1}" "${2}" 2>"$ERRFILE"; then
-      bashio::log.fatal "Unable to bind-mount ${1} to ${2}: could not create the share's export mirror. mount's error output:"
-      log_captured_stderr "$ERRFILE"
-      rm -f "$ERRFILE"
-      bashio::exit.nok
-    fi
-    rm -f "$ERRFILE"
-  fi
-}
-
-## Process each share configuration
-while IFS= read -r share; do
-  path=$(bashio::jq "$share" '.path')
-  network=$(bashio::jq "$share" '.network')
-  options=$(bashio::jq "$share" '.options')
-
-  ## Only directories mapped into the app can be exported (ephemeral or unusable otherwise).
-  if [[ "$path" != /share && "$path" != /share/* &&
-    "$path" != /media && "$path" != /media/* ]]; then
-    bashio::log.fatal "Share path ${path} is outside of /share/ or /media/: only directories mapped into the app can be exported."
-    bashio::exit.nok
-  fi
-  ## Clean absolute path only: used verbatim as the client-visible export path and concatenated with the pseudo root
-  ## below; empty components (leading/trailing/consecutive slashes) and the filesystem root are not usable.
-  if [[ ! "$path" =~ ^/[^/]+(/[^/]+)*$ ]]; then
-    bashio::log.fatal "Share path '${path}' must be an absolute path without empty components (e.g. /share/nfs)."
-    bashio::exit.nok
-  fi
-  ## /etc/exports is whitespace-separated; NFS exports must be directories.
-  if [[ "$path" =~ [[:space:]] ]] || [[ "$network" =~ [[:space:]] ]] \
-    || [[ "$options" =~ [[:space:]] ]]; then
-    bashio::log.fatal "Share path, network and options must not contain whitespace (got: '${path} | ${network} | ${options}')."
-    bashio::exit.nok
-  fi
-  if [ -e "$path" ] && [ ! -d "$path" ]; then
-    bashio::log.fatal "Share path ${path} is not a directory: NFS exports must be directories."
-    bashio::exit.nok
-  fi
-
-  ## One option set applies per (path, network) pair: the kernel keeps a single export cache entry and the last
-  ## /etc/exports line wins silently (nfs-server/KNOWLEDGE.md §"Export-cache and fsid semantics..."). The same path
-  ## with *different* networks is legitimate (per-network options).
-  share_key="${path}|${network}"
-  if [[ -n "${SEEN_SHARES[${share_key}]+x}" ]]; then
-    if [ "${SEEN_SHARES[${share_key}]}" = "$options" ]; then
-      bashio::log.fatal "Share ${path} for ${network} is configured more than once with identical settings: remove the redundant duplicate entry."
-    else
-      bashio::log.fatal "Share ${path} for ${network} is configured more than once with conflicting options ('${SEEN_SHARES[${share_key}]}' vs '${options}'): only one option set applies per path and network - keep a single entry (separate entries are only needed for different networks)."
-    fi
-    bashio::exit.nok
-  fi
-  SEEN_SHARES["${share_key}"]="$options"
-
-  bashio::log.info "Exporting NFS share ${path} for ${network} with options ${options}"
-
-  ## Create the share directory if it doesn't exist, but don't modify
-  ## existing ones
-  if [ ! -d "$path" ]; then
-    bashio::log.info "Creating directory ${path} for NFS share"
-    mkdir -p "$path"
-    # Set permissions using configured defaults
-    chmod "$DEFAULT_PERMS" "$path"
-    chown "${DEFAULT_UID}:${DEFAULT_GID}" "$path"
-    bashio::log.info "Created ${path} with UID:${DEFAULT_UID} GID:${DEFAULT_GID} Permissions:${DEFAULT_PERMS}"
-  fi
-
-  ## Mirror the share path under the pseudo file system root and export it
-  ## from there
-  MIRROR="${PSEUDO_ROOT}${path}"
-  bind_mount "$path" "$MIRROR"
-  echo "${MIRROR} ${network}(fsid=${FSID},${options})" >>/etc/exports
-  MIRROR_PATHS+=("$MIRROR")
-  ROOT_NETWORKS["${network}"]=1
-  FSID=$((FSID + 1))
-done < <(echo "$SHARES")
-
-## Export the pseudo file system root itself: read-only walk access for all client networks (the per-share entries
-## control the share contents). No crossmnt needed - NFSv4 clients switch exports at mountpoint crossings regardless
-## (nfs-server/KNOWLEDGE.md §"NFSv4 needs rpc.mountd...", consequences).
-for network in "${!ROOT_NETWORKS[@]}"; do
-  echo "${PSEUDO_ROOT} ${network}(fsid=0,ro,no_subtree_check)" >>/etc/exports
-done
-
 bashio::log.info "Configuring NFS shares completed"

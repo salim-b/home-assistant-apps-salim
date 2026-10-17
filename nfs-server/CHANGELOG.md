@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.7.0
+
+- New: automatic drive remount handling (`nfsd-watch`). Shares backed by drives that are unplugged and replugged no
+  longer need a manual app restart: the watcher detects mount changes at the configured share paths within its 30-second
+  poll interval, refreshes the export configuration and restarts the kernel NFS server. While a drive is detached, its
+  shares temporarily export an empty directory (previously the stale, detached filesystem content was served until the
+  next app restart). Connected clients keep working across these restarts via NFSv4 state recovery.
+
 ## 0.6.2
 
 - Fix: every start failed with `rpc.nfsd   --no-nfs-version 3 …: command not found` - 0.6.1's shell-quoting reformat

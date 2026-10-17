@@ -4,6 +4,13 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
 
 ## Tasks
 
+- ~~Implement an in-container watcher re-applying the config and restarting nfsd on drive device path changes~~
+
+  **Done (0.7.0, 2026-10-17)**: shipped as the `nfsd-watch` longrun plus the shared `nfsd-apply` generator (the
+  hd-idle-watch pattern: shared apply helper, 30 s poll, narrow kernel-server restart — no manual app restart needed on
+  drive unplug/replug). Design facts (detection semantics, cycle order, no-s6-rc-restart rationale) live in
+  `nfs-server/KNOWLEDGE.md` §"Automatic mirror refresh (nfsd-watch)", user-facing behavior in the app's `DOCS.md`.
+
 - Comment-slimming pass, the same treatment hd-idle got in October 2026 - **done (0.5.4, 2026-10-16)**: every topic
   already had its canonical `KNOWLEDGE.md` home - no new sections needed; all six scripts slimmed to purpose + reference
   (cld/run 24→6, mountd/run 8→5, healthcheck 8→4, nfsd-start 16→14, nfsd-stop 12→9, config.sh 67→36 comment lines; the
