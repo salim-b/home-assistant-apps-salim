@@ -55,9 +55,10 @@ facts live in the repository-root `KNOWLEDGE.md`.
   genuine miss). Verified locally: the changelog parser reproduces the PR #3 data (hd-idle `1.22-r7` -> `1.22-r8`, app
   0.1.7) and the templated dry-run entry is panache-stable; the publish-reconcile dry-run reports both apps' current
   version tags as published (zero dispatches); the nudge dry-run is a no-op and its Dockerfile-pin/APKINDEX parse logic
-  passes function tests against live Alpine v3.24 data. The first real Alpine repoint after landing validates the flow
-  end to end (drift cron red -> Renovate PR -> green CI -> automerge -> Builder publish -> changelog commit) - do not
-  fake events.
+  passes function tests against live Alpine v3.24 data. The build-app workflow_dispatch smoke test ran green on the
+  branch (run 39098829377: prepare + both arch builds succeeded, the manifest publish skipped with publish=false - no
+  registry writes). The first real Alpine repoint after landing validates the flow end to end (drift cron red ->
+  Renovate PR -> green CI -> automerge -> Builder publish -> changelog commit) - do not fake events.
 
 - Repo sweep + dev tooling review (2026-10-16) done: the CI "redundancy" check resolved as proper architecture
   (build-app.yaml is a reusable `workflow_call` workflow invoked by builder.yaml; fetch-depth and squash-merge caveats
