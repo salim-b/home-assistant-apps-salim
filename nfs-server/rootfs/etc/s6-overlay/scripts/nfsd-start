@@ -25,7 +25,7 @@ NFSD_CMD="rpc.nfsd \
 
 bashio::log.info "Executing nfsd with: ${NFSD_CMD}"
 # shellcheck disable=SC2086
-if ${NFSD_CMD}; then
+if "$NFSD_CMD"; then
   # rpc.nfsd exits after configuring the in-kernel server - hence the s6-rc oneshot
   # (nfs-server/KNOWLEDGE.md §"rpc.nfsd is not a daemon").
   bashio::log.info "NFS server started (kernel threads running)."
@@ -33,7 +33,7 @@ if ${NFSD_CMD}; then
   # Verify and log the version set rpc.nfsd configured.
   NFS_VERSIONS="$(</proc/fs/nfsd/versions)"
   bashio::log.info "Enabled NFS versions: ${NFS_VERSIONS}"
-  if grep -qE '\+(2|3)( |$)' <<<"${NFS_VERSIONS}"; then
+  if grep -qE '\+(2|3)( |$)' <<<"$NFS_VERSIONS"; then
     bashio::log.warning "NFSv2 or NFSv3 is still enabled at kernel level despite the request to disable it."
   fi
 else

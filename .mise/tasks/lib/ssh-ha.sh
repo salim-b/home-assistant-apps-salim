@@ -42,12 +42,18 @@ ha_retry() { # ha_retry <timeout-s> <cmd...>: retry commands failing with known 
   local out rc
   while true; do
     out=$("$@" 2>&1) && rc=0 || rc=$?
-    if [ "$rc" -eq 0 ]; then printf '%s\n' "$out"; return 0; fi
+    if [ "$rc" -eq 0 ]; then
+      printf '%s\n' "$out"
+      return 0
+    fi
     if ! grep -qiE "not ready|is starting|is shutdown|connection refused" <<<"$out"; then
       printf '%s\n' "$out" >&2
       return "$rc"
     fi
-    [ "$SECONDS" -lt "$deadline" ] || { printf '%s\n' "$out" >&2; return "$rc"; }
+    [ "$SECONDS" -lt "$deadline" ] || {
+      printf '%s\n' "$out" >&2
+      return "$rc"
+    }
     echo "-- transient supervisor failure, retrying: $(head -c 120 <<<"$out")"
     sleep 5
   done
@@ -57,8 +63,8 @@ ha_retry() { # ha_retry <timeout-s> <cmd...>: retry commands failing with known 
 # already established readiness, and 'not installed' is an expected outcome) --
 
 ha_app_options() { # ha_app_options <slug>: the install's current options as compact JSON ('' when none/unreadable)
-  ssh "${SSH_OPTS[@]}" "$host" "ha apps info $1 --raw-json" 2>/dev/null |
-    jq -c '.data.options // empty' 2>/dev/null || true
+  ssh "${SSH_OPTS[@]}" "$host" "ha apps info $1 --raw-json" 2>/dev/null \
+    | jq -c '.data.options // empty' 2>/dev/null || true
 }
 
 ha_post_options() { # ha_post_options <slug> <options-json>: POST {options: ...}; fails on supervisor rejection
@@ -74,8 +80,8 @@ ha_post_options() { # ha_post_options <slug> <options-json>: POST {options: ...}
 
 ha_schema_keys() { # ha_schema_keys <slug>: the app's schema keys as a JSON array (the info endpoint's schema field is
   # an array of {name, ...} objects or a key->spec object - both shapes exist, device-verified 2026-10-16)
-  ssh "${SSH_OPTS[@]}" "$host" "ha apps info $1 --raw-json" |
-    jq -c 'if (.data.schema | type) == "array" then [.data.schema[] | .name] else [.data.schema | keys[]] end'
+  ssh "${SSH_OPTS[@]}" "$host" "ha apps info $1 --raw-json" \
+    | jq -c 'if (.data.schema | type) == "array" then [.data.schema[] | .name] else [.data.schema | keys[]] end'
 }
 
 ha_filter_options() { # ha_filter_options <options-json> <target-slug>: the options filtered to the target's schema

@@ -108,24 +108,34 @@ PYEOF' >/dev/null
 
   ts "$SECONDS" "-- waiting for the fake API to be ready"
   api_ok=0
-  for _ in $(seq 1 120); do
-    if docker exec "$net-fakesup" sh -c 'wget -q -O- http://127.0.0.1:8000 >/dev/null 2>&1'; then api_ok=1; break; fi
+  for _ in {1..120}; do
+    if docker exec "$net-fakesup" sh -c 'wget -q -O- http://127.0.0.1:8000 >/dev/null 2>&1'; then
+      api_ok=1
+      break
+    fi
     sleep 0.5
   done
-  [ "$api_ok" = 1 ] || { echo "LAB FAILED ($app): fake API never became ready"; fails=$((fails + 1)); continue; }
+  [ "$api_ok" = 1 ] || {
+    echo "LAB FAILED ($app): fake API never became ready"
+    fails=$((fails + 1))
+    continue
+  }
 
   ts "$SECONDS" "-- booting the app container (full s6-rc tree, config via API)"
   ## App-provided docker args (volumes, capabilities, devices...); the
   ## defaults work for any app, hooks extend rather than replace them
   lab_docker_args=("-v" "$tmpdir/data:/data")
-  LAB_NET_NAME="$net"; LAB_APP_DIR="$PWD/$app"; LAB_TMPDIR="$tmpdir"; LAB_SUBNET="$subnet"
+  LAB_NET_NAME="$net"
+  LAB_APP_DIR="$PWD/$app"
+  LAB_TMPDIR="$tmpdir"
+  LAB_SUBNET="$subnet"
   export LAB_NET_NAME LAB_APP_DIR LAB_TMPDIR LAB_SUBNET
   # Drop a previous app's hook function first: on a default all-apps run,
   # an app without a runtime check must not inherit the last app's
   unset -f lab_runtime_check 2>/dev/null || true
   if [ -f "$hook" ]; then
     # shellcheck source=/dev/null
-    source "$hook"          # sets lab_docker_args (opt.)
+    source "$hook" # sets lab_docker_args (opt.)
   fi
   docker rm -f "$net-app" >/dev/null 2>&1 || true
   docker run -d --privileged --name "$net-app" --network "$net" \
@@ -141,16 +151,25 @@ PYEOF' >/dev/null
 
   ts "$SECONDS" "-- waiting for boot"
   boot_ok=0
-  for _ in $(seq 1 240); do
-    if docker logs "$net-app" 2>&1 | grep -q "legacy-services successfully started"; then boot_ok=1; break; fi
+  for _ in {1..240}; do
+    if docker logs "$net-app" 2>&1 | grep -q "legacy-services successfully started"; then
+      boot_ok=1
+      break
+    fi
     if docker inspect "$net-app" --format '{{.State.Status}}' | grep -q exited; then break; fi
     sleep 0.5
   done
   if [ "$boot_ok" != 1 ]; then
-    echo "LAB FAILED ($app): boot did not complete"; docker logs "$net-app" 2>&1 | tail -15; fails=$((fails + 1)); continue
+    echo "LAB FAILED ($app): boot did not complete"
+    docker logs "$net-app" 2>&1 | tail -15
+    fails=$((fails + 1))
+    continue
   fi
   if docker logs "$net-app" 2>&1 | grep -qi "deprecated\|error\|fatal"; then
-    echo "LAB FAILED ($app): deprecation/error/fatal in boot log:"; docker logs "$net-app" 2>&1 | grep -iE "deprecated|error|fatal"; fails=$((fails + 1)); continue
+    echo "LAB FAILED ($app): deprecation/error/fatal in boot log:"
+    docker logs "$net-app" 2>&1 | grep -iE "deprecated|error|fatal"
+    fails=$((fails + 1))
+    continue
   fi
 
   ts "$SECONDS" "-- app runtime check"
@@ -158,7 +177,9 @@ PYEOF' >/dev/null
     LAB_APP_IP=$(docker inspect "$net-app" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
     export LAB_APP_IP
     if ! lab_runtime_check; then
-      echo "LAB FAILED ($app): runtime check failed"; fails=$((fails + 1)); continue
+      echo "LAB FAILED ($app): runtime check failed"
+      fails=$((fails + 1))
+      continue
     fi
   else
     echo "(no hook: boot-only lab)"
@@ -166,9 +187,17 @@ PYEOF' >/dev/null
 
   ts "$SECONDS" "-- graceful stop"
   docker stop -t 60 "$net-app" >/dev/null \
-    || { echo "LAB FAILED ($app): graceful stop failed"; fails=$((fails + 1)); continue; }
+    || {
+      echo "LAB FAILED ($app): graceful stop failed"
+      fails=$((fails + 1))
+      continue
+    }
   exit_code=$(docker inspect "$net-app" --format '{{.State.ExitCode}}')
-  [ "$exit_code" = "0" ] || { echo "LAB FAILED ($app): exit code $exit_code"; fails=$((fails + 1)); continue; }
+  [ "$exit_code" = "0" ] || {
+    echo "LAB FAILED ($app): exit code $exit_code"
+    fails=$((fails + 1))
+    continue
+  }
 
   echo "$app lab OK"
 done

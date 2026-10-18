@@ -14,16 +14,16 @@ exportfs -au || true
 PSEUDO_ROOT="/data/pseudo_root"
 bashio::log.info "Unmounting the share mirrors under the pseudo file system root..."
 SHARES=$(bashio::config 'shares' || true)
-if bashio::var.has_value "${SHARES}"; then
+if bashio::var.has_value "$SHARES"; then
   PATHS=""
   while IFS= read -r share; do
     path=$(bashio::jq "$share" '.path' || true)
-    [ -n "${path}" ] || continue
+    [ "$path" != "" ] || continue
     PATHS+="${path}\n"
-  done < <(echo "${SHARES}")
+  done < <(echo "$SHARES")
   # deepest paths first: mirrors may nest (e.g. /media and /media/usb)
-  printf '%b' "${PATHS}" | awk '{print length, $0}' | sort -rn | cut -d' ' -f2- |
-    while IFS= read -r path; do
+  printf '%b' "$PATHS" | awk '{print length, $0}' | sort -rn | cut -d' ' -f2- \
+    | while IFS= read -r path; do
       umount "${PSEUDO_ROOT}${path}" 2>/dev/null || true
     done
 fi

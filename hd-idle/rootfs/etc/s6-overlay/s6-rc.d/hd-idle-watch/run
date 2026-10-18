@@ -12,12 +12,12 @@ ARGS_FILE=/etc/hd-idle.args
 CAND_FILE=/tmp/hd-idle-args.new
 
 while true; do
-  sleep "${INTERVAL}"
+  sleep "$INTERVAL"
 
   ## Regenerate from current options + current device resolution. Mid-run regeneration failures are nearly impossible
   ## by construction; the keep-current guard is cheap insurance (analysis: hd-idle/KNOWLEDGE.md
   ## §"Automatic drive re-resolution").
-  if ! /usr/bin/hd-idle-genargs --quiet "${CAND_FILE}"; then
+  if ! /usr/bin/hd-idle-genargs --quiet "$CAND_FILE"; then
     bashio::log.warning "hd-idle configuration regeneration failed - keeping the current configuration."
     continue
   fi
@@ -25,11 +25,11 @@ while true; do
   ## Compare BOTH generated files: an interrupted install (crash between the mv calls below) can leave the drives file
   ## stale behind the args file, and this comparison is what re-syncs it (and re-runs the treatment) on the next tick.
   DRIVES_FILE="${ARGS_FILE%.args}.drives"
-  case "${ARGS_FILE}" in *.args) ;; *) DRIVES_FILE="${ARGS_FILE}.drives" ;; esac
+  case "$ARGS_FILE" in *.args) ;; *) DRIVES_FILE="${ARGS_FILE}.drives" ;; esac
   CAND_DRIVES_FILE="${CAND_FILE%.args}.drives"
-  case "${CAND_FILE}" in *.args) ;; *) CAND_DRIVES_FILE="${CAND_FILE}.drives" ;; esac
-  if cmp -s "${ARGS_FILE}" "${CAND_FILE}" && cmp -s "${DRIVES_FILE}" "${CAND_DRIVES_FILE}"; then
-    rm -f "${CAND_FILE}" "${CAND_DRIVES_FILE}"
+  case "$CAND_FILE" in *.args) ;; *) CAND_DRIVES_FILE="${CAND_FILE}.drives" ;; esac
+  if cmp -s "$ARGS_FILE" "$CAND_FILE" && cmp -s "$DRIVES_FILE" "$CAND_DRIVES_FILE"; then
+    rm -f "$CAND_FILE" "$CAND_DRIVES_FILE"
     continue
   fi
 
@@ -41,13 +41,13 @@ while true; do
   ## that are NEW or CHANGED relative to it get the (possibly
   ## wake-causing) treatment re-applied; unchanged drives keep their
   ## volatile settings.
-  cp "${DRIVES_FILE}" "${DRIVES_FILE}.prev" 2>/dev/null || true
-  mv -f "${CAND_FILE}" "${ARGS_FILE}"
-  mv -f "${CAND_DRIVES_FILE}" "${DRIVES_FILE}"
+  cp "$DRIVES_FILE" "${DRIVES_FILE}.prev" 2>/dev/null || true
+  mv -f "$CAND_FILE" "$ARGS_FILE"
+  mv -f "$CAND_DRIVES_FILE" "$DRIVES_FILE"
   ## Unconditional: the drives file's pm-flag column carries the EFFECTIVE per-drive decision (global
   ## disable_drive_pm as the default, per-drive yes/no overrides); pmfix skips drives whose flag is 0.
-  /usr/bin/hd-idle-pmfix "${DRIVES_FILE}" --since "${DRIVES_FILE}.prev" ||
-    bashio::log.warning "hd-idle-pmfix failed - the drives' power management stays as is."
+  /usr/bin/hd-idle-pmfix "$DRIVES_FILE" --since "${DRIVES_FILE}.prev" \
+    || bashio::log.warning "hd-idle-pmfix failed - the drives' power management stays as is."
   if ! s6-svc -r /run/service/hd-idle; then
     bashio::log.warning "Restarting the hd-idle service failed - it will pick up the new configuration on its next restart."
   fi

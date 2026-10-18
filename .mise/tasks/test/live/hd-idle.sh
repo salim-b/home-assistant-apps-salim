@@ -43,7 +43,7 @@
 # shellcheck disable=SC2034  # LIVE_* are the harness contract variables
 
 live_prepare() {
-  [ -n "${LIVE_HDIDLE_LABEL_GLOB:-}" ] || return 0
+  [ "${LIVE_HDIDLE_LABEL_GLOB:-}" != "" ] || return 0
   local glob="$LIVE_HDIDLE_LABEL_GLOB" raw kind name disk rank lb byid
   local -A disk_labels=() disk_byid=() byid_rank=()
   local included=() included_sorted=() labels=() ok
@@ -68,10 +68,13 @@ live_prepare() {
       case "${l##*/}" in *-part*) continue ;; esac
       printf "byid|%s|%s\n" "${l##*/}" "$(basename "$(readlink "$l")")"
     done
-  ') || { echo "ERROR: drive discovery on the device failed" >&2; return 1; }
+  ') || {
+    echo "ERROR: drive discovery on the device failed" >&2
+    return 1
+  }
 
   while IFS='|' read -r kind name disk; do
-    [ -n "$kind" ] || continue
+    [ "$kind" != "" ] || continue
     case "$kind" in
       label) disk_labels[$disk]+="${name} " ;;
       byid)
@@ -84,8 +87,8 @@ live_prepare() {
           wwn-*) rank=2 ;;
           *) rank=3 ;;
         esac
-        if [ -z "${disk_byid[$disk]:-}" ] || [ "$rank" -lt "${byid_rank[$disk]}" ] ||
-          [[ "$rank" -eq "${byid_rank[$disk]}" && "$name" < "${disk_byid[$disk]}" ]]; then
+        if [ "${disk_byid[$disk]:-}" = "" ] || [ "$rank" -lt "${byid_rank[$disk]}" ] \
+          || [[ "$rank" -eq "${byid_rank[$disk]}" && "$name" < "${disk_byid[$disk]}" ]]; then
           disk_byid[$disk]=$name
           byid_rank[$disk]=$rank
         fi
@@ -124,7 +127,7 @@ live_prepare() {
   mapfile -t included_sorted < <(printf '%s\n' "${included[@]}" | sort)
   for disk in "${included_sorted[@]}"; do
     byid=${disk_byid[$disk]:-}
-    if [ -z "$byid" ]; then
+    if [ "$byid" = "" ]; then
       echo "ERROR: no /dev/disk/by-id link for $disk - it cannot be configured via the device option" >&2
       return 1
     fi
@@ -193,7 +196,7 @@ live_runtime_check() {
         ## exclusions (defense in depth); every other -a entry must be one
         ## of the discovered drives.
         cmdline=$(grep -m1 "hd-idle command line:" <<<"$tail_log" | sed 's/^.*hd-idle command line: //')
-        if [ -z "$cmdline" ]; then
+        if [ "$cmdline" = "" ]; then
           echo "   FAIL: no hd-idle command line in the app log" >&2
           return 1
         fi
@@ -210,7 +213,7 @@ live_runtime_check() {
         done
         read -ra managed_arr <<<"$declared_managed"
         expected=""
-        if [ -n "$disks_json" ]; then
+        if [ "$disks_json" != "" ]; then
           while IFS= read -r disk; do
             expected+="$disk "
           done < <(jq -r 'keys[]' <<<"$disks_json")
@@ -224,7 +227,7 @@ live_runtime_check() {
           return 1
         fi
         while IFS= read -r disk; do
-          [ -n "$disk" ] || continue
+          [ "$disk" != "" ] || continue
           label=$(jq -r --arg d "$disk" '.[$d].label' <<<"$disks_json")
           device=$(jq -r --arg d "$disk" '.[$d].device' <<<"$disks_json")
           labels_by_disk[$disk]=$label
@@ -236,10 +239,10 @@ live_runtime_check() {
         done < <(jq -r 'keys[]' <<<"$disks_json")
         hard_pending=0
         echo "   PASS: hd-idle daemon up, configuration completed"
-        if [ -n "$disks_json" ]; then
+        if [ "$disks_json" != "" ]; then
           drive_count=$(jq length <<<"$disks_json")
           echo "   PASS: hd-idle manages exactly the ${drive_count} discovered drive(s): ${managed_arr[*]}"
-          if [ -n "$declared_excluded" ]; then
+          if [ "$declared_excluded" != "" ]; then
             echo "   (excluded via idle-0 entries: ${declared_excluded%- })"
           fi
           ## Per-drive drive-PM override plumbing (boot log; the drives file
@@ -247,7 +250,7 @@ live_runtime_check() {
           ## pmfix must have skipped EXACTLY the override drive and attempted
           ## the treatment for every other managed drive.
           pm_override_disk=$(jq -r 'to_entries[] | select(.value.pm_override == true) | .key' <<<"$disks_json")
-          if [ -n "$pm_override_disk" ]; then
+          if [ "$pm_override_disk" != "" ]; then
             if ! grep -qF "Drive ${pm_override_disk}: drive-PM treatment disabled for this drive" <<<"$tail_log"; then
               echo "   FAIL: no hd-idle-pmfix skip log for the override drive ${pm_override_disk}" >&2
               return 1
@@ -278,9 +281,9 @@ live_runtime_check() {
       fi
     fi
 
-    if [ -n "$disks_json" ]; then
+    if [ "$disks_json" != "" ]; then
       while IFS= read -r disk; do
-        [ -n "$disk" ] || continue
+        [ "$disk" != "" ] || continue
         if grep -q "${disk} spindown" <<<"$tail_log"; then spun[$disk]=1; fi
       done < <(jq -r 'keys[]' <<<"$disks_json")
     fi
@@ -288,7 +291,7 @@ live_runtime_check() {
     ## All discovered drives have issued their spindown event - or (no-op
     ## options) the boot assertions passed and there is nothing to wait for.
     if [ "$hard_pending" = 0 ]; then
-      if [ -z "$disks_json" ] || [ "${#spun[@]}" -eq "$(jq length <<<"$disks_json")" ]; then
+      if [ "$disks_json" = "" ] || [ "${#spun[@]}" -eq "$(jq length <<<"$disks_json")" ]; then
         break
       fi
     fi
@@ -309,13 +312,13 @@ live_runtime_check() {
     echo "   )"
   fi
 
-  if [ -n "$disks_json" ]; then
+  if [ "$disks_json" != "" ]; then
     drive_count=$(jq length <<<"$disks_json")
     echo "-- spindown events per drive (daemon-issued, natural idle path):"
     while IFS= read -r disk; do
-      [ -n "$disk" ] || continue
+      [ "$disk" != "" ] || continue
       label=${labels_by_disk[$disk]:-?}
-      if [ -n "${spun[$disk]:-}" ]; then
+      if [ "${spun[$disk]:-}" != "" ]; then
         echo "   PASS: $disk ($label) spundown event seen"
         spin_events=$((spin_events + 1))
       else

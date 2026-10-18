@@ -2,13 +2,11 @@
 
 [env]
 DOCKER_BUILDKIT = "1"
-# hk: resolve mise environments in hooks (HK_MISE), evaluate hk.pkl with the
-# built-in Rust pkl evaluator (no pkl CLI dependency), and keep `hk check
-# --all` a tracked-files-only gate: untracked files are never selected, while
+# hk: resolve mise environments in hooks (HK_MISE) and keep `hk check --all`
+# a tracked-files-only gate: untracked files are never selected, while
 # unstaged changes stay in place and ARE checked (HK_STASH=git would stash
 # them away and lint the index instead - verified with hk 2.7.0).
 HK_MISE = "1"
-HK_PKL_BACKEND = "pklr"
 HK_STASH_UNTRACKED = "0"
 
 # Task docs: https://mise.jdx.dev/tasks/ – file tasks live in `.mise/tasks/`
@@ -16,11 +14,21 @@ HK_STASH_UNTRACKED = "0"
 description = "Lint all tracked files via hk (same checks as the pre-commit hook)"
 run = "hk check --all --no-fail-fast"
 
-# Per-repo hook install (git < 2.54 cannot use hk install --global). Run once
-# per clone after `mise install --locked`; escape hatch: HK=0 git commit.
-[tasks.hooks]
-description = "Install hk git hooks for this clone (per-repo; git < 2.54 cannot use the global install)"
-run = "hk install --mise"
+# User-wide hook install: hk writes hook.<name>.command entries into
+# ~/.gitconfig so every repository on the machine picks them up (silent no-op
+# in repos without an hk.pkl). Needs Git 2.54+ (config-based hooks). Run once
+# after `mise install --locked`; escape hatch: HK=0 git commit.
+[tasks.install-git-hooks]
+description = "Install hk git hooks user-wide via ~/.gitconfig (needs Git 2.54+)"
+run = """
+need=2.54
+have=$(git --version | sed 's/^git version //;s/ .*$//')
+if [ "$(printf '%s\\n%s\\n' "$need" "$have" | sort -V | head -n1)" != "$need" ]; then
+  echo "mise run install-git-hooks: git >= $need required (config-based hooks), found $have" >&2
+  exit 1
+fi
+exec hk install --global --mise
+"""
 
 [tasks.check]
 description = "Run all pre-commit checks (lint + validate)"
@@ -40,6 +48,8 @@ jq = "1.8.2"
 python = "3.14.8"
 rumdl = "0.2.79"
 shellcheck = "0.11.0"
+shellharden = "4.3.2"
+shfmt = "3.14.1"
 uv = "0.12.23"
 yamllint = "1.38.0"
 yq = "4.54.1"

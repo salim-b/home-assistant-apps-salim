@@ -19,7 +19,7 @@ case "$host" in *@*) ;; *) host="root@$host" ;; esac
 SSH_OPTS=(-o ConnectTimeout=10)
 
 CONFIG_MODE="${usage_config:-}"
-case "${CONFIG_MODE}" in
+case "$CONFIG_MODE" in
   "" | migrate | reset) ;;
   *)
     echo "ERROR: invalid --config value '${CONFIG_MODE}' (valid: migrate, reset)" >&2
@@ -31,7 +31,10 @@ esac
 source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
 wait_supervisor
 
-[ -d "$app" ] || { echo "ERROR: no app directory '$app' in the repo" >&2; exit 1; }
+[ -d "$app" ] || {
+  echo "ERROR: no app directory '$app' in the repo" >&2
+  exit 1
+}
 version=$(yq -r '.version' "$app/config.yaml")
 slug=$(yq -r '.slug' "$app/config.yaml")
 local_slug="local_${slug}"
@@ -48,7 +51,7 @@ echo "== deploying $app v$version to $host (store slug: $local_slug) =="
 store_apps=$(ssh "${SSH_OPTS[@]}" "$host" 'ha store apps --raw-json' 2>/dev/null || true)
 repo_installs=$(echo "$store_apps" | jq -c --arg slug "$slug" --arg local "$local_slug" \
   '[.data.addons[] | select(.installed == true and .slug != $local and ((.slug | split("_")) | last) == $slug)]' 2>/dev/null || true)
-if [ -n "$repo_installs" ] && [ "$repo_installs" != "[]" ]; then
+if [ "$repo_installs" != "" ] && [ "$repo_installs" != "[]" ]; then
   mapfile -t repo_slugs < <(echo "$repo_installs" | jq -r '.[].slug')
   echo "-- repository-installed copy of '$app' found on $host:"
   echo "$repo_installs" | jq -r '.[] | "  - \(.slug) (installed version \(.version))"'
@@ -58,9 +61,9 @@ if [ -n "$repo_installs" ] && [ "$repo_installs" != "[]" ]; then
       # Back the copy's options up before the uninstall (they die with it);
       # --config migrate additionally carries them to the local install.
       repo_opts=$(ha_app_options "$repo_slug")
-      if [ -n "$repo_opts" ] && [ "$repo_opts" != "{}" ]; then
+      if [ "$repo_opts" != "" ] && [ "$repo_opts" != "{}" ]; then
         echo "-- options of $repo_slug backed up locally: $(ha_backup_options "$app" "$repo_opts")"
-        [ "${CONFIG_MODE}" = "migrate" ] && MIGRATE_OPTIONS="$repo_opts"
+        [ "$CONFIG_MODE" = "migrate" ] && MIGRATE_OPTIONS="$repo_opts"
       fi
       ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps uninstall $repo_slug"
     done
@@ -91,14 +94,14 @@ echo "-- reloading app store metadata (rescans /local_apps; that only happens on
 ha_retry 180 ssh "${SSH_OPTS[@]}" "$host" 'ha store reload'
 
 store_info=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null || true)
-if [ -z "$store_info" ] || ! echo "$store_info" | jq -e '.result == "ok"' >/dev/null 2>&1; then
+if [ "$store_info" = "" ] || ! echo "$store_info" | jq -e '.result == "ok"' >/dev/null 2>&1; then
   echo "ERROR: $local_slug not found in the app store after reload." >&2
   echo "       Usually the device-side app config is invalid — check the Supervisor logs." >&2
   exit 1
 fi
 
 installed_version=$(echo "$store_info" | jq -r '.data.version // empty')
-if [ -z "$installed_version" ]; then
+if [ "$installed_version" = "" ]; then
   echo "-- not installed yet: installing"
   ha_retry 900 ssh "${SSH_OPTS[@]}" "$host" "ha apps install $local_slug"
   action="installed"
@@ -123,25 +126,31 @@ fi
 # uninstall (device-verified 2026-10-16), so a fresh install already has
 # the defaults (the POST is a no-op there) and an existing install gets
 # its options wiped deterministically.
-if [ "${CONFIG_MODE}" = "reset" ]; then
+if [ "$CONFIG_MODE" = "reset" ]; then
   old=$(ha_app_options "$local_slug")
-  if [ -n "$old" ] && [ "$old" != "{}" ]; then
+  if [ "$old" != "" ] && [ "$old" != "{}" ]; then
     echo "-- --config reset: previous options backed up locally: $(ha_backup_options "$app" "$old")"
   fi
-  ha_post_options "$local_slug" "$(yq -o json '.options' "$app/config.yaml" | jq -c .)" ||
-    { echo "ERROR: resetting the options failed (the previous options are backed up above)" >&2; exit 1; }
+  ha_post_options "$local_slug" "$(yq -o json '.options' "$app/config.yaml" | jq -c .)" \
+    || {
+      echo "ERROR: resetting the options failed (the previous options are backed up above)" >&2
+      exit 1
+    }
   echo "-- --config reset: options set to the app's default options"
   ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps restart $local_slug"
 fi
-if [ "${CONFIG_MODE}" = "migrate" ] && [ -n "${MIGRATE_OPTIONS:-}" ]; then
+if [ "$CONFIG_MODE" = "migrate" ] && [ "${MIGRATE_OPTIONS:-}" != "" ]; then
   echo "-- --config migrate: applying the replaced copy's options (filtered to the app's schema)"
   filtered=$(ha_filter_options "$MIGRATE_OPTIONS" "$local_slug")
   dropped=$(jq -r --argjson keys "$(ha_schema_keys "$local_slug")" \
     'to_entries | map(select(.key as $k | $keys | index($k) | not) | .key) | join(", ")' <<<"$MIGRATE_OPTIONS")
-  [ -n "$dropped" ] && echo "   (dropped, unknown to the app's schema: $dropped)"
+  [ "$dropped" != "" ] && echo "   (dropped, unknown to the app's schema: $dropped)"
   if [ "$filtered" != "{}" ]; then
-    ha_post_options "$local_slug" "$filtered" ||
-      { echo "ERROR: migrating the options failed (the replaced copy's options are backed up above)" >&2; exit 1; }
+    ha_post_options "$local_slug" "$filtered" \
+      || {
+        echo "ERROR: migrating the options failed (the replaced copy's options are backed up above)" >&2
+        exit 1
+      }
     echo "-- options migrated"
     ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps restart $local_slug"
   else

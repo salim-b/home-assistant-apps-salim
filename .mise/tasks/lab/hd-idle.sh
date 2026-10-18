@@ -67,29 +67,46 @@ lab_preflight() {
 
 lab_runtime_check() {
   local app="$LAB_NET_NAME-app" drives="$LAB_SPINDOWN_DRIVES" dev check_img
+  IFS=' ' read -r -a drive_devs <<<"${drives//,/ }"
   local fail=0 waited=0 missing=""
 
   ## Boot sanity: hd-idle must be running, its config dump must be in the
   ## app log, and /proc/diskstats must be visible (kernel-global, so it shows
   ## the host's disks).
   docker exec "$app" sh -c "ps | grep -q '[h]d-idle'" \
-    || { echo "hd-idle process not running"; return 1; }
+    || {
+      echo "hd-idle process not running"
+      return 1
+    }
   docker exec "$app" sh -c "test -r /proc/diskstats" \
-    || { echo "/proc/diskstats not readable inside the app container"; return 1; }
+    || {
+      echo "/proc/diskstats not readable inside the app container"
+      return 1
+    }
   docker logs "$app" 2>&1 | grep -q "symlinkPolicy=" \
-    || { echo "hd-idle config dump missing from the app log (daemon never started?)"; return 1; }
+    || {
+      echo "hd-idle config dump missing from the app log (daemon never started?)"
+      return 1
+    }
   docker logs "$app" 2>&1 | grep -q "Detected sd\* disks" \
-    || { echo "config.sh disk inventory missing from the app log"; return 1; }
+    || {
+      echo "config.sh disk inventory missing from the app log"
+      return 1
+    }
   if docker logs "$app" 2>&1 | grep -q "./run: line"; then
-    echo "a run script crashed during boot (raw './run: line N:' error in the app log)"; return 1
+    echo "a run script crashed during boot (raw './run: line N:' error in the app log)"
+    return 1
   fi
   docker logs "$app" 2>&1 | grep -qE "hd-idle command line: /usr/sbin/hd-idle -s 1 -c [a-z]+ -p [0-9]+ -i 0([^0-9]|$)" \
-    || { echo "the hd-idle command line does not pin the global idle to 0 (unlisted drives would be managed)"; return 1; }
+    || {
+      echo "the hd-idle command line does not pin the global idle to 0 (unlisted drives would be managed)"
+      return 1
+    }
   echo "hd-idle up (process, /proc/diskstats, config dump, drive inventory OK)"
 
   lab_preflight
 
-  if [ -z "$drives" ]; then
+  if [ "$drives" = "" ]; then
     echo "(no LAB_SPINDOWN_DRIVES: spindown smoke test skipped)"
     return 0
   fi
@@ -105,10 +122,16 @@ lab_runtime_check() {
     return 1
   fi
   pm_skip="${drives%%,*}"
-  docker exec "$app" grep -qx "${pm_skip} .* 0" /etc/hd-idle.drives ||
-    { echo "   FAIL: override drive ${pm_skip} has no pm-flag 0 in the drives file"; return 1; }
-  docker logs "$app" 2>&1 | grep -q "drive-PM treatment disabled for this drive" ||
-    { echo "   FAIL: no hd-idle-pmfix skip log for the per-drive override drive"; return 1; }
+  docker exec "$app" grep -qx "${pm_skip} .* 0" /etc/hd-idle.drives \
+    || {
+      echo "   FAIL: override drive ${pm_skip} has no pm-flag 0 in the drives file"
+      return 1
+    }
+  docker logs "$app" 2>&1 | grep -q "drive-PM treatment disabled for this drive" \
+    || {
+      echo "   FAIL: no hd-idle-pmfix skip log for the per-drive override drive"
+      return 1
+    }
   echo "   PASS: per-drive drive-PM override (4-column drives file, override drive skipped by hd-idle-pmfix)"
 
   ## Spindown smoke test (read-only on the drives).
@@ -129,7 +152,7 @@ RUN apk add --no-cache smartmontools
 EOF
   fi
 
-  for dev in ${drives//,/ }; do
+  for dev in "${drive_devs[@]}"; do
     if [ ! -e "/sys/block/$dev" ]; then
       echo "-- (note: $dev not present on this machine - skipping it)"
       continue
@@ -149,7 +172,7 @@ EOF
     ## Desktop IO on a mounted drive may wake it between the command and
     ## the probe - hence the polling retries instead of a single read.
     local tries=0 pass="" rc
-    while [ $tries -lt 6 ]; do
+    while [ "$tries" -lt 6 ]; do
       sleep 5
       rc=0
       docker run --rm --privileged "$check_img" sh -c \
@@ -176,17 +199,17 @@ EOF
   ## again) - the event must appear, the drive does not need to STAY in
   ## standby.
   echo "-- waiting for the daemon's own spindown events (fixture idle: 30 s)"
-  while [ $waited -lt 180 ]; do
+  while [ "$waited" -lt 180 ]; do
     missing=""
-    for dev in ${drives//,/ }; do
+    for dev in "${drive_devs[@]}"; do
       [ -e "/sys/block/$dev" ] || continue
       docker logs "$app" 2>&1 | grep -q "^$dev spindown$" || missing="$missing $dev"
     done
-    [ -z "$missing" ] && break
+    [ "$missing" = "" ] && break
     sleep 5
     waited=$((waited + 5))
   done
-  if [ -n "$missing" ]; then
+  if [ "$missing" != "" ]; then
     echo "   FAIL: no spindown event logged for:$missing within 180 s (busy/mounted drive? host IO keeping it awake?)"
     return 1
   fi
@@ -204,14 +227,23 @@ EOF
     docker exec "$app" cp /etc/hd-idle.args /tmp/args.expected
     docker exec "$app" sh -c 'printf "corrupted\n" > /etc/hd-idle.args'
     restored=0
-    for _ in $(seq 1 10); do
+    for _ in {1..10}; do
       sleep 5
-      if docker exec "$app" cmp -s /etc/hd-idle.args /tmp/args.expected; then restored=1; break; fi
+      if docker exec "$app" cmp -s /etc/hd-idle.args /tmp/args.expected; then
+        restored=1
+        break
+      fi
     done
-    [ "$restored" = 1 ] || { echo "   FAIL: args file not restored within 50 s (watcher not running?)"; return 1; }
+    [ "$restored" = 1 ] || {
+      echo "   FAIL: args file not restored within 50 s (watcher not running?)"
+      return 1
+    }
     restarts=$(docker logs "$app" 2>&1 | grep -c "Starting hd-idle" || true)
     [ "$restarts" -ge 2 ] \
-      || { echo "   FAIL: args restored but hd-idle not restarted (Starting count: $restarts)"; return 1; }
+      || {
+        echo "   FAIL: args restored but hd-idle not restarted (Starting count: $restarts)"
+        return 1
+      }
     if ! docker exec "$app" sh -c "ps | grep -q '[s]bin/hd-idle'"; then
       echo "   FAIL: hd-idle process gone after the watcher restart"
       return 1

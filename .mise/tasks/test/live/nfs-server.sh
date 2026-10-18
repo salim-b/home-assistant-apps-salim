@@ -21,7 +21,7 @@ live_prepare() {
   # root-owned dirs would break the rw roundtrip. (-n: keep the loop's stdin
   # away from ssh)
   while IFS=$'\t' read -r spath sopts; do
-    [ -n "$spath" ] || continue
+    [ "$spath" != "" ] || continue
     case ",$sopts," in
       *,rw,*)
         ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
@@ -124,13 +124,19 @@ live_runtime_check() {
   '
     rc=$?
     set -e
-    [ "$rc" -eq 0 ] || { echo "   ERROR: roundtrip against $1 failed (rc=$rc)" >&2; return "$rc"; }
+    [ "$rc" -eq 0 ] || {
+      echo "   ERROR: roundtrip against $1 failed (rc=$rc)" >&2
+      return "$rc"
+    }
     # Confirm the written file really landed on (and disappeared from) the
     # device filesystem (needs the path to be visible from the SSH session)
     if [ "$mode" = rw ]; then
       if ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" "test -d '$1'" 2>/dev/null; then
         ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" "test ! -e '$1/$testfile'" \
-          || { echo "   ERROR: test file was not cleaned up on the device ($1/$testfile)" >&2; return 1; }
+          || {
+            echo "   ERROR: test file was not cleaned up on the device ($1/$testfile)" >&2
+            return 1
+          }
         echo "   PASS: write verified on the device filesystem"
       else
         echo "   (note: $1 not visible from the SSH session — verified via NFS read-back only)"
@@ -156,7 +162,7 @@ live_runtime_check() {
   mapfile -t share_rows < <(jq -r '.[] | [.path, .network, .options] | @tsv' <<<"$LIVE_SHARES")
   for row in "${share_rows[@]}"; do
     IFS=$'\t' read -r spath snetwork soptions <<<"$row"
-    [ -n "$spath" ] || continue
+    [ "$spath" != "" ] || continue
     smode=$(share_mode "$soptions")
     if python3 -c "
 import ipaddress, sys
@@ -194,6 +200,9 @@ sys.exit(0 if ipaddress.ip_address('$LIVE_HOST_IP') in ipaddress.ip_network('$sn
   set -e
   [ "$rc" -eq 0 ] || fails=$((fails + 1))
 
-  [ "$fails" -eq 0 ] || { echo "ERROR: $fails roundtrip(s) failed" >&2; return 1; }
+  [ "$fails" -eq 0 ] || {
+    echo "ERROR: $fails roundtrip(s) failed" >&2
+    return 1
+  }
   return 0
 }

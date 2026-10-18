@@ -141,7 +141,7 @@ facts live in the repository-root `KNOWLEDGE.md`.
 - Repo sweep + dev tooling review (2026-10-16) done: the CI "redundancy" check resolved as proper architecture
   (build-app.yaml is a reusable `workflow_call` workflow invoked by builder.yaml; fetch-depth and squash-merge caveats
   documented). The SSH-helper factoring had one consumer until deploy-registry arrived - the shared lib
-  (.mise/tasks/lib/ssh-ha.sh) landed together with it, and lint.sh now runs shellcheck with `-x` (follows `source`
+  (.mise/tasks/lib/ssh-ha.sh) landed together with it, and linting now runs shellcheck with `-x` (follows `source`
   lines; without it the sourced helper produced SC1091 failures). nfs-server staleness pass: s6 ordering already correct
   (`dependencies.d/base` on every service); its comment-slimming pass is planned in nfs-server/TODO.md. New task
   `deploy-registry` shipped (see its header for the spec; config migration is opt-in with schema-key filtering). The lab
