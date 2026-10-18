@@ -136,6 +136,25 @@ facts live in the repository-root `KNOWLEDGE.md`.
   `NEWLINE` + `LINE_PREFIX` inside). Until fixed, this repo keeps struck spans on a single line (see `AGENTS.md`, tool
   notes).
 
+- Upstream: file an hk issue/PR against [jdx/hk](https://github.com/jdx/hk) — its shebang-based file typing (v2.7.0,
+  `src/file_type.rs`) does not recognize `#!/usr/bin/with-contenv bashio` (the Home Assistant base image's interpreter
+  for s6-overlay scripts): wrapper interpreter plus unknown `bashio` argument resolve to plain text, so hk's
+  shellcheck/shfmt/shellharden builtins (types `sh`/`bash`) silently skip every app script. Desired: look through
+  s6-overlay's `with-contenv` (and similar env-style wrappers) to the real interpreter and type `bashio` as shell — the
+  file content is plain bash. Until then, `hk.pkl` re-declares each shell builtin's `match_any` with added glob
+  selectors for the s6 script paths (see the `s6Globs` comment there); the glob additions can be dropped once this
+  lands.
+
+- Upstream: investigate whether [shellharden](https://github.com/anordal/shellharden) mangles `for` loops and file an
+  issue if none exists (check for existing ones first). Verified with v4.3.2 (2026-10): `--transform`/`--replace` quotes
+  command substitutions in the iterable — `for _ in $(seq 1 120)` becomes `for _ in "$(seq 1 120)"` — which kills word
+  splitting and makes the loop run exactly once (shellcheck flags the result as SC2066, error severity); an unquoted
+  substitution in a for iterable is the idiomatic splitting form and not flagged by shellcheck. Minimal repro is a
+  4-line script; the workaround rule (brace expansion, `read -r -a`, `mapfile`) and the 9 repo sites rewritten
+  accordingly are documented in `AGENTS.md`, tool notes. The same run also confirmed the cosmetic nit of `[ -n "$x" ]`
+  being rewritten to `[ "$x" != "" ]`. If upstream is unresponsive, reconsider whether shellharden should stay a fix
+  step here (vs check-only or dropped).
+
 ## Resolved
 
 - Repo sweep + dev tooling review (2026-10-16) done: the CI "redundancy" check resolved as proper architecture
