@@ -1,0 +1,175 @@
+name: Publish reconcile
+
+# Daily reconciliation of the published GHCR state against main's app configs:
+# every app's version tag must exist in the registry - the per-arch images
+# (`<prefix>/<arch>-<image_name>:<version>` for every arch in config.yaml) and
+# the multi-arch manifest (`<prefix>/<image_name>:<version>`).
+#
+# A missing tag (e.g. a transient build/publish failure on the push-fired
+# Builder) is self-healed by dispatching build-app.yaml (publish=true,
+# ref=main). Idempotent: only a real miss dispatches - the push-fired Builder
+# still publishes on merge, so a healthy registry means a green no-op run.
+# The dispatched Builder run is the loud signal when publishing keeps failing;
+# this run stays green with a summary note. GHCR unreachable or a failed
+# dispatch fails this run (red).
+#
+# Known limitation: this reconciles TAG EXISTENCE only. A tag that exists but
+# carries stale content (e.g. an image built from a pre-merge state) is not
+# detected here - content drift is version-guard's and validate.py's domain
+# (both fail loudly on source drift).
+#
+# Cron offset: 03:15 UTC - away from the lint workflow's daily 00:00 cron and
+# the apk-bump nudge (01:30 UTC). GHCR is probed with anonymous pull tokens
+# (the packages are public); only ghcr.io is supported.
+
+on:
+  schedule:
+    - cron: "15 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: publish-reconcile
+  cancel-in-progress: false
+
+jobs:
+  find:
+    name: Find apps
+    if: github.repository == 'salim-b/home-assistant-apps-salim'
+    runs-on: ubuntu-latest
+    outputs:
+      addons_list: ${{ steps.addons.outputs.addons_list }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Find app directories
+        id: addons
+        uses: home-assistant/actions/helpers/find-addons@master
+
+  reconcile:
+    name: Reconcile ${{ matrix.app }}
+    needs: find
+    if: github.repository == 'salim-b/home-assistant-apps-salim'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJson(needs.find.outputs.addons_list) }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Get app information
+        id: info
+        uses: home-assistant/actions/helpers/info@master
+        with:
+          path: "./${{ matrix.app }}"
+
+      - name: Normalize app information
+        id: normalize
+        run: |
+          image=${{ steps.info.outputs.image }}
+          echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
+          echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
+
+      - name: Check published tags in GHCR
+        id: tags
+        env:
+          APP: ${{ matrix.app }}
+          VERSION: ${{ steps.info.outputs.version }}
+          REGISTRY_PREFIX: ${{ steps.normalize.outputs.registry_prefix }}
+          IMAGE_NAME: ${{ steps.normalize.outputs.image_name }}
+          ARCHITECTURES: ${{ steps.info.outputs.architectures }}
+        run: |
+          set -euo pipefail
+
+          # Accept header list covering the manifest types GHCR serves (OCI
+          # image manifest/index and the Docker v2 equivalents)
+          ACCEPT='application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json,'
+          ACCEPT="${ACCEPT} application/vnd.docker.distribution.manifest.v2+json,"
+          ACCEPT="${ACCEPT} application/vnd.docker.distribution.manifest.list.v2+json"
+
+          # probe <ghcr-repo> <tag> -> echoes ok | missing | unreachable
+          probe() {
+            local repo="$1" tag="$2" token code
+            if ! token=$(curl -fsS --max-time 30 \
+              "https://ghcr.io/token?scope=repository:${repo}:pull" 2>/dev/null \
+              | jq -r '.token // empty') || [ -z "$token" ]; then
+              echo unreachable
+              return 0
+            fi
+            if ! code=$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer ${token}" -H "Accept: ${ACCEPT}" \
+              "https://ghcr.io/v2/${repo}/manifests/${tag}" 2>/dev/null); then
+              echo unreachable
+              return 0
+            fi
+            case "$code" in
+              200) echo ok ;;
+              404) echo missing ;;
+              *) echo unreachable ;; # 401/403/5xx: cannot verify - fail loudly, do not dispatch
+            esac
+          }
+
+          version=$(jq -r . <<<"${VERSION}")
+          prefix=$(jq -r . <<<"${REGISTRY_PREFIX}")
+          image_name=$(jq -r . <<<"${IMAGE_NAME}")
+          host="${prefix%%/*}"
+          repo_base="${prefix#*/}"
+          if [ "$host" != "ghcr.io" ]; then
+            echo "unsupported registry host '${host}' - only ghcr.io reconciliation is implemented" >&2
+            exit 1
+          fi
+
+          mapfile -t arches < <(jq -r '.[]' <<<"${ARCHITECTURES}")
+
+          declare -A tag_state=()
+          missing=()
+          for arch in "${arches[@]}"; do
+            tag_state["${repo_base}/${arch}-${image_name}:${version}"]=$(probe "${repo_base}/${arch}-${image_name}" "${version}")
+          done
+          tag_state["${repo_base}/${image_name}:${version}"]=$(probe "${repo_base}/${image_name}" "${version}")
+
+          {
+            echo "### Publish reconcile: ${APP} ${version}"
+            echo
+            echo "| Tag | Status |"
+            echo "| --- | --- |"
+            for tag in "${!tag_state[@]}"; do
+              echo "| \`${tag}\` | ${tag_state["$tag"]} |"
+              if [ "${tag_state["$tag"]}" = "missing" ]; then
+                missing+=("$tag")
+              fi
+              if [ "${tag_state["$tag"]}" = "unreachable" ]; then
+                echo "GHCR unreachable while checking ${tag}" >&2
+                exit 2
+              fi
+            done
+            if [ "${#missing[@]}" -gt 0 ]; then
+              echo
+              echo "Dispatching build-app.yaml (app=${APP}, publish=true, ref=main) to publish the missing tags."
+            fi
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "missing=true" >> "$GITHUB_OUTPUT"
+            echo "missing tags: ${missing[*]}"
+          else
+            echo "missing=false" >> "$GITHUB_OUTPUT"
+            echo "all ${#tag_state[@]} tags published"
+          fi
+
+      - name: Dispatch build-app to publish the missing tags
+        if: steps.tags.outputs.missing == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh workflow run build-app.yaml --ref main -f app=${{ matrix.app }} -f publish=true
+          echo "Dispatched build-app.yaml (app=${{ matrix.app }}, publish=true, ref=main)."
+          echo "Its run is the loud signal if publishing keeps failing."
