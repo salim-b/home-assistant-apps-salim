@@ -154,9 +154,11 @@ essentials:
   this at wrap boundaries): CommonMark renders such a line as prose, panache formats it as a nested list, and the two
   disagree.
 - Shell scripts: shfmt (formatting; follows .editorconfig) and shellharden (quoting hardening) are hk fix steps - let
-  pre-commit fix or run `hk check --fix` instead of hand-formatting; shellcheck `-x` is the lint gate. shellharden
-  gotcha: it quotes command substitutions even where word splitting is required (for-loop iterables), so write such
-  loops as brace expansion (`for _ in {1..N}`) or arrays (`read -r -a`/`mapfile`) instead.
+  pre-commit fix or run `hk check --fix` instead of hand-formatting; shellcheck `-x` is the lint gate. The shfmt style
+  (binary-next-line, indented case) is pinned under `.editorconfig`'s `[**]`, whose `root = true` stops EditorConfig
+  discovery at the repo - without it a home-directory config silently defines the style locally and CI sees shfmt
+  defaults instead. shellharden gotcha: it quotes command substitutions even where word splitting is required (for-loop
+  iterables), so write such loops as brace expansion (`for _ in {1..N}`) or arrays (`read -r -a`/`mapfile`) instead.
 - mise tasks: file tasks in `.mise/tasks/` with proper suffixes (`.sh`, `.py`, … — mise resolves the short names, e.g.
   `mise run lint`) and `#MISE`/`#USAGE` headers. Task arguments must be documented and typed via usage specs (never bare
   `$1` handling unless `raw_args = true`). Required args are declared `arg "<name>"` (mise errors before the task starts
