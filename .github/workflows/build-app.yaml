@@ -2,13 +2,23 @@ name: Build app
 
 on:
   workflow_call:
-    inputs:
+    inputs: &shared_inputs
       app:
+        description: Name of the app to be built. Must correspond to the app's subfolder name in the repository.
         required: true
         type: string
       publish:
+        description: Whether or not to publish the built image to GHCR.
         required: true
         type: boolean
+  # Manual/reconcile dispatch: the publish-reconcile workflow fires this when
+  # a published version tag is missing from GHCR (transient build/publish
+  # failure on the push-fired Builder). workflow_dispatch is the documented
+  # GITHUB_TOKEN exception that always creates runs - a dispatched run is not
+  # subject to the push-event workflow suppression. The prepare job's
+  # github.repository guard below applies to dispatches the same way.
+  workflow_dispatch:
+    inputs: *shared_inputs
 
 jobs:
   prepare:
