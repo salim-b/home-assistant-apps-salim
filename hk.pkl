@@ -16,7 +16,7 @@ local s6Globs = List(
 )
 local mdGlobs = List("**/*.md", "**/*.markdown")
 // Explicit paths bypass panache's own config excludes; AI_POLICY.md is
-// upstream-verbatim, **/LICENSE.md mirrors the default markdown exclude.
+// upstream-verbatim, **/LICENSE.md mirrors the default Markdown exclude.
 local mdExcludes = List("AI_POLICY.md", "**/LICENSE.md")
 
 local linters = new Mapping<String, Step> {
@@ -58,8 +58,8 @@ local linters = new Mapping<String, Step> {
   ["hadolint"] = Builtins.hadolint
   // Uses --strict (warnings fail): verified clean over all tracked yaml.
   ["yamllint"] = Builtins.yamllint
-  // Panache owns ALL markdown formatting (panache.toml). Explicit paths
-  // bypass its config excludes, hence mdExcludes. The only markdown
+  // Panache owns ALL Markdown formatting (panache.toml). Explicit paths
+  // bypass its config excludes, hence mdExcludes. The only Markdown
   // auto-fix step.
   ["panache-format"] {
     glob = mdGlobs

@@ -34,10 +34,10 @@ exec hk install --global --mise
 description = "Run all pre-commit checks (lint + validate)"
 depends = ["lint", "validate"]
 
-# Panache owns ALL markdown autoformatting (see panache.toml); rumdl stays a
+# Panache owns ALL Markdown autoformatting (see panache.toml); rumdl stays a
 # check-only second linter.
 [tasks.fmt]
-description = "Auto-format the repository's markdown via panache"
+description = "Auto-format the repository's Markdown via panache"
 run = "panache format ."
 
 [tools]
