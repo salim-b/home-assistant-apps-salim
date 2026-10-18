@@ -218,7 +218,13 @@ versioned release).
   not-found-class errors mean a missing tag, any other failure is retried with exponential backoff and then fails the
   run red - so transient outages neither dispatch nor silently pass) and dispatches `build-app.yaml` (now also
   `workflow_dispatch`-able; publish=true, ref=main) on a genuine miss — idempotent, a healthy registry is a green no-op.
-  Tag existence only: stale-content tags are not detected (content drift is version-guard's/validate's domain).
+  Tag existence only: stale-content tags are not detected (content drift is version-guard's/validate's domain). The
+  tooling landscape was researched 2026-10-18: no OSS tooling exists for apk-pin bumping with arch gates — Renovate's
+  native support plus a hand-rolled gate is the state of the art (linuxserver.io precedent: their scheduled
+  external-trigger workflows enforce the same all-arches condition before rebuilding, cf. linuxserver/docker-wireguard
+  `.github/workflows/external_trigger.yml`). Dependabot cannot bump apk pins at all (dependabot-core#2129, open since
+  2019), updatecli has no apk/APKINDEX plugin, and Chainguard's `melange bump` rewrites melange build YAML, not
+  Dockerfiles.
 
 Version-sensitive gotchas learned while implementing:
 
