@@ -1,0 +1,486 @@
+name: Apk pin bump
+
+# Post-merge follow-up for Renovate apk-pin PRs (see the apk package version
+# policy in the repository-root KNOWLEDGE.md):
+#
+# changelog: a merged renovate[bot] PR labeled apk_pin gets its templated
+# changelog section inserted post-merge (Renovate automerges pkgrel bumps
+# without a changelog entry; bumpVersions bumps the app's config.yaml version
+# in the same PR). The commit is docs-only (CHANGELOG.md) and pushed with the
+# GITHUB_TOKEN - whose workflow suppression is intended: CHANGELOG.md is
+# excluded by version-guard and the image is byte-identical, so no rebuild is
+# needed.
+#
+# nudge: Alpine repushes land per-arch asynchronously (aarch64 can serve a new
+# pkgrel days before x86_64), so an early bump PR legitimately stays red
+# (validate_apk_pins fails until every arch index serves the new pin). This
+# daily job rebases such PRs (@renovate rebase) once ALL of the app's arch
+# indexes serve the new pin - a rebase creates fresh check runs, while
+# re-running failed check runs can still count as red in Renovate's automerge
+# evaluation. While an arch index still lags the job does nothing: the daily
+# lint cron on main remains the drift alarm.
+#
+# Cron offset: 01:30 UTC - away from the lint workflow's daily 00:00 cron and
+# the publish-reconcile run (03:15 UTC).
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+  schedule:
+    - cron: "30 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  changelog:
+    name: Fill changelog for merged apk pin bump
+    if: >-
+      github.repository == 'salim-b/home-assistant-apps-salim' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.user.login == 'renovate[bot]' &&
+      contains(github.event.pull_request.labels.*.name, 'apk_pin')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    # Serialize changelog jobs (merge races with Renovate's own merges are
+    # possible; queued jobs rebase cleanly instead of conflicting)
+    concurrency:
+      group: apk-bump-changelog
+      cancel-in-progress: false
+    steps:
+      - name: Parse apk pins and version bump from the merged PR
+        id: pins
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          import re
+          import urllib.parse
+          import urllib.request
+
+          API = "https://api.github.com"
+          TOKEN = os.environ["GH_TOKEN"]
+          REPO = os.environ["GITHUB_REPOSITORY"]
+          PR = int(os.environ["PR_NUMBER"])
+          HDRS = {
+              "Authorization": f"Bearer {TOKEN}",
+              "Accept": "application/vnd.github+json",
+              "User-Agent": "apk-bump-changelog",
+          }
+          # same pin shape as validate_apk_pins in .mise/tasks/validate.py
+          PIN_RE = re.compile(r"([A-Za-z0-9][\w.+-]*)=(\d[\w.:]+(?:-r\d+)?)")
+
+          def api(path, params=None):
+              url = f"{API}/repos/{REPO}/{path}"
+              if params:
+                  url += "?" + urllib.parse.urlencode(params)
+              req = urllib.request.Request(url, headers=HDRS)
+              with urllib.request.urlopen(req, timeout=60) as resp:
+                  return json.load(resp)
+
+          def api_list(path, params):
+              out, page = [], 1
+              while True:
+                  batch = api(path, {**params, "per_page": 100, "page": page})
+                  out.extend(batch)
+                  if len(batch) < 100:
+                      return out
+                  page += 1
+
+          def parse_patch(patch):
+              """Changed apk pins in a Dockerfile patch:
+              {pkg: {"old": ..., "new": ...}} - same state machine as
+              validate_apk_pins (apk add block tracked across backslash
+              continuations), applied to +/- patch lines (REST patch blobs
+              contain hunks only, no file headers)."""
+              pins: dict = {}
+              in_apk = False
+              for raw in patch.splitlines():
+                  if raw.startswith("@@"):
+                      in_apk = False
+                      continue
+                  marker = raw[0] if raw[:1] in ("+", "-", " ") else None
+                  content = raw[1:] if marker else raw
+                  found = PIN_RE.findall(content)
+                  if in_apk:
+                      if not content.rstrip().endswith("\\"):
+                          in_apk = False
+                  elif "apk add" in content:
+                      in_apk = content.rstrip().endswith("\\")
+                  else:
+                      continue
+                  if marker == "+":
+                      for pkg, pin in found:
+                          pins.setdefault(pkg, {})["new"] = pin
+                  elif marker == "-":
+                      for pkg, pin in found:
+                          pins.setdefault(pkg, {})["old"] = pin
+              return pins
+
+          def parse_version(patch):
+              """The app version bumpVersions wrote in the same PR (added
+              config.yaml lines)."""
+              quoted = re.findall(r"(?m)^\+\s*version:\s*\"([^\"]+)\"", patch)
+              if quoted:
+                  return quoted[-1]
+              bare = re.findall(r"(?m)^\+\s*version:\s*([^\s#\"']+)", patch)
+              return bare[-1] if bare else None
+
+          result, versions = [], {}
+          for entry in api_list(f"pulls/{PR}/files", {}):
+              path = entry["filename"]
+              patch = entry.get("patch") or ""
+              if path.endswith("/Dockerfile"):
+                  app = path.removesuffix("/Dockerfile")
+                  for pkg, pair in parse_patch(patch).items():
+                      new, old = pair.get("new"), pair.get("old")
+                      if not new or old == new:
+                          continue
+                      result.append({"app": app, "pkg": pkg, "old": old, "new": new, "version": None})
+              elif path.endswith("/config.yaml") or path.endswith("/config.yml"):
+                  app = re.sub(r"/config\.ya?ml$", "", path)
+                  version = parse_version(patch)
+                  if version:
+                      versions[app] = version
+
+          for pin in result:
+              pin["version"] = versions.get(pin["app"])
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+              fh.write(f"### apk pin changes parsed from PR #{PR}\n\n")
+              if result:
+                  fh.write("| App | Package | Old | New | App version |\n| --- | --- | --- | --- | --- |\n")
+                  for pin in result:
+                      fh.write(f"| {pin['app']} | {pin['pkg']} | {pin['old'] or '-'} | {pin['new']} | "
+                               f"{pin['version'] or '(not bumped in PR)'} |\n")
+              else:
+                  fh.write("No apk pin changes found - nothing to do.\n")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"pins={json.dumps(result)}\n")
+              out.write(f"has_pins={'true' if result else 'false'}\n")
+          PY
+
+      - name: Stop when the PR has no apk pin changes
+        if: steps.pins.outputs.has_pins != 'true'
+        run: echo "No apk pin changes in the merged PR - green no-op."
+
+      - name: Check out main
+        if: steps.pins.outputs.has_pins == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up mise
+        if: steps.pins.outputs.has_pins == 'true'
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5
+
+      - name: Insert changelog sections
+        if: steps.pins.outputs.has_pins == 'true'
+        env:
+          PINS_JSON: ${{ steps.pins.outputs.pins }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          jq -c '.[]' <<<"${PINS_JSON}" | while read -r pin; do
+            app=$(jq -r .app <<<"$pin")
+            pkg=$(jq -r .pkg <<<"$pin")
+            old=$(jq -r '.old // empty' <<<"$pin")
+            new=$(jq -r .new <<<"$pin")
+            version=$(jq -r '.version // empty' <<<"$pin")
+            if [ -z "$version" ] || [ -z "$old" ]; then
+              echo "::warning::PR #${PR_NUMBER}: no version bump and/or old pin found for app '${app}' - no changelog section for ${pkg}"
+              continue
+            fi
+            mise run apk-changelog --app "$app" --pkg "$pkg" --old "$old" --new "$new" --version "$version"
+          done
+
+      - name: Format and lint
+        if: steps.pins.outputs.has_pins == 'true'
+        run: |
+          mise run fmt
+          mise run lint
+
+      - name: Commit and push changelog entries
+        if: steps.pins.outputs.has_pins == 'true'
+        env:
+          PINS_JSON: ${{ steps.pins.outputs.pins }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          committed=0
+          while IFS= read -r group; do
+            [ -n "$group" ] || continue
+            app=$(jq -r '.[0].app' <<<"$group")
+            git add "$app/CHANGELOG.md"
+            if git diff --cached --quiet -- "$app/CHANGELOG.md"; then
+              echo "no changelog change for '$app' (section already present)"
+              continue
+            fi
+            subject=$(jq -r 'if length == 1 then
+                "docs(\(.[0].app)): changelog for apk pin bump \(.[0].old) -> \(.[0].new)"
+              else
+                "docs(\(.[0].app)): changelog for apk pin bumps"
+              end' <<<"$group")
+            body=$(jq -r 'map("  - \(.pkg): \(.old) -> \(.new) (app version \(.version))") | join("\n")' <<<"$group")
+            {
+              printf '%s\n' "$subject"
+              printf 'Post-merge changelog entry for the apk pin bump merged in PR #%s (apk-changelog task template).\n' "$PR_NUMBER"
+              printf '\n%s\n' "$body"
+            } > "$RUNNER_TEMP/commitmsg"
+            git commit -F "$RUNNER_TEMP/commitmsg"
+            committed=1
+          done < <(jq -c '[.[] | select(.version != null and .old != null)] | group_by(.app) | .[]' <<<"${PINS_JSON}")
+
+          if [ "$committed" -eq 0 ]; then
+            echo "Nothing to commit - no changelog sections were inserted."
+            exit 0
+          fi
+
+          # merge races with Renovate's own merges are possible: rebase before
+          # pushing (the concurrency group serializes changelog jobs)
+          git fetch origin main
+          git rebase origin/main
+          # GITHUB_TOKEN push: workflow suppression intended (docs-only; see
+          # the workflow comment header)
+          git push origin HEAD:main
+
+  nudge:
+    name: Rebase ready apk pin PRs
+    if: >-
+      github.repository == 'salim-b/home-assistant-apps-salim' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      # issues: write - PR comments are issue comments (@renovate rebase)
+      # pull-requests: read - PR + files listing
+      # contents: read - Dockerfile/config.yaml at the PR head via the
+      # contents API (job permissions replace top-level, so the read must be
+      # restated here)
+      issues: write
+      pull-requests: read
+      contents: read
+    concurrency:
+      group: apk-bump-nudge
+      cancel-in-progress: false
+    steps:
+      - name: Rebase apk pin PRs once all arch indexes serve the new pin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 <<'PY'
+          import base64
+          import io
+          import json
+          import os
+          import re
+          import tarfile
+          import urllib.parse
+          import urllib.request
+
+          API = "https://api.github.com"
+          TOKEN = os.environ["GH_TOKEN"]
+          REPO = os.environ["GITHUB_REPOSITORY"]
+          DRY_RUN = os.environ.get("DRY_RUN", "").lower() in ("1", "true")
+          MAX_NUDGES_PER_PR = 3  # cap github-actions[bot] rebase comments per PR
+          HDRS = {
+              "Authorization": f"Bearer {TOKEN}",
+              "Accept": "application/vnd.github+json",
+              "User-Agent": "apk-bump-nudge",
+          }
+          # same pin shape as validate_apk_pins in .mise/tasks/validate.py
+          PIN_RE = re.compile(r"([A-Za-z0-9][\w.+-]*)=(\d[\w.:]+(?:-r\d+)?)")
+          # HA arch names -> Alpine arch names (others map 1:1)
+          ALPINE_ARCH = {"amd64": "x86_64", "i386": "x86"}
+          INDEX_CACHE: dict = {}
+
+          def api(path, params=None):
+              url = f"{API}/repos/{REPO}/{path}"
+              if params:
+                  url += "?" + urllib.parse.urlencode(params)
+              req = urllib.request.Request(url, headers=HDRS)
+              with urllib.request.urlopen(req, timeout=60) as resp:
+                  return json.load(resp)
+
+          def api_list(path, params):
+              out, page = [], 1
+              while True:
+                  batch = api(path, {**params, "per_page": 100, "page": page})
+                  out.extend(batch)
+                  if len(batch) < 100:
+                      return out
+                  page += 1
+
+          def parse_patch(patch):
+              """New apk pins in a Dockerfile patch: {pkg: {"old","new"}} -
+              same state machine as validate_apk_pins (apk add block across
+              backslash continuations) applied to +/- patch lines."""
+              pins: dict = {}
+              in_apk = False
+              for raw in patch.splitlines():
+                  if raw.startswith("@@"):
+                      in_apk = False
+                      continue
+                  marker = raw[0] if raw[:1] in ("+", "-", " ") else None
+                  content = raw[1:] if marker else raw
+                  found = PIN_RE.findall(content)
+                  if in_apk:
+                      if not content.rstrip().endswith("\\"):
+                          in_apk = False
+                  elif "apk add" in content:
+                      in_apk = content.rstrip().endswith("\\")
+                  else:
+                      continue
+                  if marker == "+":
+                      for pkg, pin in found:
+                          pins.setdefault(pkg, {})["new"] = pin
+                  elif marker == "-":
+                      for pkg, pin in found:
+                          pins.setdefault(pkg, {})["old"] = pin
+              return pins
+
+          def contents(path, ref):
+              data = api(f"contents/{path}", {"ref": ref})
+              return base64.b64decode(data["content"]).decode()
+
+          def build_branch(dockerfile_text):
+              """Alpine branch from the Dockerfile's BUILD_FROM default (same
+              derivation as validate.py's validate_apk_pins)."""
+              match = re.search(r"(?m)^ARG BUILD_FROM=(\S+)", dockerfile_text)
+              if not match:
+                  return None
+              return match.group(1).rsplit(":", 1)[-1].lstrip("v")
+
+          def app_arches(config_text):
+              """arch list from config.yaml (block or flow form)."""
+              match = re.search(r"(?m)^arch:\s*$\n((?:[ \t]+-[ \t]*\S.*\n)+)", config_text)
+              if match:
+                  return re.findall(r"[ \t]+-[ \t]*(\S+)", match.group(1))
+              match = re.search(r"(?m)^arch:\s*\[([^\]]+)\]", config_text)
+              if match:
+                  return [a.strip().strip("\"'") for a in match.group(1).split(",") if a.strip()]
+              return []
+
+          def index_map(branch, alpine_arch):
+              """pkg -> version from the Alpine binary indexes (dl-cdn
+              APKINDEX, main + community; same source of truth as validate.py's
+              _apkindex_versions - the APKBUILD source branch can outrun it)."""
+              key = (branch, alpine_arch)
+              if key in INDEX_CACHE:
+                  return INDEX_CACHE[key]
+              merged: dict = {}
+              for repo in ("main", "community"):
+                  url = f"https://dl-cdn.alpinelinux.org/alpine/v{branch}/{repo}/{alpine_arch}/APKINDEX.tar.gz"
+                  raw = urllib.request.urlopen(url, timeout=60).read()
+                  with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tar:
+                      text = tar.extractfile("APKINDEX").read().decode()
+                  for block in text.split("\n\n"):
+                      fields = {}
+                      for line in block.splitlines():
+                          if ":" in line:
+                              k, _, v = line.partition(":")
+                              fields[k] = v
+                      if fields.get("P"):
+                          merged.setdefault(fields["P"], fields.get("V", ""))
+              INDEX_CACHE[key] = merged
+              return merged
+
+          notes: list = []
+          candidates = [
+              pr
+              for pr in api_list("pulls", {"state": "open"})
+              if pr["user"]["login"] == "renovate[bot]"
+              and any(label["name"] == "apk_pin" for label in pr["labels"])
+          ]
+          notes.append(f"Open apk_pin PRs authored by renovate[bot]: {len(candidates)}")
+
+          for pr in candidates:
+              number = pr["number"]
+              dockerfiles = {
+                  entry["filename"]: entry.get("patch") or ""
+                  for entry in api_list(f"pulls/{number}/files", {})
+                  if entry["filename"].endswith("/Dockerfile")
+              }
+              pins = []
+              for path, patch in dockerfiles.items():
+                  app = path.removesuffix("/Dockerfile")
+                  for pkg, pair in parse_patch(patch).items():
+                      if pair.get("new"):
+                          pins.append((app, pkg, pair["new"]))
+              if not pins:
+                  notes.append(f"PR #{number}: no apk pins in the PR's Dockerfiles - skip")
+                  continue
+
+              head = pr["head"]["sha"]
+              ready, lagging = True, []
+              try:
+                  for app in sorted({pin[0] for pin in pins}):
+                      branch = build_branch(contents(f"{app}/Dockerfile", head))
+                      arches = app_arches(contents(f"{app}/config.yaml", head))
+                      if not branch or not arches:
+                          ready = False
+                          lagging.append(f"{app}: cannot derive branch/arch from PR head")
+                          continue
+                      for pkg, new in sorted({(pin[1], pin[2]) for pin in pins if pin[0] == app}):
+                          for arch in arches:
+                              served = index_map(branch, ALPINE_ARCH.get(arch, arch)).get(pkg)
+                              if served != new:
+                                  ready = False
+                                  lagging.append(
+                                      f"{app}: Alpine v{branch} {ALPINE_ARCH.get(arch, arch)} serves {pkg}="
+                                      f"{served or '(absent)'} (PR pins {new})"
+                                  )
+              except OSError as err:
+                  ready = False
+                  lagging.append(f"fetch error: {err}")
+
+              if not ready:
+                  notes.append(f"PR #{number}: indexes still lag - do nothing")
+                  for note in lagging:
+                      notes.append(f"  {note}")
+                  continue
+
+              prior = sum(
+                  1
+                  for comment in api_list(f"issues/{number}/comments", {})
+                  if comment["user"]["login"] == "github-actions[bot]"
+              )
+              if prior >= MAX_NUDGES_PER_PR:
+                  notes.append(
+                      f"PR #{number}: all arches serve the pin, but the rebase nudge cap "
+                      f"({prior}/{MAX_NUDGES_PER_PR}) is reached - skip")
+                  continue
+              if DRY_RUN:
+                  notes.append(f"PR #{number}: DRY-RUN would comment '@renovate rebase' (prior nudges: {prior}/{MAX_NUDGES_PER_PR})")
+                  continue
+              req = urllib.request.Request(
+                  f"{API}/repos/{REPO}/issues/{number}/comments",
+                  data=json.dumps({"body": "@renovate rebase"}).encode(),
+                  headers={**HDRS, "Content-Type": "application/json"},
+                  method="POST",
+              )
+              with urllib.request.urlopen(req, timeout=60) as resp:
+                  resp.read()
+              notes.append(f"PR #{number}: posted '@renovate rebase' (prior nudges: {prior}/{MAX_NUDGES_PER_PR})")
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+              fh.write("### apk pin PR rebase nudge\n\n")
+              for note in notes:
+                  fh.write(f"- {note}\n")
+          print("\n".join(notes))
+          PY
