@@ -53,12 +53,14 @@ facts live in the repository-root `KNOWLEDGE.md`.
   daily `@renovate rebase` nudge capped at 3 per PR once all Alpine arch indexes serve the new pin;
   publish-reconcile.yaml: daily GHCR version-tag check dispatching build-app.yaml - now `workflow_dispatch`-able - on a
   genuine miss). Verified locally: the changelog parser reproduces the PR #3 data (hd-idle `1.22-r7` -> `1.22-r8`, app
-  0.1.7) and the templated dry-run entry is panache-stable; the publish-reconcile dry-run reports both apps' current
-  version tags as published (zero dispatches); the nudge dry-run is a no-op and its Dockerfile-pin/APKINDEX parse logic
-  passes function tests against live Alpine v3.24 data. The build-app workflow_dispatch smoke test ran green on the
-  branch (run 39098829377: prepare + both arch builds succeeded, the manifest publish skipped with publish=false - no
-  registry writes). The first real Alpine repoint after landing validates the flow end to end (drift cron red ->
-  Renovate PR -> green CI -> automerge -> Builder publish -> changelog commit) - do not fake events.
+  0.1.7) and the templated dry-run entry is panache-stable; the publish-reconcile dry-run (buildx `imagetools inspect`
+  probe with exponential-backoff retries on unclassified failures) reports both apps' current version tags as published
+  (zero dispatches), classifies a nonexistent tag as missing immediately without retries and fails red on a dead
+  registry after the backoff schedule; the nudge dry-run is a no-op and its Dockerfile-pin/APKINDEX parse logic passes
+  function tests against live Alpine v3.24 data. The build-app workflow_dispatch smoke test ran green on the branch (run
+  39098829377: prepare + both arch builds succeeded, the manifest publish skipped with publish=false - no registry
+  writes). The first real Alpine repoint after landing validates the flow end to end (drift cron red -> Renovate PR ->
+  green CI -> automerge -> Builder publish -> changelog commit) - do not fake events.
 
 - Repo sweep + dev tooling review (2026-10-16) done: the CI "redundancy" check resolved as proper architecture
   (build-app.yaml is a reusable `workflow_call` workflow invoked by builder.yaml; fetch-depth and squash-merge caveats

@@ -10,8 +10,8 @@ name: Publish reconcile
 # ref=main). Idempotent: only a real miss dispatches - the push-fired Builder
 # still publishes on merge, so a healthy registry means a green no-op run.
 # The dispatched Builder run is the loud signal when publishing keeps failing;
-# this run stays green with a summary note. GHCR unreachable or a failed
-# dispatch fails this run (red).
+# this run stays green with a summary note. GHCR unreachable (after backoff
+# retries) or a failed dispatch fails this run (red).
 #
 # Known limitation: this reconciles TAG EXISTENCE only. A tag that exists but
 # carries stale content (e.g. an image built from a pre-merge state) is not
@@ -19,8 +19,11 @@ name: Publish reconcile
 # (both fail loudly on source drift).
 #
 # Cron offset: 03:15 UTC - away from the lint workflow's daily 00:00 cron and
-# the apk-bump nudge (01:30 UTC). GHCR is probed with anonymous pull tokens
-# (the packages are public); only ghcr.io is supported.
+# the apk-bump nudge (01:30 UTC). GHCR is probed anonymously with the runner's
+# preinstalled docker buildx CLI (`docker buildx imagetools inspect`; the
+# packages are public); only ghcr.io is supported. Unclassified probe failures
+# are retried with exponential backoff, so transient network/registry blips
+# neither go red nor trigger dispatches.
 
 on:
   schedule:
@@ -87,41 +90,45 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Accept header list covering the manifest types GHCR serves (OCI
-          # image manifest/index and the Docker v2 equivalents)
-          ACCEPT='application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json,'
-          ACCEPT="${ACCEPT} application/vnd.docker.distribution.manifest.v2+json,"
-          ACCEPT="${ACCEPT} application/vnd.docker.distribution.manifest.list.v2+json"
-
-          # probe <ghcr-repo> <tag> -> echoes ok | missing | unreachable
+          # Existence probe via the runner's preinstalled docker buildx CLI:
+          # `docker buildx imagetools inspect` talks to the registry directly -
+          # no docker daemon and no login needed for the public packages.
+          # Classification follows project-copacetic's ensure-tag-absent.sh:
+          # success -> ok, registry not-found-class errors -> missing, anything
+          # else is treated as unreachable. Unclassified failures (DNS blips,
+          # 429/5xx, timeouts) are retried with exponential backoff first, so a
+          # transient outage neither goes red nor causes a dispatch decision.
+          # Each attempt is time-bounded (SIGTERM then SIGKILL - buildx traps
+          # SIGTERM for graceful shutdown and would outlive plain `timeout`);
+          # "404 not found" also matches the error-text variants of buildx
+          # versions other than the tested one. RECONCILE_RETRIES overrides the
+          # retry count (testing/ops knob).
+          retries="${RECONCILE_RETRIES:-3}"
           probe() {
-            local repo="$1" tag="$2" token code
-            if ! token=$(curl -fsS --max-time 30 \
-              "https://ghcr.io/token?scope=repository:${repo}:pull" 2>/dev/null \
-              | jq -r '.token // empty') || [ -z "$token" ]; then
-              echo unreachable
-              return 0
-            fi
-            if ! code=$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \
-              -H "Authorization: Bearer ${token}" -H "Accept: ${ACCEPT}" \
-              "https://ghcr.io/v2/${repo}/manifests/${tag}" 2>/dev/null); then
-              echo unreachable
-              return 0
-            fi
-            case "$code" in
-              200) echo ok ;;
-              404) echo missing ;;
-              *) echo unreachable ;; # 401/403/5xx: cannot verify - fail loudly, do not dispatch
-            esac
+            local ref="$1" out attempt=0
+            while :; do
+              if out=$(timeout -k 10 60 docker buildx imagetools inspect "$ref" 2>&1); then
+                echo ok
+                return 0
+              fi
+              if grep -Eiq '(manifest unknown|name unknown|no such manifest|: not found[[:space:]]*$|404 not found)' <<<"$out"; then
+                echo missing
+                return 0
+              fi
+              if [ "$attempt" -ge "$retries" ]; then
+                echo unreachable
+                return 0
+              fi
+              sleep "$((5 * (2 ** attempt)))"
+              attempt=$((attempt + 1))
+            done
           }
 
-          version=$(jq -r . <<<"${VERSION}")
-          prefix=$(jq -r . <<<"${REGISTRY_PREFIX}")
-          image_name=$(jq -r . <<<"${IMAGE_NAME}")
-          host="${prefix%%/*}"
-          repo_base="${prefix#*/}"
-          if [ "$host" != "ghcr.io" ]; then
-            echo "unsupported registry host '${host}' - only ghcr.io reconciliation is implemented" >&2
+          version="${VERSION}"
+          prefix="${REGISTRY_PREFIX}"
+          image_name="${IMAGE_NAME}"
+          if [ "${prefix%%/*}" != "ghcr.io" ]; then
+            echo "unsupported registry host '${prefix%%/*}' - only ghcr.io reconciliation is implemented" >&2
             exit 1
           fi
 
@@ -130,9 +137,9 @@ jobs:
           declare -A tag_state=()
           missing=()
           for arch in "${arches[@]}"; do
-            tag_state["${repo_base}/${arch}-${image_name}:${version}"]=$(probe "${repo_base}/${arch}-${image_name}" "${version}")
+            tag_state["${prefix}/${arch}-${image_name}:${version}"]=$(probe "${prefix}/${arch}-${image_name}:${version}")
           done
-          tag_state["${repo_base}/${image_name}:${version}"]=$(probe "${repo_base}/${image_name}" "${version}")
+          tag_state["${prefix}/${image_name}:${version}"]=$(probe "${prefix}/${image_name}:${version}")
 
           {
             echo "### Publish reconcile: ${APP} ${version}"
