@@ -163,14 +163,17 @@ versioned release).
   hd-idle's arg generator (`hd-idle/rootfs/usr/bin/hd-idle-genargs`) relies on hd-idle's CLI semantics, so every package
   change must be a deliberate app change - one app release (pin + `config.yaml` version + changelog) per package
   version.
+
 - **Float** when chasing pkgrel rebuilds adds churn without user value: nfs-server's `nfs-utils` (multi-binary ecosystem
   whose kernel-consistency matters more than the exact userspace version).
+
 - Both are enforced/verified by `validate.py` (`validate_apk_pins`): it extracts the BUILD_FROM default branch and the
   apk pins from each app's Dockerfile and compares them against the Alpine **binary indexes** (dl-cdn APKINDEX, x86_64 +
   aarch64, community then main, cached 24 h). A mismatch fails with the release workflow — turning an Alpine-side
   repoint into a guided release instead of silent image drift. It runs in `mise run check`, and the CI lint workflow's
   **daily cron** flags drift within a day; until the pin is chased, the *next* build would break anyway (the index
   serves only the current pkgrel, old ones disappear).
+
 - **Renovate opens the update PR — including the config.yaml version bump** (verified with a local
   `npx renovate@latest --platform=local --dry-run=full` run: extraction + APKINDEX lookup + rule resolution; the branch
   edit itself only happens in a real run — safe by construction, see below): the Dockerfile manager extracts
@@ -184,12 +187,36 @@ versioned release).
   let a future comment containing `version: "..."` hijack the bump (both verified against our config with node); only
   the FIRST match per file is bumped (single `exec`, no `g` flag). The version-guard workflow still passes on the
   Renovate PR as opened. What Renovate cannot do on the hosted app: run post-upgrade tasks — `postUpgradeTasks.commands`
-  need `allowedPostUpgradeCommands`, a **self-hosted-only** option — so the changelog entry for the bumped version stays
-  a manual step before the merge (one templated line; if it ever becomes a burden, the alternatives are a self-hosted
-  Renovate or an own completion workflow). The rule's registryUrls branch value must be updated together with the
-  Dockerfile's `BUILD_FROM` default on a base-image bump; the validate.py drift check derives the branch dynamically and
-  remains the config-independent net (if `bumpVersions` ever misbehaves, version-guard fails the PR loudly — no silent
-  drift). Floating apk packages (nfs-utils) are skipped (`unspecified-version`), as intended.
+  need `allowedPostUpgradeCommands`, a **self-hosted-only** option — so the changelog entry is filled post-merge by the
+  CI changelog job instead (see the release-automation bullet below). The rule's registryUrls branch value must be
+  updated together with the Dockerfile's `BUILD_FROM` default on a base-image bump; the validate.py drift check derives
+  the branch dynamically and remains the config-independent net (if `bumpVersions` ever misbehaves, version-guard fails
+  the PR loudly — no silent drift). Floating apk packages (nfs-utils) are skipped (`unspecified-version`), as intended.
+
+- **Release automation (since 2026-10-18)**: the guided release above is followed up automatically end-to-end. Merge
+  behavior by update type (`.github/renovate.json` chained apk rules): pkgrel-only bumps (`1.22-r7` -> `1.22-r8` — the
+  apk datasource's `apk` versioning classifies them as `patch`) **automerge once CI is green**
+  (`automergeStrategy: rebase`, same linear-history rationale as the supervisor-pin rule), while pkgver bumps (upstream
+  version changes, `minor`/`major`) get the `needs-review` label and stay manual — CLI semantics may change, cf.
+  `hd-idle-genargs`. Top-level `platformAutomerge: false` keeps merges on Renovate's own path (no branch protection and
+  "Allow auto-merge" are off today; the explicit setting prevents a later repo-toggle enablement from merging before CI
+  finishes). The changelog section is filled post-merge by the apk-bump workflow's changelog job (a merged
+  `renovate[bot]` PR labeled `apk_pin` — covering Renovate automerges and manually merged pkgver PRs alike): it parses
+  the merged PR's Dockerfile patches (apk pins old -> new) and the `config.yaml` version bump, and runs the
+  `apk-changelog` mise task (`.mise/tasks/apk-changelog.py`, shared with local runs) to insert the templated
+  `## <version>` section — idempotent, a pre-written section is never touched (a PR touching several pins of the same
+  app records only the first; Renovate opens one PR per package anyway). The resulting docs-only commit is pushed with
+  the `GITHUB_TOKEN`, whose push-event workflow suppression is intended: CHANGELOG.md is excluded by version-guard and
+  the image is byte-identical, so no rebuild is needed. The same workflow's nudge job (daily 01:30 UTC) handles the
+  per-arch repush skew documented in the gotchas below: an early bump PR legitimately stays red until the lagging arch's
+  index catches up; once ALL of the app's arch indexes serve the new pin, the job comments `@renovate rebase` (capped at
+  3 per PR) — a rebase creates fresh check runs, while re-running failed check runs can still count as red in Renovate's
+  automerge evaluation; while an arch still lags it does nothing and the daily lint cron remains the drift alarm. Missed
+  image publishes self-heal via the publish-reconcile workflow (daily 03:15 UTC): it checks GHCR for every app's version
+  tags (per-arch `ghcr.io/salim-b/<arch>-app-<name>:<version>` plus the multi-arch manifest; anonymous pull tokens) and
+  dispatches `build-app.yaml` (now also `workflow_dispatch`-able; publish=true, ref=main) on a genuine miss —
+  idempotent, a healthy registry is a green no-op. Tag existence only: stale-content tags are not detected (content
+  drift is version-guard's/validate's domain).
 
 Version-sensitive gotchas learned while implementing:
 
