@@ -3,7 +3,7 @@
 # Panache configuration - Markdown formatter + semantic linter
 # (https://panache.bz, docs v3.16.0)
 #
-# Panache owns ALL markdown autoformatting: it is the single source for
+# Panache owns ALL Markdown autoformatting: it is the single source for
 # prose wrapping (run `panache format .`, wired up as `mise run fmt`).
 # rumdl (see .rumdl.toml) stays as the markdownlint-rules-rich second
 # linter - with its own reflow disabled so the two never fight over
