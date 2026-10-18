@@ -32,4 +32,4 @@ yq = "4.54.1"
 # release (github-tags) and automerges when the CI check job is green -
 # green means the new schemas still validate our app configs (see
 # .github/renovate.json, custom.regex manager).
-supervisor_ref = "2026.10.1"
+supervisor_ref = "2026.10.2"
