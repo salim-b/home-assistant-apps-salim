@@ -213,10 +213,12 @@ versioned release).
   3 per PR) — a rebase creates fresh check runs, while re-running failed check runs can still count as red in Renovate's
   automerge evaluation; while an arch still lags it does nothing and the daily lint cron remains the drift alarm. Missed
   image publishes self-heal via the publish-reconcile workflow (daily 03:15 UTC): it checks GHCR for every app's version
-  tags (per-arch `ghcr.io/salim-b/<arch>-app-<name>:<version>` plus the multi-arch manifest; anonymous pull tokens) and
-  dispatches `build-app.yaml` (now also `workflow_dispatch`-able; publish=true, ref=main) on a genuine miss —
-  idempotent, a healthy registry is a green no-op. Tag existence only: stale-content tags are not detected (content
-  drift is version-guard's/validate's domain).
+  tags (per-arch `ghcr.io/salim-b/<arch>-app-<name>:<version>` plus the multi-arch manifest) via anonymous
+  `docker buildx imagetools inspect` probes with the runner-preinstalled buildx (copacetic-style classification:
+  not-found-class errors mean a missing tag, any other failure is retried with exponential backoff and then fails the
+  run red - so transient outages neither dispatch nor silently pass) and dispatches `build-app.yaml` (now also
+  `workflow_dispatch`-able; publish=true, ref=main) on a genuine miss — idempotent, a healthy registry is a green no-op.
+  Tag existence only: stale-content tags are not detected (content drift is version-guard's/validate's domain).
 
 Version-sensitive gotchas learned while implementing:
 
