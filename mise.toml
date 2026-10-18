@@ -13,6 +13,7 @@ HK_STASH_UNTRACKED = "0"
 [tasks.lint]
 description = "Lint all tracked files via hk (same checks as the pre-commit hook)"
 run = "hk check --all --no-fail-fast"
+output = "interleave"
 
 # User-wide hook install: hk writes hook.<name>.command entries into
 # ~/.gitconfig so every repository on the machine picks them up (silent no-op
@@ -33,6 +34,7 @@ exec hk install --global --mise
 [tasks.check]
 description = "Run all pre-commit checks (lint + validate)"
 depends = ["lint", "validate"]
+output = "keep-order"
 
 # Panache owns ALL Markdown autoformatting (see panache.toml); rumdl stays a
 # check-only second linter.
