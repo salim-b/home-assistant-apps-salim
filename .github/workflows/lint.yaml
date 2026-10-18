@@ -18,7 +18,7 @@ jobs:
       addons: ${{ steps.addons.outputs.addons_list }}
     steps:
       - name: ⤵️ Check out code from GitHub
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: 🔍 Find app directories
         id: addons
@@ -33,7 +33,7 @@ jobs:
         path: ${{ fromJson(needs.find.outputs.addons) }}
     steps:
       - name: ⤵️ Check out code from GitHub
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: ⤵️ Check out the linter source
         # run frenck's app linter natively instead of via its Docker action:
@@ -41,7 +41,7 @@ jobs:
         # transient auth.docker.io outages/429 rate limits (runner IP pools,
         # unauthenticated pulls) otherwise flake the job — python + pypi are
         # the reliable path. Renovate digest-pins this checkout.
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: frenck/action-addon-linter
           ref: v2.21
@@ -67,10 +67,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: ⤵️ Check out code from GitHub
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: ⚙️ Set up mise (installs pinned tools via mise.lock)
-        uses: jdx/mise-action@v5
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5
 
       - name: ✅ Run mise tasks (lint + validate)
         run: mise run check
