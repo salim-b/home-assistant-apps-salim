@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.1.8
+
+- Internals: the app's scripts were reformatted and quoting-hardened by the repository's new shell tooling (shfmt,
+  shellharden, shellcheck) - no functional changes.
+
 ## 0.1.7
 
 - Internals: bumped the pinned hd-idle package to Alpine's current build (1.22-r8 - a Go 1.26.5 toolchain rebuild of the

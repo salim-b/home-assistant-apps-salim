@@ -18,7 +18,7 @@ case "$host" in *@*) ;; *) host="root@$host" ;; esac
 SSH_OPTS=(-o ConnectTimeout=10)
 
 CONFIG_MODE="${usage_config:-}"
-case "${CONFIG_MODE}" in
+case "$CONFIG_MODE" in
   "" | migrate | reset) ;;
   *)
     echo "ERROR: invalid --config value '${CONFIG_MODE}' (valid: migrate, reset)" >&2
@@ -30,7 +30,10 @@ esac
 source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
 wait_supervisor
 
-[ -d "$app" ] || { echo "ERROR: no app directory '$app' in the repo" >&2; exit 1; }
+[ -d "$app" ] || {
+  echo "ERROR: no app directory '$app' in the repo" >&2
+  exit 1
+}
 slug=$(yq -r '.slug' "$app/config.yaml")
 local_slug="local_${slug}"
 
@@ -38,7 +41,7 @@ echo "== switching $app to the registry version on $host =="
 
 # --- derive the repository URL (git remote origin; fallback: config.yaml url:)
 repo_url=$(git remote get-url origin 2>/dev/null || true)
-if [ -n "$repo_url" ]; then
+if [ "$repo_url" != "" ]; then
   case "$repo_url" in
     git@github.com:*) repo_url="https://github.com/${repo_url#git@github.com:}" ;;
   esac
@@ -47,7 +50,7 @@ else
   # https://github.com/<owner>/<repo>/tree/<branch>/<app> -> repo URL
   repo_url=$(yq -r '.url // ""' "$app/config.yaml" | sed 's|/tree/.*||')
 fi
-[ -n "$repo_url" ] || {
+[ "$repo_url" != "" ] || {
   echo "ERROR: cannot determine the app repository URL (no git remote 'origin', no url in $app/config.yaml)." >&2
   exit 1
 }
@@ -65,7 +68,7 @@ if ! echo "$repos" | jq -e '.result == "ok"' >/dev/null 2>&1; then
 fi
 repo_entry=$(echo "$repos" | jq -c --arg url "$repo_url" \
   '[.data[] | select(((.url // "") | sub("/$";"") | ascii_downcase) == ($url | ascii_downcase))] | .[0] // empty')
-if [ -z "$repo_entry" ] || [ "$repo_entry" = "null" ]; then
+if [ "$repo_entry" = "" ] || [ "$repo_entry" = "null" ]; then
   echo "ERROR: the app repository is not added on $host:" >&2
   echo "       $repo_url" >&2
   echo "       Add it first, e.g.:  ssh $host 'ha store add $repo_url'" >&2
@@ -88,7 +91,7 @@ store_slug="${repo_slug}_${slug}"
 
 store_entry=$(echo "$store" | jq -c --arg s "$store_slug" \
   '[.data.addons[] | select(.slug == $s)] | .[0] // empty')
-if [ -z "$store_entry" ] || [ "$store_entry" = "null" ]; then
+if [ "$store_entry" = "" ] || [ "$store_entry" = "null" ]; then
   echo "ERROR: the app '${slug}' (expected store slug: $store_slug) is not available in repository $repo_url on $host." >&2
   echo "       Is the app pushed to the repository's default branch? Refresh the store and re-run:" >&2
   echo "         ssh $host 'ha store reload'" >&2
@@ -102,10 +105,10 @@ local_installed=$(echo "$installed" | jq -c --arg s "$local_slug" 'map(select(.s
 repo_installed=$(echo "$installed" | jq -c --arg s "$store_slug" 'map(select(.slug == $s)) | .[0] // empty')
 
 echo "-- registry: $store_slug (latest version $store_version)"
-[ -n "$local_installed" ] && [ "$local_installed" != "null" ] &&
-  echo "-- locally installed: $local_slug (version $(echo "$local_installed" | jq -r '.version'))"
-[ -n "$repo_installed" ] && [ "$repo_installed" != "null" ] &&
-  echo "-- repository-installed: $store_slug (version $(echo "$repo_installed" | jq -r '.version'))"
+[ "$local_installed" != "" ] && [ "$local_installed" != "null" ] \
+  && echo "-- locally installed: $local_slug (version $(echo "$local_installed" | jq -r '.version'))"
+[ "$repo_installed" != "" ] && [ "$repo_installed" != "null" ] \
+  && echo "-- repository-installed: $store_slug (version $(echo "$repo_installed" | jq -r '.version'))"
 
 # The app's default options, from the repo's config.yaml: the reset target.
 # (POSTing {} would be rejected for schemas with required option keys -
@@ -113,14 +116,14 @@ echo "-- registry: $store_slug (latest version $store_version)"
 default_options=$(yq -o json '.options' "$app/config.yaml" | jq -c .)
 
 # --- decide what to do -------------------------------------------------------
-if [ -n "$repo_installed" ] && [ "$repo_installed" != "null" ]; then
-  if [ -n "$local_installed" ] && [ "$local_installed" != "null" ]; then
+if [ "$repo_installed" != "" ] && [ "$repo_installed" != "null" ]; then
+  if [ "$local_installed" != "" ] && [ "$local_installed" != "null" ]; then
     echo "ERROR: both a local and a repository-installed copy exist - they would conflict on the app's published" >&2
     echo "       port. Uninstall one first, e.g.: ssh $host 'ha apps uninstall $local_slug'" >&2
     exit 1
   fi
   installed_version=$(echo "$repo_installed" | jq -r '.version')
-  if [ "$installed_version" = "$store_version" ] && [ "${CONFIG_MODE}" != "reset" ]; then
+  if [ "$installed_version" = "$store_version" ] && [ "$CONFIG_MODE" != "reset" ]; then
     echo "-- already the latest registry version ($installed_version); nothing to do"
     exit 0
   fi
@@ -130,12 +133,15 @@ if [ -n "$repo_installed" ] && [ "$repo_installed" != "null" ]; then
     echo "-- updating the registry install ($installed_version -> $store_version)"
     ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps update $store_slug"
   fi
-  if [ "${CONFIG_MODE}" = "reset" ]; then
+  if [ "$CONFIG_MODE" = "reset" ]; then
     old=$(ha_app_options "$store_slug")
-    if [ -n "$old" ] && [ "$old" != "{}" ]; then
+    if [ "$old" != "" ] && [ "$old" != "{}" ]; then
       echo "-- previous options backed up locally: $(ha_backup_options "$app" "$old")"
-      ha_post_options "$store_slug" "$default_options" ||
-        { echo "ERROR: resetting the options failed (the previous options are backed up above)" >&2; exit 1; }
+      ha_post_options "$store_slug" "$default_options" \
+        || {
+          echo "ERROR: resetting the options failed (the previous options are backed up above)" >&2
+          exit 1
+        }
       echo "-- --config reset: options set to the app's default options"
       ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps restart $store_slug"
     else
@@ -145,28 +151,28 @@ if [ -n "$repo_installed" ] && [ "$repo_installed" != "null" ]; then
 else
   # Switching from a local copy (or fresh install). Registry installs of a
   # version OLDER than the local copy warn but proceed (an explicit request).
-  [ -n "$local_installed" ] && [ "$local_installed" != "null" ] &&
-    local_version=$(echo "$local_installed" | jq -r '.version') || local_version=""
-  if [ -n "$local_version" ] && [ "$local_version" != "$store_version" ] &&
-    [ "$(printf '%s\n' "$local_version" "$store_version" | sort -V | head -1)" != "$store_version" ]; then
+  [ "$local_installed" != "" ] && [ "$local_installed" != "null" ] \
+    && local_version=$(echo "$local_installed" | jq -r '.version') || local_version=""
+  if [ "$local_version" != "" ] && [ "$local_version" != "$store_version" ] \
+    && [ "$(printf '%s\n' "$local_version" "$store_version" | sort -V | head -1)" != "$store_version" ]; then
     echo "   WARNING: the registry version ($store_version) is OLDER than the locally installed $local_version - proceeding as requested."
   fi
 
   # --- the previous options' fate (--config) ---------------------------------
   old_options=""
   backup_note="none"
-  if [ -n "$local_version" ]; then
+  if [ "$local_version" != "" ]; then
     old_options=$(ha_app_options "$local_slug")
-    if [ -n "$old_options" ] && [ "$old_options" != "{}" ] && [ "$old_options" != "null" ]; then
+    if [ "$old_options" != "" ] && [ "$old_options" != "{}" ] && [ "$old_options" != "null" ]; then
       backup_note="backed up locally: $(ha_backup_options "$app" "$old_options")"
       echo "-- previous options backed up locally: ${backup_note#backed up locally: }"
     else
       old_options=""
     fi
   fi
-  case "${CONFIG_MODE}" in
+  case "$CONFIG_MODE" in
     migrate)
-      [ -n "$old_options" ] || echo "-- (no previous options to migrate)"
+      [ "$old_options" != "" ] || echo "-- (no previous options to migrate)"
       ;;
     reset)
       ## The reset POST happens after the install below - a fresh install
@@ -182,37 +188,43 @@ else
       ## and they do not survive its uninstall either (device-verified: the
       ## supervisor purges an app's options on uninstall; only the backup
       ## file keeps a copy) - the fresh store install runs the app defaults.
-      [ -n "$old_options" ] &&
-        echo "-- options not carried over (options do not survive the uninstall; $backup_note)"
+      [ "$old_options" != "" ] \
+        && echo "-- options not carried over (options do not survive the uninstall; $backup_note)"
       old_options=""
       ;;
   esac
 
-  if [ -n "$local_version" ]; then
+  if [ "$local_version" != "" ]; then
     echo "-- uninstalling the local copy ($local_slug)"
     ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps uninstall $local_slug"
   fi
   echo "-- installing the registry version ($store_slug, $store_version)"
   ha_retry 900 ssh "${SSH_OPTS[@]}" "$host" "ha apps install $store_slug"
 
-  if [ "${CONFIG_MODE}" = "migrate" ] && [ -n "$old_options" ]; then
+  if [ "$CONFIG_MODE" = "migrate" ] && [ "$old_options" != "" ]; then
     echo "-- migrating the previous options (filtered to the target schema)"
     filtered=$(ha_filter_options "$old_options" "$store_slug")
     dropped=$(jq -r --argjson keys "$(ha_schema_keys "$store_slug")" \
       'to_entries | map(select(.key as $k | $keys | index($k) | not) | .key) | join(", ")' <<<"$old_options")
-    [ -n "$dropped" ] && echo "   (dropped, unknown to the target's schema: $dropped)"
+    [ "$dropped" != "" ] && echo "   (dropped, unknown to the target's schema: $dropped)"
     if [ "$filtered" = "{}" ]; then
       echo "-- (no options left after filtering - nothing to migrate)"
     else
-      ha_post_options "$store_slug" "$filtered" ||
-        { echo "ERROR: migrating the options failed (the previous options are backed up above)" >&2; exit 1; }
+      ha_post_options "$store_slug" "$filtered" \
+        || {
+          echo "ERROR: migrating the options failed (the previous options are backed up above)" >&2
+          exit 1
+        }
       echo "-- options migrated"
     fi
   fi
-  if [ "${CONFIG_MODE}" = "reset" ]; then
+  if [ "$CONFIG_MODE" = "reset" ]; then
     echo "-- --config reset: posting the app's default options"
-    ha_post_options "$store_slug" "$default_options" ||
-      { echo "ERROR: resetting the options failed (the previous options are backed up above)" >&2; exit 1; }
+    ha_post_options "$store_slug" "$default_options" \
+      || {
+        echo "ERROR: resetting the options failed (the previous options are backed up above)" >&2
+        exit 1
+      }
   fi
 fi
 

@@ -1,49 +1,58 @@
 amends "package://github.com/jdx/hk/releases/download/v2.7.0/hk@2.7.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v2.7.0/hk@2.7.0#/Builtins.pkl"
 
-// Lint steps ported from the removed .mise/tasks/lint.sh. `mise run lint`
-// (hk check --all) and the pre-commit hook run the same step set; only
-// panache-format and final-newline auto-fix (fix = true on pre-commit).
-
-local scriptGlobs = List(
-  "**/*.sh",
-  "**/cont-init.d/**",
-  "**/s6-overlay/scripts/**",
+// The shell builtins select scripts by extension and shebang (hk file
+// typing). That misses the extensionless s6 scripts: their
+// `#!/usr/bin/with-contenv bashio` shebangs type as plain text, not bash - so
+// the shell steps also match those paths by glob (s6-overlay convention makes
+// them shell scripts). `match_any` replaces a step's default selection, so
+// each step below repeats the builtin's own selectors (frozen by the pinned
+// package version) plus s6Globs.
+local s6Globs = List(
+  "**/cont-init.d/*",
+  "**/s6-overlay/scripts/*",
   "**/s6-rc.d/*/run",
   "**/s6-rc.d/*/finish",
 )
 local mdGlobs = List("**/*.md", "**/*.markdown")
 // Explicit paths bypass panache's own config excludes; AI_POLICY.md is
-// upstream-verbatim, **/LICENSE.md mirrors the old walk's default exclude.
+// upstream-verbatim, **/LICENSE.md mirrors the default markdown exclude.
 local mdExcludes = List("AI_POLICY.md", "**/LICENSE.md")
 
 local linters = new Mapping<String, Step> {
-  ["shellcheck"] {
-    // The old lint.sh selected scripts by name glob AND a shebang-ish
-    // first line (*bash* or */sh): the glob gives candidates, the loop
-    // re-filters. -x follows `source`d helpers (.mise/tasks/lib/).
-    glob = scriptGlobs
-    check = """
-      rc=0
-      for f in {{files}}; do
-        case "$(head -1 "$f")" in
-          *bash*|*"/sh") shellcheck -x "$f" || rc=1 ;;
-        esac
-      done
-      exit $rc
-      """
+  // -x follows `source`d helpers (.mise/tasks/lib/); without it the sourced
+  // helper fails with SC1091. The fix-mode autofix path (check_diff) needs
+  // the same flag.
+  ["shellcheck"] = (Builtins.shellcheck) {
+    match_any = List(
+      new FileSelector { glob = List("**/*.sh", "**/*.bash") },
+      new FileSelector { types = List("sh", "bash") },
+      new FileSelector { glob = s6Globs },
+    )
+    check {
+      command { argv = List("shellcheck", "-x", "{{files}}") }
+    }
+    check_diff {
+      command { argv = List("shellcheck", "-x", "--format=diff", "{{files}}") }
+    }
   }
-  ["bash-syntax"] {
-    glob = scriptGlobs
-    check = """
-      rc=0
-      for f in {{files}}; do
-        case "$(head -1 "$f")" in
-          *bash*) bash -n "$f" || rc=1 ;;
-        esac
-      done
-      exit $rc
-      """
+  ["shfmt"] = (Builtins.shfmt) {
+    match_any = List(
+      new FileSelector {
+        glob = List("**/*.sh", "**/*.bash", "**/*.mksh", "**/*.bats", "**/*.zsh")
+      },
+      new FileSelector { types = List("sh", "bash") },
+      new FileSelector { glob = s6Globs },
+    )
+  }
+  ["shellharden"] = (Builtins.shellharden) {
+    // The builtin matches via step-level `types`, which cannot coexist with
+    // `match_any` - so it is cleared here and re-declared as a selector.
+    types = null
+    match_any = List(
+      new FileSelector { types = List("bash", "sh") },
+      new FileSelector { glob = s6Globs },
+    )
   }
   ["actionlint"] = Builtins.actionlint
   ["hadolint"] = Builtins.hadolint

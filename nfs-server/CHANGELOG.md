@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.6.1
+
+- Internals: the app's scripts were reformatted and quoting-hardened by the repository's new shell tooling (shfmt,
+  shellharden, shellcheck) - no functional changes.
+
 ## 0.6.0
 
 - Rename: the app's slug changed from `nfs` to `nfs-server` to match the app folder and image name. The slug surfaces in

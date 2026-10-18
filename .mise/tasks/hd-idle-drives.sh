@@ -12,7 +12,7 @@ OUT_FILE="hd-idle/.drives.md"
 
 ## The sheet carries the drives' stable by-id IDs - it must never be tracked by git (per-machine device
 ## inventory). The gitignore entry ships with the repo; refuse to write if it went missing.
-if ! git check-ignore --quiet "${OUT_FILE}"; then
+if ! git check-ignore --quiet "$OUT_FILE"; then
   echo "ERROR: ${OUT_FILE} is not gitignored - refusing to write drive IDs into a trackable file (add it to .gitignore first)" >&2
   exit 1
 fi
@@ -42,7 +42,10 @@ pick_phys() {
       ata-*) ata+="$name " ;;
     esac
   done
-  if out=$(pick_from "$disk" "$ata" "ata-*"); then printf '%s' "$out"; return 0; fi
+  if out=$(pick_from "$disk" "$ata" "ata-*"); then
+    printf '%s' "$out"
+    return 0
+  fi
   echo "ERROR: disk $disk has no ata-* by-id link (the drive's model+serial identity) - drive type not supported by the sheet" >&2
   exit 1
 }
@@ -57,7 +60,10 @@ pick_usb() {
       usb-*) usb+="$name " ;;
     esac
   done
-  if out=$(pick_from "$disk" "$usb" "usb-*"); then printf '%s' "$out"; return 0; fi
+  if out=$(pick_from "$disk" "$usb" "usb-*"); then
+    printf '%s' "$out"
+    return 0
+  fi
   printf '-'
 }
 
@@ -79,16 +85,22 @@ raw=$(ssh -n "${SSH_OPTS[@]}" "$host" '
     [ -L "$l" ] || continue
     printf "byid|%s|%s\n" "${l##*/}" "$(basename "$(readlink "$l")")"
   done
-') || { echo "ERROR: drive discovery on '$host' failed" >&2; exit 1; }
+') || {
+  echo "ERROR: drive discovery on '$host' failed" >&2
+  exit 1
+}
 
 ## DISK_LABELS: newline-joined labels per disk (a label may contain spaces); DISK_LINKS: by-id link names.
 declare -A DISK_LABELS=() DISK_LINKS=()
 while IFS='|' read -r kind a b; do
-  [ -n "$kind" ] || continue
+  [ "$kind" != "" ] || continue
   case "$kind" in
     label) DISK_LABELS[$b]+="$a"$'\n' ;;
     byid) DISK_LINKS[$b]+="$a " ;;
-    *) echo "ERROR: unexpected discovery line: $kind|$a|$b" >&2; exit 1 ;;
+    *)
+      echo "ERROR: unexpected discovery line: $kind|$a|$b" >&2
+      exit 1
+      ;;
   esac
 done <<<"$raw"
 
@@ -101,7 +113,8 @@ fi
 ## from (boot/system/data/overlay slots - covers eMMC systems and USB-booted systems alike).
 excluded=""
 rows=()
-for disk in $(printf '%s\n' "${!DISK_LABELS[@]}" | sort); do
+mapfile -t sorted_disks < <(printf '%s\n' "${!DISK_LABELS[@]}" | sort)
+for disk in "${sorted_disks[@]}"; do
   if grep -q '^hassos-' <<<"${DISK_LABELS[$disk]}"; then
     excluded+="$disk "
     continue
@@ -109,7 +122,7 @@ for disk in $(printf '%s\n' "${!DISK_LABELS[@]}" | sort); do
   labels_cell=$(sed '/^$/d' <<<"${DISK_LABELS[$disk]}" | sort | paste -sd ',' - | sed 's/,/, /g')
   rows+=("| \`$labels_cell\` | \`$(pick_phys "$disk")\` | \`$(pick_usb "$disk")\` |")
 done
-if [ -n "$excluded" ]; then
+if [ "$excluded" != "" ]; then
   echo "-- excluded system disk(s) hosting hassos-* partitions: ${excluded%- }" >&2
 fi
 if [ "${#rows[@]}" -eq 0 ]; then
@@ -135,11 +148,11 @@ deliberately omitted.
 | --- | --- | --- |
 EOF
   printf '%s\n' "${rows[@]}"
-} >"${OUT_FILE}"
+} >"$OUT_FILE"
 
 ## Panache owns ALL markdown formatting in this repo; its repo-wide pass skips gitignored files, so the task
 ## formats its output explicitly (in place - a formatter failure fails the task, per set -e).
-panache format "${OUT_FILE}"
+panache format "$OUT_FILE"
 
 echo "-- wrote ${OUT_FILE} (${#rows[@]} drive(s) on $host)"
-cat "${OUT_FILE}"
+cat "$OUT_FILE"

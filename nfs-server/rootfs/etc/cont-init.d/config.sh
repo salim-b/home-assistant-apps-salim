@@ -20,10 +20,10 @@ fi
 ## behavior, verification: nfs-server/KNOWLEDGE.md §"NFSv4 client state recovery..."). Non-fatal: without it the app
 ## runs degraded (no cross-restart client state recovery).
 RPC_PIPEFS_DIR=/var/lib/nfs/rpc_pipefs
-mkdir -p "${RPC_PIPEFS_DIR}"
+mkdir -p "$RPC_PIPEFS_DIR"
 if ! grep -qsE " on ${RPC_PIPEFS_DIR//\//\\/} rpc_pipefs " /proc/mounts; then
   bashio::log.info "Mounting rpc_pipefs (client recovery upcall channel)..."
-  if ! mount -t rpc_pipefs sunrpc "${RPC_PIPEFS_DIR}"; then
+  if ! mount -t rpc_pipefs sunrpc "$RPC_PIPEFS_DIR"; then
     bashio::log.warning "Unable to mount rpc_pipefs: NFSv4 client state will not survive app restarts."
   fi
 fi
@@ -48,7 +48,7 @@ DEFAULT_UID=$(bashio::config 'default_uid')
 DEFAULT_GID=$(bashio::config 'default_gid')
 DEFAULT_PERMS=$(bashio::config 'default_permissions')
 SHARES=$(bashio::config 'shares')
-if bashio::var.is_empty "${SHARES}"; then
+if bashio::var.is_empty "$SHARES"; then
   bashio::exit.nok "No NFS shares configured. Please add shares in the app's configuration."
 fi
 
@@ -76,24 +76,24 @@ while IFS= read -r share; do
   options=$(bashio::jq "$share" '.options')
 
   ## Only directories mapped into the app can be exported (ephemeral or unusable otherwise).
-  if [[ "${path}" != /share && "${path}" != /share/* &&
-    "${path}" != /media && "${path}" != /media/* ]]; then
+  if [[ "$path" != /share && "$path" != /share/* &&
+    "$path" != /media && "$path" != /media/* ]]; then
     bashio::log.fatal "Share path ${path} is outside of /share/ or /media/: only directories mapped into the app can be exported."
     bashio::exit.nok
   fi
   ## Clean absolute path only: used verbatim as the client-visible export path and concatenated with the pseudo root
   ## below; empty components (leading/trailing/consecutive slashes) and the filesystem root are not usable.
-  if [[ ! "${path}" =~ ^/[^/]+(/[^/]+)*$ ]]; then
+  if [[ ! "$path" =~ ^/[^/]+(/[^/]+)*$ ]]; then
     bashio::log.fatal "Share path '${path}' must be an absolute path without empty components (e.g. /share/nfs)."
     bashio::exit.nok
   fi
   ## /etc/exports is whitespace-separated; NFS exports must be directories.
-  if [[ "${path}" =~ [[:space:]] ]] || [[ "${network}" =~ [[:space:]] ]] ||
-    [[ "${options}" =~ [[:space:]] ]]; then
+  if [[ "$path" =~ [[:space:]] ]] || [[ "$network" =~ [[:space:]] ]] \
+    || [[ "$options" =~ [[:space:]] ]]; then
     bashio::log.fatal "Share path, network and options must not contain whitespace (got: '${path} | ${network} | ${options}')."
     bashio::exit.nok
   fi
-  if [ -e "${path}" ] && [ ! -d "${path}" ]; then
+  if [ -e "$path" ] && [ ! -d "$path" ]; then
     bashio::log.fatal "Share path ${path} is not a directory: NFS exports must be directories."
     bashio::exit.nok
   fi
@@ -103,37 +103,37 @@ while IFS= read -r share; do
   ## with *different* networks is legitimate (per-network options).
   share_key="${path}|${network}"
   if [[ -n "${SEEN_SHARES[${share_key}]+x}" ]]; then
-    if [ "${SEEN_SHARES[${share_key}]}" = "${options}" ]; then
+    if [ "${SEEN_SHARES[${share_key}]}" = "$options" ]; then
       bashio::log.fatal "Share ${path} for ${network} is configured more than once with identical settings: remove the redundant duplicate entry."
     else
       bashio::log.fatal "Share ${path} for ${network} is configured more than once with conflicting options ('${SEEN_SHARES[${share_key}]}' vs '${options}'): only one option set applies per path and network - keep a single entry (separate entries are only needed for different networks)."
     fi
     bashio::exit.nok
   fi
-  SEEN_SHARES["${share_key}"]="${options}"
+  SEEN_SHARES["${share_key}"]="$options"
 
   bashio::log.info "Exporting NFS share ${path} for ${network} with options ${options}"
 
   ## Create the share directory if it doesn't exist, but don't modify
   ## existing ones
-  if [ ! -d "${path}" ]; then
+  if [ ! -d "$path" ]; then
     bashio::log.info "Creating directory ${path} for NFS share"
-    mkdir -p "${path}"
+    mkdir -p "$path"
     # Set permissions using configured defaults
-    chmod "${DEFAULT_PERMS}" "${path}"
-    chown "${DEFAULT_UID}:${DEFAULT_GID}" "${path}"
+    chmod "$DEFAULT_PERMS" "$path"
+    chown "${DEFAULT_UID}:${DEFAULT_GID}" "$path"
     bashio::log.info "Created ${path} with UID:${DEFAULT_UID} GID:${DEFAULT_GID} Permissions:${DEFAULT_PERMS}"
   fi
 
   ## Mirror the share path under the pseudo file system root and export it
   ## from there
   MIRROR="${PSEUDO_ROOT}${path}"
-  bind_mount "${path}" "${MIRROR}"
+  bind_mount "$path" "$MIRROR"
   echo "${MIRROR} ${network}(fsid=${FSID},${options})" >>/etc/exports
-  MIRROR_PATHS+=("${MIRROR}")
+  MIRROR_PATHS+=("$MIRROR")
   ROOT_NETWORKS["${network}"]=1
   FSID=$((FSID + 1))
-done < <(echo "${SHARES}")
+done < <(echo "$SHARES")
 
 ## Export the pseudo file system root itself: read-only walk access for all client networks (the per-share entries
 ## control the share contents). No crossmnt needed - NFSv4 clients switch exports at mountpoint crossings regardless

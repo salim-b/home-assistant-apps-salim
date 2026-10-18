@@ -10,7 +10,7 @@ cd "$MISE_PROJECT_ROOT"
 apps=("${usage_app:-$(git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1 | sort -u)}")
 
 native_platform="linux/$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
-other_platform="linux/$( [ "$native_platform" = "linux/amd64" ] && echo arm64 || echo amd64)"
+other_platform="linux/$([ "$native_platform" = "linux/amd64" ] && echo arm64 || echo amd64)"
 
 for app in "${apps[@]}"; do
   echo "== building $app (base: ghcr.io/home-assistant/base) =="
@@ -23,14 +23,23 @@ for app in "${apps[@]}"; do
 
   echo "-- cross-check ($other_platform, cache-only)"
   docker buildx build --platform "$other_platform" --output type=cacheonly "$app" >/dev/null 2>&1 \
-    || { echo "CROSS BUILD FAILED for $other_platform" >&2; exit 1; }
+    || {
+      echo "CROSS BUILD FAILED for $other_platform" >&2
+      exit 1
+    }
 
   echo "-- assertions (what the Dockerfile itself controls; io.hass.* app labels come from CI)"
   docker image inspect "local/$app:$version" --format '{{json .Config.Healthcheck}}' | grep -q '"Test"' \
-    || { echo "ASSERT FAILED: no HEALTHCHECK" >&2; exit 1; }
+    || {
+      echo "ASSERT FAILED: no HEALTHCHECK" >&2
+      exit 1
+    }
   title="Home Assistant app: $(yq -r '.name' "$app/config.yaml")"
   docker image inspect "local/$app:$version" --format '{{json .Config.Labels}}' | grep -qF "\"org.opencontainers.image.title\":\"$title\"" \
-    || { echo "ASSERT FAILED: title label '$title' missing" >&2; exit 1; }
+    || {
+      echo "ASSERT FAILED: title label '$title' missing" >&2
+      exit 1
+    }
   echo "$app OK"
 done
 echo "build OK"

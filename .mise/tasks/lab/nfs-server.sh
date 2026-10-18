@@ -45,13 +45,19 @@ lab_runtime_check() {
   fi
   klog=$(docker exec "$LAB_NET_NAME-app" dmesg 2>/dev/null | grep "NFSD:" | tail -5)
   grep -q "Using nfsdcld client tracking operations" <<<"$klog" \
-    || { echo "kernel did not use the cld tracker; NFSD log tail: $klog"; return 1; }
+    || {
+      echo "kernel did not use the cld tracker; NFSD log tail: $klog"
+      return 1
+    }
   grep -q "no clients to reclaim, skipping NFSv4 grace period" <<<"$klog" \
-    || { echo "expected the skip-grace path (fresh /data, no records); NFSD log tail: $klog"; return 1; }
+    || {
+      echo "expected the skip-grace path (fresh /data, no records); NFSD log tail: $klog"
+      return 1
+    }
   echo "recovery tracker up (nfsdcld, sqlite on /data, kernel upcalls + skip-grace OK)"
 
-  echo "host-file" > "$LAB_TMPDIR/share/nfs/hostfile.txt" 2>/dev/null \
-    || { mkdir -p "$LAB_TMPDIR/share/nfs" && echo "host-file" > "$LAB_TMPDIR/share/nfs/hostfile.txt"; }
+  echo "host-file" >"$LAB_TMPDIR/share/nfs/hostfile.txt" 2>/dev/null \
+    || { mkdir -p "$LAB_TMPDIR/share/nfs" && echo "host-file" >"$LAB_TMPDIR/share/nfs/hostfile.txt"; }
   docker rm -f "$LAB_NET_NAME-client" >/dev/null 2>&1 || true
   if ! docker run --rm --privileged --name "$LAB_NET_NAME-client" --network "$LAB_NET_NAME" \
     local/nfslab-client:alpine3.24 sh -c "
@@ -95,25 +101,38 @@ lab_runtime_check() {
       flock -x 9 || exit 12
       while true; do sleep 2; echo tick >&9 2>/dev/null; done'
     lockfile="$LAB_TMPDIR/share/nfs/reclaim.lock"
-    for _ in $(seq 1 30); do [ -s "$lockfile" ] && break; sleep 1; done
-    [ -s "$lockfile" ] || { echo "FAIL: reclaim holder never established state"; exit 1; }
+    for _ in {1..30}; do
+      [ -s "$lockfile" ] && break
+      sleep 1
+    done
+    [ -s "$lockfile" ] || {
+      echo "FAIL: reclaim holder never established state"
+      exit 1
+    }
     sz0=$(stat -c %s "$lockfile")
     sleep 5 # let ticks land: the baseline must be from a flowing holder
     [ "$(stat -c %s "$lockfile")" -gt "$sz0" ] \
-      || { echo "FAIL: reclaim holder ticks not reaching the server"; exit 1; }
+      || {
+        echo "FAIL: reclaim holder ticks not reaching the server"
+        exit 1
+      }
     echo "-- restarting the app container (fresh netns, persistent /data)"
     docker restart "$LAB_NET_NAME-app" >/dev/null
-    for _ in $(seq 1 60); do
+    for _ in {1..60}; do
       docker logs "$LAB_NET_NAME-app" 2>&1 | grep -q "legacy-services successfully started" && break
       sleep 1
     done
     sz=0
-    for _ in $(seq 1 75); do # ~150 s: generous vs the ~lease/3 recovery cycle
+    # ~150 s: generous vs the ~lease/3 recovery cycle
+    for _ in {1..75}; do
       sz=$(stat -c %s "$lockfile" 2>/dev/null || echo 0)
       [ "$sz" -gt "$sz0" ] && break
       sleep 2
     done
-    [ "$sz" -gt "$sz0" ] || { echo "FAIL: held state not reclaimed within 150s of the restart"; exit 1; }
+    [ "$sz" -gt "$sz0" ] || {
+      echo "FAIL: held state not reclaimed within 150s of the restart"
+      exit 1
+    }
     # The flock itself must survive: a fresh open in the same container is
     # a separate open-file-description, i.e. a valid lock contender
     if docker exec "$reclaim" flock -n /mnt/test/reclaim.lock true 2>/dev/null; then

@@ -51,9 +51,12 @@ essentials:
 
 - `mise run check` — lint + validate; **always run before finishing a change**. Lint is hk (`hk.pkl`): `hk check --all`
   lints every tracked file — the full gate CI and `mise run lint` use — while plain `hk check` lints just the modified
-  files for fast local feedback (untracked files are never selected; `HK_STASH_UNTRACKED=0` in mise.toml \[env\]).
-  Enable the git hooks once per clone with `mise run hooks` (after `mise install --locked`): pre-commit auto-fixes
-  (panache format, final newlines) and gates the commit, commit-msg enforces Conventional Commits; escape hatch
+  files for fast local feedback (untracked files are never selected; `env.HK_STASH_UNTRACKED=0` set in `mise.toml`). To
+  check an explicit file set instead, pipe NUL-separated paths to hk:
+  `git diff --name-only -z HEAD | hk check --files0-from=-`. Enable the git hooks once per machine with
+  `mise run install-git-hooks` (after `mise install --locked`; needs Git 2.54+ and installs user-wide into
+  `~/.gitconfig`, silently no-op in repos without an `hk.pkl`): pre-commit auto-fixes (panache format, final newlines,
+  shfmt, shellcheck autofixes) and gates the commit, commit-msg enforces Conventional Commits; escape hatch
   `HK=0 git commit`.
 - `mise run build` — build app images (native arch + cross-check) and assert image metadata.
 - `mise run lab` — full-fidelity boot lab: fake Supervisor API serving the app's default options (adapted to the lab
@@ -150,6 +153,10 @@ essentials:
   prose wrap so that a line starts with an ordered-list marker (`4)`, `2026.` — a parenthetical ending in digits does
   this at wrap boundaries): CommonMark renders such a line as prose, panache formats it as a nested list, and the two
   disagree.
+- Shell scripts: shfmt (formatting; follows .editorconfig) and shellharden (quoting hardening) are hk fix steps - let
+  pre-commit fix or run `hk check --fix` instead of hand-formatting; shellcheck `-x` is the lint gate. shellharden
+  gotcha: it quotes command substitutions even where word splitting is required (for-loop iterables), so write such
+  loops as brace expansion (`for _ in {1..N}`) or arrays (`read -r -a`/`mapfile`) instead.
 - mise tasks: file tasks in `.mise/tasks/` with proper suffixes (`.sh`, `.py`, … — mise resolves the short names, e.g.
   `mise run lint`) and `#MISE`/`#USAGE` headers. Task arguments must be documented and typed via usage specs (never bare
   `$1` handling unless `raw_args = true`). Required args are declared `arg "<name>"` (mise errors before the task starts

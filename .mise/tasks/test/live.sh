@@ -48,7 +48,7 @@ echo "== live test: $app on $host ($local_slug) =="
 
 wait_started() { # wait until the app reaches a running state
   local state=""
-  for _ in $(seq 1 15); do
+  for _ in {1..15}; do
     state=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \
       | jq -r '.data.state // empty') || true
     [ "$state" = "started" ] && return 0
@@ -62,7 +62,10 @@ wait_started() { # wait until the app reaches a running state
 # machine's IP — servers with network ACLs deny mounts/connections from
 # outside their configured networks.
 device_ip=$(getent hosts "$host_addr" | awk '{print $1; exit}')
-[ -n "$device_ip" ] || { echo "ERROR: cannot resolve device address '$host_addr'" >&2; exit 1; }
+[ "$device_ip" != "" ] || {
+  echo "ERROR: cannot resolve device address '$host_addr'" >&2
+  exit 1
+}
 host_ip=$(ip route get "$device_ip" | awk '{for (i = 1; i <= NF; i++) if ($i == "src") {print $(i + 1); exit}}')
 
 CLIENT_IMAGE="local/nfs-live-client:alpine3.24"
@@ -95,12 +98,18 @@ fi
 
 # --- apply test options (--test-options) -----------------------------------
 if [ "${usage_test_options:-false}" = "true" ]; then
-  [ -f "$LIVE_TEST_OPTIONS_FILE" ] || { echo "ERROR: no test options file '$LIVE_TEST_OPTIONS_FILE'" >&2; exit 1; }
+  [ -f "$LIVE_TEST_OPTIONS_FILE" ] || {
+    echo "ERROR: no test options file '$LIVE_TEST_OPTIONS_FILE'" >&2
+    exit 1
+  }
   echo "-- applying test options ($LIVE_TEST_OPTIONS_FILE) to the app options"
 
   current=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \
     | jq -c '.data.options // empty')
-  [ -n "$current" ] || { echo "ERROR: could not read the app's current options on $host" >&2; exit 1; }
+  [ "$current" != "" ] || {
+    echo "ERROR: could not read the app's current options on $host" >&2
+    exit 1
+  }
 
   # Back up the original options next to the app folder for the restore step;
   # the next deploy wipes it together with the app folder. Keep a pre-existing
@@ -156,15 +165,15 @@ restore_options() {
       suspicious=0
       if [ -f "$LIVE_TEST_OPTIONS_FILE" ]; then
         test_keys=$(yq '. | keys | .[]' "$LIVE_TEST_OPTIONS_FILE")
-        if [ -n "$test_keys" ]; then
+        if [ "$test_keys" != "" ]; then
           suspicious=1
           while IFS= read -r tkey; do
-            [ -n "$tkey" ] || continue
+            [ "$tkey" != "" ] || continue
             ## -n: keep the loop's stdin away from ssh (without it, ssh eats
             ## the remaining keys and the check silently degenerates to the
             ## first key only)
             if [ "$(ssh -n "${SSH_OPTS[@]}" "$host" \
-                "jq -c --arg k '$tkey' '.[\$k] // \"<key-missing>\"' '$backup'")" \
+              "jq -c --arg k '$tkey' '.[\$k] // \"<key-missing>\"' '$backup'")" \
               != "$(yq -o json ".$tkey" "$LIVE_TEST_OPTIONS_FILE" | jq -c .)" ]; then
               suspicious=0
               break
