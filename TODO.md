@@ -42,15 +42,8 @@ facts live in the repository-root `KNOWLEDGE.md`.
     once all arch indexes serve the new pin; do not re-run failed check runs instead (re-runs can still count as red in
     Renovate's automerge evaluation; a rebase creates fresh checks).
 
-  Subtasks (suggested PR split: the version-guard fix first as its own PR - `main` is currently red on it - then the
-  automation as one PR; branch prefix `agent-`, conventional commits, follow `AGENTS.md`):
+  Subtasks (branch prefix `agent-`, conventional commits, follow `AGENTS.md`):
 
-  - version-guard: stop failing on comment-only changes. Run 39057776214 ("Version guard") fails on `abfb7c5` ("docs:
-    update official HA docs links"), which changed only comment lines (both apps' `Dockerfile`/`config.yaml` header
-    comments, plus the nfs-server `apparmor.txt` `##` block). The guard's per-file trigger counts comment-only hunks.
-    Fix: ignore hunks whose changed lines are comments/blank only (`#`-prefixed) in the device-visible files; any
-    non-comment change must still trigger. Verify: reproduce the `abfb7c5` failure locally pre-fix and green post-fix,
-    plus a synthetic content-change commit pair that must still fail. `mise run check` before finishing.
   - `.github/renovate.json`: split the apk rule by update type. Restructure the single apk packageRule into chained
     rules: a base rule (`matchDatasources: ["apk"]`) keeping the `bumpVersions` entry (rename it - it is generic, not
     hd-idle-only), the `registryUrls` (Alpine v3.24, x86_64 + aarch64) and the `apk_pin` label; a rule with
