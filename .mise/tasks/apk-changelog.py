@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 #MISE description="Insert the templated changelog section for an apk pin bump (shared by the CI apk-bump workflow and local runs)"
-#USAGE flag "--app <app>" help="App directory whose CHANGELOG.md is updated (required)"
-#USAGE flag "--pkg <pkg>" help="Pinned apk package name, e.g. hd-idle (required)"
-#USAGE flag "--old <old>" help="Old pin (full pkgver-pkgrel), e.g. 1.22-r7 (required)"
-#USAGE flag "--new <new>" help="New pin (full pkgver-pkgrel), e.g. 1.22-r8 (required)"
-#USAGE flag "--version <version>" help="App version the section is titled with (the version bumpVersions wrote in the same Renovate PR) (required)"
+#USAGE flag "--app <app>" required=true help="App directory whose CHANGELOG.md is updated"
+#USAGE flag "--pkg <pkg>" required=true help="Pinned apk package name, e.g. hd-idle"
+#USAGE flag "--old <old>" required=true help="Old pin (full pkgver-pkgrel), e.g. 1.22-r7"
+#USAGE flag "--new <new>" required=true help="New pin (full pkgver-pkgrel), e.g. 1.22-r8"
+#USAGE flag "--version <version>" required=true help="App version the section is titled with (the version bumpVersions wrote in the same Renovate PR)"
 #USAGE flag "--dry-run" help="Print the section that would be inserted instead of writing CHANGELOG.md"
 """apk-changelog: insert the templated changelog section for an apk pin bump.
 
-The Renovate apk-pin PR (bumpVersions bumps the app's config.yaml version in
-the same PR) is merged without a changelog entry - the apk-bump workflow's
-changelog job runs this task post-merge to fill it (see the apk package
-version policy in the repository-root KNOWLEDGE.md); local runs share the
-same code path.
+The Renovate apk-pin PR (bumpVersions bumps the app's config.{yaml,yml}
+version in the same PR) is merged without a changelog entry - the apk-bump
+workflow's changelog job runs this task post-merge to fill it (see the apk
+package version policy in the repository-root KNOWLEDGE.md); local runs
+share the same code path.
 
 Idempotent: the `## <version>` section is inserted only when that heading is
 absent - pre-written entries are never touched or overwritten. The bullet is
@@ -45,11 +45,10 @@ def _argv_value(name: str) -> str:
 
 
 def _val(name: str) -> str:
-    """Read a mise #USAGE option value (exposed to the task as env vars)."""
-    value = os.environ.get(f"usage_{name.replace('-', '_')}", "") or _argv_value(name)
-    if not value:
-        sys.exit(f"apk-changelog: --{name} is required")
-    return value
+    """Read a mise #USAGE option value (exposed to the task as env vars).
+    No manual check here: the usage spec declares the flag required=true, so
+    mise fails the invocation before the script ever runs."""
+    return os.environ.get(f"usage_{name.replace('-', '_')}", "") or _argv_value(name)
 
 
 def _flag(name: str) -> bool:

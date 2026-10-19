@@ -5,11 +5,11 @@ name: Apk pin bump
 #
 # changelog: a merged renovate[bot] PR labeled apk_pin gets its templated
 # changelog section inserted post-merge (Renovate automerges pkgrel bumps
-# without a changelog entry; bumpVersions bumps the app's config.yaml version
-# in the same PR). The commit is docs-only (CHANGELOG.md) and pushed with the
-# GITHUB_TOKEN - whose workflow suppression is intended: CHANGELOG.md is
-# excluded by version-guard and the image is byte-identical, so no rebuild is
-# needed.
+# without a changelog entry; bumpVersions bumps the app's config.{yaml,yml}
+# version in the same PR). The commit is docs-only (CHANGELOG.md) and pushed
+# with the GITHUB_TOKEN - whose workflow suppression is intended: CHANGELOG.md
+# is excluded by version-guard and the image is byte-identical, so no rebuild
+# is needed.
 #
 # nudge: Alpine repushes land per-arch asynchronously (aarch64 can serve a new
 # pkgrel days before x86_64), so an early bump PR legitimately stays red
@@ -18,7 +18,9 @@ name: Apk pin bump
 # indexes serve the new pin - a rebase creates fresh check runs, while
 # re-running failed check runs can still count as red in Renovate's automerge
 # evaluation. While an arch index still lags the job does nothing: the daily
-# lint cron on main remains the drift alarm.
+# lint cron on main remains the drift alarm. workflow_dispatch runs accept a
+# dry_run boolean input: the nudge job then logs would-be rebase comments
+# without posting them (manual verification runs).
 #
 # Cron offset: 01:30 UTC - away from the lint workflow's daily 00:00 cron and
 # the publish-reconcile run (03:15 UTC).
@@ -32,6 +34,12 @@ on:
   schedule:
     - cron: "30 1 * * *"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Log would-be pin findings and rebase comments instead of posting them"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -61,9 +69,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           python3 <<'PY'
           import json
+          import base64
           import os
           import re
           import urllib.parse
@@ -73,6 +84,8 @@ jobs:
           TOKEN = os.environ["GH_TOKEN"]
           REPO = os.environ["GITHUB_REPOSITORY"]
           PR = int(os.environ["PR_NUMBER"])
+          BASE_SHA = os.environ["PR_BASE_SHA"]
+          HEAD_SHA = os.environ["PR_HEAD_SHA"]
           HDRS = {
               "Authorization": f"Bearer {TOKEN}",
               "Accept": "application/vnd.github+json",
@@ -98,39 +111,44 @@ jobs:
                       return out
                   page += 1
 
-          def parse_patch(patch):
-              """Changed apk pins in a Dockerfile patch:
-              {pkg: {"old": ..., "new": ...}} - same state machine as
-              validate_apk_pins (apk add block tracked across backslash
-              continuations), applied to +/- patch lines (REST patch blobs
-              contain hunks only, no file headers)."""
+          def parse_pins(text):
+              """All pins from a full Dockerfile text: {pkg: pin} - same state
+              machine as validate_apk_pins (apk add block tracked across
+              backslash continuations)."""
               pins: dict = {}
               in_apk = False
-              for raw in patch.splitlines():
-                  if raw.startswith("@@"):
-                      in_apk = False
-                      continue
-                  marker = raw[0] if raw[:1] in ("+", "-", " ") else None
-                  content = raw[1:] if marker else raw
-                  found = PIN_RE.findall(content)
+              for line in text.splitlines():
                   if in_apk:
-                      if not content.rstrip().endswith("\\"):
+                      if not line.rstrip().endswith("\\"):
                           in_apk = False
-                  elif "apk add" in content:
-                      in_apk = content.rstrip().endswith("\\")
+                  elif "apk add" in line:
+                      in_apk = line.rstrip().endswith("\\")
                   else:
                       continue
-                  if marker == "+":
-                      for pkg, pin in found:
-                          pins.setdefault(pkg, {})["new"] = pin
-                  elif marker == "-":
-                      for pkg, pin in found:
-                          pins.setdefault(pkg, {})["old"] = pin
+                  for pkg, pin in PIN_RE.findall(line):
+                      pins[pkg] = pin
               return pins
+
+          def pin_changes(base_text, head_text):
+              """Changed pins between two file versions:
+              {pkg: {"old": ..., "new": ...}} - diffing the pin sets parsed
+              from the full Dockerfiles at the PR's base and head SHAs; a long
+              apk add block cannot be truncated by patch hunk boundaries."""
+              base_pins, head_pins = parse_pins(base_text), parse_pins(head_text)
+              changes: dict = {}
+              for pkg in set(base_pins) | set(head_pins):
+                  old, new = base_pins.get(pkg), head_pins.get(pkg)
+                  if old != new:
+                      changes[pkg] = {"old": old, "new": new}
+              return changes
+
+          def contents(path, ref):
+              data = api(f"contents/{path}", {"ref": ref})
+              return base64.b64decode(data["content"]).decode()
 
           def parse_version(patch):
               """The app version bumpVersions wrote in the same PR (added
-              config.yaml lines)."""
+              config.{yaml,yml} lines)."""
               quoted = re.findall(r"(?m)^\+\s*version:\s*\"([^\"]+)\"", patch)
               if quoted:
                   return quoted[-1]
@@ -143,9 +161,10 @@ jobs:
               patch = entry.get("patch") or ""
               if path.endswith("/Dockerfile"):
                   app = path.removesuffix("/Dockerfile")
-                  for pkg, pair in parse_patch(patch).items():
+                  changes = pin_changes(contents(path, BASE_SHA), contents(path, HEAD_SHA))
+                  for pkg, pair in changes.items():
                       new, old = pair.get("new"), pair.get("old")
-                      if not new or old == new:
+                      if not old or not new or old == new:
                           continue
                       result.append({"app": app, "pkg": pkg, "old": old, "new": new, "version": None})
               elif path.endswith("/config.yaml") or path.endswith("/config.yml"):
@@ -269,7 +288,7 @@ jobs:
     permissions:
       # issues: write - PR comments are issue comments (@renovate rebase)
       # pull-requests: read - PR + files listing
-      # contents: read - Dockerfile/config.yaml at the PR head via the
+      # contents: read - Dockerfile/config.{yaml,yml} at the PR head via the
       # contents API (job permissions replace top-level, so the read must be
       # restated here)
       issues: write
@@ -282,6 +301,7 @@ jobs:
       - name: Rebase apk pin PRs once all arch indexes serve the new pin
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           python3 <<'PY'
           import base64
@@ -326,37 +346,49 @@ jobs:
                       return out
                   page += 1
 
-          def parse_patch(patch):
-              """New apk pins in a Dockerfile patch: {pkg: {"old","new"}} -
-              same state machine as validate_apk_pins (apk add block across
-              backslash continuations) applied to +/- patch lines."""
+          def parse_pins(text):
+              """All pins from a full Dockerfile text: {pkg: pin} - same state
+              machine as validate_apk_pins (apk add block tracked across
+              backslash continuations)."""
               pins: dict = {}
               in_apk = False
-              for raw in patch.splitlines():
-                  if raw.startswith("@@"):
-                      in_apk = False
-                      continue
-                  marker = raw[0] if raw[:1] in ("+", "-", " ") else None
-                  content = raw[1:] if marker else raw
-                  found = PIN_RE.findall(content)
+              for line in text.splitlines():
                   if in_apk:
-                      if not content.rstrip().endswith("\\"):
+                      if not line.rstrip().endswith("\\"):
                           in_apk = False
-                  elif "apk add" in content:
-                      in_apk = content.rstrip().endswith("\\")
+                  elif "apk add" in line:
+                      in_apk = line.rstrip().endswith("\\")
                   else:
                       continue
-                  if marker == "+":
-                      for pkg, pin in found:
-                          pins.setdefault(pkg, {})["new"] = pin
-                  elif marker == "-":
-                      for pkg, pin in found:
-                          pins.setdefault(pkg, {})["old"] = pin
+                  for pkg, pin in PIN_RE.findall(line):
+                      pins[pkg] = pin
               return pins
+
+          def pin_changes(base_text, head_text):
+              """Changed pins between two file versions:
+              {pkg: {"old": ..., "new": ...}} - diffing the pin sets parsed
+              from the full Dockerfiles at the PR's base and head SHAs; a long
+              apk add block cannot be truncated by patch hunk boundaries."""
+              base_pins, head_pins = parse_pins(base_text), parse_pins(head_text)
+              changes: dict = {}
+              for pkg in set(base_pins) | set(head_pins):
+                  old, new = base_pins.get(pkg), head_pins.get(pkg)
+                  if old != new:
+                      changes[pkg] = {"old": old, "new": new}
+              return changes
 
           def contents(path, ref):
               data = api(f"contents/{path}", {"ref": ref})
               return base64.b64decode(data["content"]).decode()
+
+          def config_text(app, ref):
+              """config.yaml or config.yml - both spellings exist in the wild."""
+              for name in ("config.yaml", "config.yml"):
+                  try:
+                      return contents(f"{app}/{name}", ref)
+                  except OSError:
+                      continue
+              return ""
 
           def build_branch(dockerfile_text):
               """Alpine branch from the Dockerfile's BUILD_FROM default (same
@@ -411,27 +443,27 @@ jobs:
 
           for pr in candidates:
               number = pr["number"]
-              dockerfiles = {
-                  entry["filename"]: entry.get("patch") or ""
+              base, head = pr["base"]["sha"], pr["head"]["sha"]
+              dockerfiles = [
+                  entry["filename"]
                   for entry in api_list(f"pulls/{number}/files", {})
                   if entry["filename"].endswith("/Dockerfile")
-              }
+              ]
               pins = []
-              for path, patch in dockerfiles.items():
+              for path in dockerfiles:
                   app = path.removesuffix("/Dockerfile")
-                  for pkg, pair in parse_patch(patch).items():
+                  for pkg, pair in pin_changes(contents(path, base), contents(path, head)).items():
                       if pair.get("new"):
                           pins.append((app, pkg, pair["new"]))
               if not pins:
                   notes.append(f"PR #{number}: no apk pins in the PR's Dockerfiles - skip")
                   continue
 
-              head = pr["head"]["sha"]
               ready, lagging = True, []
               try:
                   for app in sorted({pin[0] for pin in pins}):
                       branch = build_branch(contents(f"{app}/Dockerfile", head))
-                      arches = app_arches(contents(f"{app}/config.yaml", head))
+                      arches = app_arches(config_text(app, head))
                       if not branch or not arches:
                           ready = False
                           lagging.append(f"{app}: cannot derive branch/arch from PR head")
