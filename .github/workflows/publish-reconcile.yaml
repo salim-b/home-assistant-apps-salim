@@ -146,7 +146,7 @@ jobs:
             echo
             echo "| Tag | Status |"
             echo "| --- | --- |"
-            for tag in "${!tag_state[@]}"; do
+            for tag in $(printf '%s\n' "${!tag_state[@]}" | sort); do
               echo "| \`${tag}\` | ${tag_state["$tag"]} |"
               if [ "${tag_state["$tag"]}" = "missing" ]; then
                 missing+=("$tag")

@@ -202,29 +202,32 @@ versioned release).
   "Allow auto-merge" are off today; the explicit setting prevents a later repo-toggle enablement from merging before CI
   finishes). The changelog section is filled post-merge by the apk-bump workflow's changelog job (a merged
   `renovate[bot]` PR labeled `apk_pin` — covering Renovate automerges and manually merged pkgver PRs alike): it parses
-  the merged PR's Dockerfile patches (apk pins old -> new) and the `config.yaml` version bump, and runs the
-  `apk-changelog` mise task (`.mise/tasks/apk-changelog.py`, shared with local runs) to insert the templated
-  `## <version>` section — idempotent, a pre-written section is never touched (a PR touching several pins of the same
-  app records only the first; Renovate opens one PR per package anyway). The resulting docs-only commit is pushed with
-  the `GITHUB_TOKEN`, whose push-event workflow suppression is intended: CHANGELOG.md is excluded by version-guard and
-  the image is byte-identical, so no rebuild is needed. The same workflow's nudge job (daily 01:30 UTC) handles the
-  per-arch repush skew documented in the gotchas below: an early bump PR legitimately stays red until the lagging arch's
-  index catches up; once ALL of the app's arch indexes serve the new pin, the job comments `@renovate rebase` (capped at
-  3 per PR) — a rebase creates fresh check runs, while re-running failed check runs can still count as red in Renovate's
-  automerge evaluation; while an arch still lags it does nothing and the daily lint cron remains the drift alarm. Missed
-  image publishes self-heal via the publish-reconcile workflow (daily 03:15 UTC): it checks GHCR for every app's version
-  tags (per-arch `ghcr.io/salim-b/<arch>-app-<name>:<version>` plus the multi-arch manifest) via anonymous
-  `docker buildx imagetools inspect` probes with the runner-preinstalled buildx (copacetic-style classification:
-  not-found-class errors mean a missing tag, any other failure is retried with exponential backoff and then fails the
-  run red - so transient outages neither dispatch nor silently pass) and dispatches `build-app.yaml` (now also
-  `workflow_dispatch`-able; publish=true, ref=main) on a genuine miss — idempotent, a healthy registry is a green no-op.
-  Tag existence only: stale-content tags are not detected (content drift is version-guard's/validate's domain). The
-  tooling landscape was researched 2026-10-18: no OSS tooling exists for apk-pin bumping with arch gates — Renovate's
-  native support plus a hand-rolled gate is the state of the art (linuxserver.io precedent: their scheduled
-  external-trigger workflows enforce the same all-arches condition before rebuilding, cf. linuxserver/docker-wireguard
-  `.github/workflows/external_trigger.yml`). Dependabot cannot bump apk pins at all (dependabot-core#2129, open since
-  2019), updatecli has no apk/APKINDEX plugin, and Chainguard's `melange bump` rewrites melange build YAML, not
-  Dockerfiles.
+  the full Dockerfile contents at the PR's base and head SHAs (apk pins old -> new, robust against patch hunk boundary
+  truncation for future apps with long apk blocks) and the `config.{yaml,yml}` version bump, and runs the
+  `apk-changelog` mise task (`.mise/tasks/apk-changelog.py`, shared with local runs; flags declared `required=true` in
+  the usage spec — mise enforces them natively, no duplicated validation) to insert the templated `## <version>` section
+  — idempotent, a pre-written section is never touched (a PR touching several pins of the same app records only the
+  first; Renovate opens one PR per package anyway). The resulting docs-only commit is pushed with the `GITHUB_TOKEN`,
+  whose push-event workflow suppression is intended: CHANGELOG.md is excluded by version-guard and the image is
+  byte-identical, so no rebuild is needed. The same workflow's nudge job (daily 01:30 UTC, also `workflow_dispatch`-able
+  with a `dry_run` boolean input to log would-be comments without posting them; it accepts both `config.yaml` and
+  `config.yml`) handles the per-arch repush skew documented in the gotchas below: an early bump PR legitimately stays
+  red until the lagging arch's index catches up; once ALL of the app's arch indexes serve the new pin, the job comments
+  `@renovate rebase` (capped at 3 per PR) — a rebase creates fresh check runs, while re-running failed check runs can
+  still count as red in Renovate's automerge evaluation; while an arch still lags it does nothing and the daily lint
+  cron remains the drift alarm. Missed image publishes self-heal via the publish-reconcile workflow (daily 03:15 UTC):
+  it checks GHCR for every app's version tags (per-arch `ghcr.io/salim-b/<arch>-app-<name>:<version>` plus the
+  multi-arch manifest) via anonymous `docker buildx imagetools inspect` probes with the runner-preinstalled buildx
+  (copacetic-style classification: not-found-class errors mean a missing tag, any other failure is retried with
+  exponential backoff and then fails the run red - so transient outages neither dispatch nor silently pass) and
+  dispatches `build-app.yaml` (now also `workflow_dispatch`-able; publish=true, ref=main) on a genuine miss —
+  idempotent, a healthy registry is a green no-op. Tag existence only: stale-content tags are not detected (content
+  drift is version-guard's/validate's domain). The tooling landscape was researched 2026-10-18: no OSS tooling exists
+  for apk-pin bumping with arch gates — Renovate's native support plus a hand-rolled gate is the state of the art
+  (linuxserver.io precedent: their scheduled external-trigger workflows enforce the same all-arches condition before
+  rebuilding, cf. linuxserver/docker-wireguard `.github/workflows/external_trigger.yml`). Dependabot cannot bump apk
+  pins at all (dependabot-core#2129, open since 2019), updatecli has no apk/APKINDEX plugin, and Chainguard's
+  `melange bump` rewrites melange build YAML, not Dockerfiles.
 
 Version-sensitive gotchas learned while implementing:
 
