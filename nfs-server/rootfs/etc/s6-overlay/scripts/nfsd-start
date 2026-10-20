@@ -15,17 +15,23 @@ APP_IP=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | 
 # nfsdcld recovery tracking the grace is only paid when client records exist
 # (see nfs-server/KNOWLEDGE.md §"The grace period..."); a user-configured
 # grace_time overrides the default.
-NFSD_CMD="rpc.nfsd \
-  --no-nfs-version 3 \
-  --no-udp \
-  --host ${APP_IP} \
-  --lease-time $(bashio::config 'lease_time') \
-  --grace-time $(bashio::config 'grace_time' "$(bashio::config 'lease_time')") \
-  $(bashio::config 'n_threads')"
+## NOTE: build this command as an array and execute it with "${NFSD_CMD[@]}": a
+## command built as a *string* must be executed unquoted word-splitting, and the
+## lint's quoting hardening (shellharden) quotes exactly that away - `"$NFSD_CMD"`
+## makes the whole string one literal command name ("command not found", the 0.6.1
+## release breakage). An array is quoting-hardening-stable by construction.
+NFSD_CMD=(
+  rpc.nfsd
+  --no-nfs-version 3
+  --no-udp
+  --host "$APP_IP"
+  --lease-time "$(bashio::config 'lease_time')"
+  --grace-time "$(bashio::config 'grace_time' "$(bashio::config 'lease_time')")"
+  "$(bashio::config 'n_threads')"
+)
 
-bashio::log.info "Executing nfsd with: ${NFSD_CMD}"
-# shellcheck disable=SC2086
-if "$NFSD_CMD"; then
+bashio::log.info "Executing nfsd with: ${NFSD_CMD[*]}"
+if "${NFSD_CMD[@]}"; then
   # rpc.nfsd exits after configuring the in-kernel server - hence the s6-rc oneshot
   # (nfs-server/KNOWLEDGE.md §"rpc.nfsd is not a daemon").
   bashio::log.info "NFS server started (kernel threads running)."
