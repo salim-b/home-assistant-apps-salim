@@ -132,11 +132,14 @@ while IFS= read -r share; do
     bashio::exit.nok
   fi
   ## /etc/exports is whitespace-separated; NFS exports must be directories. Empty network/options would produce a
-  ## malformed exports line (schema-blocked; defense in depth for hand-edited options.json).
+  ## malformed exports line (schema-blocked; defense in depth for hand-edited options.json). Backslashes are rejected
+  ## as well: /proc/mounts and mountinfo escape them (\134) and awk -v processes escape sequences, so the detection's
+  ## mount matching would misjudge (schema-blocked; same defense-in-depth rationale).
   if [[ -z "$network" || -z "$options" ]] \
+    || [[ "$path" == *\\* ]] || [[ "$network" == *\\* ]] || [[ "$options" == *\\* ]] \
     || [[ "$path" =~ [[:space:]] ]] || [[ "$network" =~ [[:space:]] ]] \
     || [[ "$options" =~ [[:space:]] ]]; then
-    bashio::log.fatal "Share path, network and options must be non-empty and whitespace-free (got: '${path} | ${network} | ${options}')."
+    bashio::log.fatal "Share path, network and options must be non-empty and free of whitespace and backslashes (got: '${path} | ${network} | ${options}')."
     bashio::exit.nok
   fi
 

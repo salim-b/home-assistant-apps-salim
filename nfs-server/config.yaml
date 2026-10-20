@@ -45,15 +45,18 @@ schema:
     # runtime semantics); the constraints they enforce beyond that:
     # - no whitespace anywhere: /etc/exports entries are whitespace-separated
     #   (a newline would inject an extra export line, parsed as root)
+    # - no backslash anywhere: /proc/mounts and /proc/self/mountinfo escape it
+    #   (\134) and awk -v processes escape sequences, so nfsd-apply's mount
+    #   detection would misjudge it
     # - path: mapped roots only, no empty path components (see DOCS.md)
     # - network: charset of the machine-name formats from exports(5) (single
     #   host, IP(+prefix/netmask), wildcards, netgroups, '*')
     # - options: comma-separated export-option tokens (exports(5)), i.e.
     #   word characters plus =:.@/+*-; no parentheses (would close the
     #   client qualifier early)
-    - path: "match(^/(share|media)(/[^\\s/]+)*$)"
-      network: "match(^[^\\s()]+$)"
-      options: "match(^[^\\s(),]+(,[^\\s(),]+)*$)"
+    - path: "match(^/(share|media)(/[^\\s/\\\\]+)*$)"
+      network: "match(^[^\\s()\\\\]+$)"
+      options: "match(^[^\\s(),\\\\]+(,[^\\s(),\\\\]+)*$)"
   default_uid: "int(0,)"
   default_gid: "int(0,)"
   default_permissions: "match(^[0-7]{3,4}$)"

@@ -212,6 +212,10 @@ at the same path the device and inode numbers are identical (same filesystem re-
 new mount instance a fresh mount ID — `stat`/`/proc/mounts` alone cannot see that re-mount. The watcher polls every 30
 s; no udev wiring, matching the trigger-path simplicity (a drive mount appearing under `/media` is the whole event).
 
+The detection's matching is exact only for whitespace- and backslash-free values, so the configuration validation
+rejects both (`/proc/mounts` and mountinfo escape backslashes as `\134`, and `awk -v` processes escape sequences — a
+backslash-containing path would misjudge the mount checks).
+
 **The change cycle** deliberately drives the kernel server directly instead of restarting the s6-rc oneshot (s6-rc is
 not reentrant from inside a service, and a down/up would deadlock; the oneshot stays "up" and container shutdown still
 runs its down script):
