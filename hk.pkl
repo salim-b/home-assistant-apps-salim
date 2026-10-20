@@ -23,6 +23,7 @@ local linters = new Mapping<String, Step> {
   // -x follows `source`d helpers (.mise/tasks/lib/); without it the sourced
   // helper fails with SC1091. The fix-mode autofix path (check_diff) needs
   // the same flag.
+  ["editorconfig-checker"] = Builtins.editorconfig_checker
   ["shellcheck"] = (Builtins.shellcheck) {
     match_any = List(
       new FileSelector { glob = List("**/*.sh", "**/*.bash") },
