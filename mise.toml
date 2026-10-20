@@ -15,10 +15,6 @@ description = "Lint all tracked files via hk (same checks as the pre-commit hook
 run = "hk check --all --no-fail-fast"
 output = "interleave"
 
-# User-wide hook install: hk writes hook.<name>.command entries into
-# ~/.gitconfig so every repository on the machine picks them up (silent no-op
-# in repos without an hk.pkl). Needs Git 2.54+ (config-based hooks). Run once
-# after `mise install --locked`; escape hatch: HK=0 git commit.
 [tasks.install-git-hooks]
 description = "Install hk git hooks user-wide via ~/.gitconfig (needs Git 2.54+)"
 run = """

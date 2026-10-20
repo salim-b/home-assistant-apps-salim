@@ -9,9 +9,7 @@ indent_size = 2
 insert_final_newline = true
 # shfmt printer style (hk's shfmt step reads these for every file it selects;
 # other tools ignore the unknown properties). Pinned repo-wide so no file the
-# step touches can miss it. `root = true` stops EditorConfig discovery at this
-# file, making local runs match CI - without it, a home-directory
-# .editorconfig silently defined the shfmt style locally and CI saw defaults.
+# step touches can miss it.
 binary_next_line = true
 switch_case_indent = true
 function_next_line = false
