@@ -2,6 +2,16 @@
 
 # Changelog
 
+## 0.6.2
+
+- Fix: every start failed with `rpc.nfsd   --no-nfs-version 3 …: command not found` - 0.6.1's shell-quoting reformat
+  made the start script execute the whole command string as a single command name. All configurations were affected
+  (found on-device after an auto-update); no configuration or data was touched.
+- Diagnostics: start failures now state their actual cause. Failed setup steps (exports table refresh, the nfsd and
+  rpc_pipefs mounts, the per-share mirror bind-mounts, the rpc.nfsd invocation) capture and log their error output;
+  rpc.nfsd's exit status and command line are logged with the failure instead of the generic "check the app
+  configuration" hint.
+
 ## 0.6.1
 
 - Internals: the app's scripts were reformatted and quoting-hardened by the repository's new shell tooling (shfmt,
