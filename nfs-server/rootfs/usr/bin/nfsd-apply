@@ -64,19 +64,22 @@ dir_key() {
   printf '%s' "$key"
 }
 
-## Mount ID of the mount covering $1: the deepest mountinfo mount point that is a path prefix (over-mounts stack by
-## mount ID, so the longest match wins). A re-mounted drive always gets a new ID - that is what catches an
-## unplug/replug inside one poll interval, which the dev+ino key cannot see (same device, same inode numbers).
+## Mount ID of the mount covering $1: the deepest mountinfo mount point that is a path prefix. Equal-length matches
+## (mounts stacked at one path) are tie-broken by the HIGHEST mount ID: the topmost mount is always the newest one
+## (mount IDs are allocated monotonically), and that is the object stat(2) reports - mountinfo file order is a
+## kernel-internal detail and is deliberately not relied on. A re-mounted drive always gets a new ID - that is what
+## catches an unplug/replug inside one poll interval, which the dev+ino key cannot see (same device, same inode
+## numbers). Reads the MOUNTINFO snapshot (one consistent view per apply), not the file directly.
 covering_mount_id() {
   awk -v p="$1" '
     BEGIN { best = 0; id = 0 }
     {
       mp = $5
       if (mp == p || mp == "/" || (index(p, mp) == 1 && substr(p, length(mp) + 1, 1) == "/")) {
-        if (length(mp) >= best) { best = length(mp); id = $1 }
+        if (length(mp) > best || (length(mp) == best && $1 + 0 > id)) { best = length(mp); id = $1 }
       }
     }
-    END { print id + 0 }' /proc/self/mountinfo
+    END { print id + 0 }' <<<"$MOUNTINFO"
 }
 
 ## Mountpoint check (share paths are whitespace-free - validated below): -F fixed-string matching stays exact for
@@ -93,10 +96,22 @@ SHARES=$(bashio::config 'shares')
 if bashio::var.is_empty "$SHARES"; then
   bashio::exit.nok "No NFS shares configured. Please add shares in the app's configuration."
 fi
+## Parse all shares in ONE jq pass (TSV rows: path, network, options) instead of one bashio::jq spawn per field - the
+## watcher re-runs this on every poll tick. @tsv escapes tabs/newlines/backslashes as backslash sequences and the
+## loop's validation rejects backslashes outright, so a malformed (hand-edited) value can neither survive as raw
+## control characters nor shift the columns. An empty array parses to no rows and gets the same friendly fatal.
+SHARE_ROWS="$(bashio::jq "$SHARES" '.[] | [.path, .network, .options] | @tsv')"
+if bashio::var.is_empty "$SHARE_ROWS"; then
+  bashio::exit.nok "No NFS shares configured. Please add shares in the app's configuration."
+fi
 
 if [ "$CHECK" = 0 ]; then
   mkdir -p "$PSEUDO_ROOT"
 fi
+
+## One mountinfo snapshot per apply: every covering_mount_id call reads this consistent view (the baseline state file
+## then records what THIS apply actually saw) and the per-share awk calls save the per-call file reads.
+MOUNTINFO="$(</proc/self/mountinfo)"
 
 declare -A ROOT_NETWORKS=()  # unique client networks of all shares (the fsid=0 pseudo-root entries)
 declare -A SEEN_SHARES=()    # options already configured per (path|network)
@@ -114,10 +129,7 @@ fi
 CHANGED=0
 FSID=1
 
-while IFS= read -r share; do
-  path=$(bashio::jq "$share" '.path')
-  network=$(bashio::jq "$share" '.network')
-  options=$(bashio::jq "$share" '.options')
+while IFS=$'\t' read -r path network options; do
 
   ## Only directories mapped into the app can be exported (ephemeral or unusable otherwise).
   if [[ "$path" != /share && "$path" != /share/* &&
@@ -233,7 +245,7 @@ while IFS= read -r share; do
   fi
   ROOT_NETWORKS["${network}"]=1
   FSID=$((FSID + 1))
-done < <(echo "$SHARES")
+done <<<"$SHARE_ROWS"
 
 ## Export the pseudo file system root itself: read-only walk access for all client networks (the per-share entries
 ## control the share contents). No crossmnt needed - NFSv4 clients switch exports at mountpoint crossings regardless

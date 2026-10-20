@@ -209,8 +209,11 @@ exit 3 = changed), `--quiet` (no per-tick narrative logs).
 source path's current directory object (equal `dev:ino`, preserved across bind mounts) *and* the source's covering mount
 is the one recorded in the baseline state file (`/var/lib/nfs/mirrors.state`). The mount ID is essential: after a replug
 at the same path the device and inode numbers are identical (same filesystem re-mounted), but the kernel assigns every
-new mount instance a fresh mount ID — `stat`/`/proc/mounts` alone cannot see that re-mount. The watcher polls every 30
-s; no udev wiring, matching the trigger-path simplicity (a drive mount appearing under `/media` is the whole event).
+new mount instance a fresh mount ID — `stat`/`/proc/mounts` alone cannot see that re-mount. Among mounts stacked at one
+path the check picks the highest mount ID — the topmost mount is always the newest (IDs are allocated monotonically),
+which is also the object `stat` reports; mountinfo's file order is a kernel-internal detail and is deliberately not
+relied on. The watcher polls every 30 s; no udev wiring, matching the trigger-path simplicity (a drive mount appearing
+under `/media` is the whole event).
 
 The detection's matching is exact only for whitespace- and backslash-free values, so the configuration validation
 rejects both (`/proc/mounts` and mountinfo escape backslashes as `\134`, and `awk -v` processes escape sequences — a
