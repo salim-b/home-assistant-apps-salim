@@ -30,8 +30,8 @@ lab_docker_args+=(
   ## make exportfs refuse the export).
   -v "$LAB_TMPDIR/drive-b:/mnt/drive-b"
 )
-mkdir -p "$LAB_TMPDIR/drive-b" 2>/dev/null || true
-echo b-content >"$LAB_TMPDIR/drive-b/b.txt" 2>/dev/null || true
+mkdir -p "$LAB_TMPDIR/drive-b"
+echo b-content >"$LAB_TMPDIR/drive-b/b.txt"
 
 ## The fixture adaptation itself lives in .mise/tasks/lab/nfs-server.py
 ## (convention: every share's client network must point at the lab subnet
