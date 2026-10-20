@@ -48,12 +48,6 @@ local linters = new Mapping<String, Step> {
       new FileSelector { types = List("sh", "bash") },
       new FileSelector { glob = s6Globs },
     )
-    check {
-      command { argv = List("shellcheck", "-x", "{{files}}") }
-    }
-    check_diff {
-      command { argv = List("shellcheck", "-x", "--format=diff", "{{files}}") }
-    }
   }
   ["shfmt"] = (Builtins.shfmt) {
     match_any = List(
