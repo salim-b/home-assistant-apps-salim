@@ -322,9 +322,15 @@ YAML is linted by [ryl](https://ryl-docs.pages.dev/) — the hk `ryl` step with 
 - **Warnings fail via `--strict`**: the hk step runs `ryl check --strict`, so warning-level rules (line-length,
   comments, document-start, truthy — see `.ryl.toml`) fail the gate like yamllint's `--strict` did (warning-only runs
   exit `2` under `--strict`, errors `1`).
-- **The step is deliberately not hk's `Builtins.ryl`**: the builtin selects files by hk file typing, omits `--strict`
-  and carries an auto-fix (`--fix`) step; this repo keeps yamllint's glob selection (`**/*.yml`, `**/*.yaml`) and stays
-  check-only.
+- **The hk step is `Builtins.ryl` with `--strict` added to both `check` and `fix`**: the builtin's commands omit
+  `--strict`, which would demote the config's warning-level rules (line-length, comments, document-start, truthy) to
+  non-blocking; yamllint's builtin failed on warnings too. The builtin's fix step auto-fixes mechanical issues
+  (braces/brackets/commas spacing, comment spacing, final newline, quoting) in pre-commit.
+- **The builtin's `check_diff` wiring is cleared (`check_diff = null`, `check_after_diff = false`)**: ryl's `--diff`
+  exit code only reflects patch presence — it exits `0` whenever nothing is fixable, including files with unfixable
+  warnings *or errors* (verified on ryl 0.26.0) — and hk's fix mode skips the fixer when `check_diff` exits `0`, so
+  violating files would pass pre-commit untouched. With `check_diff` gone, fix mode runs `fix` (carrying `--strict`) on
+  every staged YAML file and its exit code decides: `0` only when nothing remains to fix or flag.
 - **`line-length` ignores comments by default** (yamllint parity): long comment lines don't fail the gate — the 140
   limit bites YAML scalars only.
 - **Config is TOML with `[lint.rules]`**: `[rules]` still parses but is deprecated as of ryl 0.26 (the built-in
