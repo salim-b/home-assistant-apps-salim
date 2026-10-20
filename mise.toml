@@ -1,4 +1,4 @@
-# Dev-ops framework: https://mise.jdx.dev
+# https://mise.jdx.dev/configuration.html
 
 [env]
 DOCKER_BUILDKIT = "1"
@@ -47,10 +47,13 @@ run = "panache format ."
 
 [tools]
 actionlint = "1.7.12"
+editorconfig-checker = "4.0.2"
 hadolint = "2.15.1"
+hk = { version = "2.7.0", workflow = "release.yml" }
 jq = "1.8.2"
 "aqua:jolars/panache" = "3.16.0"
 python = "3.14.8"
+ripgrep = "15.2.0"
 rumdl = "0.2.79"
 shellcheck = "0.11.0"
 shellharden = "4.3.2"
@@ -58,7 +61,6 @@ shfmt = "3.14.1"
 uv = "0.12.23"
 yamllint = "1.38.0"
 yq = "4.54.1"
-hk = { version = "2.7.0", workflow = "release.yml" }
 
 [vars]
 # supervisor ref the validate task fetches schemas from (single source of
