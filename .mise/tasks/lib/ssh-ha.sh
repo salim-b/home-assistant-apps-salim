@@ -71,7 +71,7 @@ ha_post_options() { # ha_post_options <slug> <options-json>: POST {options: ...}
   local result
   result=$(printf '{"options": %s}' "$2" | ssh "${SSH_OPTS[@]}" "$host" \
     "curl -s -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" -H 'Content-Type: application/json' \
-       -X POST --data-binary @- http://supervisor/addons/$1/options")
+      -X POST --data-binary @- http://supervisor/addons/$1/options")
   if ! echo "$result" | jq -e '.result == "ok"' >/dev/null 2>&1; then
     printf 'supervisor rejected the options: %s\n' "$result" >&2
     return 1

@@ -129,7 +129,7 @@ if [ "${usage_test_options:-false}" = "true" ]; then
     <(yq -o json '.' "$LIVE_TEST_OPTIONS_FILE"))
   result=$(printf '%s' "$merged" | ssh "${SSH_OPTS[@]}" "$host" \
     "curl -s -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" -H 'Content-Type: application/json' \
-       -X POST --data-binary @- http://supervisor/addons/$local_slug/options")
+      -X POST --data-binary @- http://supervisor/addons/$local_slug/options")
   if ! echo "$result" | jq -e '.result == "ok"' >/dev/null 2>&1; then
     echo "ERROR: the supervisor rejected the test options: $result" >&2
     exit 1
@@ -152,8 +152,8 @@ restore_options() {
     echo "-- restoring original app options"
     if restore_result=$(ssh "${SSH_OPTS[@]}" "$host" \
       "jq -c '{options: .}' '$backup' | \
-         curl -s -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" -H 'Content-Type: application/json' \
-         -X POST --data-binary @- http://supervisor/addons/$local_slug/options") \
+        curl -s -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" -H 'Content-Type: application/json' \
+        -X POST --data-binary @- http://supervisor/addons/$local_slug/options") \
       && echo "$restore_result" | jq -e '.result == "ok"' >/dev/null 2>&1; then
       # Refuse to delete the backup if it turns out to contain the test
       # options (a previous failed run may have saved them as the
