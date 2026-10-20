@@ -158,7 +158,10 @@ essentials:
   (binary-next-line, indented case) is pinned under `.editorconfig`'s `[**]`, whose `root = true` stops EditorConfig
   discovery at the repo - without it a home-directory config silently defines the style locally and CI sees shfmt
   defaults instead. shellharden gotcha: it quotes command substitutions even where word splitting is required (for-loop
-  iterables), so write such loops as brace expansion (`for _ in {1..N}`) or arrays (`read -r -a`/`mapfile`) instead.
+  iterables), so write such loops as brace expansion (`for _ in {1..N}`) or arrays (`read -r -a`/`mapfile`) instead. It
+  also quotes command-string executions (`if "$NFSD_CMD"`) where quoting changes what is *executed*: the whole string
+  becomes one literal command name (`command not found`) - this broke nfs-server 0.6.1 on-device. Build such commands as
+  arrays (`NFSD_CMD=(...); "${NFSD_CMD[@]}"`) so quoting is stable either way.
 - mise tasks: file tasks in `.mise/tasks/` with proper suffixes (`.sh`, `.py`, … — mise resolves the short names, e.g.
   `mise run lint`) and `#MISE`/`#USAGE` headers. Task arguments must be documented and typed via usage specs (never bare
   `$1` handling unless `raw_args = true`). Required args are declared `arg "<name>"` (mise errors before the task starts
