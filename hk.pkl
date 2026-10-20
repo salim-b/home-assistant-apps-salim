@@ -69,14 +69,32 @@ local linters = new Mapping<String, Step> {
   }
   ["actionlint"] = Builtins.actionlint
   ["hadolint"] = Builtins.hadolint
-  // ryl (Rust yamllint re-implementation, configured in .ryl.toml) replaces
-  // the yamllint builtin - deliberately not Builtins.ryl: that selects files
-  // by hk file typing instead of the yamllint builtin's globs (kept here),
-  // omits --strict (warnings fail: verified clean over all tracked yaml) and
-  // auto-fixes YAML in pre-commit - YAML stays check-only.
-  ["ryl"] {
-    glob = List("**/*.yml", "**/*.yaml")
-    check = "ryl check --strict {{files}}"
+  // Builtins.ryl (Rust yamllint re-implementation, configured in .ryl.toml)
+  // with --strict added to check and fix: the .ryl.toml ruleset leans on
+  // warning-level rules (line-length, comments, document-start, truthy) and
+  // yamllint's builtin failed on warnings too - without --strict they would
+  // stop blocking (verified clean over all tracked yaml). The builtin's fix
+  // step auto-fixes mechanical issues (spacing, final newline, quoting) in
+  // pre-commit; --strict makes its exit code self-verifying (0 only when
+  // nothing remains to fix or flag). check_diff/check_after_diff are
+  // cleared: ryl's --diff exits 0 whenever it has no patch - including
+  // unfixable findings - so hk's fix mode would skip the fixer and pass
+  // files that still violate (leak verified 2026-10-20); running fix (with
+  // --strict) on every staged yaml file both fixes and verifies instead.
+  ["ryl"] = (Builtins.ryl) {
+    check_diff = null
+    check_after_diff = false
+    check_list_files = null
+    check {
+      command {
+        argv = List("ryl", "check", "--strict", "{{files}}")
+      }
+    }
+    fix {
+      command {
+        argv = List("ryl", "check", "--fix", "--strict", "{{files}}")
+      }
+    }
   }
   // Panache owns ALL Markdown formatting (panache.toml). Explicit paths
   // bypass its config excludes, hence mdExcludes. The only Markdown
