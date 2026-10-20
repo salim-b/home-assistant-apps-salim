@@ -1,0 +1,55 @@
+# ryl (https://ryl-docs.pages.dev/) - the YAML linter run by the hk `ryl`
+# step; replaced yamllint (and its .yamllint config). TOML is ryl's
+# recommended format and has no `extends` - the tables below inline the
+# `default` preset (ryl enables no rules by default) with this repo's
+# overrides applied.
+
+[files]
+yaml = [
+    "*.yaml",
+    "*.yml",
+]
+
+[lint.rules]
+anchors = "enable"
+braces = "enable"
+brackets = "enable"
+colons = "enable"
+commas = "enable"
+document-end = "disable"
+empty-lines = "enable"
+empty-values = "disable"
+float-values = "disable"
+hyphens = "enable"
+indentation = "enable"
+key-duplicates = "enable"
+key-ordering = "disable"
+new-line-at-end-of-file = "enable"
+new-lines = "enable"
+octal-values = "disable"
+quoted-strings = "disable"
+trailing-spaces = "enable"
+
+# App config descriptions and translations use long lines intentionally, and
+# Renovate pins workflow action refs to full commit SHAs with a version
+# comment (`uses: owner/repo/actions/name@<40-char-sha> # v1.2.3`) - those
+# scalars are single-line by YAML grammar and cannot be wrapped
+[lint.rules.line-length]
+level = "warning"
+max = 140
+
+# HA app files don't use a leading '---'
+[lint.rules.document-start]
+level = "warning"
+present = false
+
+[lint.rules.comments]
+level = "warning"
+min-spaces-from-content = 1
+
+[lint.rules.comments-indentation]
+level = "warning"
+
+[lint.rules.truthy]
+level = "warning"
+check-keys = false

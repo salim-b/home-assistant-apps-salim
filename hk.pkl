@@ -69,8 +69,15 @@ local linters = new Mapping<String, Step> {
   }
   ["actionlint"] = Builtins.actionlint
   ["hadolint"] = Builtins.hadolint
-  // Uses --strict (warnings fail): verified clean over all tracked yaml.
-  ["yamllint"] = Builtins.yamllint
+  // ryl (Rust yamllint re-implementation, configured in .ryl.toml) replaces
+  // the yamllint builtin - deliberately not Builtins.ryl: that selects files
+  // by hk file typing instead of the yamllint builtin's globs (kept here),
+  // omits --strict (warnings fail: verified clean over all tracked yaml) and
+  // auto-fixes YAML in pre-commit - YAML stays check-only.
+  ["ryl"] {
+    glob = List("**/*.yml", "**/*.yaml")
+    check = "ryl check --strict {{files}}"
+  }
   // Panache owns ALL Markdown formatting (panache.toml). Explicit paths
   // bypass its config excludes, hence mdExcludes. The only Markdown
   // auto-fix step.
