@@ -309,3 +309,25 @@ The lab boots app containers `--privileged` **on the lab host**, so host-side ha
   Device/bridge-specific findings live in the apps' `KNOWLEDGE.md`.
 - **Plain Docker vs. HAOS `/dev`**: see the device-access section — when an app's behavior depends on the udev symlink
   trees, the lab hook must mirror the supervisor's read-only host-`/dev` bind (e.g. `-v /dev/disk:/dev/disk:ro`).
+
+## YAML linting: ryl (replaced yamllint)
+
+YAML is linted by [ryl](https://ryl-docs.pages.dev/) — the hk `ryl` step with config `.ryl.toml`, pinned as
+`aqua:owenlamont/ryl` in `mise.toml`. Facts that outlive the swap:
+
+- **ryl parses YAML 1.2; yamllint defaulted to 1.1** (ryl docs, [YAML version
+  compatibility](https://ryl-docs.pages.dev/yaml-version/), observed on ryl 0.26.0): bareword booleans
+  (`yes`/`no`/`on`/`off`, any case) are plain strings to ryl and leading-zero integers like `0755` are decimal — while
+  YAML 1.1 parsers (PyYAML and kin) still coerce both. Don't predict what a parser will load from ryl's lint view.
+- **Warnings fail via `--strict`**: the hk step runs `ryl check --strict`, so warning-level rules (line-length,
+  comments, document-start, truthy — see `.ryl.toml`) fail the gate like yamllint's `--strict` did (warning-only runs
+  exit `2` under `--strict`, errors `1`).
+- **The step is deliberately not hk's `Builtins.ryl`**: the builtin selects files by hk file typing, omits `--strict`
+  and carries an auto-fix (`--fix`) step; this repo keeps yamllint's glob selection (`**/*.yml`, `**/*.yaml`) and stays
+  check-only.
+- **`line-length` ignores comments by default** (yamllint parity): long comment lines don't fail the gate — the 140
+  limit bites YAML scalars only.
+- **Config is TOML with `[lint.rules]`**: `[rules]` still parses but is deprecated as of ryl 0.26 (the built-in
+  migrator, `ryl --migrate-configs`, emits the `[lint.rules]` form), and a rule with an option table must not also
+  appear as a `"<name> = "enable"` string in the same table — TOML duplicate key, and ryl exits `2` loudly instead of
+  linting.
