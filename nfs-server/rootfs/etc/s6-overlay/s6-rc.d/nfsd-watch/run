@@ -41,6 +41,10 @@ while true; do
   ## §"Automatic mirror refresh (nfsd-watch)".
   if [ "$RC" = 3 ]; then
     bashio::log.info "Share mount state changed - re-applying the NFS configuration and restarting the NFS server"
+    ## Mark the cycle pending BEFORE tearing the server down: from here on the kernel server may be down (a failed
+    ## apply below leaves it down), so every subsequent tick must try to get it back up - even when the by-then clean
+    ## detection state (umounts succeeded, rebind failed, drive detached) would otherwise skip the restart.
+    touch "$PENDING_FILE"
     rpc.nfsd 0 || true
     exportfs -au || true
     if ! /usr/bin/nfsd-apply --quiet; then
@@ -49,8 +53,8 @@ while true; do
     fi
   fi
 
-  ## (Re)start the kernel server - also the retry path when a previous cycle's start failed: the pending marker
-  ## makes the retry survive the by-then-clean detection state (the mirrors were already re-applied successfully).
+  ## (Re)start the kernel server - also the retry path for any cycle that failed after the marker was set (a failed
+  ## re-apply or a failed start): the pending marker makes the retry survive the by-then-clean detection state.
   ## A failed check with a pending marker falls through here as well: getting the server up takes priority over a
   ## mirror re-assessment, and the next tick re-checks the mirrors.
   if /etc/s6-overlay/scripts/nfsd-start; then

@@ -229,8 +229,11 @@ beneath it). Mirrors are deduplicated per path (a path may appear in several sha
 
 **Failure semantics**: a failed check keeps the current configuration (like `hd-idle-watch`, options can't change
 mid-run, so a check failure is a can't-happen guarded for insurance); a failed apply or restart logs a warning and
-retries next tick — the baseline state file only advances on a successful apply, so detection is idempotent. The watcher
-logs one info line per detected change ("Share mount state changed…") and is silent on clean ticks.
+retries next tick — the baseline state file only advances on a successful apply, so detection is idempotent. The
+restart-pending marker is set when a cycle begins (before the server is torn down), so a failed apply also retries the
+server start on the next tick even if the detection state has gone clean in between (umounts succeeded, rebind failed,
+drive detached) — the kernel server can never stay down across ticks. The watcher logs one info line per detected change
+("Share mount state changed…") and is silent on clean ticks.
 
 Grace-period interplay: each watcher cycle restarts the kernel server exactly like an app restart — connected clients
 reclaim state during the grace period via the shipped `nfsdcld` tracker (see the sections above; the tracker's store
