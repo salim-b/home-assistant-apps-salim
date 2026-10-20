@@ -20,25 +20,22 @@ local mdGlobs = List("**/*.md", "**/*.markdown")
 local mdExcludes = List("AI_POLICY.md", "**/LICENSE.md")
 
 local linters = new Mapping<String, Step> {
-  // LICENSE is verbatim GPL-3.0 text; its left-padding is not a multiple of 2
-  // and must not be rewritten - exclude it from checking and fixing.
-  //
-  // Outside shell scripts the left-padding is marker- or string-driven
-  // (Markdown list indents, quoted string continuations, ...), so the
-  // "multiple of indent_size" rule is noise. This step drops only the
-  // indent-size check and keeps every other EditorConfig rule; shell scripts
-  // keep the full contract via editorconfig-checker-shell below, hence the
-  // exclusions here (a shebang-shell file outside those globbed paths stays
-  // in both steps - harmless; the shell step is authoritative).
+  // Left-padding in this repo is marker- or string-driven (Markdown list
+  // indents, quoted string continuations), so the "multiple of indent_size"
+  // rule is noise: `-disable-indent-size` drops it on the check and the fix
+  // command alike, and every other EditorConfig rule stays in force. Shell
+  // indentation is governed by the shfmt step (which reads `indent_size`
+  // from `.editorconfig`); the one class shfmt cannot see is padding inside
+  //  quoted multi-line strings – kept at even multiples by hand.
   ["editorconfig-checker"] = (Builtins.editorconfig_checker) {
-    exclude = List(
-      "LICENSE",
-      "**/*.sh",
-      "**/*.bash",
-    ) + s6Globs
     check {
       command {
         argv = List("editorconfig-checker", "-disable-indent-size", "{{files}}")
+      }
+    }
+    fix {
+      command {
+        argv = List("editorconfig-checker", "-disable-indent-size", "--fix", "{{files}}")
       }
     }
   }
@@ -57,21 +54,6 @@ local linters = new Mapping<String, Step> {
     check_diff {
       command { argv = List("shellcheck", "-x", "--format=diff", "{{files}}") }
     }
-  }
-  // Full EditorConfig contract (incl. indent_size) for shell scripts: shfmt
-  // formats these to indent_size = 2 (read from .editorconfig), so even
-  // left-padding is a real, checkable contract here - unlike in prose/config
-  // files. Selection mirrors the shellcheck step's file set (frozen by the
-  // pinned package version).
-  ["editorconfig-checker-shell"] = (Builtins.editorconfig_checker) {
-    // The builtin matches via step-level `types`, which cannot coexist with
-    // `match_any` - so it is cleared here and re-declared as a selector.
-    types = null
-    match_any = List(
-      new FileSelector { glob = List("**/*.sh", "**/*.bash") },
-      new FileSelector { types = List("sh", "bash") },
-      new FileSelector { glob = s6Globs },
-    )
   }
   ["shfmt"] = (Builtins.shfmt) {
     match_any = List(
