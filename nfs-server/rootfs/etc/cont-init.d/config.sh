@@ -2,17 +2,37 @@
 # shellcheck shell=bash
 set -euo pipefail
 
+## Log the stderr captured from a failed command, one FATAL log line per stderr
+## line: the app's log must state the actual cause of a failure - a bare
+## "failed" message sent users checking their app configuration for what were
+## image-internal problems. An empty capture is logged explicitly (a silent
+## failing command is itself diagnostic information).
+log_captured_stderr() {
+  if [ -s "$1" ]; then
+    while IFS= read -r line; do
+      bashio::log.fatal "    ${line}"
+    done <"$1"
+  else
+    bashio::log.fatal "    (no error output)"
+  fi
+}
+
 ## Mount the kernel's nfsd control filesystem at /proc/fs/nfsd (the control files exist only once it is mounted; the
 ## mount also autoloads the nfsd kernel module in kernel context - no modprobe needed, see the repository-root
 ## KNOWLEDGE.md §AppArmor).
 if [ ! -e /proc/fs/nfsd/versions ]; then
   bashio::log.info "Mounting nfsd filesystem..."
-  if ! mount -t nfsd nfsd /proc/fs/nfsd; then
-    bashio::log.fatal "Unable to mount the nfsd filesystem: the host's kernel probably lacks NFS server support."
+  ERRFILE="$(mktemp)"
+  if ! mount -t nfsd nfsd /proc/fs/nfsd 2>"$ERRFILE"; then
+    bashio::log.fatal "Unable to mount the nfsd filesystem. mount's error output:"
+    log_captured_stderr "$ERRFILE"
+    rm -f "$ERRFILE"
+    bashio::log.fatal "The host's kernel probably lacks NFS server support."
     bashio::log.fatal "Note: Home Assistant OS only ships the nfsd kernel module on some boards"
     bashio::log.fatal "(currently the Rockchip-based ones, e.g. ODROID-M1/M1S and Home Assistant Green)."
     bashio::exit.nok
   fi
+  rm -f "$ERRFILE"
 fi
 
 ## Mount rpc_pipefs in this network namespace: the kernel creates the cld tracker's upcall pipe inside the rpc_pipefs
@@ -23,9 +43,16 @@ RPC_PIPEFS_DIR=/var/lib/nfs/rpc_pipefs
 mkdir -p "$RPC_PIPEFS_DIR"
 if ! grep -qsE " on ${RPC_PIPEFS_DIR//\//\\/} rpc_pipefs " /proc/mounts; then
   bashio::log.info "Mounting rpc_pipefs (client recovery upcall channel)..."
-  if ! mount -t rpc_pipefs sunrpc "$RPC_PIPEFS_DIR"; then
-    bashio::log.warning "Unable to mount rpc_pipefs: NFSv4 client state will not survive app restarts."
+  ERRFILE="$(mktemp)"
+  if ! mount -t rpc_pipefs sunrpc "$RPC_PIPEFS_DIR" 2>"$ERRFILE"; then
+    bashio::log.warning "Unable to mount rpc_pipefs: NFSv4 client state will not survive app restarts. mount's error output:"
+    if [ -s "$ERRFILE" ]; then
+      while IFS= read -r line; do
+        bashio::log.warning "    ${line}"
+      done <"$ERRFILE"
+    fi
   fi
+  rm -f "$ERRFILE"
 fi
 
 ## Persistent store of the client-recovery tracker daemon (nfsdcld's sqlite
@@ -61,11 +88,20 @@ FSID=1
 ## Bind-mount $1 at $2 if not already mounted (idempotent)
 bind_mount() {
   if ! grep -qE " on ${2//\//\\/} " /proc/mounts; then
-    mkdir -p "${2}"
-    if ! mount --bind "${1}" "${2}"; then
-      bashio::log.fatal "Unable to bind-mount ${1} to ${2}: could not create the share's export mirror."
+    ERRFILE="$(mktemp)"
+    if ! mkdir -p "${2}" 2>"$ERRFILE"; then
+      bashio::log.fatal "Unable to create the share's export mirror directory ${2}. mkdir's error output:"
+      log_captured_stderr "$ERRFILE"
+      rm -f "$ERRFILE"
       bashio::exit.nok
     fi
+    if ! mount --bind "${1}" "${2}" 2>"$ERRFILE"; then
+      bashio::log.fatal "Unable to bind-mount ${1} to ${2}: could not create the share's export mirror. mount's error output:"
+      log_captured_stderr "$ERRFILE"
+      rm -f "$ERRFILE"
+      bashio::exit.nok
+    fi
+    rm -f "$ERRFILE"
   fi
 }
 
