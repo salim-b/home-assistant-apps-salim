@@ -36,6 +36,19 @@ done
 qlog_info() { [ "$QUIET" = 1 ] || bashio::log.info "$@"; }
 qlog_warning() { [ "$QUIET" = 1 ] || bashio::log.warning "$@"; }
 
+## Log the stderr captured from a failed command, one FATAL log line per stderr line: the app's log must state the
+## actual cause of a failure - mount/umount denials (the AppArmor forensics case) would otherwise surface only as a
+## bare "failed" message. Same pattern as the other scripts' log_captured_stderr.
+log_captured_stderr() {
+  if [ -s "$1" ]; then
+    while IFS= read -r line; do
+      bashio::log.fatal "    ${line}"
+    done <"$1"
+  else
+    bashio::log.fatal "    (no error output)"
+  fi
+}
+
 PSEUDO_ROOT=/data/pseudo_root
 EXPORTS=/etc/exports
 STATE_FILE=/var/lib/nfs/mirrors.state
@@ -66,8 +79,10 @@ covering_mount_id() {
     END { print id + 0 }' /proc/self/mountinfo
 }
 
-## Mountpoint check (share paths are whitespace-free - validated below, so plain grep is exact).
-is_mounted() { grep -qE " on ${1//\//\\/} " /proc/mounts; }
+## Mountpoint check (share paths are whitespace-free - validated below): -F fixed-string matching stays exact for
+## paths containing regex metacharacters (the schema only excludes whitespace and slashes); the leading " on " and
+## trailing space anchor rule out partial matches.
+is_mounted() { grep -qF " on $1 " /proc/mounts; }
 
 ## App options are immutable while the app runs (the supervisor validates at save time and only hands new options to
 ## the app at its next start), so boot and watcher derive the same configuration from them.
@@ -116,10 +131,12 @@ while IFS= read -r share; do
     bashio::log.fatal "Share path '${path}' must be an absolute path without empty components (e.g. /share/nfs)."
     bashio::exit.nok
   fi
-  ## /etc/exports is whitespace-separated; NFS exports must be directories.
-  if [[ "$path" =~ [[:space:]] ]] || [[ "$network" =~ [[:space:]] ]] \
+  ## /etc/exports is whitespace-separated; NFS exports must be directories. Empty network/options would produce a
+  ## malformed exports line (schema-blocked; defense in depth for hand-edited options.json).
+  if [[ -z "$network" || -z "$options" ]] \
+    || [[ "$path" =~ [[:space:]] ]] || [[ "$network" =~ [[:space:]] ]] \
     || [[ "$options" =~ [[:space:]] ]]; then
-    bashio::log.fatal "Share path, network and options must not contain whitespace (got: '${path} | ${network} | ${options}')."
+    bashio::log.fatal "Share path, network and options must be non-empty and whitespace-free (got: '${path} | ${network} | ${options}')."
     bashio::exit.nok
   fi
 
@@ -150,14 +167,16 @@ while IFS= read -r share; do
         bashio::log.fatal "Unable to create the share directory ${path}."
         bashio::exit.nok
       fi
-      chmod "$DEFAULT_PERMS" "$path" \
-        || {
-          bashio::log.fatal "Unable to set the configured permissions on ${path}."
-          bashio::exit.nok
-        }
+      ## chown first, chmod second: chown(2) clears the setuid/setgid bits, so a 4-digit configured mode would
+      ## otherwise lose them.
       chown "${DEFAULT_UID}:${DEFAULT_GID}" "$path" \
         || {
           bashio::log.fatal "Unable to set the configured ownership on ${path}."
+          bashio::exit.nok
+        }
+      chmod "$DEFAULT_PERMS" "$path" \
+        || {
+          bashio::log.fatal "Unable to set the configured permissions on ${path}."
           bashio::exit.nok
         }
       bashio::log.info "Created ${path} with UID:${DEFAULT_UID} GID:${DEFAULT_GID} Permissions:${DEFAULT_PERMS}"
@@ -225,38 +244,50 @@ if [ "$CHECK" = 1 ]; then
   exit 0
 fi
 
-## Rebind phase 1 (umount): drop every stale mirror, deepest paths first - mirrors may nest (a share below another
-## share's path), and unmounting a parent mirror with a child mirror still mounted inside it fails with EBUSY (the
-## same deepest-first rule the nfsd-stop down script applies). Already-unmounted mirrors are skipped (idempotent
-## after a partial failure).
+## Depth order for the rebind phases: mirrors may nest (a share path below another share's mirror) and sorting by
+## path length orders parent before child (a child path is strictly longer than its parent's). Computed once,
+## ascending: binds iterate forward (shallowest first), umounts iterate reversed (deepest first).
+SORTED_MIRRORS=()
 if [ "${#REBIND_MIRRORS[@]}" -gt 0 ]; then
-  mapfile -t UMOUNTS < <(printf '%s\n' "${REBIND_MIRRORS[@]}" | awk '{print length, $0}' | sort -rn | cut -d' ' -f2-)
-  for mirror in "${UMOUNTS[@]}"; do
-    is_mounted "$mirror" || continue
-    if ! umount "$mirror"; then
-      bashio::log.fatal "Unable to unmount the stale mirror ${mirror}: could not rebind the share's export mirror."
-      bashio::exit.nok
-    fi
-  done
+  mapfile -t SORTED_MIRRORS < <(printf '%s\n' "${REBIND_MIRRORS[@]}" | awk '{print length, $0}' | sort -n | cut -d' ' -f2-)
 fi
+
+## Rebind phase 1 (umount): drop every stale mirror, deepest paths first - unmounting a parent mirror with a child
+## mirror still mounted inside it fails with EBUSY (the same deepest-first rule the nfsd-stop down script applies).
+## Already-unmounted mirrors are skipped (idempotent after a partial failure).
+for ((i = ${#SORTED_MIRRORS[@]} - 1; i >= 0; i--)); do
+  mirror="${SORTED_MIRRORS[i]}"
+  is_mounted "$mirror" || continue
+  ERRFILE="$(mktemp)"
+  if ! umount "$mirror" 2>"$ERRFILE"; then
+    bashio::log.fatal "Unable to unmount the stale mirror ${mirror}: could not rebind the share's export mirror. umount's error output:"
+    log_captured_stderr "$ERRFILE"
+    rm -f "$ERRFILE"
+    bashio::exit.nok
+  fi
+  rm -f "$ERRFILE"
+done
 
 ## Rebind phase 2 (bind): re-create the mirrors shallowest paths first (a child's bind target must exist inside its
 ## parent's fresh bind, not beneath it) from the share path's current mount state. An absent source (e.g. the drive
 ## is detached) leaves the mirror as the plain exportable fallback directory.
-if [ "${#REBIND_MIRRORS[@]}" -gt 0 ]; then
-  mapfile -t BINDS < <(printf '%s\n' "${REBIND_MIRRORS[@]}" | awk '{print length, $0}' | sort -n | cut -d' ' -f2-)
-  for mirror in "${BINDS[@]}"; do
-    src="${mirror#"${PSEUDO_ROOT}"}"
-    if ! mkdir -p "$mirror"; then
-      bashio::log.fatal "Unable to create the mirror mountpoint ${mirror}."
-      bashio::exit.nok
-    fi
-    if [ -d "$src" ] && ! mount --bind "$src" "$mirror"; then
-      bashio::log.fatal "Unable to bind-mount ${src} to ${mirror}: could not create the share's export mirror."
-      bashio::exit.nok
-    fi
-  done
-fi
+for mirror in "${SORTED_MIRRORS[@]}"; do
+  src="${mirror#"${PSEUDO_ROOT}"}"
+  ERRFILE="$(mktemp)"
+  if ! mkdir -p "$mirror" 2>"$ERRFILE"; then
+    bashio::log.fatal "Unable to create the mirror mountpoint ${mirror}. mkdir's error output:"
+    log_captured_stderr "$ERRFILE"
+    rm -f "$ERRFILE"
+    bashio::exit.nok
+  fi
+  if [ -d "$src" ] && ! mount --bind "$src" "$mirror" 2>"$ERRFILE"; then
+    bashio::log.fatal "Unable to bind-mount ${src} to ${mirror}: could not create the share's export mirror. mount's error output:"
+    log_captured_stderr "$ERRFILE"
+    rm -f "$ERRFILE"
+    bashio::exit.nok
+  fi
+  rm -f "$ERRFILE"
+done
 
 ## /etc/exports (atomic; skipped when the content is unchanged - clean watcher ticks write nothing).
 printf '%s\n' "${EXPORT_LINES[@]}" >"${EXPORTS}.tmp" \
