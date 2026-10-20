@@ -23,7 +23,9 @@ name: Publish reconcile
 # preinstalled docker buildx CLI (`docker buildx imagetools inspect`; the
 # packages are public); only ghcr.io is supported. Unclassified probe failures
 # are retried with exponential backoff, so transient network/registry blips
-# neither go red nor trigger dispatches.
+# neither go red nor trigger dispatches; an unclassified failure that survives
+# the retries is dumped (with its last error) to the log and fails the run
+# (red).
 
 on:
   schedule:
@@ -75,15 +77,21 @@ jobs:
       - name: Normalize app information
         id: normalize
         run: |
+          # helpers/info emits its string outputs JSON-quoted (`yq -o=json`).
+          # Shell-assigning the interpolated output strips the quotes (quotes
+          # are shell syntax there) - the same pattern build-app.yaml relies
+          # on. Never feed the raw outputs to env:, they keep their quotes.
           image=${{ steps.info.outputs.image }}
           echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
           echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
+          version=${{ steps.info.outputs.version }}
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       - name: Check published tags in GHCR
         id: tags
         env:
           APP: ${{ matrix.app }}
-          VERSION: ${{ steps.info.outputs.version }}
+          VERSION: ${{ steps.normalize.outputs.version }}
           REGISTRY_PREFIX: ${{ steps.normalize.outputs.registry_prefix }}
           IMAGE_NAME: ${{ steps.normalize.outputs.image_name }}
           ARCHITECTURES: ${{ steps.info.outputs.architectures }}
@@ -117,6 +125,7 @@ jobs:
               fi
               if [ "$attempt" -ge "$retries" ]; then
                 echo unreachable
+                printf 'probe %s: unclassified failure after %d attempts, last error:\n%s\n' "$ref" "$((attempt + 1))" "$out" >&2
                 return 0
               fi
               sleep "$((5 * (2 ** attempt)))"
