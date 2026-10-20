@@ -30,6 +30,9 @@ if [ "$(printf '%s\\n%s\\n' "$need" "$have" | sort -V | head -n1)" != "$need" ];
 fi
 exec hk install --global --mise
 """
+skip_if = """
+f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"; [[ -f "$f" ]] || f="$HOME/.gitconfig"; [[ -f "$f" ]] && rg -q '^\\s*\\[\\s*hook\\s+"hk-[\\w-]+"\\s*\\]' "$f"
+"""
 
 [tasks.check]
 description = "Run all pre-commit checks (lint + validate)"
