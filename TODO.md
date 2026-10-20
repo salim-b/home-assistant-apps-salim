@@ -33,6 +33,32 @@ facts live in the repository-root `KNOWLEDGE.md`.
   selectors for the s6 script paths (see the `s6Globs` comment there); the glob additions can be dropped once this
   lands.
 
+- Upstream: file an hk issue against [jdx/hk](https://github.com/jdx/hk) (likely co-filed with
+  [owenlamont/ryl](https://github.com/owenlamont/ryl)) — the `ryl` builtin's fix-mode wiring silently passes files with
+  unfixable violations. hk's fix mode runs `check_diff` first and skips the fixer when it exits 0; ryl 0.26.0's `--diff`
+  exit code reflects only patch presence: it exits 0 whenever nothing is fixable — including files carrying unfixable
+  warnings or errors (probed 2026-10-20: `ryl check --diff` on a duplicate-key error file exits 0, and `--strict` does
+  not change `--diff` exit codes; a fixable brace-spacing file prints the patch and exits 1). With the builtin as
+  shipped (hk v2.7.0 `pkl/builtins/ryl.pkl`: `check_diff = ryl check --diff {{files}}`, `check_after_diff = true`),
+  every pre-commit run (fix mode) passes files that `hk check --all` fails — the `check_after_diff` recheck never fires
+  because no diff was applied. hk's own builtin test misses this: `testMaker.fixFail` exercises the fix command
+  directly, not the check_diff-first flow the hook actually takes. Investigate which side should own the fix: ryl
+  exiting non-zero from `--diff` when diagnostics exist without fixes, or hk not treating `check_diff` exit 0 as "clean"
+  for partial fixers (e.g. re-running `check` when the fixer is skipped). Until then, this repo's `hk.pkl` clears
+  `check_diff`/`check_after_diff`/`check_list_files` on the ryl step and puts `--strict` on both `check` and `fix` (the
+  fix run is self-verifying: exit 0 only when nothing remains to fix or flag); the overrides can be dropped once this
+  lands.
+
+- Upstream: file an hk PR against [jdx/hk](https://github.com/jdx/hk) adding a `panache` builtin
+  (`pkl/builtins/panache.pkl`): [panache](https://github.com/jolars/panache) is the Markdown formatter this repo runs as
+  a custom hk step (`check = panache format --check {{files}}`, `fix = panache format {{files}}` over
+  `**/*.md`/`**/*.markdown`), installed via the aqua registry (`aqua:jolars/panache`), so a builtin would let repos drop
+  the custom step the same way the rumdl/ryl builtins do. Design point to settle in the PR: hk passes explicit file
+  paths, and panache bypasses its own config excludes for explicit paths (observed here — hence the `mdExcludes` for
+  `AI_POLICY.md` and `**/LICENSE.md` in `hk.pkl`); decide whether the builtin filters such files itself, documents the
+  interaction, or waits for panache to honor excludes on explicit paths (cf. the panache strikethrough idempotency entry
+  above for the other known panache quirk).
+
 - Upstream: investigate whether [shellharden](https://github.com/anordal/shellharden) mangles `for` loops and file an
   issue if none exists (check for existing ones first). Verified with v4.3.2 (2026-10): `--transform`/`--replace` quotes
   command substitutions in the iterable — `for _ in $(seq 1 120)` becomes `for _ in "$(seq 1 120)"` — which kills word
