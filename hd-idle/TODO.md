@@ -94,10 +94,11 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
   full regeneration now runs only on a detected change (the nfsd-apply `--check` pattern, nfs-server commit d78c7ea).
   This supersedes two items rejected in the 2026-10-15 footprint review: the jq `@tsv` batching (the jq chain no longer
   runs per tick at all) and the by-id hash pre-gate (the baseline replay IS the pre-gate, justified by precedent). Also
-  closed an AppArmor gap the earlier review had not caught: the watcher's `hd-idle.drives.prev` copy for `pmfix --since`
-  had no profile rule, so on enforcing devices the treatment re-application would fail on every change tick.
-  Lab-verified via the watcher roundtrips (args-content and baseline-state corruption, including the no-restart state
-  resync), now running in every lab (relocated out of the spindown-drives gate).
+  added the watcher's `hd-idle.drives.prev` copy for `pmfix --since` to the profile's documented file surface (initially
+  mistaken for an enforcing-device failure - file rules are documentation under the `file,` blanket, repository-root
+  KNOWLEDGE.md §AppArmor; corrected 2026-10-21). Lab-verified via the watcher roundtrips (args-content and
+  baseline-state corruption, including the no-restart state resync), now running in every lab (relocated out of the
+  spindown-drives gate).
 
 - Per-drive drive-PM treatment override (2026-10-16, v0.1.6): each drive-list entry gained a `disable_drive_pm` yes/no
   field (empty = follow the global option), emitted as the drives file's fourth column; hd-idle-pmfix decides per drive

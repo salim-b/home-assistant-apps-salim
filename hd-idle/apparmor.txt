@@ -68,8 +68,9 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
 
   # Generated hd-idle command line (cont-init config.sh -> s6 run script) plus its companions: the drives file
   # (hd-idle-pmfix), the resolution baseline replayed by hd-idle-genargs --check (hd-idle-watch), and the
-  # previous-drives copy hd-idle-pmfix --since diffs against (written by the watcher on a change tick; without a
-  # rule the copy fails silently and the treatment re-application logs a warning on every change tick).
+  # previous-drives copy hd-idle-pmfix --since diffs against (written by the watcher on a change tick). These rules
+  # document the generated-config file surface (file rules are not load-bearing under the `file,` blanket - see the
+  # note at the top); keep them in sync with what the scripts read and write.
   /etc/hd-idle.args rw,
   /etc/hd-idle.drives rw,
   /etc/hd-idle.drives.prev rw,
