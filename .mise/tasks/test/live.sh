@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2029  # remote/docker commands intentionally embed client-side values
-#MISE description="Deploy an app to a device and run live checks against it (app hook provides the checks)"
+#MISE description="Deploy an app to a HAOS device and run live checks against it (app hook provides the checks)"
 # NOTE: the docs (mise.jdx.dev, "Passing parent task arguments to dependencies",
 # depends = [{ task = "deploy", args = ["{{ usage.app }}", ...] }]) describe
 # arg/env forwarding to dependencies — but as of mise 2026.10.6 NO released
@@ -10,9 +10,10 @@
 #USAGE arg "<app>" help="App to test (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
-#USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to root), e.g. root@homeassistant.local or just homeassistant.local"
-#USAGE flag "--replace" help="Forwarded to deploy: uninstall an existing repository-installed copy first"
-#USAGE flag "--test-options" help="Apply the app's test options (.mise/tasks/test/live/<app>.yaml) to the device app for the run (backup kept, restored on exit)"
+#USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to `root`), e.g. `root@homeassistant.local` or just `homeassistant.local`"
+#USAGE flag "--replace" help="Forwarded to the `deploy` task: uninstall an existing repository-installed copy first"
+#USAGE flag "--test-options" help="Apply the app's test options (`.mise/tasks/test/live/<app>.yaml`) to the device app for the run (backup kept, restored on exit)"
+
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 

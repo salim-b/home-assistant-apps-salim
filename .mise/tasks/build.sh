@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-#MISE description="Build app images for all supported architectures and assert metadata"
+#MISE description="Build app container images for all supported architectures and assert metadata"
 #USAGE arg "[app]" help="App to build (default: all apps)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
+
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 

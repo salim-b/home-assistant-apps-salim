@@ -4,12 +4,13 @@
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
 #USAGE flag "--keep" help="Keep lab containers/dirs for debugging"
-#USAGE flag "--spindown-drives <drives>" help="Comma-separated sd* kernel names an app hook may spin down for real (hd-idle smoke test; read-only: no data is written)"
+#USAGE flag "--spindown-drives <drives>" help="Comma-separated `sd*` kernel names an app hook may spin down for real (hd-idle smoke test; read-only: no data is written)"
 #
 # Per-app specifics (docker args, a runtime roundtrip) live in the
 # .mise/tasks/lab/<app>.sh hook, fixture adaptation (optional) in
 # .mise/tasks/lab/<app>.py - see AGENTS.md. Apps without a hook get a
 # boot-only lab (config fetch via fake API, full s6-rc boot, graceful stop).
+
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 

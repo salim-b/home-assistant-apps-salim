@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2029  # remote commands intentionally embed client-side values ($local_slug)
-#MISE description="Deploy an app to a real HAOS device: copy to /local_apps, install/update/rebuild as needed, ensure running"
+#MISE description="Deploy an app to a real HAOS device: copy to `/local_apps`, install/update/rebuild as needed and ensure it's running"
 #USAGE arg "<app>" help="App to deploy (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
-#USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to root), e.g. root@homeassistant.local or just homeassistant.local"
-#USAGE flag "--replace" help="Uninstall an existing repository-installed copy of this app before deploying"
-#USAGE flag "--config <mode>" help="Fate of the options: reset (wipe the local install's options - it runs with the app's config.yaml default options afterwards), migrate (with --replace: carry the repository-installed copy's options over to the local install), or unset = keep (default: the local install's options survive update/rebuild untouched; a replaced copy's options are not carried over - options do not survive an uninstall, so the backup file keeps the only copy)." {
+#USAGE arg "<host>" help="SSH target of the Home Assistant OS device, e.g. `root@homeassistant.local` or just `homeassistant.local` (bare host defaults to `root`)"
+#USAGE flag "--replace" help="Uninstall an existing repository-installed copy of the app before deploying"
+#USAGE flag "--config <mode>" help="""
+#USAGE   Fate of the previous app installation's options:
+#USAGE   - `migrate`: carry the repository-installed copy's options over to the local install (filtered to the target's schema); only effective with `--replace`
+#USAGE   - `reset`: wipe the local install's options; it runs with the app's `config.yaml` default options afterwards
+#USAGE   - ***unset*** (default): leave the local install's options untouched unless the app is `--replace`d (options do not survive an uninstall, so the backup file keeps the only copy)
+#USAGE """ {
 #USAGE   choices "migrate" "reset"
 #USAGE }
+
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 
@@ -69,7 +75,7 @@ if [ "$repo_installs" != "" ] && [ "$repo_installs" != "[]" ]; then
     done
   else
     echo "ERROR: two installations would conflict on the app's published port. Uninstall it first, e.g." >&2
-    echo "       ssh $host 'ha apps uninstall ${repo_slugs[0]}' — or re-run with --replace." >&2
+    echo "       \`ssh $host 'ha apps uninstall ${repo_slugs[0]}'\` — or re-run with \`--replace\`." >&2
     exit 1
   fi
 fi

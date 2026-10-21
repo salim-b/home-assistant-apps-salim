@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2029  # remote commands intentionally embed client-side values
-#MISE description="Switch a device to the app's latest registry/store version: tear down any locally installed copy; --config decides the previous options' fate (migrate|reset, default discard)"
+#MISE description="Switch a HAOS device to the app's latest registry/store version and tear down any locally installed copy"
 #USAGE arg "<app>" help="App to switch to the registry version (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
-#USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to root), e.g. root@homeassistant.local or just homeassistant.local"
-#USAGE flag "--config <mode>" help="Fate of the previous install's options: migrate (carry the local copy's options to the registry install, filtered to the target's schema - applies to the local->store switch; an update keeps its options anyway), reset (wipe the target install's options - the app then runs with the repo's config.yaml defaults), or unset = keep (default: an update preserves the options; a local->store switch starts the store install with the app's defaults - stored options do not survive an uninstall, so the local copy's options would be lost without --config migrate; any orphaned set is archived to a local backup file, path printed)." {
+#USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to `root`), e.g. `root@homeassistant.local` or just `homeassistant.local`"
+#USAGE flag "--config <mode>" help="""
+#USAGE   Fate of the previous app installation's options:
+#USAGE   - `migrate`: carry the local copy's options over to the registry install (filtered to the target's schema); only effective if the app was installed locally previously (a registry install update keeps its options anyway)
+#USAGE   - `reset`: wipe the registry install's options, making the app run with the repo's `config.yaml` defaults
+#USAGE   - ***unset*** (default): the local copy's options are *not* carried over to the registry install (stored options do not survive an uninstall, but are archived to a local backup file, path printed); a registry install update preserves its options
+#USAGE """ {
 #USAGE   choices "migrate" "reset"
 #USAGE }
+
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 

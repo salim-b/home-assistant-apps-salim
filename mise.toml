@@ -16,7 +16,7 @@ run = "hk check --all --no-fail-fast"
 output = "interleave"
 
 [tasks.install-git-hooks]
-description = "Install hk git hooks user-wide via ~/.gitconfig (needs Git 2.54+)"
+description = "Install hk git hooks user-wide via `~/.gitconfig` (needs Git 2.54+)"
 run = """
 need=2.54
 have=$(git --version | sed 's/^git version //;s/ .*$//')
@@ -38,7 +38,7 @@ output = "keep-order"
 # Panache owns ALL Markdown autoformatting (see panache.toml); rumdl stays a
 # check-only second linter.
 [tasks.fmt]
-description = "Auto-format the repository's Markdown via panache"
+description = "Auto-format the repository's Markdown via Panache"
 run = "panache format ."
 
 [tools]

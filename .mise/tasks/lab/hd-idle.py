@@ -1,5 +1,6 @@
 #MISE hide=true
 #MISE description="⚠️ internal helper script (fixture adapter, sourced by the lab task)"
+
 """Fixture adapter for the hd-idle lab: the lab's smoke-test drives (kernel names
 from LAB_SPINDOWN_DRIVES, e.g. "sda,sdb") on a short idle so the daemon
 exercises its natural spindown path within the check window. Bare kernel names

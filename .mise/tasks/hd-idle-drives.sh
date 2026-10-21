@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-#MISE description="Regenerate the drive cheat sheet (hd-idle/.drives.md): every connected drive with a labeled filesystem except the system disk(s), mapped to stable /dev/disk/by-id IDs (HAOS hosts only)"
-#USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to root), e.g. root@192.168.1.11 or just 192.168.1.11"
+#MISE description="Regenerate the drive cheat sheet (`hd-idle/.drives.md`): every connected drive with a labeled filesystem except the system disk(s), mapped to stable `/dev/disk/by-id` IDs (HAOS hosts only)"
+#USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to `root`), e.g. `root@192.168.1.11` or just `192.168.1.11`"
+
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
 

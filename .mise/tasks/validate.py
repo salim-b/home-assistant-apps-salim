@@ -1,7 +1,8 @@
 #!/usr/bin/env -S uv run --with voluptuous --with pyyaml --with jsonschema python3
-#MISE description="Validate app configs and translations against supervisor schemas"
+#MISE description="Validate app configs and translations against HA Supervisor schemas"
 #USAGE arg "[app]" help="App directory to validate (default: all apps)"
-#USAGE flag "--schemas-only" help="Only refetch the pinned supervisor schemas"
+#USAGE flag "--schemas-only" help="Only refetch the pinned Supervisor schemas"
+
 """Validation harness: supervisor-side semantics that the CI app linter
 (HA-side expectations) does not cover, at a pinned supervisor ref.
 

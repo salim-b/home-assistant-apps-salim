@@ -6,6 +6,7 @@
 #USAGE flag "--new <new>" required=#true help="New pin (full pkgver-pkgrel), e.g. 1.22-r8"
 #USAGE flag "--version <version>" required=#true help="App version the section is titled with (the version bumpVersions wrote in the same Renovate PR)"
 #USAGE flag "--dry-run" help="Print the section that would be inserted instead of writing CHANGELOG.md"
+
 """apk-changelog: insert the templated changelog section for an apk pin bump.
 
 The Renovate apk-pin PR (bumpVersions bumps the app's config.{yaml,yml}
