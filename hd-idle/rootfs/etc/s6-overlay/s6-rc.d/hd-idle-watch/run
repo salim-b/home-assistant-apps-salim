@@ -3,39 +3,70 @@
 set -euo pipefail
 
 ## Drive re-resolution watcher (longrun service): kernel names are not stable across re-plugs and hd-idle's -s 1 never
-## re-verifies already-resolved entries, so a moved drive would keep its stale entry until an app restart. This watcher
-## regenerates the command line quietly every 30 s and restarts just the hd-idle service when it actually changed.
+## re-verifies already-resolved entries, so a moved drive would keep its stale entry until an app restart. Each tick
+## first replays the recorded resolution baseline (hd-idle-genargs --check - shas of the installed files, system-disk
+## set, per-device resolution; no option reads, no jq, no file writes) and only on a detected change regenerates the
+## command line and restarts just the hd-idle service (the nfsd-apply --check pattern, nfs-server commit d78c7ea).
 ## Problem, design, restart effects, failure class: hd-idle/KNOWLEDGE.md §"Automatic drive re-resolution".
 
-INTERVAL=30
+## Poll interval (seconds). HD_IDLE_WATCH_INTERVAL overrides the 30 s default (the lab sets 5 s - the floor - to keep
+## its full-interval waits short; the detection and restart logic is interval-agnostic). Invalid values fall back to
+## the default, floored at 5 s so a bogus value cannot busy-cycle the tick.
+INTERVAL="${HD_IDLE_WATCH_INTERVAL:-30}"
+case "$INTERVAL" in
+  '' | *[!0-9]*)
+    bashio::log.warning "Invalid HD_IDLE_WATCH_INTERVAL '${INTERVAL}' - using the 30 s default."
+    INTERVAL=30
+    ;;
+esac
+[ "$INTERVAL" -ge 5 ] || INTERVAL=5
+
 ARGS_FILE=/etc/hd-idle.args
 CAND_FILE=/tmp/hd-idle-args.new
+## Companion files of the args file (derivation mirrored from hd-idle-genargs' companion_file; both paths here are
+## absolute, so the plain suffixing below is equivalent).
+DRIVES_FILE="${ARGS_FILE%.args}.drives"
+CAND_DRIVES_FILE="${CAND_FILE%.args}.drives"
+STATE_FILE="${ARGS_FILE%.args}.resolution"
+CAND_STATE_FILE="${CAND_FILE%.args}.resolution"
 
 while true; do
   sleep "$INTERVAL"
 
-  ## Regenerate from current options + current device resolution. Mid-run regeneration failures are nearly impossible
-  ## by construction; the keep-current guard is cheap insurance (analysis: hd-idle/KNOWLEDGE.md
-  ## §"Automatic drive re-resolution").
+  ## Detect (read-only): 0 = unchanged, 3 = changed (regeneration due), any other nonzero = check failure.
+  ## Mid-run failures are nearly impossible by construction (options cannot change while the app runs - the
+  ## supervisor validates at save time), so like nfsd-watch the keep-current guard is cheap insurance.
+  RC=0
+  /usr/bin/hd-idle-genargs --quiet --check || RC=$?
+
+  if [ "$RC" = 0 ]; then
+    continue
+  fi
+  if [ "$RC" != 3 ]; then
+    bashio::log.warning "Checking the hd-idle configuration failed - keeping the current configuration."
+    continue
+  fi
+
+  ## Regenerate from current options + current device resolution.
   if ! /usr/bin/hd-idle-genargs --quiet "$CAND_FILE"; then
     bashio::log.warning "hd-idle configuration regeneration failed - keeping the current configuration."
     continue
   fi
 
-  ## Compare BOTH generated files: an interrupted install (crash between the mv calls below) can leave the drives file
-  ## stale behind the args file, and this comparison is what re-syncs it (and re-runs the treatment) on the next tick.
-  DRIVES_FILE="${ARGS_FILE%.args}.drives"
-  case "$ARGS_FILE" in *.args) ;; *) DRIVES_FILE="${ARGS_FILE}.drives" ;; esac
-  CAND_DRIVES_FILE="${CAND_FILE%.args}.drives"
-  case "$CAND_FILE" in *.args) ;; *) CAND_DRIVES_FILE="${CAND_FILE}.drives" ;; esac
+  ## The regenerated args AND drives files still matching the installed ones means only the baseline state is stale
+  ## (an interrupted install, or a resolution change that reverted before this regeneration ran): resync the state
+  ## file without a restart - the configuration itself is already current.
   if cmp -s "$ARGS_FILE" "$CAND_FILE" && cmp -s "$DRIVES_FILE" "$CAND_DRIVES_FILE"; then
-    rm -f "$CAND_FILE" "$CAND_DRIVES_FILE"
+    if ! cmp -s "$STATE_FILE" "$CAND_STATE_FILE"; then
+      mv -f "$CAND_STATE_FILE" "$STATE_FILE"
+    fi
+    rm -f "$CAND_FILE" "$CAND_DRIVES_FILE" "$CAND_STATE_FILE"
     continue
   fi
 
   ## The new command line itself (logged by the hd-idle run script after
-  ## the restart) shows the new drive names - the generator runs fully
-  ## quiet per tick so unchanged states produce no log lines at all.
+  ## the restart) shows the new drive names - the check tick is fully
+  ## quiet so unchanged states produce no log lines at all.
   bashio::log.info "Drive device paths changed - updating the hd-idle configuration and restarting hd-idle"
   ## Keep the previous drives file for hd-idle-pmfix (--since): only drives
   ## that are NEW or CHANGED relative to it get the (possibly
@@ -44,6 +75,11 @@ while true; do
   cp "$DRIVES_FILE" "${DRIVES_FILE}.prev" 2>/dev/null || true
   mv -f "$CAND_FILE" "$ARGS_FILE"
   mv -f "$CAND_DRIVES_FILE" "$DRIVES_FILE"
+  ## State file last: it records the shas of the two files just installed
+  ## and is the commit point of the three-file install - a crash before it
+  ## leaves the recorded shas mismatching the installed files, so the next
+  ## tick detects the half-finished install and re-syncs.
+  mv -f "$CAND_STATE_FILE" "$STATE_FILE"
   ## Unconditional: the drives file's pm-flag column carries the EFFECTIVE per-drive decision (global
   ## disable_drive_pm as the default, per-drive yes/no overrides); pmfix skips drives whose flag is 0.
   /usr/bin/hd-idle-pmfix "$DRIVES_FILE" --since "${DRIVES_FILE}.prev" \

@@ -2,6 +2,19 @@
 
 # Changelog
 
+## 0.1.9
+
+- Internals: the drive re-resolution watcher's per-tick detection now replays a recorded resolution baseline
+  (`hd-idle-genargs --check` - the pattern the nfs-server app's watcher uses) instead of regenerating the full
+  configuration every 30 s: unchanged ticks no longer read the options, run jq, or write candidate files, and a stale
+  baseline resyncs without restarting the daemon.
+- Internals: the watcher's poll interval is overridable via `HD_IDLE_WATCH_INTERVAL` (default 30 s, floored at 5 s),
+  mirroring the nfs-server app.
+- Fixed: the watcher's drive-PM re-application after a device change copies the drives file to
+  `/etc/hd-idle.drives.prev` for its `--since` diff - a file the AppArmor profile did not allow, so on devices with
+  enforcement the copy silently failed and the treatment re-application logged a warning on every change tick. The
+  profile now allows it (plus the new baseline file).
+
 ## 0.1.8
 
 - Internals: the app's scripts were reformatted and quoting-hardened by the repository's new shell tooling (shfmt,

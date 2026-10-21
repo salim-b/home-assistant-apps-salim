@@ -3,8 +3,8 @@
 #MISE description="⚠️ internal helper script"
 # App hook for .mise/tasks/lab.sh (hd-idle specifics).
 #
-# Contract: this file may set lab_docker_args (nothing needed here: the app
-# requires no volumes beyond the harness-provided /data, and the harness
+# Contract: this file may set lab_docker_args (the app requires no volumes
+# beyond the harness-provided /dev/disk mirror and /data, and the harness
 # already runs the app container --privileged) and may define
 # lab_runtime_check.
 #
@@ -20,6 +20,10 @@ lab_docker_args=()
 if [ -d /dev/disk ]; then
   lab_docker_args+=(-v /dev/disk:/dev/disk:ro)
 fi
+## Short watcher interval (the 5 s floor) so the watcher roundtrips in
+## lab_runtime_check complete within their poll windows (mirrors the
+## nfs-server lab's NFSD_WATCH_INTERVAL).
+lab_docker_args+=(-e HD_IDLE_WATCH_INTERVAL=5)
 #
 # The lab container sees this machine's real /dev and /proc/diskstats. The
 # optional spindown smoke test is driven by LAB_SPINDOWN_DRIVES (comma-
@@ -105,6 +109,94 @@ lab_runtime_check() {
   echo "hd-idle up (process, /proc/diskstats, config dump, drive inventory OK)"
 
   lab_preflight
+
+  ## Watcher mechanics (drive re-resolution) - run for EVERY lab, before the
+  ## LAB_SPINDOWN_DRIVES gate: the roundtrips below need no spindownable
+  ## drives. The watcher must detect configuration drift by replaying the
+  ## recorded resolution baseline (hd-idle-genargs --check) and regenerate +
+  ## restart hd-idle when it changed. A kernel-name move cannot be simulated
+  ## in the lab (renames happen kernel-side), so verify the mechanism
+  ## deterministically: corrupt /etc/hd-idle.args (content drift) and the
+  ## baseline state file (state drift) and expect the watcher to restore
+  ## within a poll interval - restarting hd-idle for the content roundtrip,
+  ## while the state roundtrip must be resynced WITHOUT a restart (asserted
+  ## via the watcher's change-tick log line, which only the restart path
+  ## emits).
+  if docker exec "$app" sh -c "test -x /usr/bin/hd-idle-genargs" 2>/dev/null; then
+    ## Clean baseline: the boot generation must have written a state file
+    ## that replays as unchanged.
+    docker exec "$app" sh -c "test -s /etc/hd-idle.resolution" \
+      || {
+        echo "   FAIL: /etc/hd-idle.resolution baseline missing after boot"
+        return 1
+      }
+    if ! docker exec "$app" /usr/bin/hd-idle-genargs --quiet --check; then
+      echo "   FAIL: hd-idle-genargs --check does not replay the boot baseline as clean"
+      return 1
+    fi
+    echo "   PASS: resolution baseline written at boot and replayed clean"
+
+    echo "-- verifying the drive re-resolution watcher (corrupt-args roundtrip)"
+    docker exec "$app" cp /etc/hd-idle.args /tmp/args.expected
+    docker exec "$app" sh -c 'printf "corrupted\n" > /etc/hd-idle.args'
+    restored=0
+    for _ in {1..10}; do
+      sleep 5
+      if docker exec "$app" cmp -s /etc/hd-idle.args /tmp/args.expected; then
+        restored=1
+        break
+      fi
+    done
+    [ "$restored" = 1 ] || {
+      echo "   FAIL: args file not restored within 50 s (watcher not running?)"
+      return 1
+    }
+    restarts=$(docker logs "$app" 2>&1 | grep -c "Starting hd-idle" || true)
+    [ "$restarts" -ge 2 ] \
+      || {
+        echo "   FAIL: args restored but hd-idle not restarted (Starting count: $restarts)"
+        return 1
+      }
+    if ! docker exec "$app" sh -c "ps | grep -q '[s]bin/hd-idle'"; then
+      echo "   FAIL: hd-idle process gone after the watcher restart"
+      return 1
+    fi
+    if ! docker exec "$app" /usr/bin/hd-idle-genargs --quiet --check; then
+      echo "   FAIL: baseline check not clean again after the args restore"
+      return 1
+    fi
+    echo "   PASS: watcher restored the configuration, restarted hd-idle, baseline replays clean"
+
+    echo "-- verifying the watcher's baseline state roundtrip (state-only resync, no restart)"
+    docker exec "$app" cp /etc/hd-idle.resolution /tmp/resolution.expected
+    changes_before=$(docker logs "$app" 2>&1 | grep -c "Drive device paths changed" || true)
+    docker exec "$app" sh -c 'printf "corrupted\n" > /etc/hd-idle.resolution'
+    resynced=0
+    for _ in {1..10}; do
+      sleep 5
+      if docker exec "$app" cmp -s /etc/hd-idle.resolution /tmp/resolution.expected; then
+        resynced=1
+        break
+      fi
+    done
+    [ "$resynced" = 1 ] || {
+      echo "   FAIL: baseline state not resynced within 50 s (watcher not running?)"
+      return 1
+    }
+    changes_after=$(docker logs "$app" 2>&1 | grep -c "Drive device paths changed" || true)
+    [ "$changes_after" = "$changes_before" ] \
+      || {
+        echo "   FAIL: state resync took the restart path (change-tick log line count ${changes_before} -> ${changes_after}; a stale baseline must resync without a restart)"
+        return 1
+      }
+    if ! docker exec "$app" /usr/bin/hd-idle-genargs --quiet --check; then
+      echo "   FAIL: baseline check not clean after the state resync"
+      return 1
+    fi
+    echo "   PASS: watcher resynced the baseline state without restarting hd-idle"
+  else
+    echo "(no hd-idle-genargs: watcher check skipped - app image predates the watcher?)"
+  fi
 
   if [ "$drives" = "" ]; then
     echo "(no LAB_SPINDOWN_DRIVES: spindown smoke test skipped)"
@@ -215,42 +307,5 @@ EOF
   fi
   echo "   PASS: daemon logged its own spindown events for all smoke-test drives"
 
-  ## Watcher mechanics (drive re-resolution): the watcher must regenerate
-  ## the args file and restart hd-idle when the configuration changed. A
-  ## kernel-name move cannot be simulated in the lab (renames happen
-  ## kernel-side), so verify the mechanism deterministically: corrupt
-  ## /etc/hd-idle.args and expect the watcher to regenerate the identical
-  ## content from the options within one poll interval and restart hd-idle
-  ## (second "Starting hd-idle" log line, daemon process up again).
-  if docker exec "$app" sh -c "test -x /usr/bin/hd-idle-genargs" 2>/dev/null; then
-    echo "-- verifying the drive re-resolution watcher (corrupt-args roundtrip)"
-    docker exec "$app" cp /etc/hd-idle.args /tmp/args.expected
-    docker exec "$app" sh -c 'printf "corrupted\n" > /etc/hd-idle.args'
-    restored=0
-    for _ in {1..10}; do
-      sleep 5
-      if docker exec "$app" cmp -s /etc/hd-idle.args /tmp/args.expected; then
-        restored=1
-        break
-      fi
-    done
-    [ "$restored" = 1 ] || {
-      echo "   FAIL: args file not restored within 50 s (watcher not running?)"
-      return 1
-    }
-    restarts=$(docker logs "$app" 2>&1 | grep -c "Starting hd-idle" || true)
-    [ "$restarts" -ge 2 ] \
-      || {
-        echo "   FAIL: args restored but hd-idle not restarted (Starting count: $restarts)"
-        return 1
-      }
-    if ! docker exec "$app" sh -c "ps | grep -q '[s]bin/hd-idle'"; then
-      echo "   FAIL: hd-idle process gone after the watcher restart"
-      return 1
-    fi
-    echo "   PASS: watcher restored the configuration and restarted hd-idle"
-  else
-    echo "(no hd-idle-genargs: watcher check skipped - app image predates the watcher?)"
-  fi
   return 0
 }

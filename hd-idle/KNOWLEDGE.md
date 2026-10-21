@@ -65,7 +65,7 @@ Verified against the v1.22 source (`main.go`, `hdidle.go`):
 - Events are logged as `<givenName> spindown|spinup` to stdout; with kernel names as given names the app log reads
   `sda spindown`.
 
-## hd-idle-genargs quiet mode
+## hd-idle-genargs quiet mode and --check baseline replay
 
 `hd-idle-genargs --quiet` (the watcher's per-tick mode) suppresses ALL narrative/info output and the warning-level notes
 for expected-transient states (a currently detached drive, a non-sd\* entry): both are surfaced once per boot by the
@@ -74,6 +74,19 @@ non-quiet cont-init run, and options cannot change mid-run (repository-root `KNO
 configuration still exits nonzero in both modes: for cont-init that fails the app boot; for the watcher it means
 regeneration failed and the current configuration (the args file plus the running daemon's argv - see
 §`Automatic drive re-resolution` for when that can happen at all) stays as is.
+
+Since v0.1.9 the watcher's per-tick detection is `hd-idle-genargs --quiet --check` (transplanted from nfsd-apply
+`--check`, nfs-server commit d78c7ea): the full generation records a **resolution baseline** alongside the args and
+drives files (`<args-stem>.resolution`, e.g. `/etc/hd-idle.resolution`) - the sha256 of each installed file plus the
+detection facts it was generated from (the system-disk set and every configured device's resolution *outcome*: kernel
+name, `PASSTHRU` when it does not resolve, `IGNORED` when it resolves to something hd-idle cannot manage). `--check`
+re-runs only the cheap detection and compares against that baseline - no option reads, no jq, no file writes, a few
+`readlink`/`sha256sum` spawns total. Exit codes: 0 = everything matches, 3 = changed (regeneration due), any other
+nonzero = check failure. Because options are immutable mid-run, the recorded facts fully determine what a regeneration
+would produce: when they all hold, the installed files are already correct. Installed-file drift (hand edits,
+corruption, an interrupted install) is caught by the recorded shas - `--check` is detection-equivalent to a full
+regeneration-and-compare. The state file is written LAST by the generation (commit point), and the derivation of its
+name mirrors the drives file (`companion_file`, mirrored inline in the watcher run script).
 
 ## hd-idle's monitoring scope
 
@@ -236,15 +249,20 @@ an unchanged override stays skipped).
   container - there is no callback/notification API to apps and no restart-on-device-change mechanism (verified against
   supervisor 2026.10.1). The fix is entirely app-internal; no HAOS interaction is involved.
 - **Design**: the arg generation lives in a shared helper (`/usr/bin/hd-idle-genargs`, used by cont-init config.sh and
-  the watcher). The `hd-idle-watch` longrun polls every 30 s: regenerate the command line with `hd-idle-genargs --quiet`
-  into candidate files, compare BOTH generated files (args + drives) against the installed ones, and only on an actual
-  difference install them and restart just the hd-idle service (`s6-svc -r /run/service/hd-idle`) - the args file is
-  installed last (commit point), so an interrupted install leaves the drives file stale behind it and the next tick's
-  comparison re-syncs it. Unrelated churn therefore never triggers a restart, and `--quiet` makes unchanged 30-s ticks
-  produce **no log output at all** (warnings/errors still surface; the new command line is logged by the hd-idle run
-  script after each restart). Polling (not udev events) because mapping the host's `/run/udev` socket (`with_udev`) into
-  an Alpine-based container for event-driven monitoring is version-fragile for zero gain - 30 s worst-case latency is
-  fine for a maintenance action.
+  the watcher). The `hd-idle-watch` longrun polls every 30 s (overridable via `HD_IDLE_WATCH_INTERVAL`, floored at 5 s -
+  the lab sets 5 s; mirrors the nfsd-watch `NFSD_WATCH_INTERVAL`): **check first** with the baseline replay
+  (`hd-idle-genargs --quiet --check`, §`hd-idle-genargs quiet mode and --check baseline replay` - unchanged ticks cost a
+  few light spawns and do no option reads, no jq, and no file writes), and only on a detected change (exit 3) regenerate
+  into candidate files, compare, and install. The comparison covers all three generated files: when the regenerated args
+  AND drives files match the installed ones, only the baseline state is stale (an interrupted install, or a resolution
+  change that reverted before the regeneration ran) and it is resynced **without a restart**; otherwise the candidates
+  are installed and just the hd-idle service restarts (`s6-svc -r /run/service/hd-idle`). The state file is installed
+  last (commit point - it records the shas of the two files just installed), so a crash anywhere before it leaves the
+  recorded shas mismatching the installed files and the next tick re-syncs. Unrelated churn therefore never triggers a
+  restart, and unchanged ticks produce **no log output at all** (warnings/errors still surface; the new command line is
+  logged by the hd-idle run script after each restart). Polling (not udev events) because mapping the host's `/run/udev`
+  socket (`with_udev`) into an Alpine-based container for event-driven monitoring is version-fragile for zero gain - 30
+  s worst-case latency is fine for a maintenance action.
 - **hd-idle restart effects are benign**: the run script re-reads the args file; hd-idle starts with fresh in-memory
   stats (idle timers restart) and no command is sent to any disk at startup - a drive in standby is NOT spun up by the
   restart. Minor cosmetic cost: an activity-log "running" period spanning the restart is misaccounted (hd-idle cannot
