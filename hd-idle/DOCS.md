@@ -89,4 +89,6 @@ With **Activity log** enabled, hd-idle writes per-drive spin-up records (running
   itself is granted per configured drive by the supervisor's device policy - the system disk cannot be granted at all.
 - The hd-idle daemon runs under its own AppArmor sub-profile with all networking denied; it talks to no network service
   whatsoever.
-- The app never writes to managed drives: it only issues standby commands and reads state.
+- The app never writes data to managed drives: it issues standby commands and, when the drive-PM treatment is enabled,
+  ATA SET FEATURES requests that switch off the drive's own power management (the settings described under **Disable
+  drive power management**) - but no data is ever written.

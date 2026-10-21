@@ -72,7 +72,10 @@ STATE_FILE=$(companion_file "${ARGS_FILE}" resolution)
 
 ## Parent block device of a partition name (sdi1 -> sdi, mmcblk0p3 ->
 ## mmcblk0, nvme0n1p2 -> nvme0n1). A trailing "p" is only stripped when
-## preceded by a digit, so genuinely named disks (e.g. "sdp") survive.
+## preceded by a digit, so genuinely named disks (e.g. "sdp") survive. Note
+## the partitionless input artifact: a whole-disk name like nvme0n1 or
+## mmcblk0 loses its final digit (-> nvme0n / mmcblk) - harmless, since
+## only the sd* subset is ever pinned, recorded, or compared.
 parent_disk() {
   local name="$1"
   ## Device-mapper names (dm-0, ...) have no partition suffixes; their

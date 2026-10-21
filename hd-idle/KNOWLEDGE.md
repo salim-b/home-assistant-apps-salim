@@ -94,7 +94,11 @@ name mirrors the drives file (`companion_file`, mirrored inline in the watcher r
 attributed to parent disk) and `dm-*$` (device-mapper → attributed to its holder disk). **Anything else is never
 touched**: `nvme*`, `mmcblk*`, `loop*`, `ram*`. Consequences: system disks on SD/eMMC/NVMe are out of hd-idle's reach
 (third exclusion layer), and the app cannot manage NVMe drives at all. Partition/dm attribution also makes per-partition
-activity wake the configured disk.
+activity wake the configured disk. Attribution picks a single holder: the app's `resolve_device()` takes the first
+`/sys/class/block/<dm>/holders/` entry (readdir order - nondeterministic when several exist), so a multi-holder dm
+device (multi-PV LVM) is attributed to one disk only, and hd-idle's own dm attribution is likewise single-holder per its
+source - disks hidden behind a shared dm device cannot be managed correctly (upstream limitation class; the common
+dm-crypt case has exactly one holder, where this is exact).
 
 ## SG_IO privileges: what the kernel actually requires
 
