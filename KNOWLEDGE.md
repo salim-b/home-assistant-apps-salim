@@ -133,6 +133,13 @@ Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7.
 - **File-rule tightening is impractical**: without audit logs there is no way to iterate file rules safely, so a `file,`
   blanket is the upstream HA convention (docs template, dnsmasq, this repo's apps). The profile's confinement value sits
   in the non-file classes (network, capability, mount), which Docker's default profile would otherwise grant broadly.
+  The asymmetry is the point: a missed rule in a tightened file set fails silently and undiagnosably on the device (the
+  capability forensics above only worked because errno clues existed), while the marginal gain is near zero - the real
+  boundaries are the supervisor's cgroup device rules plus the non-file classes. A strace-derived access inventory (the
+  hd-idle 2026-10 review recorded the clean- and change-tick file surfaces) is not a safe basis for tightening either:
+  the lab cannot exercise device-only paths (real drives, SG_IO on hardware, hotplug), and AppArmor mediates more than
+  strace shows (directory reads behind globs, mmap exec bits, locks, disconnected/deleted-file mediation). Revisit only
+  if HAOS ever ships usable AppArmor audit plumbing.
 - **Supervisor profile mechanics**: the profile is installed from the app folder's `apparmor.txt` on install/update and
   **renamed to the installed slug** (`local_<slug>` for repo-folder installs, `<hash>_<slug>` when installed from a
   repository) — the declared profile name is otherwise arbitrary. Requirements: exactly one top-level (non-indented)
