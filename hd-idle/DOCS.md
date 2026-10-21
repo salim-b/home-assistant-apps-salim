@@ -30,12 +30,13 @@ Drive /dev/disk/by-id/usb-WD_Elements_1234567890AB-0:0 -> sda
 
 Drives run their own power management (an APM level and an internal standby timer) that can conflict with hd-idle - some
 USB bridge firmwares wake the drive again shortly after an external spindown, invisibly to the app's I/O monitoring. The
-**Disable drive power management** option (on by default) disables both for every managed drive; see its field
-description in the options UI for the details. Individual drives can override the global setting with their own
-**Disable drive power management** field in the drive list (`yes`/`no`; empty follows the global setting) - for example
-when only some bridges need the treatment or one drive must keep its own power management. Switching the treatment off
-(globally or per drive) does not actively restore the drive's power management: the settings applied earlier are
-volatile but persist until the drive is power-cycled.
+**Disable drive power management** option (on by default) disables both for every managed drive - regardless of the
+drive's idle time, so even a drive configured to never spin down does not get put to sleep by its own power management;
+see its field description in the options UI for the details. Individual drives can override the global setting with
+their own **Disable drive power management** field in the drive list (`yes`/`no`; empty follows the global setting) -
+for example when only some bridges need the treatment or one drive must keep its own power management. Switching the
+treatment off (globally or per drive) does not actively restore the drive's power management: the settings applied
+earlier are volatile but persist until the drive is power-cycled.
 
 ### Command types
 

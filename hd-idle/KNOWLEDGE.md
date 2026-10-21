@@ -233,11 +233,12 @@ from the args-file path is mirrored in the hd-idle-watch run script) is pmfix's 
 `<kernel-name> <idle> <command-type> <pm-flag>` line per drive with EFFECTIVE values (exclusions carry idle 0 and
 pm-flag 0, entries without explicit values carry the inherited defaults; pm-flag: 1 = disable the drive's own power
 management, 0 = leave it alone - the effective value of the global `disable_drive_pm` option overridden by the per-drive
-`disable_drive_pm` field). pmfix treats only idle != 0 AND pm-flag 1 entries; config.sh and the watcher run it
-unconditionally (the former global bashio gate could not express per-drive overrides - the drives file is the single
-source of truth for the effective per-drive decision); with `--since <old-file>` only drives whose line is NEW or
-CHANGED are treated (a flipped pm-flag line counts as CHANGED, so a newly overridden drive is treated exactly once, and
-an unchanged override stays skipped).
+`disable_drive_pm` field). pmfix treats only pm-flag 1 entries (the idle time plays no role: an idle-0 drive is a
+treatment target all the same - its firmware timer must not fight the user's "never spin down" config); config.sh and
+the watcher run it unconditionally (the former global bashio gate could not express per-drive overrides - the drives
+file is the single source of truth for the effective per-drive decision); with `--since <old-file>` only drives whose
+line is NEW or CHANGED are treated (a flipped pm-flag line counts as CHANGED, so a newly overridden drive is treated
+exactly once, and an unchanged override stays skipped).
 
 ## Automatic drive re-resolution (hd-idle-watch)
 

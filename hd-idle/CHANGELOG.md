@@ -10,6 +10,10 @@
   baseline resyncs without restarting the daemon.
 - Internals: the watcher's poll interval is overridable via `HD_IDLE_WATCH_INTERVAL` (default 30 s, floored at 5 s),
   mirroring the nfs-server app.
+- Fixed: drives configured with an idle time of `0` (never spin down) now also get their own power management disabled
+  by the **Disable drive power management** treatment. Previously the treatment silently skipped idle-`0` drives, so
+  their firmware timer could still put them to sleep despite the explicit "never spin down" configuration (a drive
+  configured to never spin down should never be spun down by anything the app can control).
 - Fixed: the watcher's drive-PM re-application after a device change copies the drives file to
   `/etc/hd-idle.drives.prev` for its `--since` diff - a file the AppArmor profile did not allow, so on devices with
   enforcement the copy silently failed and the treatment re-application logged a warning on every change tick. The
