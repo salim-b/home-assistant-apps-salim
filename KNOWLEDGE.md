@@ -264,6 +264,13 @@ Version-sensitive gotchas learned while implementing:
   Anything exported by a calling shell or `docker run -e` is erased — unless `S6_KEEP_ENV=1` is set, which makes
   `with-contenv` pass the inherited environment through untouched (production s6-rc boots are unaffected: there the env
   arrives via `container_environment` either way).
+- **PATH differs between `docker exec` and s6 services**: the image's ENV PATH (HA base image default, no `/command`) is
+  what `docker exec` inherits, so exec-driven commands must call s6 tools by absolute path (`/command/s6-svc`). Services
+  started by s6-rc see an *augmented* PATH instead: s6-overlay v3's preinit writes `/run/s6/container_environment` with
+  `/command` prepended, and service run scripts take their environment from it — a bare `s6-svc` inside a run script
+  therefore resolves (observed in `local/hd-idle:0.1.9`, 2026-10-21:
+  `docker exec … cat /run/s6/container_environment/PATH` vs the service process's `/proc/<pid>/environ`).
+  Version-sensitive: re-verify against the s6-overlay version shipped by the base image before relying on it.
 - **Stubbing `bashio::config` in bare-container script tests**: `bashio::config` fetches the app options from the
   Supervisor API (`bashio::app.config` → `GET /addons/self/options/config`), backed by a file cache — it never reads
   `/data/options.json`. Seeding `${CACHE_DIR}/addons.self.options.config.cache` (env override `CACHE_DIR`; the key is
