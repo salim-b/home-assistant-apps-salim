@@ -213,7 +213,9 @@ new mount instance a fresh mount ID — `stat`/`/proc/mounts` alone cannot see t
 path the check picks the highest mount ID — the topmost mount is always the newest (IDs are allocated monotonically),
 which is also the object `stat` reports; mountinfo's file order is a kernel-internal detail and is deliberately not
 relied on. The watcher polls every 30 s; no udev wiring, matching the trigger-path simplicity (a drive mount appearing
-under `/media` is the whole event).
+under `/media` is the whole event). The interval is overridable via `NFSD_WATCH_INTERVAL` (integer seconds, floored at
+5, default 30) — the lab sets 5 s (the floor) to keep its full-interval waits short; the detection/cycle logic is
+interval-agnostic.
 
 The detection's matching is exact only for whitespace- and backslash-free values, so the configuration validation
 rejects both (`/proc/mounts` and mountinfo escape backslashes as `\134`, and `awk -v` processes escape sequences — a

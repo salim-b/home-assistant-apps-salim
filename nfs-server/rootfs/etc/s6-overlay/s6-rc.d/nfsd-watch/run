@@ -11,7 +11,18 @@ set -euo pipefail
 ## recovery via the shipped tracker) and the deliberate no-s6-rc-restart choice: nfs-server/KNOWLEDGE.md
 ## §"Automatic mirror refresh (nfsd-watch)".
 
-INTERVAL=30
+## Poll interval (seconds). NFSD_WATCH_INTERVAL overrides the 30 s default (the lab sets 5 s - the floor - to keep
+## its full-interval waits short; the detection and cycle logic is interval-agnostic - see nfs-server/KNOWLEDGE.md
+## §"Automatic mirror refresh (nfsd-watch)"). Invalid values fall back to the default, floored at 5 s so a bogus
+## value cannot busy-cycle the tick.
+INTERVAL="${NFSD_WATCH_INTERVAL:-30}"
+case "$INTERVAL" in
+  '' | *[!0-9]*)
+    bashio::log.warning "Invalid NFSD_WATCH_INTERVAL '${INTERVAL}' - using the 30 s default."
+    INTERVAL=30
+    ;;
+esac
+[ "$INTERVAL" -ge 5 ] || INTERVAL=5
 PENDING_FILE=/var/lib/nfs/nfsd-restart-pending
 
 while true; do

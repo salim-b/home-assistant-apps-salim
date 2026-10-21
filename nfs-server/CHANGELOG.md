@@ -9,6 +9,9 @@
   poll interval, refreshes the export configuration and restarts the kernel NFS server. While a drive is detached, its
   shares temporarily export an empty directory (previously the stale, detached filesystem content was served until the
   next app restart). Connected clients keep working across these restarts via NFSv4 state recovery.
+- Internals: the nfsd-watch poll interval is overridable via the `NFSD_WATCH_INTERVAL` environment variable (integer
+  seconds, minimum 5, default 30) - the lab harness sets it to 5 s (the floor) to keep its full-interval waits short.
+  Regular installs are unaffected (the variable is unset there).
 - Change: share paths, client networks and export options must not contain backslashes anymore; such configurations are
   rejected with a clear error at startup (and at save time by the schema). Backslash values could not be handled
   reliably by the mount-state detection that powers the watcher.
