@@ -14,7 +14,8 @@ set -euo pipefail
 ##
 ## Usage: nfsd-apply [--boot] [--check] [--quiet]
 ##   --boot   create missing share directories (with the configured uid/gid/permissions) - boot-time only
-##   --check  read-only: validate and detect mirror changes without touching anything (exit 3 = changed)
+##   --check  read-only: replay the recorded baseline against current reality without touching anything
+##            (exit 3 = changed); no option reads - see the detection comment below
 ##   --quiet  no narrative/info logs and no expected-transient warnings (per-tick silence); errors always log
 ## Exit codes: 0 = success (mirror state unchanged), 3 = mirror state (would) change (with --check), 1 = failure.
 
@@ -52,6 +53,7 @@ log_captured_stderr() {
 PSEUDO_ROOT=/data/pseudo_root
 EXPORTS=/etc/exports
 STATE_FILE=/var/lib/nfs/mirrors.state
+APP_IP_FILE=/var/lib/nfs/app.ip
 
 ## "dev:ino" of a path's directory object: empty when the path is absent or not a directory. Bind mounts preserve
 ## both values, so a mirror and its source carry equal keys iff the mirror serves the source's current directory
@@ -87,8 +89,41 @@ covering_mount_id() {
 ## trailing space anchor rule out partial matches.
 is_mounted() { grep -qF " on $1 " /proc/mounts; }
 
-## App options are immutable while the app runs (the supervisor validates at save time and only hands new options to
-## the app at its next start), so boot and watcher derive the same configuration from them.
+## One mountinfo snapshot per run: every covering_mount_id call reads this consistent view (the baseline state file
+## records what THIS run actually saw) and the per-share awk calls save the per-call file reads.
+MOUNTINFO="$(</proc/self/mountinfo)"
+
+## Detection (--check) replays the baseline state file against current reality - it does NOT read the options: the
+## state file carries every share path plus its recorded source identity from the last successful apply, and the
+## option set cannot change while the app runs (the supervisor refreshes options only at the next start), so the
+## option-driven validation and reconciliation happen only in the apply path below (boot and watcher cycles). Per
+## tick this skips all config reads and jq parsing; the state file always exists when the watcher runs (the boot
+## apply precedes s6-rc and a failed boot aborts the container), and a missing or empty file is treated as "changed"
+## so the next cycle's full apply re-establishes it.
+if [ "$CHECK" = 1 ]; then
+  [ -s "$STATE_FILE" ] || exit 3
+  while read -r rec_path rec_id rec_key; do
+    MIRROR="${PSEUDO_ROOT}${rec_path}"
+    SRC_KEY="$(dir_key "$rec_path")"
+    SRC_ID="$(covering_mount_id "$rec_path")"
+    if [ "$SRC_KEY" != "" ]; then
+      ## Source present: unchanged iff the mirror matches it and both match the recorded baseline.
+      MIR_KEY="$(dir_key "$MIRROR")"
+      if [ "$SRC_KEY" = "$MIR_KEY" ] \
+        && [ "${rec_id} ${rec_key}" = "${SRC_ID} ${SRC_KEY}" ]; then
+        continue
+      fi
+    elif ! is_mounted "$MIRROR"; then
+      ## Source absent and mirror unmounted: the cycle's umount phase applies that state - keep the server down.
+      continue
+    fi
+    exit 3
+  done <"$STATE_FILE"
+  exit 0
+fi
+
+## Apply path (boot and watcher cycles): derive the configuration from the options. The supervisor validates them at
+## save time and only hands new options to the app at its next start, so boot and watcher see the same options.
 DEFAULT_UID=$(bashio::config 'default_uid')
 DEFAULT_GID=$(bashio::config 'default_gid')
 DEFAULT_PERMS=$(bashio::config 'default_permissions')
@@ -97,21 +132,19 @@ if bashio::var.is_empty "$SHARES"; then
   bashio::exit.nok "No NFS shares configured. Please add shares in the app's configuration."
 fi
 ## Parse all shares in ONE jq pass (TSV rows: path, network, options) instead of one bashio::jq spawn per field - the
-## watcher re-runs this on every poll tick. @tsv escapes tabs/newlines/backslashes as backslash sequences and the
-## loop's validation rejects backslashes outright, so a malformed (hand-edited) value can neither survive as raw
-## control characters nor shift the columns. An empty array parses to no rows and gets the same friendly fatal.
-SHARE_ROWS="$(bashio::jq "$SHARES" '.[] | [.path, .network, .options] | @tsv')"
+## watcher re-runs this on every poll tick. bashio::config hands out an array option as one compact JSON document per
+## element (bashio iterates arrays rather than returning them whole - the same shape nfsd-stop and hd-idle consume),
+## so the filter projects per share object - no .[]: jq runs the filter once per input document, and .[] on a document
+## would instead iterate the object's values and fail indexing the strings. @tsv escapes tabs/newlines/backslashes as
+## backslash sequences and the loop's validation rejects backslashes outright, so a malformed (hand-edited) value can
+## neither survive as raw control characters nor shift the columns. An empty array parses to no rows and gets the same
+## friendly fatal.
+SHARE_ROWS="$(bashio::jq "$SHARES" '[.path, .network, .options] | @tsv')"
 if bashio::var.is_empty "$SHARE_ROWS"; then
   bashio::exit.nok "No NFS shares configured. Please add shares in the app's configuration."
 fi
 
-if [ "$CHECK" = 0 ]; then
-  mkdir -p "$PSEUDO_ROOT"
-fi
-
-## One mountinfo snapshot per apply: every covering_mount_id call reads this consistent view (the baseline state file
-## then records what THIS apply actually saw) and the per-share awk calls save the per-call file reads.
-MOUNTINFO="$(</proc/self/mountinfo)"
+mkdir -p "$PSEUDO_ROOT" /var/lib/nfs
 
 declare -A ROOT_NETWORKS=()  # unique client networks of all shares (the fsid=0 pseudo-root entries)
 declare -A SEEN_SHARES=()    # options already configured per (path|network)
@@ -221,9 +254,7 @@ while IFS=$'\t' read -r path network options; do
     CLEAN=1
   fi
 
-  if [ "$CHECK" = 1 ]; then
-    [ "$CLEAN" = 1 ] || CHANGED=1
-  elif [ "$CLEAN" = 0 ]; then
+  if [ "$CLEAN" = 0 ]; then
     ## Rebind needed: the stale mirror may serve a detached superblock clone (unplug/replug). NOT done inline: the
     ## umounts/binds run in dedicated phases after the loop because mirrors may nest and the order matters
     ## (umounts deepest-first - umounting a parent mirror with a child mirror still mounted inside it fails with
@@ -240,9 +271,7 @@ while IFS=$'\t' read -r path network options; do
   fi
 
   EXPORT_LINES+=("${MIRROR} ${network}(fsid=${FSID},${options})")
-  if [ "$CHECK" = 0 ]; then
-    STATE_LINES+=("${path} ${SRC_ID} ${SRC_KEY:-none}")
-  fi
+  STATE_LINES+=("${path} ${SRC_ID} ${SRC_KEY:-none}")
   ROOT_NETWORKS["${network}"]=1
   FSID=$((FSID + 1))
 done <<<"$SHARE_ROWS"
@@ -253,11 +282,6 @@ done <<<"$SHARE_ROWS"
 for network in "${!ROOT_NETWORKS[@]}"; do
   EXPORT_LINES+=("${PSEUDO_ROOT} ${network}(fsid=0,ro,no_subtree_check)")
 done
-
-if [ "$CHECK" = 1 ]; then
-  [ "$CHANGED" = 1 ] && exit 3
-  exit 0
-fi
 
 ## Depth order for the rebind phases: mirrors may nest (a share path below another share's mirror) and sorting by
 ## path length orders parent before child (a child path is strictly longer than its parent's). Computed once,
@@ -354,5 +378,12 @@ mv -f /etc/nfsd.args.tmp /etc/nfsd.args \
     bashio::log.fatal "Unable to install the nfsd command line."
     bashio::exit.nok
   }
+
+## Record the app IP for the Docker HEALTHCHECK probe (nfsd-healthcheck): the apply re-detects it per run (the app
+## IP can change across restarts), so the probe reads this one line instead of re-running its own detection pipeline
+## on every poll. Detection failure is already fatal above, so only the write needs a best-effort guard (the probe's
+## fallback below keeps the container alive without it).
+printf '%s\n' "$APP_IP" >"$APP_IP_FILE" \
+  || bashio::log.warning "Unable to record the app IP for the healthcheck probe."
 
 exit 0

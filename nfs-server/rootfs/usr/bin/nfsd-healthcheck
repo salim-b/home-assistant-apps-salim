@@ -1,8 +1,18 @@
 #!/bin/bash
 # Docker HEALTHCHECK probe: rpc.nfsd only configures the in-kernel server and exits, so there is no daemon process to
 # check - probe the kernel's NFS listener on TCP 2049 instead, at the app's own IP (the daemon binds it for hardening,
-# see /etc/s6-overlay/scripts/nfsd-start).
+# see /etc/s6-overlay/scripts/nfsd-start). The probe reads the address recorded by the last nfsd-apply run (which
+# re-detects it before every server start) instead of re-running its own detection pipeline on every 30 s poll - and
+# it is the address the server actually bound, not whatever the live pipeline would pick first (they only diverge in
+# exotic interface-ordering corner cases, where the recorded value is the correct one to probe).
 set -euo pipefail
 
-APP_IP=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
+APP_IP=""
+if [ -s /var/lib/nfs/app.ip ]; then
+  read -r APP_IP </var/lib/nfs/app.ip || true
+fi
+if [ "$APP_IP" = "" ]; then
+  ## Fallback for a missing/empty record (e.g. the apply's best-effort write failed): the old self-detection.
+  APP_IP=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
+fi
 exec 3<>"/dev/tcp/${APP_IP}/2049"

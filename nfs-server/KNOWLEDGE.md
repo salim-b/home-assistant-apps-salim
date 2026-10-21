@@ -219,6 +219,15 @@ The detection's matching is exact only for whitespace- and backslash-free values
 rejects both (`/proc/mounts` and mountinfo escape backslashes as `\134`, and `awk -v` processes escape sequences — a
 backslash-containing path would misjudge the mount checks).
 
+**Tick performance**: the watcher's `--check` tick is a slim path that skips all option reads and parsing: the options
+are immutable mid-run (see above), so detection only replays the baseline state file (every share path plus its recorded
+source identity) against current reality — option validation and reconciliation run only in the apply path (boot and
+watcher cycles). A missing or empty state file (e.g. a fresh container) counts as "changed", so the next cycle's full
+apply re-establishes it. Relatedly, `nfsd-apply` records the app IP it already detects for the `nfsd.args` server bind
+to `/var/lib/nfs/app.ip`; the Docker HEALTHCHECK (also a 30 s poll) reads that record instead of re-running its own
+`ip addr` detection pipeline per probe — and it probes the address the server actually bound, which only diverges from
+the live pipeline in exotic interface-ordering corner cases (where the recorded value is the correct one to probe).
+
 **The change cycle** deliberately drives the kernel server directly instead of restarting the s6-rc oneshot (s6-rc is
 not reentrant from inside a service, and a down/up would deadlock; the oneshot stays "up" and container shutdown still
 runs its down script):
