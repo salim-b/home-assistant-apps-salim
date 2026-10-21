@@ -116,29 +116,117 @@ lab_runtime_check() {
   ## recorded resolution baseline (hd-idle-genargs --check) and regenerate +
   ## restart hd-idle when it changed. A kernel-name move cannot be simulated
   ## in the lab (renames happen kernel-side), so verify the mechanism
-  ## deterministically: corrupt /etc/hd-idle.args (content drift) and the
-  ## baseline state file (state drift) and expect the watcher to restore
-  ## within a poll interval - restarting hd-idle for the content roundtrip,
-  ## while the state roundtrip must be resynced WITHOUT a restart (asserted
-  ## via the watcher's change-tick log line, which only the restart path
-  ## emits).
+  ## deterministically: first the hermetic --check exit-code matrix below
+  ## (every detection path against a known mutation), then the roundtrips -
+  ## corrupt /etc/hd-idle.args (content drift) and the baseline state file
+  ## (state drift) and expect the watcher to restore within a poll interval -
+  ## restarting hd-idle for the content roundtrip, while the state roundtrip
+  ## must be resynced WITHOUT a restart (asserted via the watcher's
+  ## change-tick log line, which only the restart path emits).
   if docker exec "$app" sh -c "test -x /usr/bin/hd-idle-genargs" 2>/dev/null; then
-    ## Clean baseline: the boot generation must have written a state file
-    ## that replays as unchanged.
+    ## Hermetic --check exit-code matrix: every detection path of the
+    ## baseline replay, each run against a mutation with a known expected
+    ## exit code (0 = unchanged, 3 = regeneration due). The watcher is
+    ## paused for the matrix so no tick can race the mutations (its exit is
+    ## confirmed via s6-svstat before the first mutation).
+    echo "-- verifying the hd-idle-genargs --check exit-code matrix (watcher paused)"
+    docker exec "$app" /command/s6-svc -d /run/service/hd-idle-watch
+    mx_down=0
+    for _ in {1..10}; do
+      docker exec "$app" /command/s6-svstat /run/service/hd-idle-watch 2>/dev/null | grep -q '^down' \
+        && mx_down=1 && break
+      sleep 1
+    done
+    [ "$mx_down" = 1 ] \
+      || {
+        echo "   FAIL: the watcher did not stop for the --check matrix (s6-svc -d ignored?)"
+        return 1
+      }
+    sleep 2 ## margin for an in-flight tick finishing after the stop signal
+    docker exec "$app" sh -c '
+      cp /etc/hd-idle.args /tmp/mx.args &&
+      cp /etc/hd-idle.drives /tmp/mx.drives &&
+      cp /etc/hd-idle.resolution /tmp/mx.state' \
+      || {
+        echo "   FAIL: backing up the generated files for the --check matrix failed"
+        return 1
+      }
+    ## The boot generation must have written a state file that replays as
+    ## unchanged (the matrix's clean case).
     docker exec "$app" sh -c "test -s /etc/hd-idle.resolution" \
       || {
         echo "   FAIL: /etc/hd-idle.resolution baseline missing after boot"
         return 1
       }
-    if ! docker exec "$app" /usr/bin/hd-idle-genargs --quiet --check; then
-      echo "   FAIL: hd-idle-genargs --check does not replay the boot baseline as clean"
-      return 1
+    mx_case() { ## <label> <mutation-command (may be empty)> <expected exit>
+      local label="$1" mutate="$2" expect="$3" rc=0
+      if [ "$mutate" != "" ]; then
+        docker exec "$app" sh -c "$mutate" || true
+      fi
+      docker exec "$app" /usr/bin/hd-idle-genargs --quiet --check || rc=$?
+      if [ "$rc" != "$expect" ]; then
+        echo "   FAIL: matrix case '${label}': exit ${rc}, expected ${expect}"
+        return 1
+      fi
+      echo "   PASS: matrix case '${label}' -> ${rc}"
+    }
+    mx_case "clean baseline replay" "" 0 || return 1
+    mx_case "args file content drift" "printf 'x\n' >> /etc/hd-idle.args" 3 \
+      || return 1
+    mx_case "args file restore" "cp /tmp/mx.args /etc/hd-idle.args" 0 || return 1
+    mx_case "drives file content drift" "printf 'x\n' >> /etc/hd-idle.drives" 3 \
+      || return 1
+    mx_case "drives file restore" "cp /tmp/mx.drives /etc/hd-idle.drives" 0 \
+      || return 1
+    mx_case "state file missing" "rm -f /etc/hd-idle.resolution" 3 || return 1
+    mx_case "state file restore" "cp /tmp/mx.state /etc/hd-idle.resolution" 0 \
+      || return 1
+    mx_case "state file garbage" "printf 'garbage\n' > /etc/hd-idle.resolution" 3 \
+      || return 1
+    mx_case "state file restore (2)" "cp /tmp/mx.state /etc/hd-idle.resolution" 0 \
+      || return 1
+    mx_case "system-disk set drift" \
+      "sed -i 's/^system.*/system mx-fake-system-disk/' /etc/hd-idle.resolution" 3 \
+      || return 1
+    mx_case "state file restore (3)" "cp /tmp/mx.state /etc/hd-idle.resolution" 0 \
+      || return 1
+    if docker exec "$app" sh -c "grep -q '^dev ' /tmp/mx.state"; then
+      mx_case "device outcome drift" \
+        "sed -i 's/^dev \(.*\) .*/dev \1 mx-fake-outcome/' /etc/hd-idle.resolution" 3 \
+        || return 1
+    else
+      ## No configured drives: inject a dev line with an outcome the replay
+      ## cannot confirm (the device does not exist -> PASSTHRU) - a drift
+      ## nonetheless, since the recorded outcome is a kernel name.
+      mx_case "device outcome drift (injected)" \
+        "printf 'dev /dev/mx-no-such-device sda\n' >> /etc/hd-idle.resolution" 3 \
+        || return 1
     fi
-    echo "   PASS: resolution baseline written at boot and replayed clean"
+    mx_case "state file restore (4)" "cp /tmp/mx.state /etc/hd-idle.resolution" 0 \
+      || return 1
+    docker exec "$app" sh -c 'rm -f /tmp/mx.args /tmp/mx.drives /tmp/mx.state'
+    echo "-- resuming the watcher after the matrix (s6-svc -u)"
+    docker exec "$app" /command/s6-svc -u /run/service/hd-idle-watch
+    mx_up=0
+    for _ in {1..10}; do
+      docker exec "$app" /command/s6-svstat /run/service/hd-idle-watch 2>/dev/null | grep -q '^up' \
+        && mx_up=1 && break
+      sleep 1
+    done
+    [ "$mx_up" = 1 ] \
+      || {
+        echo "   FAIL: the watcher did not come back up after the --check matrix"
+        return 1
+      }
+    echo "   PASS: --check exit-code matrix green, watcher resumed"
 
     echo "-- verifying the drive re-resolution watcher (corrupt-args roundtrip)"
     docker exec "$app" cp /etc/hd-idle.args /tmp/args.expected
     docker exec "$app" sh -c 'printf "corrupted\n" > /etc/hd-idle.args'
+    if docker exec "$app" cmp -s /etc/hd-idle.args /tmp/args.expected; then
+      echo "   FAIL: the args corruption did not take effect"
+      return 1
+    fi
     restored=0
     for _ in {1..10}; do
       sleep 5
@@ -151,7 +239,15 @@ lab_runtime_check() {
       echo "   FAIL: args file not restored within 50 s (watcher not running?)"
       return 1
     }
-    restarts=$(docker logs "$app" 2>&1 | grep -c "Starting hd-idle" || true)
+    ## The restore (the watcher's args mv) precedes the restart by ~1 s (drives+state mv, pmfix, s6-svc -r, then
+    ## the daemon's run script logs 'Starting hd-idle' again) - a single grep right after the cmp success can land
+    ## in that window and count 1 (observed twice). Poll for the restarted daemon instead.
+    restarts=0
+    for _ in {1..10}; do
+      restarts=$(docker logs "$app" 2>&1 | grep -c "Starting hd-idle" || true)
+      [ "$restarts" -ge 2 ] && break
+      sleep 1
+    done
     [ "$restarts" -ge 2 ] \
       || {
         echo "   FAIL: args restored but hd-idle not restarted (Starting count: $restarts)"
