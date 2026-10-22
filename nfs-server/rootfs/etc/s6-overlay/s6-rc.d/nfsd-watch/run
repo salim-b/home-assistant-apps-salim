@@ -3,18 +3,13 @@
 set -euo pipefail
 
 ## Share-mount watcher (longrun): a drive's unplug/replug changes the mount object backing the configured share paths
-## while the app runs (HAOS bind-mounts /share and /media rslave - new mounts propagate into the running container),
-## but the pseudo file system root's mirrors are private bind clones outside that propagation chain: they keep serving
-## a detached superblock clone (stale data; on replug a second superblock on the same device) until they are rebound
-## and the kernel server is restarted. This watcher detects the change (nfsd-apply --check) and cycles the kernel
-## server - no manual app restart needed. Detection semantics, cycle order, restart effects (grace period, client
-## recovery via the shipped tracker) and the deliberate no-s6-rc-restart choice: nfs-server/KNOWLEDGE.md
-## §"Automatic mirror refresh (nfsd-watch)".
+## while the pseudo file system root's mirrors are private bind clones outside that propagation chain - they keep
+## serving a detached superblock clone until they are rebound and the kernel server is restarted. This watcher detects
+## the change (nfsd-apply --check) and cycles the kernel server, no manual app restart needed.
+## Facts: nfs-server/KNOWLEDGE.md §"Automatic mirror refresh (nfsd-watch)".
 
-## Poll interval (seconds). NFSD_WATCH_INTERVAL overrides the 30 s default (the lab sets 5 s - the floor - to keep
-## its full-interval waits short; the detection and cycle logic is interval-agnostic - see nfs-server/KNOWLEDGE.md
-## §"Automatic mirror refresh (nfsd-watch)"). Invalid values fall back to the default, floored at 5 s so a bogus
-## value cannot busy-cycle the tick.
+## Poll interval (seconds). NFSD_WATCH_INTERVAL overrides the 30 s default; invalid values fall back to it, floored
+## at 5 s so a bogus value cannot busy-cycle the tick.
 INTERVAL="${NFSD_WATCH_INTERVAL:-30}"
 case "$INTERVAL" in
   '' | *[!0-9]*)
@@ -28,10 +23,8 @@ PENDING_FILE=/var/lib/nfs/nfsd-restart-pending
 while true; do
   sleep "$INTERVAL"
 
-  ## Detect (read-only): 0 = clean, 3 = a share's backing mount changed, 1 = check failure. Mid-run check failures
-  ## are nearly impossible by construction (options cannot change while the app runs - the supervisor validates at
-  ## save time), so like hd-idle-watch the keep-current guard is cheap insurance; a nonzero nfsd-apply always logged
-  ## its own fatal reason first.
+  ## Detect (read-only): 0 = clean, 3 = a share's backing mount changed, 1 = check failure (keep-current guard:
+  ## a nonzero nfsd-apply always logs its own fatal reason first).
   RC=0
   /usr/bin/nfsd-apply --quiet --check || RC=$?
 
@@ -43,18 +36,14 @@ while true; do
     continue
   fi
 
-  ## Change detected: cycle the kernel server in the proven nfsd-stop order (threads down FIRST - that releases the
-  ## kernel's pins on the mirrors' old superblocks, so the apply's umount succeeds), minus the nfsd-stop down
-  ## script's mirror teardown: the apply below recreates the mirrors and nfsd-start re-exports. Deliberately NOT an
-  ## s6-rc oneshot restart: s6-rc is not reentrant (a down/up cycle from inside a service deadlocks) and the nfsd
-  ## oneshot has no documented re-run guarantee; driving rpc.nfsd directly keeps s6-rc's state untouched - the
-  ## oneshot stays "up" and the container shutdown still runs its down script. Rationale: nfs-server/KNOWLEDGE.md
-  ## §"Automatic mirror refresh (nfsd-watch)".
+  ## Change detected: cycle the kernel server in the proven nfsd-stop order - rpc.nfsd 0 FIRST (it releases the
+  ## kernel's pins on the mirrors' old superblocks, so the apply's umounts succeed), minus the down script's mirror
+  ## teardown: the apply below recreates the mirrors and nfsd-start re-exports. Deliberately NOT an s6-rc restart
+  ## (not reentrant from inside a service): nfs-server/KNOWLEDGE.md §"Automatic mirror refresh (nfsd-watch)".
   if [ "$RC" = 3 ]; then
     bashio::log.info "Share mount state changed - re-applying the NFS configuration and restarting the NFS server"
-    ## Mark the cycle pending BEFORE tearing the server down: from here on the kernel server may be down (a failed
-    ## apply below leaves it down), so every subsequent tick must try to get it back up - even when the by-then clean
-    ## detection state (umounts succeeded, rebind failed, drive detached) would otherwise skip the restart.
+    ## Mark the cycle pending BEFORE tearing the server down: every subsequent tick must keep trying to get the
+    ## server back up, even when the by-then-clean detection state would otherwise skip the restart.
     touch "$PENDING_FILE"
     rpc.nfsd 0 || true
     exportfs -au || true
@@ -64,10 +53,8 @@ while true; do
     fi
   fi
 
-  ## (Re)start the kernel server - also the retry path for any cycle that failed after the marker was set (a failed
-  ## re-apply or a failed start): the pending marker makes the retry survive the by-then-clean detection state.
-  ## A failed check with a pending marker falls through here as well: getting the server up takes priority over a
-  ## mirror re-assessment, and the next tick re-checks the mirrors.
+  ## (Re)start the kernel server - also the retry path for a cycle that failed after the marker was set (the marker
+  ## makes the retry survive the by-then-clean detection state; a failed check with a pending marker falls through).
   if /etc/s6-overlay/scripts/nfsd-start; then
     rm -f "$PENDING_FILE"
   else

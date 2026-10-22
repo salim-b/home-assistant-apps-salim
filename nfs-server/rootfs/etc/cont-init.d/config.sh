@@ -2,11 +2,8 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-## Log the stderr captured from a failed command, one FATAL log line per stderr
-## line: the app's log must state the actual cause of a failure - a bare
-## "failed" message sent users checking their app configuration for what were
-## image-internal problems. An empty capture is logged explicitly (a silent
-## failing command is itself diagnostic information).
+## Log a failed command's captured stderr as FATAL lines, one per stderr line
+## (an empty capture is logged explicitly - a silent failure is itself diagnostic).
 log_captured_stderr() {
   if [ -s "$1" ]; then
     while IFS= read -r line; do
@@ -18,8 +15,7 @@ log_captured_stderr() {
 }
 
 ## Mount the kernel's nfsd control filesystem at /proc/fs/nfsd (the control files exist only once it is mounted; the
-## mount also autoloads the nfsd kernel module in kernel context - no modprobe needed, see the repository-root
-## KNOWLEDGE.md §AppArmor).
+## mount also autoloads the nfsd kernel module in kernel context - no modprobe/SYS_MODULE needed).
 if [ ! -e /proc/fs/nfsd/versions ]; then
   bashio::log.info "Mounting nfsd filesystem..."
   ERRFILE="$(mktemp)"
@@ -35,10 +31,9 @@ if [ ! -e /proc/fs/nfsd/versions ]; then
   rm -f "$ERRFILE"
 fi
 
-## Mount rpc_pipefs in this network namespace: the kernel creates the cld tracker's upcall pipe inside the rpc_pipefs
-## instance registered for the server's netns, so one must exist here for NFSv4 client state recovery (design, fallback
-## behavior, verification: nfs-server/KNOWLEDGE.md §"NFSv4 client state recovery..."). Non-fatal: without it the app
-## runs degraded (no cross-restart client state recovery).
+## Mount rpc_pipefs in this network namespace: the cld tracker's upcall pipe lives in the rpc_pipefs instance
+## registered for the server's netns (nfs-server/KNOWLEDGE.md §"NFSv4 client state recovery (nfsdcld + per-netns rpc_pipefs)").
+## Non-fatal: without it the app runs degraded (no cross-restart client state recovery).
 RPC_PIPEFS_DIR=/var/lib/nfs/rpc_pipefs
 mkdir -p "$RPC_PIPEFS_DIR"
 if ! grep -qsE " on ${RPC_PIPEFS_DIR//\//\\/} rpc_pipefs " /proc/mounts; then
@@ -55,18 +50,14 @@ if ! grep -qsE " on ${RPC_PIPEFS_DIR//\//\\/} rpc_pipefs " /proc/mounts; then
   rm -f "$ERRFILE"
 fi
 
-## Persistent store of the client-recovery tracker daemon (nfsdcld's sqlite
-## database lives here; the daemon creates the directory itself if missing).
+## Persistent store of the client-recovery tracker daemon (nfsdcld's sqlite database; it creates the directory itself).
 mkdir -p /data/nfsdcld
 
-## NOTE: rpc.nfsd configures the kernel's NFS version set itself at server
-## start (see /etc/s6-overlay/scripts/nfsd-start and KNOWLEDGE.md in the app's
-## source repository for why direct writes to /proc/fs/nfsd/* don't work).
+## NOTE: rpc.nfsd configures the kernel's NFS version set itself at server start (nfsd-start); direct writes to
+## /proc/fs/nfsd/* fail (nfs-server/KNOWLEDGE.md §"nfsd control files reject `writev(2)`").
 
 ## Generate /etc/exports and set up the share mirrors under the app's own pseudo file system root on /data (the
-## container's overlayfs root is not NFS-exportable): shared helper, used by the nfsd-watch longrun for the same
-## apply afterwards (hd-idle-genargs pattern). Why mountd is needed at all and the pseudo-root design incl. the fsid
-## ambiguity: nfs-server/KNOWLEDGE.md §"NFSv4 needs rpc.mountd...".
+## container's overlayfs root is not NFS-exportable): nfs-server/KNOWLEDGE.md §"mountd and the pseudo file system root".
 bashio::log.info "Configuring NFS shares..."
 if ! /usr/bin/nfsd-apply --boot; then
   bashio::exit.nok "Applying the NFS share configuration failed - see the log messages above."

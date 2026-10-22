@@ -3,40 +3,23 @@
 profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   #include <abstractions/base>
 
-  ## Conventions & references (device-enforcement-verified on HAOS 18.3 /
-  ## OS Agent 1.14 / AppArmor 3.1.7 — see nfs-server/KNOWLEDGE.md):
-  ## - shape modeled on the official dev-docs AppArmor template
-  ##   (https://contributors.home-assistant.io/apps/guides/security/#apparmor)
-  ##   and the shipped dnsmasq app profile; sub-profile signal receive is
-  ##   peer-scoped per the docs template.
-  ## - `file,` blanket: upstream HA convention (docs template + dnsmasq).
-  ##   Tightening file rules is impractical here because HAOS produces no
-  ##   AppArmor audit/denial logs (no audit plumbing) — silent breakage
-  ##   risk. The profile's confinement value sits in the non-file classes
-  ##   (mount/capability), which Docker's default profile would otherwise
-  ##   grant broadly (blanket `capability,`).
-  ## - explicit `capability` rules are REQUIRED for privileged mounts:
-  ##   AppArmor mediates capable(CAP_SYS_ADMIN) during mount(2) even when
-  ##   the `mount` rule itself grants it.
+  ## Conventions & references (device-enforcement-verified on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7):
+  ## shape modeled on the official dev-docs AppArmor template and the shipped dnsmasq app profile; sub-profile
+  ## signal receive is peer-scoped per the docs template; `file,` blanket per upstream convention - HAOS produces
+  ## no AppArmor audit/denial logs, so tightening file rules risks silent breakage (the confinement value sits in
+  ## the non-file classes: mount/capability). Facts:
+  ## nfs-server/KNOWLEDGE.md §"AppArmor profile — app-specific grants";
+  ## root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics"; procedure: .agents/skills/ha-app-apparmor.
 
-  # Generic file access, signals (s6 supervision, bash job control).
-  # Bare `signal,` matches the upstream dnsmasq app profile convention: it
-  # grants send AND receive for all signals/peers. Cross-label signal
-  # delivery needs rules on both sides (pod: sender needs send for the
-  # peer's profile, receiver needs receive for the sender's); same-label
-  # pairs appear to be implicitly allowed, but not relying on that is
-  # cheaper than documenting it.
+  # Generic file access, signals (s6 supervision, bash job control). Bare `signal,` matches the upstream dnsmasq
+  # app profile convention: it grants send AND receive for all signals/peers (cross-label delivery needs rules on
+  # both sides).
   file,
   signal,
 
-  # Network mediation is enabled by the PRESENCE of any network rule; a
-  # profile without network rules has networking entirely unmediated. Once
-  # enabled, anything not explicitly allowed is denied - so this is a
-  # close allowlist of what the supervised stack actually needs:
-  # - inet/inet6 stream+dgram: bashio (supervisor API over HTTP), DNS
-  #   resolution, and the Docker HEALTHCHECK's /dev/tcp probe
-  # - netlink raw: busybox `ip` (rtnetlink address detection in
-  #   nfsd-start / nfsd-healthcheck)
+  # Network mediation is enabled by the PRESENCE of any network rule; once enabled, anything not explicitly
+  # allowed is denied - a close allowlist: inet/inet6 stream+dgram (bashio supervisor API, DNS, the Docker
+  # HEALTHCHECK's /dev/tcp probe) and netlink raw (busybox `ip` address detection in nfsd-start/nfsd-healthcheck).
   network inet stream,
   network inet dgram,
   network inet6 stream,
@@ -68,30 +51,20 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   /sbin/ip rix,
   /bin/busybox ix,
 
-  # Mount the nfsd filesystem (SYS_ADMIN) - the app's core operation.
-  # busybox `mount -t nfsd nfsd /proc/fs/nfsd` passes the device string
-  # "nfsd" as the mount source, so the source cannot be constrained to a
-  # path; scope by filesystem type instead. The per-share mirrors are
-  # mount --bind (fstype = the underlying fs), and the down script umounts
-  # them again.
-  # Device-iteration finding (diagnostic round): the mount mediation was
-  # NOT the blocker - AppArmor also mediates capable(CAP_SYS_ADMIN) during
-  # the mount syscall, and the profile lacked the capability grant (Docker's
-  # default profile carries a blanket 'capability,', plain Docker containers
-  # do not hit this). Mounting the nfsd fs triggers the kernel's module
-  # autoload (request_module runs in kernel context, outside this label),
-  # so no sys_module/modprobe access is needed here.
+  # Mount the nfsd filesystem (SYS_ADMIN) - the app's core operation. busybox mount passes the device string
+  # ("nfsd"/"sunrpc") as the mount source, so sources cannot be constrained to a path - scope by filesystem type
+  # instead. The per-share mirrors are mount --bind (fstype = the underlying fs), umounted again by the down
+  # script. AppArmor also mediates capable(CAP_SYS_ADMIN) during mount(2) even when the `mount` rule itself
+  # grants it (plain Docker containers carry a blanket `capability,` and do not hit this). Mounting the nfsd fs
+  # triggers the kernel's module autoload (kernel context, outside this label) - no sys_module/modprobe access
+  # needed here.
   capability sys_admin,
-  # Tightened: the busybox mount passes the device string "nfsd" as the
-  # mount source; fstype matching applies to new mounts only.
+  # fstype matching applies to new mounts only.
   mount fstype=(nfsd) nfsd -> /proc/fs/nfsd/,
-  # Client-recovery tracker upcall channel: the nfsdcld pipe lives in the
-  # rpc_pipefs instance mounted in this netns (cont-init.d/config.sh). Same
-  # grammar note as above: busybox passes the device string "sunrpc" as the
-  # mount source; fstype matching applies to new mounts only.
+  # Client-recovery tracker upcall channel: the nfsdcld pipe lives in the rpc_pipefs instance mounted in this
+  # netns (rootfs/etc/cont-init.d/config.sh).
   mount fstype=(rpc_pipefs) sunrpc -> /var/lib/nfs/rpc_pipefs/,
-  # NOTE: fstype matching only applies to new mounts (not bind/remount),
-  # so bind mirrors are conditioned on the bind flag instead.
+  # fstype matching applies to new mounts only, so binds are conditioned on the bind flag instead.
   mount options=(bind) /{share,media}{,/**} -> /data/pseudo_root{,/**},
   umount /data/pseudo_root{,/**},
   /proc/fs/nfsd/ r,
@@ -115,9 +88,8 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   /etc/cont-init.d/config.sh rix,
   /etc/s6-overlay/scripts/* rix,
 
-  ## Sub-profiles: the privileged NFS binaries run under their own tighter
-  ## profiles (cx = change profile on execute). They still need the
-  ## procfs/exports access listed above, hence re-granted here.
+  ## Sub-profiles: the privileged NFS binaries run under their own tighter profiles (cx = change profile on
+  ## execute). They still need the procfs/exports access listed above, hence re-granted here.
 
   # exportfs (runs twice: config.sh + nfsd-start/stop)
   /usr/sbin/exportfs cx -> exportfs,
@@ -127,14 +99,11 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
     file,
     signal (send) set=(kill,term,int,hup,cont),
-    # Official docs template: scope receive to the app's own top profile
-    # (the supervisor renames it to the installed slug on the device, e.g.
-    # local_nfs-server — the *_nfs-server glob covers repo installs too).
+    # Official docs template: scope receive to the app's own top profile (the supervisor renames it to the
+    # installed slug on the device, e.g. local_nfs-server — the *_nfs-server glob covers repo installs too).
     signal (receive) peer=*_nfs-server,
 
-    # inet/inet6 stream+dgram: in case exportfs attempts RPC-based cache
-    # flushes toward mountd/rpcbind; everything else (raw etc.) is denied
-    # by the mediation-enabled allowlist model.
+    # inet/inet6 stream+dgram: in case exportfs attempts RPC-based cache flushes toward mountd/rpcbind.
     network inet stream,
     network inet dgram,
     network inet6 stream,
@@ -160,9 +129,8 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
     file,
     signal (send) set=(kill,term,int,hup,cont),
-    # Official docs template: scope receive to the app's own top profile
-    # (the supervisor renames it to the installed slug on the device, e.g.
-    # local_nfs-server — the *_nfs-server glob covers repo installs too).
+    # Official docs template: scope receive to the app's own top profile (the supervisor renames it to the
+    # installed slug on the device, e.g. local_nfs-server — the *_nfs-server glob covers repo installs too).
     signal (receive) peer=*_nfs-server,
 
     capability net_bind_service,
@@ -170,12 +138,9 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     capability setuid,
     capability dac_override,
 
-    # Network: rpc.nfsd creates NO sockets itself - it configures the kernel
-    # server via /proc/fs/nfsd/* (the kernel threads own the actual NFS
-    # listeners); explicitly deny all networking.
-    # NOTE: AppArmor enables a mediation class by the PRESENCE of any rule;
-    # a deny-only class denies everything in it. (An empty network class
-    # would be entirely UNMEDIATED, i.e. allow all - not what we want.)
+    # Network: rpc.nfsd creates NO sockets itself - it configures the kernel server via /proc/fs/nfsd/* (the
+    # kernel threads own the actual NFS listeners); explicitly deny all networking (a deny-only class denies
+    # everything in it; an empty class would be entirely unmediated).
     deny network,
 
     /usr/sbin/rpc.nfsd rm,
@@ -198,9 +163,8 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
     file,
     signal (send) set=(kill,term,int,hup,cont),
-    # Official docs template: scope receive to the app's own top profile
-    # (the supervisor renames it to the installed slug on the device, e.g.
-    # local_nfs-server — the *_nfs-server glob covers repo installs too).
+    # Official docs template: scope receive to the app's own top profile (the supervisor renames it to the
+    # installed slug on the device, e.g. local_nfs-server — the *_nfs-server glob covers repo installs too).
     signal (receive) peer=*_nfs-server,
 
     capability net_bind_service,
@@ -208,10 +172,8 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     capability setuid,
     capability dac_override,
 
-    # inet/inet6 stream+dgram: rpc.mountd is an actual RPC server - it
-    # creates its MNT service sockets (TCP/UDP, v4+v6) and attempts rpcbind
-    # registration (fails harmlessly without rpcbind, same as unmediated);
-    # everything else (raw etc.) is denied by the allowlist model.
+    # inet/inet6 stream+dgram: rpc.mountd is an actual RPC server (MNT service sockets TCP/UDP, v4+v6) and
+    # attempts rpcbind registration (fails harmlessly without rpcbind).
     network inet stream,
     network inet dgram,
     network inet6 stream,
@@ -227,9 +189,7 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     /data/** r,
   }
 
-  # nfsdcld (cld service: client-recovery tracker daemon; answers the
-  # kernel's upcalls on <rpc_pipefs>/nfsd/cld and keeps its sqlite store on
-  # /data/nfsdcld)
+  # nfsdcld (cld service: client-recovery tracker daemon over the rpc_pipefs upcall pipe; sqlite store on /data/nfsdcld)
   /usr/sbin/nfsdcld cx -> nfsdcld,
 
   profile nfsdcld flags=(attach_disconnected,mediate_deleted) {
@@ -237,23 +197,16 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
     file,
     signal (send) set=(kill,term,int,hup,cont),
-    # Official docs template: scope receive to the app's own top profile
-    # (the supervisor renames it to the installed slug on the device, e.g.
-    # local_nfs-server — the *_nfs-server glob covers repo installs too).
+    # Official docs template: scope receive to the app's own top profile (the supervisor renames it to the
+    # installed slug on the device, e.g. local_nfs-server — the *_nfs-server glob covers repo installs too).
     signal (receive) peer=*_nfs-server,
 
-    # setpcap: nfsdcld prunes its own capability set at startup (prctl
-    # PR_CAPBSET_DROP for every capability + a final capset zeroing all
-    # sets) — both require CAP_SETPCAP, which AppArmor mediates: without
-    # this rule the daemon exits in a restart loop ("Unable to prune
-    # capability 0 from bounding set: Operation not permitted",
-    # device-enforcement-verified; the lab cannot catch this — no AppArmor
-    # enforcement there). The grant only enables the self-pruning; the
-    # daemon ends up with zero capabilities anyway.
+    # setpcap: nfsdcld prunes its own capability set at startup (prctl PR_CAPBSET_DROP + a final capset); without
+    # this rule the daemon exits in a restart loop ("Unable to prune capability 0 from bounding set: Operation
+    # not permitted", device-enforcement-verified; the lab cannot catch this - no AppArmor enforcement there).
+    # The grant only enables the self-pruning; the daemon ends up with zero capabilities anyway.
     capability setpcap,
-    # Network: none at all - the daemon only talks to the kernel over the
-    # rpc_pipefs pipe (inotify + file I/O); like the rpc.nfsd sub-profile,
-    # a deny-only class denies everything in it.
+    # Network: none at all - the daemon only talks to the kernel over the rpc_pipefs pipe (inotify + file I/O).
     deny network,
 
     /usr/sbin/nfsdcld rm,

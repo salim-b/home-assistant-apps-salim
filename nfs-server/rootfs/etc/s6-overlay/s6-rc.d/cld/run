@@ -2,8 +2,7 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-## NFSv4 client-recovery tracker daemon (nfsdcld, longrun): the kernel's cld tracker upcalls it over the rpc_pipefs
-## mounted in this container (cont-init config.sh), and its sqlite store on /data keeps client identities so connected
-## clients can reclaim their state across app restarts. Design, the ~1 s upcall-race handling (this service starts
-## before the nfsd oneshot), and the flags' meaning: nfs-server/KNOWLEDGE.md §"NFSv4 client state recovery".
+## NFSv4 client-recovery tracker daemon (nfsdcld, longrun): answers the kernel's cld-tracker upcalls over the
+## rpc_pipefs mounted in this container, storing client identities on /data for cross-restart reclaims. Starts
+## before the nfsd oneshot: nfs-server/KNOWLEDGE.md §"NFSv4 client state recovery (nfsdcld + per-netns rpc_pipefs)".
 exec nfsdcld -F -p /var/lib/nfs/rpc_pipefs -s /data/nfsdcld

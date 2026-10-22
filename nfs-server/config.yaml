@@ -4,8 +4,7 @@ version: "0.7.0"
 slug: nfs-server
 description: Network File System (NFS) server for Home Assistant
 # Generic (multi-arch) image name; CI builds & publishes per-arch images
-# (`ghcr.io/salim-b/{amd64,aarch64}-app-nfs-server`) and a multi-arch manifest
-# under this name on pushes to main.
+# (`ghcr.io/salim-b/{amd64,aarch64}-app-nfs-server`) and a multi-arch manifest on pushes to main.
 image: "ghcr.io/salim-b/app-nfs-server"
 url: "https://github.com/salim-b/home-assistant-apps-salim/tree/main/nfs-server"
 panel_icon: mdi:nas
@@ -15,15 +14,13 @@ arch:
 startup: services
 init: false
 # SYS_ADMIN is required to mount the kernel's nfsd filesystem (see
-# rootfs/etc/cont-init.d/config.sh). Loading the nfsd kernel module itself is
-# done by the kernel's mount-time autoload (kernel context, outside the
-# AppArmor label) - no kernel_modules mapping or SYS_MODULE capability needed.
+# rootfs/etc/cont-init.d/config.sh); module autoload runs in kernel context,
+# so no kernel_modules mapping or SYS_MODULE capability is needed.
 privileged:
   - SYS_ADMIN
-# AppArmor: the apparmor.txt custom profile is loaded because the file
-# exists (device-enforcement-verified); `apparmor` itself defaults to true —
-# the on-device gotchas live in nfs-server/KNOWLEDGE.md, the hardening
-# context in nfs-server/TODO.md (Resolved section)
+# AppArmor: the apparmor.txt custom profile is loaded because the file exists
+# (device-enforcement-verified); `apparmor` itself defaults to true — grants:
+# nfs-server/KNOWLEDGE.md §"AppArmor profile — app-specific grants"
 map:
   - media:rw
   - share:rw
@@ -41,19 +38,12 @@ options:
   lease_time: 300
 schema:
   shares:
-    # NOTE: these regexes are defense in depth (the scripts validate the
-    # runtime semantics); the constraints they enforce beyond that:
-    # - no whitespace anywhere: /etc/exports entries are whitespace-separated
-    #   (a newline would inject an extra export line, parsed as root)
-    # - no backslash anywhere: /proc/mounts and /proc/self/mountinfo escape it
-    #   (\134) and awk -v processes escape sequences, so nfsd-apply's mount
-    #   detection would misjudge it
-    # - path: mapped roots only, no empty path components (see DOCS.md)
-    # - network: charset of the machine-name formats from exports(5) (single
-    #   host, IP(+prefix/netmask), wildcards, netgroups, '*')
-    # - options: comma-separated export-option tokens (exports(5)), i.e.
-    #   word characters plus =:.@/+*-; no parentheses (would close the
-    #   client qualifier early)
+    # Defense in depth (the scripts validate the runtime semantics): no whitespace anywhere (/etc/exports entries
+    # are whitespace-separated - a newline would inject an extra export line, parsed as root), no backslashes
+    # (/proc/mounts and /proc/self/mountinfo escape them as \134 and awk -v processes escapes, so nfsd-apply's
+    # mount detection would misjudge them); path: mapped roots only, no empty path components (see DOCS.md);
+    # network: exports(5) machine-name charset; options: comma-separated exports(5) tokens, no parentheses.
+    # Facts: nfs-server/KNOWLEDGE.md §"Export-cache and fsid semantics"
     - path: "match(^/(share|media)(/[^\\s/\\\\]+)*$)"
       network: "match(^[^\\s()\\\\]+$)"
       options: "match(^[^\\s(),\\\\]+(,[^\\s(),\\\\]+)*$)"

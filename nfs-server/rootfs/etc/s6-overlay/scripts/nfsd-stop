@@ -1,7 +1,6 @@
 #!/usr/bin/with-contenv bashio
 # shellcheck shell=bash
-# Best-effort cleanup at app shutdown: failures must not block the container
-# from stopping, hence no `set -e` here.
+# Best-effort cleanup: failures must not block container shutdown, hence no `set -e`.
 set -uo pipefail
 
 bashio::log.info "Stopping nfsd kernel threads..."
@@ -21,13 +20,11 @@ if bashio::var.has_value "$SHARES"; then
     [ "$path" != "" ] || continue
     PATHS+="${path}\n"
   done < <(echo "$SHARES")
-  # deepest paths first: mirrors may nest (e.g. /media and /media/usb)
   printf '%b' "$PATHS" | awk '{print length, $0}' | sort -rn | cut -d' ' -f2- \
     | while IFS= read -r path; do
       umount "${PSEUDO_ROOT}${path}" 2>/dev/null || true
     done
 fi
 
-## The rpc_pipefs mount (client-recovery upcall channel) is deliberately NOT unmounted: the cld daemon still holds its
-## upcall pipe open here (services stop in dependency-reverse order, so EBUSY), and the mount evaporates with the
-## container's mount namespace anyway.
+## The rpc_pipefs mount is deliberately NOT unmounted: the cld daemon holds its upcall pipe open (EBUSY), and the
+## mount evaporates with the container's mount namespace anyway.
