@@ -48,4 +48,6 @@ level = "warning"
 
 [lint.rules.truthy]
 level = "warning"
+# GitHub Actions workflow files key their triggers on `on:` - a bare truthy key must not be flagged (inherited from
+# the pre-ryl .yamllint config).
 check-keys = false

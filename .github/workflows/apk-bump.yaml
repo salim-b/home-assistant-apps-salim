@@ -395,8 +395,10 @@ jobs:
 
           def index_map(branch, alpine_arch):
               """pkg -> version from the Alpine binary indexes (dl-cdn
-              APKINDEX, main + community; same source of truth as validate.py's
-              _apkindex_versions - the APKBUILD source branch can outrun it)."""
+              APKINDEX, main + community merged with main winning - NOT the same
+              index semantics as validate.py's _apkindex_versions, which consults
+              one repo per arch (community preferred); alignment tracked in root
+              TODO.md - the APKBUILD source branch can outrun the index either way)."""
               key = (branch, alpine_arch)
               if key in INDEX_CACHE:
                   return INDEX_CACHE[key]

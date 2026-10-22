@@ -1,6 +1,9 @@
 name: Builder
 
 env:
+  # apparmor.txt and translations/ are deliberately absent: the supervisor consumes both from the app repository, not
+  # from the image, so changing them needs no image rebuild. config.yaml stays because its version bump is what
+  # publishes the tag (version-guard requires one for any device-visible change).
   MONITORED_FILES: "config.json config.yaml config.yml Dockerfile rootfs"
 
 on:

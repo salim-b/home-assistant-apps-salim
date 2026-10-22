@@ -19,8 +19,9 @@ via `mise run <task> --help` — not duplicated here. Device access over SSH onl
 - **An uninstall purges stored options** in every case (the `--remove-config` flag only additionally deletes the app's
   `/data` config folder), so a reinstall always runs the app's default options. Any option set that would die with an
   uninstall is archived to a local backup file first (path printed) — that backup is the only surviving copy.
-- The deploy tasks comment out the top-level `image:` key in the device copy so the Supervisor builds the image locally
-  instead of pulling from GHCR.
+- The `deploy` task comments out the top-level `image:` key in the device copy so the Supervisor builds the image
+  locally instead of pulling from GHCR (only `deploy` does this; `deploy-registry` reinstalls from the app repository
+  and migrates the options).
 - A repository-installed copy uses a hashed store slug (e.g. `f8b2d53d_nfs-server`) and conflicts on ports with a local
   install; `--replace` uninstalls it first. `--config` decides the previous options' fate — see `--help`.
 - `deploy-registry` switches a device from the local `/local_apps` copy to the app-repository install (the hashed store

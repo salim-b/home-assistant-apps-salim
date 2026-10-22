@@ -13,8 +13,10 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 ## Lint gate (hk)
 
 - `mise run check` — lint plus validate; **always run before finishing a change**. CI's `check` job and `mise run lint`
-  run `hk check --all` over every tracked file; plain `hk check` lints only modified files (fast local feedback;
-  untracked files are never selected — `env.HK_STASH_UNTRACKED=0` in mise.toml).
+  run `hk check --all` over every tracked file; plain `hk check` lints only modified files (fast local feedback).
+  Untracked files are never selected (verified for hk 2.7.1, `check` and `--all` alike, independent of HK_STASH
+  settings); `env.HK_STASH_UNTRACKED=0` in mise.toml additionally keeps untracked worktree files out of the pre-commit
+  stash/restore cycle and skips their discovery.
 - To check an explicit file set, pipe NUL-separated paths to hk:
   `git diff --name-only -z HEAD | hk check --files0-from=-`.
 - Git hooks (enable once per machine: `mise run install-git-hooks`, after `mise install --locked`; needs Git 2.54+,

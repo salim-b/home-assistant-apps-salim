@@ -2,8 +2,9 @@
 
 [env]
 DOCKER_BUILDKIT = "1"
-# hk: resolve mise environments in hooks (HK_MISE); HK_STASH_UNTRACKED=0 keeps `hk check --all` a
-# tracked-files-only gate (HK_STASH=git would lint the index instead of the worktree; verified hk 2.7.0).
+# hk: resolve mise environments in hooks (HK_MISE). HK_STASH_UNTRACKED=0 keeps untracked worktree files out of the
+# pre-commit stash/restore cycle and skips their discovery (hk docs; `hk check`/`hk check --all` select tracked
+# files only in hk 2.7.1 regardless of it - verified with a bait untracked file).
 HK_MISE = "1"
 HK_STASH_UNTRACKED = "0"
 
@@ -42,6 +43,8 @@ run = "panache format ."
 actionlint = "1.7.12"
 editorconfig-checker = "4.0.2"
 hadolint = "2.15.1"
+# hk's binary pin and the hk@X.Y.Z package imported by hk.pkl must move together (the package provides the builtin
+# step definitions the binary executes).
 hk = { version = "2.7.1", workflow = "release.yml" }
 jq = "1.8.2"
 "aqua:jolars/panache" = "3.17.0"
