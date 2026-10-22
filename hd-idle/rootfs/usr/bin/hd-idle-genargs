@@ -2,20 +2,11 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-## Generate the hd-idle command line from the app options (validated, written to <args-file>, default
-## /etc/hd-idle.args) for the s6 run script - hd-idle has no config file, everything is argv.
-##
-## Two modes:
-## - Full generation (default): reads the options, resolves every configured device and writes the args file plus
-##   its two companions - the drives file (hd-idle-pmfix) and the resolution baseline (the state file --check
-##   replays).
-## - --check: replays the recorded baseline against current reality - the shas of the installed files, the detected
-##   system-disk set, and every configured device's resolution outcome - with no option reads and no jq.
-##   Exit 0 = unchanged, exit 3 = changed (regeneration due), any other nonzero = check failure. This is the
-##   hd-idle-watch per-tick detection, transplanted from nfsd-apply --check (nfs-server commit d78c7ea).
-##
-## The hd-idle semantics relied upon, the quiet-mode contract, the drives-file format, and the baseline replay:
-## hd-idle/KNOWLEDGE.md.
+## Generate the hd-idle command line from the app options (validated, written to <args-file>, default /etc/hd-idle.args)
+## for the s6 run script - hd-idle has no config file, everything is argv. Full generation (default) writes the args
+## file plus two companions: the drives file (hd-idle-pmfix) and the resolution baseline (the state file --check
+## replays: exit 0 = unchanged, 3 = changed (regeneration due), other = failure). CLI semantics, quiet-mode contract,
+## drives-file format, baseline replay: hd-idle/KNOWLEDGE.md.
 
 QUIET=0
 CHECK=0
@@ -35,25 +26,22 @@ qlog_info() {
   [ "${QUIET}" = 1 ] || bashio::log.info "$@"
 }
 
-## Warning wrapper for expected-transient states (detached drive, non-sd* entry) - suppressed in quiet mode so the
-## watcher does not repeat them every tick (see the quiet-mode contract in hd-idle/KNOWLEDGE.md). Genuine failures
-## (bashio::exit.nok) always log and exit nonzero.
+## Expected-transient warnings (detached drive, non-sd* entry), suppressed in quiet mode - surfaced once per boot by
+## the non-quiet cont-init run; genuine failures (bashio::exit.nok) always log.
 qlog_warning() {
   [ "${QUIET}" = 1 ] || bashio::log.warning "$@"
 }
 
-## Every emitted token must be space-free: the hd-idle run script reads the args file with plain word splitting, so
-## whitespace inside any value would silently corrupt the argv. The supervisor schema blocks this for saved options;
-## this check covers hand-edited options.json (defense in depth).
+## Every emitted token must be space-free: the run script word-splits the args file, so whitespace would corrupt the
+## argv. The supervisor schema blocks it for saved options; this covers hand-edited options.json.
 require_space_free() {
   local what="$1" value="$2"
   [[ "${value}" != *[[:space:]]* ]] ||
     bashio::exit.nok "Invalid ${what} '${value}': must not contain whitespace."
 }
 
-## Companion files written next to the args file: <stem>.<suffix> for *.args paths (/etc/hd-idle.args ->
-## /etc/hd-idle.drives, /etc/hd-idle.resolution), <args-file>.<suffix> otherwise (the watcher's /tmp candidates).
-## The derivation is mirrored inline in the hd-idle-watch run script (which cannot source this helper).
+## Companion files next to the args file (<stem>.<suffix> for *.args paths, <args-file>.<suffix> otherwise - the
+## watcher's /tmp candidates). The derivation is mirrored inline in the hd-idle-watch run script.
 companion_file() {
   local args_file="$1" suffix="$2" file
   case "${args_file}" in
@@ -70,16 +58,12 @@ STATE_FILE=$(companion_file "${ARGS_FILE}" resolution)
 ## Device resolution
 ## ---------------------------------------------------------------------------
 
-## Parent block device of a partition name (sdi1 -> sdi, mmcblk0p3 ->
-## mmcblk0, nvme0n1p2 -> nvme0n1). A trailing "p" is only stripped when
-## preceded by a digit, so genuinely named disks (e.g. "sdp") survive. Note
-## the partitionless input artifact: a whole-disk name like nvme0n1 or
-## mmcblk0 loses its final digit (-> nvme0n / mmcblk) - harmless, since
-## only the sd* subset is ever pinned, recorded, or compared.
+## Parent block device of a partition name (sdi1 -> sdi, nvme0n1p2 -> nvme0n1). A trailing "p" is only stripped when
+## preceded by a digit, so genuinely named disks (e.g. "sdp") survive; whole-disk names like nvme0n1/mmcblk0 lose
+## their final digit - harmless, since only the sd* subset is ever pinned, recorded, or compared.
 parent_disk() {
   local name="$1"
-  ## Device-mapper names (dm-0, ...) have no partition suffixes; their
-  ## holder attribution happens via /sys/block/*/holders (see resolve_device).
+  ## dm-* names have no partition suffixes; holder attribution via /sys/block/*/holders (resolve_device).
   if [[ "${name}" == dm-* ]]; then
     printf '%s' "${name}"
     return
@@ -93,9 +77,8 @@ parent_disk() {
   printf '%s' "${name}"
 }
 
-## Resolve a configured device value (stable /dev/disk/by-* path, /dev node,
-## or bare kernel name) to its kernel base name. Prints the base name;
-## returns 1 if the path does not resolve (e.g. drive currently detached).
+## Resolve a configured device value (by-* path, /dev node, or bare kernel name) to its kernel base name; returns 1
+## if the path does not resolve (e.g. drive currently detached).
 resolve_device() {
   local dev="$1" target base holder
   case "${dev}" in
@@ -104,13 +87,9 @@ resolve_device() {
       if [ -z "${target}" ]; then
         return 1
       fi
-      ## busybox readlink -f prints the INPUT path itself when the final
-      ## component does not exist (missing symlink or dangling link):
-      ## without an existence check such a path was misclassified as
-      ## "resolves to <its own name>, not an sd* disk" - silently dropping
-      ## the drive from the configuration on every watcher tick - instead
-      ## of taking the detached pass-through path (device-verified
-      ## 2026-10-15, a drive whose bridge had left the bus).
+      ## busybox readlink -f prints the INPUT path itself when the final component does not exist: without this
+      ## existence check a detached drive is misclassified as "not an sd* disk" and silently dropped from the
+      ## configuration instead of taking the pass-through path.
       if [ ! -e "${target}" ]; then
         return 1
       fi
@@ -120,8 +99,7 @@ resolve_device() {
       base="${dev}"
       ;;
   esac
-  ## A device-mapper device (e.g. LUKS) attributes to its holding disk
-  ## (hd-idle attributes dm stats to the holder disk as well).
+  ## A dm device (e.g. LUKS) attributes to its holding disk (hd-idle attributes dm stats to the holder as well).
   if [[ "${base}" =~ ^dm-[0-9]+$ ]]; then
     holder=""
     for entry in "/sys/class/block/${base}/holders/"*; do
@@ -141,14 +119,9 @@ resolve_device() {
 ## System disk detection (always on - HA's own partitions are never spun down)
 ## ---------------------------------------------------------------------------
 
-## Three independent layers protect the system disk; this is the second:
-## (1) the supervisor refuses device access for system-used devices, (2) we
-## resolve the boot device and every hassos-* partition here and pin them to
-## idle 0 (first matching entry wins in hd-idle), (3) hd-idle itself only
-## ever monitors sd*/dm-* devices (nvme*/mmcblk* are out of its reach).
-## Detected system disks are collected as kernel base names - insertion
-## order (root= first, then the lexically sorted hassos-* glob); the
-## --check comparison is set-based, so the order carries no semantics.
+## Three independent layers protect the system disk (hd-idle/KNOWLEDGE.md §"Monitoring scope"); this is the second:
+## the supervisor refuses system-used devices (1); the boot device and hassos-* partitions are pinned to idle 0 here,
+## first-match-wins (2); hd-idle only monitors sd*/dm-* anyway (3). Detection is set-based, order carries no semantics.
 
 ## All detected system-disk base names (deduplicated) and their sd* subset.
 SYSTEM_DISKS=()
@@ -168,11 +141,8 @@ add_system_disk() {
 }
 
 detect_system_disks() {
-  ## The kernel command line's root= parameter (visible inside the container -
-  ## /proc/cmdline is not namespaced). HAOS boots with root=UUID=... or
-  ## root=PARTUUID=...; resolve via the udev symlink trees in /dev/disk.
-  ## read over the spawn-free path: /proc/cmdline has no trailing newline, so
-  ## read exits nonzero at EOF - the words are assigned all the same.
+  ## The kernel command line's root= parameter (/proc/cmdline is not namespaced), resolved via the udev symlink trees
+  ## in /dev/disk. /proc/cmdline has no trailing newline: read exits nonzero at EOF - the words are assigned all the same.
   local -a cmdline_words=()
   read -r -a cmdline_words </proc/cmdline || true
   local root_param="" root_link="" resolved="" word link disk
@@ -195,17 +165,14 @@ detect_system_disks() {
     ROOT_SOURCE=""
   fi
 
-  ## Every hassos-* partition (boot, kernel/system RAUC slots, data, overlay)
-  ## sits on the system disk; resolving their partlabels also covers setups
-  ## where root= cannot be resolved.
+  ## Every hassos-* partition sits on the system disk; partlabel resolution also covers setups where root= is unresolvable.
   for link in /dev/disk/by-partlabel/hassos-*; do
     [ -e "${link}" ] || continue
     resolved=$(readlink -f "${link}")
     add_system_disk "${resolved##*/}"
   done
 
-  ## Only sd* disks can be pinned (hd-idle monitors nothing else); other
-  ## system-disk types (mmcblk, nvme) are out of hd-idle's reach anyway.
+  ## Only sd* disks can be pinned (hd-idle monitors nothing else; hd-idle/KNOWLEDGE.md §"Monitoring scope").
   for disk in "${SYSTEM_DISKS[@]}"; do
     if [[ "${disk}" =~ ^sd[a-z]+$ ]]; then
       SYSTEM_SD_DISKS+=("${disk}")
@@ -216,8 +183,7 @@ detect_system_disks() {
   if [ "${#SYSTEM_SD_DISKS[@]}" -gt 0 ]; then
     qlog_info "Excluding the system disk(s) from spin-down: ${SYSTEM_SD_DISKS[*]} (${ROOT_SOURCE:+${ROOT_SOURCE}; }hassos-* partitions)"
   elif [ "${#SYSTEM_DISKS[@]}" -eq 0 ]; then
-    ## Boot-time concern only (cont-init warns once loudly); the watcher's
-    ## periodic runs must not repeat it every poll interval.
+    ## Boot-time concern only (cont-init warns once loudly); the watcher must not repeat it per tick.
     qlog_info "Could not identify the system disk via root= or hassos-* partlabels. Only listed drives are ever touched; do not list the system disk."
   else
     qlog_info "System disk(s) identified but not sd* devices - hd-idle ignores them anyway."
@@ -228,18 +194,10 @@ detect_system_disks() {
 ## Baseline replay (--check): the watcher's per-tick detection
 ## ---------------------------------------------------------------------------
 
-## Replays the recorded baseline (the resolution state file, written by the
-## full generation) against current reality - the same nfsd-apply --check
-## pattern nfs-server uses: record the detection facts on the apply path,
-## then re-verify ONLY those facts per tick. The options cannot change while
-## the app runs (the supervisor validates at save time and hands over new
-## options only on the next start), so the recorded facts fully determine the
-## generated configuration: if they all still hold, the installed files are
-## exactly what a regeneration would produce and nothing needs to happen.
-## Exit 0 = everything matches, exit 3 = changed (regeneration due: a
-## resolution drift, a system-disk move, or installed-file drift - hand
-## edits, corruption, an interrupted install), any other nonzero = check
-## failure.
+## The watcher's per-tick detection (nfsd-apply --check pattern, nfs-server commit d78c7ea): re-verify ONLY the
+## recorded detection facts - options cannot change mid-run, so if they all hold, the installed files are exactly
+## what a regeneration would produce. Exit 0 = unchanged, 3 = changed (resolution/system-disk drift or installed-file
+## drift), any other nonzero = check failure. Facts: hd-idle/KNOWLEDGE.md §"hd-idle-watch design".
 check_baseline_replay() {
   ## No baseline (nothing recorded yet / boot not finished): regeneration due.
   [ -s "${STATE_FILE}" ] || return 3
@@ -248,12 +206,9 @@ check_baseline_replay() {
   local recorded_args_sha="" recorded_drives_sha="" recorded_system=""
   local -A recorded_resolutions=()
 
-  ## Line-based state format: 'args <sha256>', 'drives <sha256>',
-  ## 'system <sd* names...>', 'dev <configured device> <outcome>'. The
-  ## outcome is the kernel name, PASSTHRU (does not resolve right now) or
-  ## IGNORED (resolves to something hd-idle cannot manage). Unknown tags and
-  ## comment lines are ignored. Device values are space-free (enforced by
-  ## require_space_free), so plain field splitting is safe.
+  ## Line-based state format: 'args <sha256>', 'drives <sha256>', 'system <sd* names...>',
+  ## 'dev <configured device> <outcome>' (outcome: kernel name, PASSTHRU, or IGNORED). Device values are space-free
+  ## (require_space_free), so plain field splitting is safe.
   while read -r tag rest; do
     case "${tag}" in
       args) recorded_args_sha="${rest}" ;;
@@ -270,18 +225,15 @@ check_baseline_replay() {
     esac
   done <"${STATE_FILE}"
 
-  ## The installed files must still be exactly what this baseline was
-  ## generated from - this is what makes hand-edits, corruption and partial
-  ## installs (the state file is the commit point) detection-equivalent to a
-  ## full regeneration comparison.
+  ## The installed files must still be exactly what this baseline was generated from: this makes hand-edits,
+  ## corruption and partial installs (state file = commit point) detection-equivalent to a regeneration comparison.
   [ -n "${recorded_args_sha}" ] && [ -n "${recorded_drives_sha}" ] || return 3
   sha=$(sha256sum "${ARGS_FILE}" 2>/dev/null) || return 3
   [ "${sha%% *}" = "${recorded_args_sha}" ] || return 3
   sha=$(sha256sum "${DRIVES_FILE}" 2>/dev/null) || return 3
   [ "${sha%% *}" = "${recorded_drives_sha}" ] || return 3
 
-  ## System-disk set drift: a re-enumeration can move the system disk's
-  ## kernel name - the same class of event the watcher exists for.
+  ## System-disk set drift: a re-enumeration can move the system disk's kernel name.
   local -A recorded_system_set=()
   if [ -n "${recorded_system}" ]; then
     local -a recorded_system_fields=()
@@ -295,9 +247,7 @@ check_baseline_replay() {
     [[ -n "${recorded_system_set[${disk}]+x}" ]] || return 3
   done
 
-  ## Per-configured-device resolution drift: re-resolve every recorded
-  ## device and compare the outcome class. (Devices configured as bare
-  ## kernel names re-resolve spawn-free; /dev/* paths cost one readlink.)
+  ## Per-device resolution drift: re-resolve every recorded device, compare the outcome class.
   local current="" current_outcome=""
   for dev in "${!recorded_resolutions[@]}"; do
     if current=$(resolve_device "${dev}"); then
@@ -331,17 +281,15 @@ DEFAULT_COMMAND=$(bashio::config 'default_command_type')
 DEFAULT_POWER=$(bashio::config 'default_power_condition')
 DISKS=$(bashio::config 'disks')
 
-## Drive-PM treatment: the global option is the DEFAULT for drives whose own disable_drive_pm field is empty
-## (per-drive yes/no in the disks list overrides it). The EFFECTIVE flag is emitted as the drives file's pm-flag
-## column and hd-idle-pmfix decides per drive from it - config.sh and the watcher run pmfix unconditionally, the
-## drives file is the single source of truth for the effective per-drive decision.
+## The global option is the DEFAULT for drives whose own disable_drive_pm field is empty (per-drive yes/no overrides
+## it); the EFFECTIVE flag is the drives file's pm-flag column, hd-idle-pmfix decides per drive from it
+## (hd-idle/KNOWLEDGE.md §"Drive-PM treatment").
 GLOBAL_PM=0
 if [ "$(bashio::config 'disable_drive_pm' true)" = "true" ]; then
   GLOBAL_PM=1
 fi
 
-## Defense in depth: the supervisor schema already validates these; cheap re-checks keep a hand-edited options.json
-## from producing a bogus command line (every emitted token must be space-free - the run script word-splits the file).
+## Defense in depth: the supervisor schema already validates these; cheap re-checks keep a hand-edited options.json from producing a bogus argv.
 [[ "${DEFAULT_IDLE}" =~ ^[0-9]+$ ]] ||
   bashio::exit.nok "Invalid default idle time '${DEFAULT_IDLE}': must be a non-negative integer."
 case "$DEFAULT_COMMAND" in
@@ -360,10 +308,8 @@ detect_system_disks
 ## Drive inventory (helps users map by-id paths to kernel names)
 ## ---------------------------------------------------------------------------
 
-## Boot-time UX only (non-quiet cont-init run): the walk costs two spawns per disk plus one readlink per by-id link
-## per disk. The quiet-mode guard used to be the app's main long-run spawn-churn saver; since the --check baseline
-## replay the watcher never reaches this code at all (it exits long before), and the guard just keeps the boot
-## inventory out of the rare regeneration ticks.
+## Boot-time UX only (non-quiet cont-init run): maps by-id paths to kernel names. Since the --check baseline replay
+## the watcher never reaches this code; the guard just keeps the inventory out of regeneration ticks.
 if [ "${QUIET}" = 0 ]; then
   qlog_info "Detected sd* disks:"
   for block in /sys/block/sd*; do
@@ -386,9 +332,8 @@ fi
 ## Drive configuration -> per-device entries
 ## ---------------------------------------------------------------------------
 
-## hd-idle's global idle stays pinned to 0: unlisted drives (and drives appearing at runtime) are never touched -
-## Home Assistant OS grants device access per listed drive only, so anything else could only fail. Every -a entry
-## carries an explicit -i: the per-drive idle, or the configured default idle when left empty.
+## The global idle stays pinned to 0: unlisted drives (and runtime-appearing ones) are never touched - HAOS grants
+## device access per listed drive only. Every -a entry carries an explicit -i (per-drive idle, or default idle).
 ARGS=(-s 1 -c "${DEFAULT_COMMAND}" -p "${DEFAULT_POWER}" -i 0)
 
 DRIVES_LINES=()
@@ -403,10 +348,8 @@ done
 
 N_DRIVES=0
 declare -A SEEN_DEVICES=()
-## Baseline records for the state file: every configured device (in options
-## order - deterministic) with its resolution OUTCOME. The outcome classes
-## (kernel name / PASSTHRU / IGNORED) fully determine the generated
-## configuration given the immutable options.
+## Baseline records for the state file: every configured device (options order, deterministic) with its resolution
+## OUTCOME (kernel name / PASSTHRU / IGNORED) - fully determines the generated configuration given immutable options.
 RECORD_DEVICES=()
 declare -A RECORD_RESOLVED=()
 record_resolution() {
@@ -427,9 +370,7 @@ while IFS= read -r disk; do
   require_space_free 'idle' "${IDLE}"
   require_space_free 'command_type' "${COMMAND_TYPE}"
   require_space_free 'power_condition' "${POWER_CONDITION}"
-  ## Per-drive drive-PM override (yes/no): read with `// empty` like the other optional fields (the values are
-  ## strings, so jq's falsy-true pitfall for booleans does not apply). Unknown values (hand-edited options.json -
-  ## the supervisor schema blocks them at save time) fall back to the global default like an empty value.
+  ## Per-drive drive-PM override (yes/no), read with `// empty` like the other optional fields (string values); unknown values fall back to the global default.
   PM_OVERRIDE=$(bashio::jq "${disk}" '.disable_drive_pm // empty')
   require_space_free 'disable_drive_pm' "${PM_OVERRIDE}"
   DRIVE_PM="${GLOBAL_PM}"
@@ -437,8 +378,7 @@ while IFS= read -r disk; do
     yes) DRIVE_PM=1 ;;
     no) DRIVE_PM=0 ;;
   esac
-  ## Partition selection would grant cgroup access for the partition node
-  ## only, while hd-idle opens the disk node -> always broken, reject it.
+  ## Partition selection grants cgroup access only for the partition node, while hd-idle opens the disk node.
   if [[ "${DEV}" == *-part[0-9]* ]]; then
     bashio::exit.nok "Drive '${DEV}' is a partition (by-id path ending in -partN): select the disk itself (the dropdown entry without -partN) - the app needs the whole disk."
   fi
@@ -464,9 +404,8 @@ while IFS= read -r disk; do
     record_resolution "${DEV}" "${NAME}"
     EMIT_NAME="${NAME}"
   else
-    ## Detached at startup (or a race during boot): pass the configured path through for hd-idle's runtime symlink
-    ## resolution (-s 1; cgroup access is granted dynamically on hotplug). The watcher restarts hd-idle once the
-    ## drive resolves here again (hd-idle/KNOWLEDGE.md §"Automatic drive re-resolution").
+    ## Detached at startup: pass the path through for hd-idle's runtime resolution (-s 1; cgroup access is granted
+    ## dynamically on hotplug); the watcher restarts hd-idle once it resolves (hd-idle/KNOWLEDGE.md §"hd-idle-watch design").
     qlog_warning "Drive '${DEV}' does not resolve right now (detached or still enumerating?) - passing it through for hd-idle's runtime resolution."
     record_resolution "${DEV}" "PASSTHRU"
     EMIT_NAME="${DEV}"
@@ -513,11 +452,8 @@ fi
 printf '%s\n' "${ARGS[*]}" >"${ARGS_FILE}"
 printf '%s\n' "${DRIVES_LINES[@]}" >"${DRIVES_FILE}"
 
-## Baseline state for the --check replay: the shas of the two files just
-## written plus the detection facts they were generated from (see
-## check_baseline_replay). Written LAST - it is the commit point of the
-## three-file install, so the watcher's comparison treats a crash before it
-## as an unfinished install and re-syncs on the next tick.
+## Baseline state for the --check replay: shas of the two files just written plus the detection facts they were
+## generated from. Written LAST - the commit point of the three-file install; a crash before it is re-synced next tick.
 ARGS_SHA=$(sha256sum "${ARGS_FILE}")
 DRIVES_SHA=$(sha256sum "${DRIVES_FILE}")
 {

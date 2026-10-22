@@ -1,286 +1,213 @@
 # Development knowledge
 
-Non-obvious facts and gotchas learned while developing this app, collected here so they don't have to be re-learned the
-hard way. App-specific facts only — repository-wide knowledge (supervisor rating formula, schema quirks, device access,
-AppArmor mechanics, base-image shell gotchas, lab testing) lives in the repository-root `KNOWLEDGE.md`.
+App-specific facts only — repository-wide knowledge lives in the repository-root `KNOWLEDGE.md`, runtime procedures in
+`.agents/skills/hd-idle-runtime`, open work items in `TODO.md`.
 
-## hd-idle configuration is command-line-only
+## CLI-only configuration
 
-`main.go` (v1.22) parses `os.Args` and nothing else. The `/etc/default/hd-idle` file and the `HD_IDLE_OPTS` variable are
-distro-packaging conventions: the systemd unit declares `EnvironmentFile=/etc/default/hd-idle` and
-`ExecStart=/usr/sbin/hd-idle $HD_IDLE_OPTS` – the shell word-splits the variable into argv. The Alpine package does the
-same via its OpenRC `conf.d` file. The only environment variable the binary itself reads is `START_HD_IDLE` (exits
-immediately when set to `false`). Sources:
-[debian/hd-idle.service](https://github.com/adelolmo/hd-idle/blob/v1.22/debian/hd-idle.service),
-[main.go](https://github.com/adelolmo/hd-idle/blob/v1.22/main.go), [v3.24
-APKBUILD](https://gitlab.alpinelinux.org/alpine/aports/-/blob/3.24-stable/community/hd-idle/APKBUILD).
-
-Alpine v3.24 ships `hd-idle 1.22-r8` (community repo; v1.22 is a GitHub tag *without* a release). The package installs
-`/usr/sbin/hd-idle`, has no runtime dependencies, and is built from the same code as the v1.22 tag (`main.go` is
-byte-identical to it as of 2026-10; pkgrel bumps so far are Go-toolchain rebuilds with an unchanged CLI).
+hd-idle's `main.go` (v1.22) parses `os.Args` and nothing else; the only environment variable it reads is `START_HD_IDLE`
+(exits when set to `false`). `/etc/default/hd-idle` and `HD_IDLE_OPTS` are distro-packaging conventions (systemd
+`EnvironmentFile=` + shell word-splitting into argv; the Alpine package does the same via its OpenRC `conf.d`). Sources:
+[main.go](https://github.com/adelolmo/hd-idle/blob/v1.22/main.go),
+[debian/hd-idle.service](https://github.com/adelolmo/hd-idle/blob/v1.22/debian/hd-idle.service), [v3.24
+APKBUILD](https://gitlab.alpinelinux.org/alpine/aports/-/blob/3.24-stable/community/hd-idle/APKBUILD). Alpine v3.24
+ships `hd-idle 1.22-r8` (`/usr/sbin/hd-idle`, no runtime deps; v1.22 is a GitHub tag without a release; pkgrel bumps so
+far are toolchain rebuilds with an unchanged CLI).
 
 ## bashio option parsing (list-of-object options)
 
-`bashio::config '<list-option>'` returns one compact JSON object per line for list-of-object options: hd-idle-genargs
-reads the `disks` option with
-`while IFS= read -r entry; do ... bashio::jq "${entry}" '.field' ... done < <(echo "${DISKS}")` and relies on that shape
-(verified against the v3.24 base image's bashio). If a bashio update ever changed the return shape (e.g. to
-pretty-printed arrays), every drive entry would fail to parse - a lab boot with configured drives catches it.
-
-Optional per-entry fields are read with `'<field> // empty'` (jq prints the empty string for absent keys). That idiom is
-only valid for STRING-typed fields: jq's alternative operator treats `false` as empty too, so an optional BOOLEAN field
-could not distinguish "absent" from an explicit "false" (verified against the v3.24 base image: absent -> "null", false
--> "false", true -> "true"). Together with the UI showing an untouched optional checkbox as unchecked -
-indistinguishable from an explicit "off" - that is why the per-drive `disable_drive_pm` override is a `list(yes|no)?`
-dropdown instead of a `bool?`: the dropdown's empty state visibly means "follow the global setting", matching the app's
-other per-drive override fields.
+`bashio::config '<list-option>'` returns one compact JSON object per line for list-of-object options; hd-idle-genargs
+reads the `disks` option line by line (`bashio::jq "${entry}" '.field'`) and relies on that shape (v3.24 base image; a
+shape change would break every entry — a lab boot with configured drives catches it). `'<field> // empty'` is valid only
+for STRING-typed fields: jq treats `false` as empty, so an optional BOOLEAN field cannot distinguish "absent" from
+"false" (absent → "null", false → "false"). With an untouched optional checkbox rendered as unchecked, the per-drive
+`disable_drive_pm` override is therefore a `list(yes|no)?` dropdown, not a `bool?`: empty visibly means "follow the
+global setting".
 
 ## hd-idle CLI semantics relied upon by config.sh
 
 Verified against the v1.22 source (`main.go`, `hdidle.go`):
 
-- Arguments before the first `-a` set the global defaults; each `-a` seeds a per-device config **from the defaults
-  parsed so far**, and `-i`/`-c`/`-p` after a `-a` (before the next one) override that device's values. Our generator
-  therefore always emits defaults first, then entries.
-- Unconfigured devices are governed by the global defaults; the app pins the global idle to `0` (unlisted drives are
-  never touched - HAOS grants device access per listed drive only) and emits an explicit `-i` after EVERY `-a` (the
-  per-drive idle, or the configured default idle when left empty; system disks: `-i 0`) - the passthrough path for
-  detached drives inherits the right idle without a watcher restart. First-match-wins: `deviceConfig()` returns the
-  first device entry whose name matches the `/proc/diskstats` name.
-- `-a` accepts a bare kernel name (`sda` – returned as-is), a `/dev` node (`filepath.Base`), or a `/dev/disk/by-*`
-  symlink (readlink + basename + trailing-digit strip, i.e. partition links resolve to their disk). Resolution happens
-  once at startup with `-s 0`; `-s 1` re-resolves at runtime **only while the entry is still unresolved** – a device
-  that re-attaches with a different kernel name after being resolved stays stale until an app restart. That is why
-  config.sh resolves by-id paths itself (kernel names are stable within a boot) and passes `-s 1` only as the fallback
-  for devices unresolvable at startup.
-- `-I` (ignore spin-down detection) is **global only**: parsed as a valueless flag into
-  `Defaults.IgnoreSpinDownDetection`; `DeviceConf` has no such field and `updateState()` reads only the default.
-- `-d` (debug) and `-l` (logfile) are **global only and position-independent**, like `-I`: the parser assigns them to
-  `Defaults` no matter where they appear - only `-i`/`-c`/`-p` follow the `-a` context. The generator therefore appends
-  them after the `-a` entries; both orders are equivalent, do not "reorder" them expecting a stricter parse.
-- The poll interval is `min(configured idle)/10` (min 1 s; 60 s when no devices are configured); a sleep overrun of >3x
-  the interval resets spin state (suspend detection).
-- Spindown failures do not loop per poll cycle: the device is marked spun down with `LastSpunDownAt=now` even on error,
-  so an unspindownable disk produces one error line per idle interval, not per poll.
-- Events are logged as `<givenName> spindown|spinup` to stdout; with kernel names as given names the app log reads
-  `sda spindown`.
+- Arguments before the first `-a` set the global defaults; each `-a` seeds a per-device config from the defaults parsed
+  so far; `-i`/`-c`/`-p` after a `-a` override that device — the generator emits defaults first, then entries.
+- First-match-wins: `deviceConfig()` returns the first entry matching the `/proc/diskstats` name. The global idle is
+  pinned to `0` (unlisted drives are never touched — device access is per listed drive only); an explicit `-i` follows
+  EVERY `-a` (per-drive or default idle), so the passthrough path for detached drives inherits the right idle without a
+  watcher restart.
+- `-a` accepts a bare kernel name, a `/dev` node (`filepath.Base`), or a `/dev/disk/by-*` symlink (readlink + basename +
+  trailing-digit strip — partition links resolve to their disk). `-s 0` resolves once at startup; `-s 1` re-resolves at
+  runtime only while the entry is still unresolved (`resolveSymlinks()` skips entries with a populated `Name`) — a
+  re-attach under a different kernel name stays stale until an app restart. config.sh therefore resolves by-id paths
+  itself and passes `-s 1` only as the fallback for devices unresolvable at startup.
+- `-I`, `-d` and `-l` are **global only and position-independent**: the parser assigns them to `Defaults` wherever they
+  appear (only `-i`/`-c`/`-p` follow the `-a` context) — both orders are equivalent, do not "reorder" them expecting a
+  stricter parse. `-I` fills `Defaults.IgnoreSpinDownDetection`; `DeviceConf` has no such field, and `updateState()`
+  reads only the default.
+- Poll interval: `min(configured idle)/10` (min 1 s; 60 s with no devices configured); a sleep overrun of >3x the
+  interval resets spin state (suspend detection).
+- Spindown failure: the device is marked spun down (`LastSpunDownAt=now`) even on error — one error line per idle
+  interval, not per poll.
+- Events log as `<givenName> spindown|spinup` (with kernel names as given names: `sda spindown`).
 
-## hd-idle-genargs quiet mode and --check baseline replay
-
-`hd-idle-genargs --quiet` (the watcher's per-tick mode) suppresses ALL narrative/info output and the warning-level notes
-for expected-transient states (a currently detached drive, a non-sd\* entry): both are surfaced once per boot by the
-non-quiet cont-init run, and options cannot change mid-run (repository-root `KNOWLEDGE.md`
-§`Supervisor: option schema quirks`), so repeating them every 30-s tick adds nothing. Errors always log, and invalid
-configuration still exits nonzero in both modes: for cont-init that fails the app boot; for the watcher it means
-regeneration failed and the current configuration (the args file plus the running daemon's argv - see
-§`Automatic drive re-resolution` for when that can happen at all) stays as is.
-
-Since v0.1.9 the watcher's per-tick detection is `hd-idle-genargs --quiet --check` (transplanted from nfsd-apply
-`--check`, nfs-server commit d78c7ea): the full generation records a **resolution baseline** alongside the args and
-drives files (`<args-stem>.resolution`, e.g. `/etc/hd-idle.resolution`) - the sha256 of each installed file plus the
-detection facts it was generated from (the system-disk set and every configured device's resolution *outcome*: kernel
-name, `PASSTHRU` when it does not resolve, `IGNORED` when it resolves to something hd-idle cannot manage). `--check`
-re-runs only the cheap detection and compares against that baseline - no option reads, no jq, no file writes, a few
-`readlink`/`sha256sum` spawns total. Exit codes: 0 = everything matches, 3 = changed (regeneration due), any other
-nonzero = check failure. Because options are immutable mid-run, the recorded facts fully determine what a regeneration
-would produce: when they all hold, the installed files are already correct. Installed-file drift (hand edits,
-corruption, an interrupted install) is caught by the recorded shas - `--check` is detection-equivalent to a full
-regeneration-and-compare. The state file is written LAST by the generation (commit point), and the derivation of its
-name mirrors the drives file (`companion_file`, mirrored inline in the watcher run script).
-
-## hd-idle's monitoring scope
+## Monitoring scope
 
 `diskstats/snapshot.go` matches `/proc/diskstats` names against `sd[a-z]+$` (disk), `sd[a-z]+[0-9]+$` (partition →
-attributed to parent disk) and `dm-*$` (device-mapper → attributed to its holder disk). **Anything else is never
-touched**: `nvme*`, `mmcblk*`, `loop*`, `ram*`. Consequences: system disks on SD/eMMC/NVMe are out of hd-idle's reach
-(third exclusion layer), and the app cannot manage NVMe drives at all. Partition/dm attribution also makes per-partition
-activity wake the configured disk. Attribution picks a single holder: the app's `resolve_device()` takes the first
-`/sys/class/block/<dm>/holders/` entry (readdir order - nondeterministic when several exist), so a multi-holder dm
-device (multi-PV LVM) is attributed to one disk only, and hd-idle's own dm attribution is likewise single-holder per its
-source - disks hidden behind a shared dm device cannot be managed correctly (upstream limitation class; the common
-dm-crypt case has exactly one holder, where this is exact).
+parent disk) and `dm-*$` (dm → holder disk); anything else (`nvme*`, `mmcblk*`, `loop*`, `ram*`) is never touched —
+system disks on SD/eMMC/NVMe are out of hd-idle's reach (third exclusion layer), and NVMe drives cannot be managed at
+all. Per-partition activity wakes the configured disk. dm attribution picks a single holder (the app takes the first
+`/sys/class/block/<dm>/holders/` entry, readdir order — hd-idle's own attribution is likewise single-holder): a
+multi-holder dm device (multi-PV LVM) cannot be managed correctly; the common dm-crypt case (one holder) is exact.
 
-## SG_IO privileges: what the kernel actually requires
+## SG_IO privileges
 
-hd-idle opens disk nodes **O_RDONLY** (`sgio/common.go openDevice`, gated by `SG_GET_VERSION_NUM`) and issues `SG_IO`
-ioctls. Kernel-side (`drivers/scsi/scsi_ioctl.c`, `scsi_cmd_allowed()` – verified against master 2026-10; re-verify
-against the device's kernel (6.18-haos) before relying on it for new work):
+hd-idle opens disk nodes **O_RDONLY** (`sgio/common.go`, gated by `SG_GET_VERSION_NUM`) and issues `SG_IO` ioctls.
+Kernel-side (`drivers/scsi/scsi_ioctl.c` `scsi_cmd_allowed()`, verified against master 2026-10; re-verify against the
+device's kernel, 6.18-haos, before relying on it for new work): **START STOP UNIT (0x1B) is "read-safe"** — any process
+that can open the node, no capability, no write access; covers hd-idle's `scsi` command type entirely. **ATA
+PASS-THROUGH (0x85/0xa1, the `ata` command type) needs `CAP_SYS_RAWIO`** ("root can do any command" branch): the sole
+reason for `privileged: [SYS_RAWIO]`, unconditional because Jmicron-quirk USB bridges (supported since 1.21) and all
+SATA disks need the `ata` path.
 
-- **START STOP UNIT (0x1B) is in the "read-safe" list**: allowed for any process that can open the node – no capability,
-  no write access needed. This covers hd-idle's `scsi` command type entirely.
-- **ATA PASS-THROUGH (0x85/0xa1, the `ata` command type) is in neither list** → requires `CAP_SYS_RAWIO` (the kernel's
-  "root can do any command" branch). That is the sole reason for the app's `privileged: [SYS_RAWIO]`. It is
-  unconditional in `config.yaml` because some USB bridges (Jmicron quirk, supported since 1.21) and all SATA disks need
-  the `ata` path.
+Two independent AppArmor gates, both must be open: (1) the SG_IO ioctl is mediated only via the file's r/w permission
+(no per-command mediation until AppArmor 4; mechanism: repository-root `KNOWLEDGE.md` §"AppArmor: mediation and profile
+mechanics") — `/dev/sd* rwk,` plus the `file,` blanket covers it; (2) the kernel's `capable(CAP_SYS_RAWIO)` check inside
+`scsi_cmd_allowed()` is mediated by AppArmor itself (same root section) — both profiles need `capability sys_rawio,`.
+Without (2) every ata-path command failed with EPERM despite the container capability: capable() returned false and
+`scsi_cmd_allowed()` fell through to `return open_for_write` (the EPERM source for O_RDONLY fds).
 
-Consequence for the profile - TWO independent gates, both must be open (device-verified 2026-10-15; the missing second
-gate was the 0.1.3 fix): (1) the SG_IO ioctl itself is mediated only via the file's r/w permission (no per-command
-mediation until AppArmor 4 - mechanism repository-wide, see the repository-root `KNOWLEDGE.md` §AppArmor), so
-`/dev/sd* rwk,` (plus the `file,` blanket) covers it; (2) the kernel's `capable(CAP_SYS_RAWIO)` check inside
-`scsi_cmd_allowed()` is mediated by AppArmor itself (repository-root `KNOWLEDGE.md` §AppArmor), so both profiles need
-`capability sys_rawio,` - without that rule every ata-path command failed with EPERM even though the container carried
-the capability: capable() returned false and `scsi_cmd_allowed()` fell through to `return open_for_write` (the EPERM
-source for hd-idle's O_RDONLY fds).
+**Why the capability cannot be tightened**: AppArmor capability rules enumerate whole capabilities (they mediate the
+kernel's boolean `capable()` check — apparmor.d(5)), so a fraction of `CAP_SYS_RAWIO` is not expressible; per-command
+ioctl mediation does not exist upstream; HAOS ships AppArmor 3.1.7. **Both grant sites are needed**: the daemon
+sub-profile (ata spindowns) and the top profile (pmfix's smartctl ATA SET FEATURES is the same non-read-safe class;
+`hd-idle -t` runs in the top profile, e.g. the lab's `docker exec`). What the capability additionally unlocks in this
+container (capabilities(7)): `/proc/kcore` reads (kernel-gated on capable(CAP_SYS_RAWIO), file side allowed by the
+`file,` blanket — genuinely reachable for a compromised process; the accepted residual risk of the ata path) and
+`ioperm`/`iopl` (x86/amd64). Closed surfaces: `/dev/mem`, `/dev/kmem`, `/dev/port`, `/dev/cpu/*/msr` (outside the
+supervisor's device-cgroup allowlist); `mmap_min_addr` (moot: `/proc/sys` mounted read-only); SCSI commands to other
+nodes (device cgroup); seccomp could trim further but the supervisor exposes no per-app seccomp customization.
 
-### Why the capability cannot be tightened (CAP_SYS_RAWIO scope analysis, 2026-10)
+## Device access in this app
 
-- **No subsetting exists**: AppArmor capability rules enumerate whole capabilities (apparmor.d(5): "the only
-  capabilities a confined process may use may be enumerated") - they mediate the kernel's boolean `capable()` check, so
-  a fraction of `CAP_SYS_RAWIO` is not expressible. Per-command ioctl mediation (which would scope SG_IO without the
-  capability) does not exist upstream (4.0 added mqueue/userns/io_uring/AF_UNIX mediation; fine-grained inet/inet6 still
-  WIP as of the 6.17-era pulls - repository-root `KNOWLEDGE.md` §AppArmor) and HAOS ships AppArmor 3.1.7 anyway.
-- **Both grant sites are needed**: the daemon sub-profile (ata spindowns) and the top profile (pmfix's smartctl ATA SET
-  FEATURES commands are the same non-read-safe class, and `hd-idle -t` single-shot runs in the TOP-profile context -
-  e.g. the lab smoke test's `docker exec`). Moving the rule into sub-profiles only would break the latter.
-- **What the capability additionally unlocks inside this container** (capabilities(7)), and what closes each surface:
-  `/proc/kcore` reads - kernel-gated on capable(CAP_SYS_RAWIO), file side allowed by the `file,` blanket -> genuinely
-  reachable for a compromised process (denied before the capability rule): the accepted residual risk of the ata path
-  (analysis, not device-verified). `ioperm`/`iopl` (x86 only - relevant on amd64): reachable in principle, same class.
-  `/dev/mem`, `/dev/kmem`, `/dev/port`, `/dev/cpu/*/msr`: character devices outside the supervisor's device-cgroup
-  allowlist -> blocked by the cgroup layer. `mmap_min_addr`: `/proc/sys` is mounted read-only (non-privileged mounts).
-  SCSI commands to other nodes: the device cgroup opens only granted drives.
-- **Seccomp** could trim further (block ioperm/iopl syscalls, restrict ioctl cmd values), but the supervisor exposes no
-  per-app seccomp customization - not available in this framework.
+Mechanics: repository-root `KNOWLEDGE.md` §"Supervisor: device access" (verified at supervisor ref 2026.10.1 — re-verify
+per the version-sensitive-facts rule before relying on them for new work).
 
-## Device access in this app (mechanics: repository-root `KNOWLEDGE.md`)
-
-Supervisor facts verified at ref 2026.10.1 — re-verify per the version-sensitive-facts rule before relying on them for
-new work.
-
-- The app grants device access **exclusively via device-typed option fields**: `disks[].device`
-  (`device(subsystem=block)`) — cgroup rules per configured drive, UI dropdown of stable by-id paths, hotplug re-grant
-  via udev links (no restart needed on re-plug), and the system-disk refusal as exclusion layer 1. This is why every
-  managed drive must be listed (and why unlisted drives are pinned to never spin down instead of being attempted).
-- Validation timing matters for the UX: saving options while a drive is detached fails (device existence is validated at
-  save time); at boot the validation is suppressed, so a detached drive does not prevent the app from starting
-  (config.sh passes it through for hd-idle's runtime resolution, see the watcher section below).
+- Access is granted **exclusively via device-typed option fields**: `disks[].device` (`device(subsystem=block)`) —
+  cgroup rules per configured drive, UI dropdown of stable by-id paths, hotplug re-grant via udev links (no restart
+  needed on re-plug), system-disk refusal (exclusion layer 1). Hence every managed drive must be listed; unlisted drives
+  are pinned to never spin down instead of being attempted.
+- Saving options while a drive is detached fails (device existence is validated at save time); at boot the validation is
+  suppressed — a detached drive does not prevent the app from starting (config.sh passes it through for hd-idle's
+  runtime resolution).
 - Plain Docker (the lab) exposes no `/dev/disk` udev symlink trees (HAOS binds the host `/dev` read-only into app
-  containers) — the lab hook mirrors it with `-v /dev/disk:/dev/disk:ro` so config.sh's by-id resolution and inventory
-  behave as on a device.
+  containers); the lab hook mirrors them with `-v /dev/disk:/dev/disk:ro` so by-id resolution and inventory behave as on
+  a device.
 
-## Security rating — this app's ceiling
+## Security rating ceiling
 
-For the rating *formula* (every branch, sources, the store-vs-installed delta) see the repository-root `KNOWLEDGE.md`.
+Formula, branches and sources: repository-root `KNOWLEDGE.md` §"Supervisor: app security rating". This app: 5 + 1
+(custom profile) + 2 (no ports, no host network) − 1 (`SYS_RAWIO` is in the high-risk capability list) = **7 installed,
+6 in the store listing**. `full_access` is deliberately avoided: rating 1, protection mode off, and cgroup access to
+*all* devices including the system disk — which the device-option mechanism refuses precisely.
 
-For this app (0.1.0): 5 + 1 (custom profile) + 2 (no ports, no host network) − 1 (`SYS_RAWIO` is in the high-risk
-capability list) = **7 installed, 6 in the store listing**. `full_access` would force the rating to 1 and disable
-protection mode — deliberately avoided: it would grant cgroup access to *all* devices including the system disk, which
-the device-option mechanism refuses precisely.
+## hd-idle -t quirks
 
-## hd-idle -t (single-shot spindown) quirks
+- The disk argument needs the **full `/dev/` path**: single-shot passes the argument straight to `openDevice` (the
+  daemon path prefixes `/dev/`) — bare names fail (`open sda: no such file or directory`); the usage string's `-t sda`
+  example is misleading.
+- It uses the **global default** command type / power condition only (single-disk mode skips the per-device config
+  entirely).
 
-- The disk argument needs the **full `/dev/` path**: single-shot mode, unlike the daemon path (which does
-  `fmt.Sprintf("/dev/%s", name)`), passes the argument straight to `openDevice` - bare kernel names fail with
-  `open sda: no such file or directory`. The usage string's `-t sda` example is misleading. Verified against v1.22
-  (`main.go` singleDiskMode branch).
-- The command uses the **global default** command type / power condition only (single-disk mode skips the per-device
-  config entirely).
+No in-app caller since the diagnostics build was reverted; the lab spindown smoke test drives it via `docker exec`, and
+it is useful for manual debugging.
 
-(No in-app caller since the diagnostics build was reverted; the lab spindown smoke test drives `hd-idle -t` via docker
-exec, and it is useful for manual debugging.)
+## USB-bridge behaviors
 
-## Verifying drive power states from the lab (USB bridges)
+Empirical findings from WD USB bridges (My Book 1110/1230/25EE, Elements 107C, Ext HDD 1021) on test hardware; matrix
+entries are per-bridge firmware behavior.
 
-`hdparm -C` is **not a safe probe** for these drives: empirically (WD My Book 1230 / Elements 25A3 USB bridges on this
-machine) it races the spin-down window (`SG_IO: bad/missing sense data` with sense key 70 00 02, ASC/ASCQ 04 01 = NOT
-READY / "in process of becoming ready") and then **actually wakes the drive** (STOP → `smartctl -n standby` says SLEEP →
-one `hdparm -C` → smartctl says active). Use **`smartctl -H -n standby`** instead (exit code 2 + "Device is in
-STANDBY/SLEEP mode" without any media access) - that is what the lab hook does, with polling retries (desktop IO on
-mounted drives may wake a drive between the STOP command and the probe).
+- **`hdparm -C` is not a safe probe** for these drives: it races the spin-down window (NOT READY sense data, ASC/ASCQ 04 01)
+  and then **wakes the drive** — CHECK POWER MODE is forwarded to the drive: truthful, but spin-up inducing. Use
+  **`smartctl -H -n standby`** (exit code 2, "Device is in STANDBY/SLEEP mode", no media access), with polling retries
+  (desktop IO on mounted drives may wake a drive between the STOP command and the probe); that is what the lab hook
+  does.
+- **Bridges lie about the power state**: the firmware answers SCSI power-condition queries (the sense data behind
+  `smartctl -H -n standby`; hd-idle's own state view is equally blind) from its **own** model without consulting the
+  drive. A host-invisibly self-woken drive still reports STANDBY/SLEEP to every passive host-side probe, with frozen
+  `/proc/diskstats` counters: hd-idle's diskstats-based belief never resets after such a wake — it never re-issues a
+  spindown, so a drive can spin for hours while the app reports it as spun down. The only host-side truth is the ramp-up
+  latency of a *real* read (an asleep drive takes the motor ramp; bypass the page cache, read far offsets) — intrusive,
+  it wakes an asleep drive. Prevention beats detection: the drives' own power management off plus a spindown command
+  class the bridge actually honors (§"Drive-PM treatment", `TODO.md`).
+- **Drive-PM matrix**: `standby,off` is honored by ALL five bridges (the universally deliverable part); `apm,off` only
+  by the My Book 25EE bridge ("APM disabled", reads back as Disabled) — the other four fail with "scsi error aborted
+  command" (107C, 1230) resp. "SAT command failed" (1110, 1021), their APM feature page filtered entirely (smartctl:
+  "APM feature is: Unavailable"); non-fatal by design, logged once. Treatment settings are volatile (reset on drive
+  power cycle): re-applied at boot and on (re)appearance.
+- **Redundant STOP commands are not harmless**: a STOP to an already-asleep drive half-started the motor (My Book 1230,
+  audibly). Consequences: hd-idle's `-I` re-asserts spindowns to EVERY still-asleep drive once per idle interval
+  (source-verified `updateState()`) — on such bridges a wear generator, not production-safe; and each app restart fires
+  one spindown wave at ALL drives (fresh state; restarts are rare — real config changes only). Upstream-report items
+  (`TODO.md`).
+- **Same-kernel-name reconnect gap**: a drive whose bridge power-cycles it while it reconnects under the SAME kernel
+  name is invisible to the watcher's `--since` diff and stays untreated until the next app restart (`TODO.md`).
 
-## WD USB bridges lie about the drive's power state
-
-The bridge firmware answers SCSI power-condition queries (the sense data behind `smartctl -H -n standby`, and hd-idle's
-own state view is equally blind) from its **own** power-state model without consulting the drive: a drive that woke
-itself up host-invisibly still reports STANDBY/SLEEP to every passive host-side probe (device-verified 2026-10-15: three
-drives audibly spinning while `smartctl -n standby` and the app's diagnostics reported SLEEP, with frozen
-`/proc/diskstats` counters). Consequences:
-
-- No passive host-side probe can detect a host-invisible wake-up through these bridges. hd-idle's diskstats-based belief
-  therefore never resets after such a wake: it never re-issues a spindown, and the drive can spin for hours while the
-  app reports it as spun down.
-- The only host-side truth is the ramp-up latency of a *real* read: an actually spinning drive answers in well under a
-  second, an asleep drive takes the motor ramp (seconds). That probe is intrusive (it wakes an asleep drive) and must
-  bypass the page cache (read far offsets; the first sector of a partition is typically cached from udev/blkid probing).
-- `CHECK POWER MODE` (what `hdparm -C` sends) is forwarded to the drive - it is truthful but **wakes the drive** (see
-  the section above), so it is likewise useless for passive observation.
-- Prevention (the drive's own power management off + a spindown command class the bridge actually honors) beats
-  detection here; see `TODO.md`.
-
-## Drive-PM treatment (disable_drive_pm) - per-bridge reality
+## Drive-PM treatment
 
 `hd-idle-pmfix` disables the drives' own power management (ATA SET FEATURES: APM level off + standby timer off) for
 every managed drive whose EFFECTIVE pm-flag is 1 (the global `disable_drive_pm` option as the default, per-drive
-`disable_drive_pm` yes/no overrides) at boot and on drive (re)appearance (the watcher re-applies to NEW/CHANGED drives
-only - redundant treatment of sleeping drives risks bridge-mediated motor starts). Device-verified per-bridge matrix (a
-test device, five WD USB bridges, 2026-10-15):
+`disable_drive_pm` yes/no overrides) at boot and on drive (re)appearance — the watcher re-applies to NEW/CHANGED drives
+only (redundant treatment of sleeping drives risks bridge-mediated motor starts, §"USB-bridge behaviors").
 
-- **`standby,off`: honored by ALL five bridges** (My Book 1110/1230/25EE, Elements 107C, Ext HDD 1021) - the universally
-  deliverable part.
-- **`apm,off`: honored ONLY by the My Book 25EE bridge** ("APM disabled", reads back as Disabled); the other four fail
-  with "scsi error aborted command" (107C, 1230) resp. "SAT command failed" (1110, 1021) - their APM feature page is
-  filtered entirely (smartctl reads "APM feature is: Unavailable"). Non-fatal by design: logged once, everything else
-  works.
-- The treatment settings are volatile (reset on drive power cycle): re-applied at boot and on (re)appearance. **Known
-  gap**: a drive whose bridge power-cycles it while it RECONNECTS UNDER THE SAME KERNEL NAME is invisible to the
-  watcher's args diff and stays untreated until the next app restart (see TODO.md).
-- **Redundant STOP commands are NOT harmless on all bridges**: a STOP sent to an already-asleep drive half-started the
-  motor on the My Book 1230 bridge (audibly, ~21:43). Consequences verified in the wild: (a) hd-idle's `-I` (ignore
-  spin-down detection) re-asserts spindowns to EVERY still-asleep drive once per idle interval (source-verified
-  updateState(): `idleDuration > IdleTime && timeSinceLastSpunDown > IdleTime`) - on such bridges it is a wear
-  generator, NOT production-safe; (b) each app restart makes the fresh daemon fire one spindown wave at ALL drives
-  (fresh state), including already-asleep ones - the app restarts rarely (only on real config changes), so the cost is
-  one wave per restart. Both documented in TODO.md as upstream-report items.
+The drives file (`/etc/hd-idle.drives`, written by hd-idle-genargs next to the args file) is pmfix's machine-readable
+interface and the single source of truth for the effective per-drive decision: one
+`<kernel-name> <idle> <command-type> <pm-flag>` line per drive with effective values (exclusions: idle 0, pm-flag 0).
+pmfix treats only pm-flag 1 entries; the idle time plays no role — an idle-0 drive is a treatment target all the same
+(its firmware timer must not fight the user's "never spin down" config). A missing pm-flag column (a pre-0.1.6 3-column
+file — cannot occur in practice) means treat. config.sh and the watcher run pmfix unconditionally (a global-only bashio
+gate could not express per-drive overrides); `--since <old-file>` treats only lines NEW or CHANGED relative to it — a
+flipped pm-flag counts as changed, so a newly overridden drive is treated exactly once and an unchanged override stays
+skipped.
 
-The drives file (`/etc/hd-idle.drives`, written by hd-idle-genargs next to the args file - the derivation of its name
-from the args-file path is mirrored in the hd-idle-watch run script) is pmfix's machine-readable interface: one
-`<kernel-name> <idle> <command-type> <pm-flag>` line per drive with EFFECTIVE values (exclusions carry idle 0 and
-pm-flag 0, entries without explicit values carry the inherited defaults; pm-flag: 1 = disable the drive's own power
-management, 0 = leave it alone - the effective value of the global `disable_drive_pm` option overridden by the per-drive
-`disable_drive_pm` field). pmfix treats only pm-flag 1 entries (the idle time plays no role: an idle-0 drive is a
-treatment target all the same - its firmware timer must not fight the user's "never spin down" config); config.sh and
-the watcher run it unconditionally (the former global bashio gate could not express per-drive overrides - the drives
-file is the single source of truth for the effective per-drive decision); with `--since <old-file>` only drives whose
-line is NEW or CHANGED are treated (a flipped pm-flag line counts as CHANGED, so a newly overridden drive is treated
-exactly once, and an unchanged override stays skipped).
+## hd-idle-watch design
 
-## Automatic drive re-resolution (hd-idle-watch)
-
-- **The problem**: hd-idle resolves its `-a` device entries **once** at startup; `-s 1` re-resolves *only entries that
-  are still unresolved* (`resolveSymlinks()` skips entries whose `Name` is already populated - verified in v1.22).
-  Kernel names (`sdX`) are not stable across re-plugs (different ports/hubs, enumeration order), so a moved drive would
-  keep its stale entry: hd-idle watches (and spins down) the wrong name or none, until an app restart fixed it.
-- **The supervisor cannot help**: its HARDWARE_NEW_DEVICE handling only re-grants cgroup device rules to the *running*
-  container - there is no callback/notification API to apps and no restart-on-device-change mechanism (verified against
-  supervisor 2026.10.1). The fix is entirely app-internal; no HAOS interaction is involved.
-- **Design**: the arg generation lives in a shared helper (`/usr/bin/hd-idle-genargs`, used by cont-init config.sh and
-  the watcher). The `hd-idle-watch` longrun polls every 30 s (overridable via `HD_IDLE_WATCH_INTERVAL`, floored at 5 s -
-  the lab sets 5 s; mirrors the nfsd-watch `NFSD_WATCH_INTERVAL`): **check first** with the baseline replay
-  (`hd-idle-genargs --quiet --check`, §`hd-idle-genargs quiet mode and --check baseline replay` - unchanged ticks cost a
-  few light spawns and do no option reads, no jq, and no file writes), and only on a detected change (exit 3) regenerate
-  into candidate files, compare, and install. The comparison covers all three generated files: when the regenerated args
-  AND drives files match the installed ones, only the baseline state is stale (an interrupted install, or a resolution
-  change that reverted before the regeneration ran) and it is resynced **without a restart**; otherwise the candidates
-  are installed and just the hd-idle service restarts (`s6-svc -r /run/service/hd-idle`). The state file is installed
-  last (commit point - it records the shas of the two files just installed), so a crash anywhere before it leaves the
-  recorded shas mismatching the installed files and the next tick re-syncs. Unrelated churn therefore never triggers a
-  restart, and unchanged ticks produce **no log output at all** (warnings/errors still surface; the new command line is
-  logged by the hd-idle run script after each restart). Polling (not udev events) because mapping the host's `/run/udev`
-  socket (`with_udev`) into an Alpine-based container for event-driven monitoring is version-fragile for zero gain - 30
-  s worst-case latency is fine for a maintenance action.
-- **hd-idle restart effects are benign**: the run script re-reads the args file; hd-idle starts with fresh in-memory
-  stats (idle timers restart) and no command is sent to any disk at startup - a drive in standby is NOT spun up by the
-  restart. Minor cosmetic cost: an activity-log "running" period spanning the restart is misaccounted (hd-idle cannot
-  know it was restarted).
+- **The problem**: hd-idle resolves its `-a` entries once at startup and `-s 1` re-resolves only still-unresolved ones,
+  while kernel names (`sdX`) are not stable across re-plugs (ports/hubs, enumeration order): a moved drive keeps its
+  stale entry — watched under the wrong name or none — until an app restart fixed it.
+- **The supervisor cannot help**: its HARDWARE_NEW_DEVICE handling only re-grants cgroup device rules to the running
+  container — no callback/notification API, no restart-on-device-change (verified against supervisor 2026.10.1). The fix
+  is entirely app-internal.
+- **Design**: arg generation lives in the shared helper `/usr/bin/hd-idle-genargs`; `hd-idle-watch` polls every 30 s
+  (`HD_IDLE_WATCH_INTERVAL` override, floored at 5 s — the lab sets 5 s; mirrors nfsd-watch's `NFSD_WATCH_INTERVAL`):
+  check first (baseline replay), and on a detected change regenerate into candidate files, compare, and install.
+  Regenerated args AND drives matching the installed ones = only the baseline state is stale → resync without restart;
+  otherwise install the candidates and restart just the hd-idle service (`s6-svc -r /run/service/hd-idle`). The state
+  file (`<args-stem>.resolution`, e.g. `/etc/hd-idle.resolution`) is installed last (commit point — it records the shas
+  of the two files just installed): a crash before it leaves the recorded shas mismatching the installed files, and the
+  next tick re-syncs. Unchanged ticks log nothing; the new command line is logged by the hd-idle run script after each
+  restart. Polling instead of udev events: mapping the host's `/run/udev` socket (`with_udev`) into an Alpine-based
+  container is version-fragile for zero gain — 30 s worst-case latency is fine for a maintenance action.
+- **Quiet mode and the baseline replay**: `--quiet` (the watcher's per-tick mode) suppresses narrative/info output and
+  the expected-transient warnings (detached drive, non-sd\* entry) — both surface once per boot from the non-quiet
+  cont-init run, and options cannot change mid-run (repository-root `KNOWLEDGE.md` §"Supervisor: option schema quirks");
+  errors always log. `--check` (the nfsd-apply pattern, nfs-server commit d78c7ea) replays the **resolution baseline**
+  the full generation recorded: the sha256 of each installed file plus the detection facts it was generated from
+  (system-disk set; every configured device's resolution outcome — kernel name, `PASSTHRU`, or `IGNORED`), with no
+  option reads, no jq, no file writes. Exit 0 = unchanged, 3 = changed (regeneration due), any other nonzero = check
+  failure (the watcher keeps the current configuration: args file plus running argv, untouched). Because options are
+  immutable mid-run, the recorded facts fully determine a regeneration; installed-file drift (hand edits, corruption,
+  interrupted install) is caught by the shas — detection-equivalent to a full regenerate-and-compare. The state file is
+  written LAST by the generation (commit point); its name derivation mirrors the drives file (`companion_file`, mirrored
+  inline in the watcher run script).
+- **Restart effects are benign**: the run script re-reads the args file; hd-idle starts with fresh in-memory stats (idle
+  timers restart) and sends no command at startup — a drive in standby is NOT spun up by the restart. Cosmetic: an
+  activity-log "running" period spanning the restart is misaccounted.
 - **The clean upstream fix** would make the watcher redundant: re-verify already-resolved symlinks each cycle in `-s 1`
-  mode and update changed entries (see TODO.md). Until then the watcher is the app-side workaround; remove it if/when
-  upstream ships the behavior (Alpine package users would get it via a package version bump + app version bump).
-- **The watcher's failure class is nearly empty, by construction** (the regeneration-failure guard is cheap insurance,
-  not a fix for a real path): the options cannot change under a running app (supervisor validates at save time -
-  `api/apps.py` options endpoint - and only hands the new options.json to the app at its next start), so all
-  config-content rejections fire at boot. Device-resolution failures are not failures (pass-through path). The one
-  reachable mid-run failure: two configured symlink names of the same physical drive (drives can carry several by-id
-  links - e.g. `ata-*` and `usb-*` for one disk) where one was detached at boot; once the drive is plugged in, the
-  duplicate-entry rejection fires per tick (ERROR lines every 30 s until the user fixes the config - spammy but
-  truthful, accepted). "Known-good configuration" = the args file (re-read by the run script on every (re)start) plus
-  the running daemon's argv, both untouched on failure; the persistent source of truth is `options.json` on /data.
+  mode and update changed entries (`TODO.md`); remove the watcher when upstream ships the behavior (Alpine package users
+  get it via a package version bump + app version bump).
+- **The failure class is nearly empty by construction**: options cannot change under a running app (the supervisor
+  validates at save time and hands over new options.json only at the app's next start) — all config-content rejections
+  fire at boot; device-resolution failures are not failures (passthrough path). The one reachable mid-run failure: two
+  configured symlink names of the same physical drive (drives can carry several by-id links, e.g. `ata-*` and `usb-*`
+  for one disk) with one detached at boot — the duplicate-entry rejection fires per tick (ERROR lines every 30 s until
+  the user fixes the config; spammy but truthful, accepted). Known-good = the args file plus the running daemon's argv,
+  both untouched on failure; the persistent source of truth is `options.json` on /data.

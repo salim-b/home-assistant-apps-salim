@@ -3,29 +3,21 @@
 profile hd-idle flags=(attach_disconnected,mediate_deleted) {
   #include <abstractions/base>
 
-  ## Conventions & references: modeled on the nfs-server app profile and the
-  ## official dev-docs AppArmor template; the AppArmor mediation gotchas
-  ## documented there apply here too (capabilities are mediated, network
-  ## mediation is opt-in per class, HAOS produces no AppArmor audit logs).
-  ## See hd-idle/KNOWLEDGE.md and the repository-root KNOWLEDGE.md.
+  ## Modeled on the nfs-server profile and the official dev-docs AppArmor template. Mediation mechanics and gotchas:
+  ## repository-root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics"; app facts: hd-idle/KNOWLEDGE.md.
 
-  # Generic file access, signals (s6 supervision, bash job control). `file,` is the upstream HA convention: tightening
-  # file rules is impractical without AppArmor audit logs (repository-root KNOWLEDGE.md §AppArmor) - the confinement
-  # value sits in the non-file classes (network, capability).
+  # Generic file access, signals (s6 supervision, bash job control). `file,` is the upstream HA convention - the
+  # confinement value sits in the non-file classes (network, capability); repository-root KNOWLEDGE.md §AppArmor.
   file,
   signal,
 
-  # CAP_SYS_RAWIO for SCSI passthrough: the kernel gates non-read-safe SCSI commands (ATA PASS-THROUGH - the `ata`
-  # spindown path and smartctl's ATA commands; read-safe commands like START STOP UNIT need no capability) behind
-  # capable(CAP_SYS_RAWIO), and AppArmor mediates capable() checks themselves - without this rule every ata-path
-  # SG_IO fails with EPERM even though the container carries the cap (device-verified; full story:
-  # hd-idle/KNOWLEDGE.md §"SG_IO privileges").
+  # Non-read-safe SCSI passthrough (hd-idle's `ata` command type, smartctl) requires CAP_SYS_RAWIO, and AppArmor
+  # mediates capable() checks itself - without this rule every ata-path SG_IO fails with EPERM:
+  # hd-idle/KNOWLEDGE.md §"SG_IO privileges".
   capability sys_rawio,
 
-  # Network: mediation is enabled by the PRESENCE of any network rule. The
-  # app only needs supervisor-API HTTP (bashio) and DNS resolution; the
-  # hd-idle daemon itself makes no sockets (its sub-profile denies network
-  # entirely).
+  # Mediation is enabled by the PRESENCE of any network rule; the app needs supervisor-API HTTP (bashio) and DNS
+  # only - the hd-idle daemon makes no sockets (its sub-profile denies network entirely).
   network inet stream,
   network inet dgram,
   network inet6 stream,
@@ -51,26 +43,18 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
   # AppArmor status reporting (s6 sets this up; harmless otherwise)
   /sys/kernel/security/apparmor/** r,
 
-  # Disk introspection and spindown targets. hd-idle opens disk nodes
-  # O_RDONLY and issues SG_IO ioctls (AppArmor 3.x mediates ioctls via the
-  # file's r/w permission). /dev/disk/by-* is read for device-path
-  # resolution (config.sh), /sys/class/block and /sys/block for disk
-  # attribution (partition/device-mapper stats) and USB-bridge detection
-  # (sgio's idVendor walk). The explicit rules document the app's disk
-  # access surface; the supervisor's cgroup device rules (granted per
-  # configured drive via the device-type option fields) are the layer that
-  # actually scopes WHICH disks are reachable, and it refuses devices the
-  # system uses. (The nfs-server KNOWLEDGE.md AppArmor notes apply.)
+  # Disk introspection and spindown targets (O_RDONLY + SG_IO; mediated via the file's r/w permission). /dev/disk/by-*
+  # for path resolution (config.sh), /sys/block for attribution and USB-bridge detection. The supervisor's cgroup
+  # device rules (granted per configured drive via the device-type option fields) actually scope WHICH disks are
+  # reachable, and refuse system-used devices.
   /dev/sd* rwk,
   /dev/disk/{,**} r,
   /sys/class/block/{,**} r,
   /sys/block/{,**} r,
 
-  # Generated hd-idle command line (cont-init config.sh -> s6 run script) plus its companions: the drives file
-  # (hd-idle-pmfix), the resolution baseline replayed by hd-idle-genargs --check (hd-idle-watch), and the
-  # previous-drives copy hd-idle-pmfix --since diffs against (written by the watcher on a change tick). These rules
-  # document the generated-config file surface (file rules are not load-bearing under the `file,` blanket - see the
-  # note at the top); keep them in sync with what the scripts read and write.
+  # Generated-config file surface (not load-bearing under the `file,` blanket; documents what the scripts read and
+  # write): args (cont-init -> run script), drives (hd-idle-pmfix), resolution baseline (genargs --check), and the
+  # previous-drives copy hd-idle-pmfix --since diffs against.
   /etc/hd-idle.args rw,
   /etc/hd-idle.drives rw,
   /etc/hd-idle.drives.prev rw,
@@ -79,15 +63,12 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
   # Runtime check scripts
   /etc/cont-init.d/config.sh rix,
 
-  # Drive power-management treatment (hd-idle-pmfix, options disable_drive_pm / per-drive disable_drive_pm):
-  # smartctl issues the ATA SET FEATURES commands (non-read-safe SCSI commands, hence the capability rule above).
-  # The sysfs coverage is kept broad per the header note above.
+  # Drive-PM treatment (hd-idle-pmfix): smartctl issues ATA SET FEATURES (non-read-safe, hence the capability rule
+  # above); sysfs coverage broad per the header note.
   /usr/sbin/smartctl rix,
   /sys/devices/{,**} r,
 
-  ## The hd-idle daemon runs under its own tighter sub-profile (cx = change
-  ## profile on execute): no networking at all, and only the disk/sysfs
-  ## surface it actually needs.
+  ## The hd-idle daemon runs under a tighter sub-profile (cx): no networking, only the disk/sysfs surface it needs.
   /usr/sbin/hd-idle cx -> hdidle,
 
   profile hdidle flags=(attach_disconnected,mediate_deleted) {
@@ -97,14 +78,11 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
     # CAP_SYS_RAWIO for the daemon's ata path: see the top profile (hd-idle/KNOWLEDGE.md §"SG_IO privileges").
     capability sys_rawio,
     signal (send) set=(kill,term,int,hup,cont),
-    # Official docs template: scope receive to the app's own top profile
-    # (the supervisor renames it to the installed slug on the device, e.g.
-    # local_hd-idle - the *_hd-idle glob covers repo installs too).
+    # Official docs template: scope receive to the app's own top profile (the supervisor renames it to the installed
+    # slug on the device - the glob covers repo installs too).
     signal (receive) peer=*_hd-idle,
 
-    # hd-idle creates no sockets: reads /proc/diskstats, sysfs, and issues
-    # SG_IO ioctls on the disk nodes. A deny-only network class denies
-    # everything in it.
+    # hd-idle creates no sockets (reads /proc/diskstats, sysfs, SG_IO ioctls); a deny-only network class denies everything in it.
     deny network,
 
     /usr/sbin/hd-idle rm,

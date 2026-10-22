@@ -3,9 +3,7 @@ name: hd-idle
 version: "0.1.9"
 slug: hd-idle
 description: Spin down idle hard disks (USB, SATA) automatically using hd-idle
-# Generic (multi-arch) image name; CI builds & publishes per-arch images
-# (`ghcr.io/salim-b/{amd64,aarch64}-app-hd-idle`) and a multi-arch manifest
-# under this name on pushes to main.
+# Generic image name; CI publishes per-arch images and a multi-arch manifest under this name on pushes to main.
 image: "ghcr.io/salim-b/app-hd-idle"
 url: "https://github.com/salim-b/home-assistant-apps-salim/tree/main/hd-idle"
 panel_icon: mdi:harddisk
@@ -14,15 +12,14 @@ arch:
   - amd64
 startup: services
 init: false
-# CAP_SYS_RAWIO is required for hd-idle's `ata` command type (non-read-safe SCSI passthrough), and the AppArmor
-# profile must grant it as well - AppArmor mediates capable() checks (see apparmor.txt and hd-idle/KNOWLEDGE.md
-# §"SG_IO privileges"). Per-drive device-node access is granted via the device-type option fields below.
+# CAP_SYS_RAWIO is required for hd-idle's `ata` command type (non-read-safe SCSI passthrough) and must also be
+# granted by the AppArmor profile: hd-idle/KNOWLEDGE.md §"SG_IO privileges". Per-drive device access is granted via
+# the device-type option fields below.
 privileged:
   - SYS_RAWIO
 options:
-  # Every listed drive is managed: it follows the global defaults wherever its own fields are left empty (idle,
-  # command type, power condition, and the drive-PM treatment override), and an idle time of 0 never spins it down.
-  # Unlisted drives are never touched (hd-idle's global idle is pinned to 0).
+  # Every listed drive follows the global defaults wherever its own fields are empty; idle 0 = never spin down.
+  # Unlisted drives are never touched (the global idle is pinned to 0; hd-idle/KNOWLEDGE.md §"Device access in this app").
   disks: []
   default_idle: 600
   default_command_type: scsi
@@ -33,33 +30,26 @@ options:
   ignore_spin_down_detection: false
 schema:
   disks:
-    # `device` is a supervisor device-type field: it renders as a dropdown of
-    # block devices with their stable /dev/disk/by-id paths AND is what grants
-    # the app kernel cgroup access to that drive (dynamically re-granted on
-    # hotplug; refused for system-used devices). Select the disk itself, never
-    # a partition (a partition entry would grant access only to the partition
-    # node, while hd-idle opens the disk node).
+    # `device` is a supervisor device-type field: a dropdown of block devices with stable by-id paths that ALSO
+    # grants the app cgroup access (re-granted on hotplug; system-used devices refused). Select the disk itself,
+    # never a partition (a -partN entry grants only the partition node; hd-idle opens the disk node).
     - device: "device(subsystem=block)"
-      # Idle time in seconds; 0 = never spin down this drive.
-      # Empty = use the default idle time.
+      # Idle time in seconds; 0 = never spin down this drive. Empty = use the default idle time.
       idle: "int(0,)?"
       command_type: "list(scsi|ata)?"
       power_condition: "int(0,15)?"
       # Per-drive override of the global disable_drive_pm: yes = disable this drive's own power management, no =
-      # keep it, empty = follow the global setting. Rendered as a per-drive dropdown like the other override fields
-      # (an optional bool would be indistinguishable from "off" in the UI when untouched); emitted as the drives
-      # file's pm-flag column, hd-idle-pmfix decides per drive from it.
+      # keep it, empty = follow the global setting. A dropdown, not an optional bool: an untouched checkbox is
+      # indistinguishable from "off", and bashio's `// empty` cannot tell absent from false
+      # (hd-idle/KNOWLEDGE.md §"bashio option parsing (list-of-object options)"); emitted as the drives file's
+      # pm-flag column.
       disable_drive_pm: "list(yes|no)?"
-  # Global defaults, filling the per-drive fields that are left empty.
-  # default_idle only applies to LISTED drives (unlisted drives are never
-  # touched - the global idle stays pinned to 0); default_command_type and
-  # default_power_condition also seed drives that appear without a list
-  # entry at runtime.
+  # Global defaults for the per-drive fields left empty. default_idle only applies to LISTED drives (the global
+  # idle stays pinned to 0); command type / power condition defaults also seed runtime-appearing drives.
   default_idle: "int(0,)?"
   default_command_type: "list(scsi|ata)"
   default_power_condition: "int(0,15)"
-  # disable_drive_pm is the DEFAULT for drives whose own disable_drive_pm field is empty; an explicit per-drive
-  # yes/no overrides it (schema note above the disks entry).
+  # DEFAULT for drives whose own disable_drive_pm field is empty; an explicit per-drive yes/no overrides it.
   disable_drive_pm: "bool?"
   debug: "bool?"
   activity_log: "bool?"

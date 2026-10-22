@@ -1,6 +1,7 @@
 # TODOs
 
-Short dev items first; resolved items at the bottom. Underlying technical facts and root causes live in `KNOWLEDGE.md`.
+Open dev items. Underlying technical facts and root causes live in `KNOWLEDGE.md`, runtime procedures in
+`.agents/skills/hd-idle-runtime` (resolved items are encoded in git history and the changelog).
 
 ## Tasks
 
@@ -16,9 +17,10 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
 
 - Monitor hd-idle upstream: v1.22 has no GitHub release (Alpine tracks the tag); Alpine-side package updates are caught
   automatically by the apk drift check (validate.py, daily CI cron) and released per the repository-root KNOWLEDGE.md
-  workflow. Upstream *behavior* changes (new flags etc.) are read and adapted when such a release is made; a future
-  version adding per-device `-I` or a config file would also relax the option schema. Worth filing upstream: per-device
-  `-I` would make the global-only limitation moot for mixed setups.
+  §`apk package version policy` (release discipline: skill `ha-app-workflow`). Upstream *behavior* changes (new flags
+  etc.) are read and adapted when such a release is made; a future version adding per-device `-I` or a config file would
+  also relax the option schema. Worth filing upstream: per-device `-I` would make the global-only limitation moot for
+  mixed setups.
 
 - The supervisor's `device(subsystem=block)` dropdown lists partitions and loop devices alongside disks (filter is by
   udev subsystem only); users can pick a `-partN` entry, which our startup validation rejects with an explanatory
@@ -55,11 +57,12 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
     for our exclusion semantics); no `-I` equivalent at all (hd-idle's re-assertion flag is a wear generator on bridges
     where redundant STOP commands half-start the motor, per `KNOWLEDGE.md` §`Drive-PM treatment`, so its absence is no
     loss); genuinely tiny (2 dependency crates, zero-allocation steady state, ~71 kB binary with nightly build-std per
-    upstream claim vs the ~1.6 MB stripped Go binary - against the resolved long-running-footprint review below this
-    amounts to a small RSS saving at best); permissive MIT license (vs GPL-3.0-only) should forking ever become the
-    path; its only command (START STOP UNIT) is in the kernel's read-safe list, so a rust-idle-based app would need no
-    SYS_RAWIO (security rating +1) - but only as long as no drive-PM treatment (smartctl ATA SET FEATURES) is ported,
-    which is precisely the feature this app's users rely on.
+    upstream claim vs the ~1.6 MB stripped Go binary - against the already-reviewed long-running footprint (the resident
+    set is the watcher bash and the upstream Go daemon; RAM peaks are transient) this amounts to a small RSS saving at
+    best); permissive MIT license (vs GPL-3.0-only) should forking ever become the path; its only command (START STOP
+    UNIT) is in the kernel's read-safe list, so a rust-idle-based app would need no SYS_RAWIO (security rating +1) - but
+    only as long as no drive-PM treatment (smartctl ATA SET FEATURES) is ported, which is precisely the feature this
+    app's users rely on.
 
   - Cons (honest): effectively unmaintained (last commit 2024-09-08, a single v0.1.0 release 2022-05 while Cargo.toml
     already says 0.1.1, 3 stars, no open issues; the author frames the project as an exercise "to see how well rust
@@ -85,76 +88,3 @@ Short dev items first; resolved items at the bottom. Underlying technical facts 
     machinery (hd-idle-genargs/hd-idle-watch/hd-idle-pmfix) is built around hd-idle's CLI semantics. One thing survives
     this assessment regardless: the sync-before-spindown/spin-up idea is a legitimate hd-idle upstream feature request
     (could be folded into the upstream items in this section).
-
-## Resolved
-
-- Watcher tick slimmed to a baseline replay (2026-10-21, v0.1.9): hd-idle-genargs records a resolution baseline
-  (`/etc/hd-idle.resolution`: shas of the installed args/drives files, the system-disk set, and every configured
-  device's resolution outcome) and `--check` replays it per tick - no option reads, no jq, no candidate-file writes; the
-  full regeneration now runs only on a detected change (the nfsd-apply `--check` pattern, nfs-server commit d78c7ea).
-  This supersedes two items rejected in the 2026-10-15 footprint review: the jq `@tsv` batching (the jq chain no longer
-  runs per tick at all) and the by-id hash pre-gate (the baseline replay IS the pre-gate, justified by precedent). Also
-  added the watcher's `hd-idle.drives.prev` copy for `pmfix --since` to the profile's documented file surface (initially
-  mistaken for an enforcing-device failure - file rules are documentation under the `file,` blanket, repository-root
-  KNOWLEDGE.md §AppArmor; corrected 2026-10-21). Lab-verified via the watcher roundtrips (args-content and
-  baseline-state corruption, including the no-restart state resync), now running in every lab (relocated out of the
-  spindown-drives gate).
-
-- Per-drive drive-PM treatment override (2026-10-16, v0.1.6): each drive-list entry gained a `disable_drive_pm` yes/no
-  field (empty = follow the global option), emitted as the drives file's fourth column; hd-idle-pmfix decides per drive
-  from it and runs unconditionally (a global-only bashio gate could not express per-drive overrides). A `list(yes|no)?`
-  dropdown instead of a `bool?` because an untouched optional checkbox is visually indistinguishable from an explicit
-  "off" while unset - and jq's `// empty` cannot distinguish absent from an explicit false (both: `KNOWLEDGE.md`
-  §`bashio option parsing`). Verified via a genargs/pmfix decision-matrix run against the pinned base image (options
-  stubbed by seeding bashio's options cache; see the repository-root `KNOWLEDGE.md` base-image gotchas) and the lab boot
-  with a configured override drive; the lab spindown smoke test itself needs a real spindownable drive and stays a
-  device-side check.
-
-- Configuration mode switch dropped (2026-10-16, v0.1.5): single mode - listed drives follow the global defaults where
-  their fields are empty (default_idle alive for all listed drives; the former opt-in idle-less rejection is gone), the
-  global idle is pinned to 0 so unlisted and runtime-appearing drives are never touched (the former opt-out EPERM churn
-  is gone), system-disk pins kept as defense in depth, and detached-at-boot drives carry their effective idle in the
-  passthrough entry (no watcher restart needed for the value). A stored mode key is inert (one-line supervisor warning,
-  device-verified; see the repository-root KNOWLEDGE.md options bullet). Migration device-verified.
-
-- Long-running footprint review (2026-10-15): taken - the genargs inventory walk (boot-time UX) is now guarded off in
-  quiet mode (~290 process spawns per watcher tick eliminated, dominant churn source) and the healthcheck scans /proc
-  with the read builtin (one spawn per checked PID eliminated); lab-verified, no behavior change (the inventory log line
-  is boot-only, and args-file content is unchanged). Considered and rejected: batching the per-disk jq calls into one
-  @tsv call (~27 fewer spawns for nine disks; parsing subtlety disproportionate after the guard), raising or backing off
-  the watcher's 30 s interval (changes the documented hotplug pickup latency), a by-id hash pre-gate before regeneration
-  (complexity disproportionate now), and RAM trimming (peaks are transient; the resident set is the watcher bash and the
-  upstream Go daemon only). The daemon's poll interval is upstream and scales with user-configured idle times - not ours
-  to change.
-
-- Round 2 review applied (2026-10-15): the SG_IO section documents the kernel's EPERM fall-through mechanism
-  (`scsi_cmd_allowed()` -> `return open_for_write`, restored as slimming collateral); the `-t` KNOWLEDGE note reflects
-  the lab smoke test's docker-exec caller; boot-time hd-idle-pmfix failure is non-fatal (consistent with the watcher,
-  CHANGELOG 0.1.3); pmfix's result classification greps use `-iE` (POSIX alternation); README wording (the daemon opens
-  no sockets; ASCII hyphen in "3-5"); lab-hook comment corrected (single-shot uses the GLOBAL default command type).
-  Durable verified-OK facts from the round: the drives-file derivation's nonsuffix case branch exists for the watcher's
-  /tmp candidate naming; a genargs failure after the args write converges via the dual-cmp (or boot restart).
-
-- Code review + doc/comment cleanup (2026-10-15, v0.1.3) done: full read-only review of all scripts, profile, config and
-  Dockerfile (shellcheck/bash -n clean); both must-fix doc defects fixed (the SG_IO capability guidance contradicted the
-  shipped profile; the dangling same-kernel-name TODO reference), both behavioral nice-to-haves implemented and
-  lab-verified (the watcher compares/re-syncs both generated files; hd-idle-genargs rejects whitespace in emitted
-  tokens), and the comment slimming landed (single canonical homes per the placement rule, references elsewhere; comment
-  share 29-73% -> 21-54%; zero behavior verified via comment-stripped diffs). Accepted residual risks: the crash window
-  between the watcher's second mv and hd-idle-pmfix defers treatment to the next app restart (documented fallback); the
-  `hd-idle -t` KNOWLEDGE section has no in-app caller (kept for manual debugging).
-
-- AppArmor profile verified on a real device (2026-10-15): the `hdidle` sub-profile (`cx` transition + `deny network`)
-  and the `/dev/sd*` ioctl path work under real enforcement. Proven functionally rather than via audit logs (HAOS
-  produces no AppArmor audit logs, and the SSH app context cannot read apparmorfs): `test:live` ran the daemon in opt-in
-  mode against all nine glob-selected USB disks and every single drive issued its daemon-driven spindown event - device
-  cgroup grant, `/dev` node open, SG_IO `START STOP UNIT` and command execution all happened under the enforced profile.
-  Zero error/denial lines in the app log and dmesg.
-
-- `test:live` does real spindown checks (`.mise/tasks/test/live/hd-idle.sh`): `LIVE_HDIDLE_LABEL_GLOB` selects the
-  drives by filesystem label (only disks whose labeled partitions ALL match the glob; non-`sd*` disks and disks hosting
-  non-matching labels are excluded - the glob is a test-target selector, not a safety boundary), generates opt-in test
-  options with a 30 s idle on the fly and asserts the boot (managed-disk set exactly equal to the discovery, by-id to
-  kernel mapping) plus per-drive daemon-issued spindown events within a 300 s window. HAOS ships no docker CLI, so the
-  lab's forced `hd-idle -t` single-shot check is not reproducible on the device - the daemon's own events are the
-  stronger end-to-end assertion anyway.
