@@ -24,7 +24,7 @@ Never duplicate information across files. Place it where it belongs and referenc
   gotchas, apk policy). Skills and code comments cite its sections by exact name — keep section names stable.
 - `.agents/skills/<name>/` — **procedures** for coding agents (how to do things), in the
   [agentskills.io](https://agentskills.io/specification) format (`SKILL.md` with YAML frontmatter; optional `scripts/`,
-  `references/`, `assets/`). Skills cite facts from the knowledge files by section, never restate them.
+  `references/`, `assets/`). Skills cite facts from the knowledge files by section (`§"..."`), never restate them.
 - `<app>/KNOWLEDGE.md` — app-specific cross-session facts (same discipline as the root file). Write a new entry whenever
   you learn something non-obvious about *this app* that outlives the current change; repository-wide facts go to the
   root `KNOWLEDGE.md` instead.

@@ -29,7 +29,7 @@ Procedures for lab/device testing and releases live in the skills `ha-app-lab-te
 
 ## Boot sequence and s6 services
 
-Tree under `rootfs/etc/s6-overlay/` (wiring facts: root `KNOWLEDGE.md`, section "s6-overlay: user bundles live OUTSIDE
+Tree under `rootfs/etc/s6-overlay/` (wiring facts: root `KNOWLEDGE.md` §"s6-overlay: user bundles live OUTSIDE
 s6-rc.d"), in dependency order:
 
 1. **cont-init** (`etc/cont-init.d/config.sh`): mounts the nfsd control filesystem at `/proc/fs/nfsd` (failure is fatal

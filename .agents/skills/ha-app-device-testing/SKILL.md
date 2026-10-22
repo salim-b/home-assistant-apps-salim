@@ -14,8 +14,8 @@ via `mise run <task> --help` — not duplicated here. Device access over SSH onl
 ## Semantics that outlive the flags
 
 - **Stored options are user data**: written at first install and at save time only; update and rebuild preserve them;
-  `config.yaml` default changes never reach existing installs. Facts: root `KNOWLEDGE.md`, section "Supervisor: option
-  schema quirks".
+  `config.yaml` default changes never reach existing installs. Facts: root `KNOWLEDGE.md` §"Supervisor: option schema
+  quirks".
 - **An uninstall purges stored options** in every case (the `--remove-config` flag only additionally deletes the app's
   `/data` config folder), so a reinstall always runs the app's default options. Any option set that would die with an
   uninstall is archived to a local backup file first (path printed) — that backup is the only surviving copy.

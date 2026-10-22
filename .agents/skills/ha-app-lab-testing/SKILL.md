@@ -9,10 +9,10 @@ description: How to run the full-fidelity boot lab and write per-app lab hooks (
 
 ## When and how
 
-Run for every runtime-affecting change — it caught the mountd/pseudo-root class of bugs. Invocation:
-`mise run lab [app] [--keep]`; usage via `mise run lab --help` (not duplicated here). What it does: a fake Supervisor
-API serves the app's default options (adapted to the lab network), the app container boots with its complete s6-rc tree,
-an app-provided runtime check runs, then a graceful stop. `--keep` keeps containers/directories for debugging.
+Run for every runtime-affecting change. Invocation: `mise run lab [app] [--keep]`; usage via `mise run lab --help` (not
+duplicated here). What it does: a fake Supervisor API serves the app's default options (adapted to the lab network), the
+app container boots with its complete s6-rc tree, an app-provided runtime check runs, then a graceful stop. `--keep`
+keeps containers/directories for debugging.
 
 ## Boot-only default
 
@@ -48,4 +48,4 @@ The lab boots app containers `--privileged` on the lab host, so host-side hardwa
   `smartctl -n standby` is designed not to. Device/bridge-specific findings live in the apps' `KNOWLEDGE.md`.
 - Plain Docker exposes no `/dev/disk` udev symlink trees (HAOS binds the host `/dev` read-only into app containers):
   when an app's behavior depends on them, mirror it in the hook (`-v /dev/disk:/dev/disk:ro`). Facts: root
-  `KNOWLEDGE.md`, section "Supervisor: device access".
+  `KNOWLEDGE.md` §"Supervisor: device access".

@@ -43,7 +43,7 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 - Also schema-validates `.github/renovate.json` against the published Renovate config schema (refetched whenever that
   file changes), `.rumdl.toml` against rumdl's and `.panache.toml` against panache's config schema, and compares pinned
   apk package versions in app Dockerfiles against the Alpine binary indexes (drift = guided release — root
-  `KNOWLEDGE.md`, section "apk package version policy").
+  `KNOWLEDGE.md` §"apk package version policy").
 
 ## YAML linting: ryl
 

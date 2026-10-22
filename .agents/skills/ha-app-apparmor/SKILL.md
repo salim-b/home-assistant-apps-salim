@@ -7,7 +7,9 @@ description: How to author, update, and debug custom AppArmor profiles (apparmor
 
 # AppArmor profiles for HA apps
 
-## Mechanics (facts — root `KNOWLEDGE.md`, section "AppArmor: mediation and profile mechanics")
+Facts: root `KNOWLEDGE.md` §"AppArmor: mediation and profile mechanics"
+
+## Mechanics
 
 Capabilities are mediated (list every one the binaries need — a profile without explicit capability rules denies them
 all at the LSM hook); network mediation is opt-in per class ("no rules" is not "no networking"); ioctls are mediated via
@@ -21,7 +23,8 @@ Read that section before writing rules.
 - Exactly one top-level (non-indented) `profile` declaration; nested sub-profiles must be indented. The supervisor
   renames the profile to the installed slug on install/update — the declared name is arbitrary.
 - HA convention: a `file,` blanket. Tightening file rules is impractical without audit logs; the profile's confinement
-  value sits in the non-file classes (network, capability, mount). Rationale: root `KNOWLEDGE.md`, AppArmor section.
+  value sits in the non-file classes (network, capability, mount). Rationale: root `KNOWLEDGE.md` §"AppArmor: mediation
+  and profile mechanics".
 - Enumerate capabilities from what the binaries actually do (strace, errno evidence). Sub-profile subtlety:
   self-capability-management (`prctl(PR_CAPBSET_DROP)`, `capset(2)`) needs `capability setpcap,` — daemons that prune
   their whole bounding set at startup exit in a restart loop without it.
@@ -46,5 +49,5 @@ only; `rebuild` does not re-apply them. Release rules: skill `ha-app-workflow`.
 ## Device verification
 
 Verify functionally — run the workload under enforcement and assert zero error/denial lines in the app log and dmesg —
-not via audit logs. Worked per-app examples: `hd-idle/KNOWLEDGE.md` (SG_IO privileges section) and
-`nfs-server/KNOWLEDGE.md` (AppArmor profile section).
+not via audit logs. Worked per-app examples: `hd-idle/KNOWLEDGE.md` (§"SG_IO privileges") and `nfs-server/KNOWLEDGE.md`
+(§"AppArmor profile — app-specific grants").

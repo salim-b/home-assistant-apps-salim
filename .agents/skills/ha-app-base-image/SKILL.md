@@ -7,7 +7,7 @@ description: HA base image shell gotchas and safe procedures for app scripts —
 
 # HA base image shell gotchas
 
-Mechanism facts: root `KNOWLEDGE.md`, section "HA base image: shell gotchas". The procedures:
+Mechanism facts: root `KNOWLEDGE.md` §"HA base image: shell gotchas". The procedures:
 
 ## Writing to procfs/sysfs transaction files (e.g. `/proc/fs/nfsd/*`)
 
@@ -51,4 +51,4 @@ is an inherited variable. Worked example: hd-idle's per-drive decision-matrix te
 User-bundle services: directories under `/etc/s6-overlay/user-bundles.d/`, never under `s6-rc.d/`; every service needs
 an empty `dependencies.d/base` file (otherwise a longrun can start before `legacy-cont-init` has completed). Any change
 under those trees must be lab-booted before deploy (`mise run lab <app>` — skill `ha-app-lab-testing`). Facts: root
-`KNOWLEDGE.md`, section "s6-overlay: user bundles live OUTSIDE s6-rc.d".
+`KNOWLEDGE.md` §"s6-overlay: user bundles live OUTSIDE s6-rc.d".
