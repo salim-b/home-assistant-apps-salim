@@ -2,11 +2,12 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/base:3.24
 FROM ${BUILD_FROM}
 
-# Install requirements for app (nfs-utils is unpinned deliberately -
-# see the repository-root KNOWLEDGE.md §"apk package version policy")
-# hadolint ignore=DL3018
+# Pinned apk versions: the app's runtime logic encodes nfs-utils's interface (exportfs's export-table/fsid semantics
+# in nfsd-apply, the rpc.nfsd CLI in nfsd-start, nfsdcld's client-tracking store format), so package changes must be
+# explicit app releases (nfs-server/KNOWLEDGE.md §"Export-cache and fsid semantics", §"`rpc.nfsd` is not a daemon",
+# §"NFSv4 client state recovery (nfsdcld + per-netns rpc_pipefs)"; policy: repository-root KNOWLEDGE.md §"apk package version policy").
 RUN apk add --no-cache \
-  nfs-utils
+  nfs-utils=2.6.4-r6
 
 # Create necessary system directories (exportfs keeps its export table state in /var/lib/nfs)
 # hadolint ignore=DL3059

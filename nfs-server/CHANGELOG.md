@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.7.2
+
+- Internals: pinned the nfs-utils apk package (2.6.4-r6): Alpine-side package updates now become explicit app releases
+  guided by the CI drift check and auto-bumped by Renovate (like hd-idle's pins), instead of silently changing released
+  images' package content on rebuilds. The app's runtime logic encodes nfs-utils's interface (exportfs's
+  export-table/fsid semantics, the rpc.nfsd CLI, nfsdcld's client-tracking store format) - see the repository-root
+  `KNOWLEDGE.md` apk package version policy.
+
 ## 0.7.1
 
 - Maintainability: no behavior change (the comment-stripped scripts and the AppArmor rule lines are unchanged) - code

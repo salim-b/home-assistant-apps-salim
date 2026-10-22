@@ -170,11 +170,14 @@ digest until the next versioned release.
 
 **Our policy** splits by coupling:
 
-- **Pin** (full `pkgver-pkgrel`, e.g. `hd-idle=1.22-r8`) when the app's runtime logic encodes the package's interface
-  (hd-idle's arg generator relies on hd-idle's CLI semantics): every package change becomes a deliberate app release
-  (pin plus `config.yaml` version plus changelog).
-- **Float** when chasing pkgrel rebuilds adds churn without user value (nfs-server's `nfs-utils` — a multi-binary
-  ecosystem whose kernel-consistency matters more than the exact userspace version).
+- **Pin** (full `pkgver-pkgrel`, e.g. `hd-idle=1.22-r8`, `nfs-utils=2.6.4-r6`) when the app's runtime logic encodes the
+  package's interface (hd-idle's arg generator relies on hd-idle's CLI semantics; nfs-server's scripts rely on
+  exportfs's export-table/fsid semantics, the rpc.nfsd CLI and nfsdcld's client-tracking store format): every package
+  change becomes a deliberate app release (pin plus `config.yaml` version plus changelog). The release automation
+  (Renovate apk datasource, pkgrel-only automerge, post-merge changelog job) keeps the release cost of pinning near zero
+  even for frequently-rebuilt packages.
+- **Float** when the package's interface is not encoded in the app's runtime logic (a generic tool the app runs but
+  never inspects): chasing pkgrel rebuilds would add version-bump churn without user value.
 
 Enforcement: `validate.py` (`validate_apk_pins`) extracts the BUILD_FROM default branch and the apk pins from each app's
 Dockerfile and compares them against the Alpine **binary indexes** (dl-cdn APKINDEX, cached 24 h). The comparison is
