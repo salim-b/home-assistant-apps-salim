@@ -4,5 +4,5 @@
 #
 # Safe no-op by design: an empty drive list - the app boots, runs and manages nothing until real
 # drives are configured. Extend with device-specific drives + a short idle once drives are attached
-# to the test device (see hd-idle/TODO.md).
+# to the test device (the device-verification item in hd-idle/TODO.md covers this and the port-move scenario).
 disks: []

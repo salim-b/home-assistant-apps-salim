@@ -4,10 +4,10 @@
 
 ## 0.1.10
 
-- Maintainability: no behavior change (the comment-stripped scripts and the AppArmor rule lines are unchanged) - code
-  comments slimmed to purpose + references, `KNOWLEDGE.md` tightened to durable facts and `TODO.md` pruned to open
-  items. The narratives and procedures now live in the repository's `KNOWLEDGE.md` and agent skills, their single
-  canonical homes.
+- Maintainability: no behavior change (the comment-stripped scripts are unchanged; AppArmor confinement unchanged - the
+  only rule edit is two blanket-covered `/proc` documentation rules) - code comments slimmed to purpose + references,
+  `KNOWLEDGE.md` tightened to durable facts and `TODO.md` pruned to open items. The narratives and procedures now live
+  in the repository's `KNOWLEDGE.md` and agent skills, their single canonical homes.
 
 ## 0.1.9
 

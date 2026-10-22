@@ -17,6 +17,8 @@ LABEL \
     org.opencontainers.image.source="https://github.com/salim-b/home-assistant-apps-salim" \
     org.opencontainers.image.licenses="Apache License 2.0"
 
-# hd-idle exits (log.Fatal) when it loses /proc/diskstats: probe the process and the stats file.
+# hd-idle log.Fatals when it loses /proc/diskstats OR cannot open/write its activity log (hdidle.go logToFile): the
+# probe checks the stats file and the daemon process (the process probe covers both crash loops).
+# hd-idle/KNOWLEDGE.md §"Daemon failure semantics".
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD ["/usr/bin/hd-idle-healthcheck"]

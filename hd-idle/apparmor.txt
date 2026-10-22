@@ -5,6 +5,8 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
 
   ## Modeled on the nfs-server profile and the official dev-docs AppArmor template. Mediation mechanics and gotchas:
   ## repository-root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics"; app facts: hd-idle/KNOWLEDGE.md.
+  ## Sub-profile `signal (send)` grants are template-inherited headroom: nothing in them sends signals (s6-svc talks
+  ## to s6 over its control fifo, not kill(2)) - scoping/dropping them is tracked in hd-idle/TODO.md.
 
   # Generic file access, signals (s6 supervision, bash job control). `file,` is the upstream HA convention - the
   # confinement value sits in the non-file classes (network, capability); repository-root
@@ -43,6 +45,11 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
 
   # AppArmor status reporting (s6 sets this up; harmless otherwise)
   /sys/kernel/security/apparmor/** r,
+
+  # Docker HEALTHCHECK probes (blanket-covered; enumerated as documentation): the stats file and the daemon-process
+  # scan. Fatal-path inventory: hd-idle/KNOWLEDGE.md §"Daemon failure semantics".
+  /proc/diskstats r,
+  /proc/[0-9]*/comm r,
 
   # Disk introspection and spindown targets (O_RDONLY + SG_IO; mediated via the file's r/w permission). /dev/disk/by-*
   # for path resolution (config.sh), /sys/block for attribution and USB-bridge detection. The supervisor's cgroup
@@ -95,6 +102,7 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
     /sys/block/{,**} r,
     # Activity log (-l, written only on spinup/spindown events)
     /data/** rw,
+    # Template-inherited per-PID enumeration (hd-idle v1.22 itself reads only /proc/diskstats above); blanket-covered.
     /proc/[0-9]*/{,cmdline,mounts,stat} r,
     /tmp/** rwk,
   }

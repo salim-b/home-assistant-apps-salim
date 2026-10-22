@@ -20,6 +20,8 @@ The app generates that command line from the app options and keeps it in sync wi
   with effective values (format and semantics: §"Drive-PM treatment").
 - `/etc/hd-idle.resolution` — the baseline state file, written LAST (commit point of the three-file install).
 - `/usr/bin/hd-idle-pmfix` — drive-PM treatment via smartctl (§"Drive-PM treatment").
+- `/usr/bin/hd-idle-healthcheck` — the Docker HEALTHCHECK probe (stats file + daemon process; §"Daemon failure
+  semantics").
 - s6-rc services: `hd-idle` (longrun; its run script reads the args file and `exec`s the daemon, so s6 signals hd-idle
   directly on stop and its stdout — spinup/spindown events, debug lines — lands in the app log) and `hd-idle-watch`
   (longrun, 30 s tick). cont-init: `/etc/cont-init.d/config.sh`.

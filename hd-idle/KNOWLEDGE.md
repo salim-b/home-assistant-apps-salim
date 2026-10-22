@@ -51,12 +51,28 @@ Verified against the v1.22 source (`main.go`, `hdidle.go`):
 
 ## Monitoring scope
 
-`diskstats/snapshot.go` matches `/proc/diskstats` names against `sd[a-z]+$` (disk), `sd[a-z]+[0-9]+$` (partition →
-parent disk) and `dm-*$` (dm → holder disk); anything else (`nvme*`, `mmcblk*`, `loop*`, `ram*`) is never touched —
-system disks on SD/eMMC/NVMe are out of hd-idle's reach (third exclusion layer), and NVMe drives cannot be managed at
-all. Per-partition activity wakes the configured disk. dm attribution picks a single holder (the app takes the first
-`/sys/class/block/<dm>/holders/` entry, readdir order — hd-idle's own attribution is likewise single-holder): a
-multi-holder dm device (multi-PV LVM) cannot be managed correctly; the common dm-crypt case (one holder) is exact.
+`diskstats/snapshot.go` (v1.22) matches `/proc/diskstats` names against `sd[a-z]+$` (disk) and `dm-*$` (dm → holder
+disk); anything else (`nvme*`, `mmcblk*`, `loop*`, `ram*`) is never touched — system disks on SD/eMMC/NVMe are out of
+hd-idle's reach (third exclusion layer), and NVMe drives cannot be managed at all. The upstream PARTITION matching
+(`sd[a-z]+[0-9]+$`) is commented out in v1.22 — partitions are invisible to the daemon; per-partition activity still
+wakes the configured disk only because the kernel accumulates partition I/O into the disk's own counters. dm attribution
+picks a single holder — upstream reads `/sys/class/block/<dm>/holders/` via `os.ReadDir` (lexicographic order,
+deterministic; the app's own attribution is likewise single-holder): a multi-holder dm device (multi-PV LVM) cannot be
+managed correctly; the common dm-crypt case (one holder) is exact. Source:
+[snapshot.go](https://github.com/adelolmo/hd-idle/blob/v1.22/diskstats/snapshot.go).
+
+## Daemon failure semantics
+
+The daemon is crash-only, with two fatal paths (v1.22 source): a `log.Fatal` when `/proc/diskstats` cannot be opened or
+scanned (`diskstats/snapshot.go`), and a `log.Fatal` when the activity log `/data/hd-idle.log` cannot be opened or
+written (`logToFile` in `hdidle.go`) — a full or read-only `/data` kills the daemon rather than disabling logging.
+s6-supervise restarts the process in both cases, so a *persistent* failure becomes a crash loop that process supervision
+cannot distinguish from a healthy app. The Docker HEALTHCHECK is the only container-level signal: `hd-idle-healthcheck`
+re-checks both premises (stats file readable; daemon process alive via a `/proc/*/comm` scan) — the file probe covers
+diskstats loss, the process probe covers both crash loops. The supervisor relays the resulting health events as bus
+events and its app watchdog decides on a restart (root `KNOWLEDGE.md` §"Supervisor: health events and the app
+watchdog"). Sources: [snapshot.go](https://github.com/adelolmo/hd-idle/blob/v1.22/diskstats/snapshot.go),
+[hdidle.go](https://github.com/adelolmo/hd-idle/blob/v1.22/hdidle.go).
 
 ## SG_IO privileges
 
@@ -167,6 +183,14 @@ file — cannot occur in practice) means treat. config.sh and the watcher run pm
 gate could not express per-drive overrides); `--since <old-file>` treats only lines NEW or CHANGED relative to it — a
 flipped pm-flag counts as changed, so a newly overridden drive is treated exactly once and an unchanged override stays
 skipped.
+
+Treatment-success detection (`smart()` in hd-idle-pmfix) requires smartctl exit 0 AND output free of
+`failed|unknown|unavailable`: the exit code alone does not certify that ATA SET FEATURES took effect —
+feature-page-filtered bridges answer "APM feature is: Unavailable" with exit 0 (the silent-no-op class of §"USB-bridge
+behaviors"). The failure-detail grep uses a different word list (`failed|unavailable|aborted|invalid`) — it only picks a
+log line for the message. Every treatment call pins `-d sat` (SAT passthrough for every sd\* device — no reliance on
+smartctl's per-device type auto-detection) and is capped at `timeout 60` (a wedged bridge or slow motor ramp-up must
+neither stall the s6 boot nor wedge a watcher tick).
 
 ## hd-idle-watch design
 

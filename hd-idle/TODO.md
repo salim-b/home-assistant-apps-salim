@@ -88,3 +88,19 @@ Open work items only (resolved items live in git history). Underlying technical 
     machinery (hd-idle-genargs/hd-idle-watch/hd-idle-pmfix) is built around hd-idle's CLI semantics. One thing survives
     this assessment regardless: the sync-before-spindown/spin-up idea is a legitimate hd-idle upstream feature request
     (could be folded into the upstream items in this section).
+
+- Hermetic lab test for hd-idle-pmfix's `--since` decision logic (the treatment-success path is host-dependent, but the
+  skip/treat DECISION is not): unchanged drives-file line → skip, new/changed line → treat exactly once, missing `.prev`
+  file → treat all (pmfix logs every decision). A regression (e.g. in the line match) would silently re-treat asleep
+  drives on every change tick — the wear-generating failure mode (`KNOWLEDGE.md` §"USB-bridge behaviors"). Mirror the
+  genargs `--check` matrix in `.mise/tasks/lab/hd-idle.sh`.
+
+- Device-side verification with real drives attached (the lab can cover neither half: it cannot simulate kernel renames
+  — `.mise/tasks/lab/hd-idle.sh` — and has no drives): (a) extend `.mise/tasks/test/live/hd-idle.yaml` with
+  device-specific drives and run the live hook through a short idle soak; (b) verify the watcher's core promise
+  end-to-end — a drive moved to another port (kernel rename) is re-granted (cgroup rules), re-resolved (by-id) and the
+  daemon restarted under the new name (DOCS.md's "drives moved between ports are picked up automatically").
+
+- AppArmor sub-profiles: the unscoped `signal (send)` grant is template-inherited and unused (the daemon sends no
+  signals; s6-svc talks to s6 over its control fifo, not kill(2)). Scope or drop it — device-verify first (no audit logs
+  on HAOS: skill `ha-app-apparmor`).

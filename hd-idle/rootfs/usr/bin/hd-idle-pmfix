@@ -27,6 +27,11 @@ esac
 
 [ -r "${DRIVES_FILE}" ] || { bashio::log.warning "hd-idle-pmfix: no drives file (${DRIVES_FILE}) - nothing to treat"; exit 0; }
 
+# Success requires rc=0 AND no failed|unknown|unavailable output: smartctl's exit code alone does not certify that
+# ATA SET FEATURES took effect (feature-page-filtered bridges answer "APM feature is: Unavailable" with rc=0 - a
+# silent no-op). The detail grep's different word list only picks a log line for the failure message. -d sat pins
+# SAT passthrough for every sd* device; timeout 60 keeps a wedged bridge from stalling the s6 boot or a watcher tick.
+# Rationale: hd-idle/KNOWLEDGE.md §"Drive-PM treatment".
 smart() {
   local dev="$1" flag="$2" value="$3" out rc
   out=$(timeout 60 smartctl -d sat -s "${flag},${value}" "/dev/${dev}" 2>&1) && rc=0 || rc=$?
