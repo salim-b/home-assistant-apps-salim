@@ -11,7 +11,7 @@ supervisor's voluptuous schemas (AST-extracted from the pinned ref - no drifting
 AppArmor profile against the supervisor's profile-name regex (exactly one top-level profile);
 cross-checks translation 'configuration' keys vs schema keys (incl. nested 'fields') and
 'network' keys (lowercase!) vs config.yaml 'ports'; schema-validates .github/renovate.json,
-.rumdl.toml and panache.toml against their published schemas; canary-checks that rumdl's
+.rumdl.toml and .panache.toml against their published schemas; canary-checks that rumdl's
 autofix stays disabled (panache owns formatting; see .rumdl.toml `fixable`); verifies apk pins
 against the Alpine binary indexes (policy: root KNOWLEDGE.md §apk package version policy).
 """
@@ -228,12 +228,12 @@ def validate_rumdl_no_autofix() -> None:
 
 
 def validate_panache_config() -> None:
-    """Schema-validate panache.toml against panache's published config schema, fetched at the
+    """Schema-validate .panache.toml against panache's published config schema, fetched at the
     installed panache version's tag (pin: mise.toml [tools] + mise.lock) - same pattern as rumdl.
     Requires panache on PATH (`mise run validate`)."""
     import jsonschema
 
-    config_file = ROOT / "panache.toml"
+    config_file = ROOT / ".panache.toml"
     if not config_file.is_file():
         return
     config = tomllib.loads(config_file.read_text())
@@ -259,9 +259,9 @@ def validate_panache_config() -> None:
         jsonschema.validate(config, json.loads(schema_file.read_text()))
     except jsonschema.ValidationError as err:
         loc = "/".join(str(p) for p in err.absolute_path) or "<root>"
-        fail("panache.toml", f"schema mismatch at {loc}: {err.message[:200]}")
+        fail(".panache.toml", f"schema mismatch at {loc}: {err.message[:200]}")
     except jsonschema.SchemaError as err:
-        fail("panache.toml", f"fetched schema unusable: {err.message[:200]}")
+        fail(".panache.toml", f"fetched schema unusable: {err.message[:200]}")
 
 
 APKINDEX_TTL = 24 * 3600  # the daily CI cron should see Alpine-side repoints
