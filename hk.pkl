@@ -1,5 +1,7 @@
-amends "package://github.com/jdx/hk/releases/download/v2.7.0/hk@2.7.0#/Config.pkl"
-import "package://github.com/jdx/hk/releases/download/v2.7.0/hk@2.7.0#/Builtins.pkl"
+// The package version must stay in sync with the hk binary pin in mise.toml [tools] - the package provides the
+// builtin step definitions the binary executes.
+amends "package://github.com/jdx/hk/releases/download/v2.7.1/hk@2.7.1#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.7.1/hk@2.7.1#/Builtins.pkl"
 
 // hk's shebang-based file typing misses the extensionless s6 scripts (upstream item: root TODO.md).
 // `match_any` REPLACES a step's default selection (frozen by the pinned package version), so each
