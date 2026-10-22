@@ -47,7 +47,8 @@ local_slug="local_${slug}"
 
 echo "== deploying $app v$version to $host (store slug: $local_slug) =="
 
-# Repository installs get the hashed store slug (fact: root KNOWLEDGE.md §Supervisor: store slugs);
+# Repository installs get the hashed store slug
+# (fact: root KNOWLEDGE.md §"Supervisor: store slugs (in-app documentation links)");
 # a second installation would conflict on the published port, so refuse (or --replace). Matching by
 # slug suffix instead of reproducing the hash keeps working when the app moves between repositories.
 store_apps=$(ssh "${SSH_OPTS[@]}" "$host" 'ha store apps --raw-json' 2>/dev/null || true)

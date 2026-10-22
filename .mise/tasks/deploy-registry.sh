@@ -85,8 +85,8 @@ repo_slug=$(echo "$repo_entry" | jq -r '.slug')
 echo "-- repository on device: $repo_slug ($repo_url)"
 
 # --- discover the store entry + installed copies (one listing) ---------------
-# Store installs get the exact hashed slug '<repo-hash>_<app-slug>', the local one 'local_<app-slug>'
-# (fact: root KNOWLEDGE.md §Supervisor: store slugs) - exact matches, no suffix guessing.
+# Store installs get the exact hashed slug '<repo-hash>_<app-slug>', the local one 'local_<app-slug>' -
+# exact matches, no suffix guessing (fact: root KNOWLEDGE.md §"Supervisor: store slugs (in-app documentation links)").
 store=$(sup_get store/addons)
 if ! echo "$store" | jq -e '.result == "ok"' >/dev/null 2>&1; then
   echo "ERROR: could not read the store listing on $host: $store" >&2

@@ -7,7 +7,8 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
   ## repository-root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics"; app facts: hd-idle/KNOWLEDGE.md.
 
   # Generic file access, signals (s6 supervision, bash job control). `file,` is the upstream HA convention - the
-  # confinement value sits in the non-file classes (network, capability); repository-root KNOWLEDGE.md §AppArmor.
+  # confinement value sits in the non-file classes (network, capability); repository-root
+  # KNOWLEDGE.md §"AppArmor: mediation and profile mechanics".
   file,
   signal,
 

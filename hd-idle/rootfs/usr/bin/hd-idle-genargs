@@ -357,8 +357,8 @@ record_resolution() {
   RECORD_RESOLVED["${1}"]="${2}"
 }
 
-## bashio::config returns one compact JSON object per line for list-of-object options (hd-idle/KNOWLEDGE.md
-## §"bashio option parsing").
+## bashio::config returns one compact JSON object per line for list-of-object options
+## (hd-idle/KNOWLEDGE.md §"bashio option parsing (list-of-object options)").
 while IFS= read -r disk; do
   [ -n "${disk}" ] || continue
   N_DRIVES=$((N_DRIVES + 1))
