@@ -1,7 +1,7 @@
 # TODOs
 
-Open dev items. Underlying technical facts and root causes live in `KNOWLEDGE.md`, runtime procedures in
-`.agents/skills/hd-idle-runtime` (resolved items are encoded in git history and the changelog).
+Open work items only (resolved items live in git history). Underlying technical facts and root causes live in
+`KNOWLEDGE.md`, runtime procedures in `.agents/skills/hd-idle-runtime`.
 
 ## Tasks
 

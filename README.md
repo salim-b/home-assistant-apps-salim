@@ -28,41 +28,32 @@ practices](https://contributors.home-assistant.io/apps/) as far as possible.
 
 Non-obvious development knowledge lives in [`KNOWLEDGE.md`](./KNOWLEDGE.md) (repository-wide: supervisor behaviors,
 AppArmor, base-image gotchas, testing) and in each app's own `KNOWLEDGE.md` (e.g.
-[`hd-idle/KNOWLEDGE.md`](./hd-idle/KNOWLEDGE.md), [`nfs-server/KNOWLEDGE.md`](./nfs-server/KNOWLEDGE.md)).
+[`hd-idle/KNOWLEDGE.md`](./hd-idle/KNOWLEDGE.md), [`nfs-server/KNOWLEDGE.md`](./nfs-server/KNOWLEDGE.md)); step-by-step
+procedures live in the skills under [`.agents/skills/`](./.agents/skills) (index in [`AGENTS.md`](./AGENTS.md)).
 
-To test an app on your Home Assistant server (device), use the `deploy` mise task. It copies the app folder to the
-device's `/local_apps/` directory (removing an existing copy first), refreshes the app store metadata, then installs the
-app (if not present), updates it (if the version changed in `config.yaml`) or rebuilds its image (otherwise), and makes
-sure it is running afterwards:
+To test an app on your Home Assistant server (device), use the deploy mise tasks — `mise run <task> --help` has the
+full, current usage (options, flags and what happens to the app's stored options); the examples below cover the common
+flows:
 
 ```sh
 # app name (repo subfolder) + SSH target of the device
 mise run deploy nfs-server root@homeassistant.local
+
+# switch a device from the locally installed app to the published registry
+# version (after merging); --config decides the previous options' fate
+mise run deploy-registry hd-idle root@homeassistant.local --config migrate
 
 # get app logs (`--follow` continuously prints new log entries until you abort;
 # app slug is `local_<config.yaml slug>`)
 ssh root@homeassistant.local 'ha apps logs --follow local_nfs-server'
 ```
 
-Note that the task comments out the top-level `image:` key in the *device-side* copy of `config.yaml`: with an `image`
-key set, the Supervisor would pull that image from GHCR instead of building locally from your working tree — see the
-[dev docs](https://contributors.home-assistant.io/apps/guides/testing/#remote-development).
-
-To switch a device from the locally installed app to the published registry version (after merging), use
-`deploy-registry`. It uninstalls the local copy and installs/updates the app-repository install (discovered via the
-device's store listing); `--config` decides what happens to the previous install's options — `migrate` carries them over
-(filtered to the target version's schema), `reset` wipes them (the app then runs with its default options), and unset
-keeps them (an update preserves the options; a switch starts the store install with the app's defaults — stored options
-do not survive an uninstall). Options an uninstall would orphan are archived to a local backup file:
-
-```sh
-mise run deploy-registry hd-idle root@homeassistant.local --config migrate
-```
-
-If the app is already installed on the device **from an app repository** (i.e. not as a local app — such installs have a
-hashed store slug like `f8b2d53d_nfs-server`), the task refuses: a second installation would conflict on the app's
-published port. Uninstall that copy first (the error message shows the exact command) or pass `--replace` to have the
-task uninstall it automatically.
+Note that the deploy tasks comment out the top-level `image:` key in the *device-side* copy of `config.yaml`: with an
+`image` key set, the Supervisor would pull that image from GHCR instead of building locally from your working tree — see
+the [dev docs](https://contributors.home-assistant.io/apps/guides/testing/#remote-development). An app already installed
+**from an app repository** (not as a local app — such installs have a hashed store slug like `f8b2d53d_nfs-server`)
+would conflict on the app's published port, so the tasks refuse; uninstall that copy first (the error message shows the
+exact command) or pass `--replace` to have the task uninstall it automatically.
 
 For a full end-to-end test, run `test:live` (for the `nfs-server` app, this includes an NFS client roundtrip against the
 running app). It deploys the app, forwarding `--replace`/`--test-options`:
