@@ -1,13 +1,9 @@
 amends "package://github.com/jdx/hk/releases/download/v2.7.0/hk@2.7.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v2.7.0/hk@2.7.0#/Builtins.pkl"
 
-// The shell builtins select scripts by extension and shebang (hk file
-// typing). That misses the extensionless s6 scripts: their
-// `#!/usr/bin/with-contenv bashio` shebangs type as plain text, not bash - so
-// the shell steps also match those paths by glob (s6-overlay convention makes
-// them shell scripts). `match_any` replaces a step's default selection, so
-// each step below repeats the builtin's own selectors (frozen by the pinned
-// package version) plus s6Globs.
+// hk's shebang-based file typing misses the extensionless s6 scripts (upstream item: root TODO.md).
+// `match_any` REPLACES a step's default selection (frozen by the pinned package version), so each
+// shell step below repeats the builtin's own selectors plus s6Globs.
 local s6Globs = List(
   "**/cont-init.d/*",
   "**/s6-overlay/scripts/*",
@@ -15,18 +11,13 @@ local s6Globs = List(
   "**/s6-rc.d/*/finish",
 )
 local mdGlobs = List("**/*.md", "**/*.markdown")
-// Explicit paths bypass panache's own config excludes; AI_POLICY.md is
-// upstream-verbatim, **/LICENSE.md mirrors the default Markdown exclude.
+// Explicit paths bypass panache's config excludes; AI_POLICY.md is upstream-verbatim, **/LICENSE.md mirrors the default Markdown exclude.
 local mdExcludes = List("AI_POLICY.md", "**/LICENSE.md")
 
 local linters = new Mapping<String, Step> {
-  // Left-padding in this repo is marker- or string-driven (Markdown list
-  // indents, quoted string continuations), so the "multiple of indent_size"
-  // rule is noise: `-disable-indent-size` drops it on the check and the fix
-  // command alike, and every other EditorConfig rule stays in force. Shell
-  // indentation is governed by the shfmt step (which reads `indent_size`
-  // from `.editorconfig`); the one class shfmt cannot see is padding inside
-  //  quoted multi-line strings – kept at even multiples by hand.
+  // -disable-indent-size: padding here is marker/string-driven (Markdown list indents, quoted
+  // string continuations), so the indent_size multiple rule is noise - shell indentation is the
+  // shfmt step's job (.editorconfig). Every other EditorConfig rule stays in force.
   ["editorconfig-checker"] = (Builtins.editorconfig_checker) {
     check {
       command {
@@ -39,9 +30,7 @@ local linters = new Mapping<String, Step> {
       }
     }
   }
-  // -x follows `source`d helpers (.mise/tasks/lib/); without it the sourced
-  // helper fails with SC1091. The fix-mode autofix path (check_diff) needs
-  // the same flag.
+  // -x follows `source`d helpers (.mise/tasks/lib/ - without it SC1091); the fix-mode check_diff path needs the same flag.
   ["shellcheck"] = (Builtins.shellcheck) {
     match_any = List(
       new FileSelector { glob = List("**/*.sh", "**/*.bash") },
@@ -59,8 +48,7 @@ local linters = new Mapping<String, Step> {
     )
   }
   ["shellharden"] = (Builtins.shellharden) {
-    // The builtin matches via step-level `types`, which cannot coexist with
-    // `match_any` - so it is cleared here and re-declared as a selector.
+    // The builtin's step-level `types` cannot coexist with `match_any` - cleared and re-declared as a selector.
     types = null
     match_any = List(
       new FileSelector { types = List("bash", "sh") },
@@ -69,18 +57,10 @@ local linters = new Mapping<String, Step> {
   }
   ["actionlint"] = Builtins.actionlint
   ["hadolint"] = Builtins.hadolint
-  // Builtins.ryl (Rust yamllint re-implementation, configured in .ryl.toml)
-  // with --strict added to check and fix: the .ryl.toml ruleset leans on
-  // warning-level rules (line-length, comments, document-start, truthy) and
-  // yamllint's builtin failed on warnings too - without --strict they would
-  // stop blocking (verified clean over all tracked yaml). The builtin's fix
-  // step auto-fixes mechanical issues (spacing, final newline, quoting) in
-  // pre-commit; --strict makes its exit code self-verifying (0 only when
-  // nothing remains to fix or flag). check_diff/check_after_diff are
-  // cleared: ryl's --diff exits 0 whenever it has no patch - including
-  // unfixable findings - so hk's fix mode would skip the fixer and pass
-  // files that still violate (leak verified 2026-10-20); running fix (with
-  // --strict) on every staged yaml file both fixes and verifies instead.
+  // ryl (Rust yamllint re-implementation, configured in .ryl.toml); --strict on check and fix so
+  // the .ryl.toml warning-level rules keep blocking (fix's exit code is then self-verifying).
+  // check_diff/check_after_diff are cleared: hk's fix mode skips the fixer when check_diff exits
+  // 0, but ryl's --diff exits 0 even for unfixable findings (verified 2026-10-20; upstream: root TODO.md).
   ["ryl"] = (Builtins.ryl) {
     check_diff = null
     check_after_diff = false
@@ -96,9 +76,8 @@ local linters = new Mapping<String, Step> {
       }
     }
   }
-  // Panache owns ALL Markdown formatting (panache.toml). Explicit paths
-  // bypass its config excludes, hence mdExcludes. The only Markdown
-  // auto-fix step.
+  // Panache owns ALL Markdown formatting (.agents/skills/ha-app-markdown, .panache.toml); explicit
+  // paths bypass panache's config excludes, hence mdExcludes.
   ["panache-format"] {
     glob = mdGlobs
     exclude = mdExcludes

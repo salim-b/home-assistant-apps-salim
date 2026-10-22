@@ -1,21 +1,16 @@
-# Test OPTIONS for the nfs-server app, applied to the device app's options by
-# `mise run test:live <app> <host> --test-options` (backing up the previous
-# options for the live task to restore afterwards). Top-level keys override
-# the current options; keys not present here are kept.
+# Test OPTIONS for the nfs-server app, applied to the device app by
+# `mise run test:live nfs-server <host> --test-options` (previous options backed up, restored on exit).
+# Top-level keys override the current options; keys not present here are kept.
 #
 # Coverage rationale (whole AppArmor profile surface + export-generation paths):
-# - /share/nfs          the default share; the r/w roundtrip target
-# - /share/ro           read-only export: the write attempt must fail with
-#                       EROFS (per-share options are enforced at the export
-#                       boundary)
-# - /media/test         second bind-mount source root (/media/** branch of the
-#                       bind rule)
-# - /share/nested/deep  nested share path: two-level mirror directory in the
-#                       pseudo root (deepest-first umount ordering, {,/**}
-#                       glob depth)
-# - /share/alt-net      second client network: a second pseudo-root (fsid=0)
-#                       export line via the ROOT_NETWORKS dedup; no client can
-#                       mount it, only the export generation is exercised
+# - /share/nfs          default share; the r/w roundtrip target
+# - /share/ro           read-only export: the write must fail with EROFS (per-share options are
+#                       enforced at the export boundary)
+# - /media/test         second bind-mount source root (/media/** branch of the bind rule)
+# - /share/nested/deep  nested share path: two-level mirror directory in the pseudo root
+#                       (deepest-first umount ordering, {,/**} glob depth)
+# - /share/alt-net      second client network: a second pseudo-root (fsid=0) export line via the
+#                       ROOT_NETWORKS dedup; unmountable by design, only export generation is exercised
 shares:
   - path: /share/nfs
     network: 192.168.1.0/24

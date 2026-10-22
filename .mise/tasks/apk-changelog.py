@@ -9,17 +9,12 @@
 
 """apk-changelog: insert the templated changelog section for an apk pin bump.
 
-The Renovate apk-pin PR (bumpVersions bumps the app's config.{yaml,yml}
-version in the same PR) is merged without a changelog entry - the apk-bump
-workflow's changelog job runs this task post-merge to fill it (see the apk
-package version policy in the repository-root KNOWLEDGE.md); local runs
-share the same code path.
-
-Idempotent: the `## <version>` section is inserted only when that heading is
-absent - pre-written entries are never touched or overwritten. The bullet is
-greedy-wrapped at the repository's Markdown width (panache, 120 chars) so
-`mise run fmt` right after the insertion is a no-op and the dry-run output
-matches the committed form.
+The Renovate apk-pin PR is merged without a changelog entry - the apk-bump workflow's changelog
+job runs this task post-merge to fill it (policy: root KNOWLEDGE.md §apk package version policy);
+local runs share the same code path. Idempotent: the `## <version>` section is inserted only when
+that heading is absent. The bullet is greedy-wrapped at the repository's Markdown width (panache,
+120 chars) so `mise run fmt` right after the insertion is a no-op and the dry-run output matches
+the committed form.
 """
 from __future__ import annotations
 
@@ -104,8 +99,7 @@ def main() -> int:
 
     lines = changelog.read_text().splitlines()
 
-    # Idempotency: any existing `## <version>` heading (also with a trailing
-    # qualifier) counts as present - pre-written entries are never touched.
+    # Idempotency: any existing `## <version>` heading (with a trailing qualifier) counts as present.
     heading_re = re.compile(rf"^## {re.escape(version)}(?:\s|$)")
     if any(heading_re.match(line) for line in lines):
         print(f"apk-changelog: [{app}] a '## {version}' section already exists - nothing to do")

@@ -85,9 +85,8 @@ repo_slug=$(echo "$repo_entry" | jq -r '.slug')
 echo "-- repository on device: $repo_slug ($repo_url)"
 
 # --- discover the store entry + installed copies (one listing) ---------------
-# Store/repo installs get the exact slug '<repo-hash>_<app-slug>' (the addon
-# entries carry their owning repository's slug); the local repo install is
-# 'local_<app-slug>'. Exact matches - no suffix guessing.
+# Store installs get the exact hashed slug '<repo-hash>_<app-slug>', the local one 'local_<app-slug>'
+# (fact: root KNOWLEDGE.md §Supervisor: store slugs) - exact matches, no suffix guessing.
 store=$(sup_get store/addons)
 if ! echo "$store" | jq -e '.result == "ok"' >/dev/null 2>&1; then
   echo "ERROR: could not read the store listing on $host: $store" >&2
@@ -116,9 +115,8 @@ echo "-- registry: $store_slug (latest version $store_version)"
 [ "$repo_installed" != "" ] && [ "$repo_installed" != "null" ] \
   && echo "-- repository-installed: $store_slug (version $(echo "$repo_installed" | jq -r '.version'))"
 
-# The app's default options, from the repo's config.yaml: the reset target.
-# (POSTing {} would be rejected for schemas with required option keys -
-# device-verified 2026-10-16; the defaults always satisfy the schema.)
+# The app's config.yaml default options: the reset target ({} would be rejected for schemas with
+# required option keys - the defaults always satisfy the schema).
 default_options=$(yq -o json '.options' "$app/config.yaml" | jq -c .)
 
 # --- decide what to do -------------------------------------------------------
@@ -155,8 +153,7 @@ if [ "$repo_installed" != "" ] && [ "$repo_installed" != "null" ]; then
     fi
   fi
 else
-  # Switching from a local copy (or fresh install). Registry installs of a
-  # version OLDER than the local copy warn but proceed (an explicit request).
+  # Switching from a local copy (or fresh install); an OLDER registry version warns but proceeds (explicit request).
   [ "$local_installed" != "" ] && [ "$local_installed" != "null" ] \
     && local_version=$(echo "$local_installed" | jq -r '.version') || local_version=""
   if [ "$local_version" != "" ] && [ "$local_version" != "$store_version" ] \
@@ -181,19 +178,14 @@ else
       [ "$old_options" != "" ] || echo "-- (no previous options to migrate)"
       ;;
     reset)
-      ## The reset POST happens after the install below - a fresh install
-      ## already carries the app's default options (stored options do not
-      ## survive an uninstall, device-verified 2026-10-16), so the POST is a
-      ## no-op there and the deterministic guard for anything else.
+      ## The reset POST runs after the install below: a fresh install already carries the app's default
+      ## options (stored options never survive an uninstall) - no-op there, deterministic wipe otherwise.
       echo "-- --config reset: the registry install will run with the app's default options (previous options: $backup_note)"
       old_options=""
       ;;
     *)
-      ## unset = keep (the default): an UPDATE preserves the options. On the
-      ## local->store switch the local copy's options are NOT carried over -
-      ## and they do not survive its uninstall either (device-verified: the
-      ## supervisor purges an app's options on uninstall; only the backup
-      ## file keeps a copy) - the fresh store install runs the app defaults.
+      ## unset = keep (the default): an UPDATE preserves the options; on a local->store switch they are
+      ## NOT carried over (options never survive an uninstall - only the backup file keeps a copy).
       [ "$old_options" != "" ] \
         && echo "-- options not carried over (options do not survive the uninstall; $backup_note)"
       old_options=""
@@ -235,9 +227,8 @@ else
 fi
 
 # --- ensure running ----------------------------------------------------------
-# 'ha apps install' never auto-starts the app (updates/rebuilds only restart
-# when it was running): start it when the state check finds it not running,
-# then verify again.
+# 'ha apps install' never auto-starts (updates/rebuilds only restart when it was running):
+# start it when the state check finds it not running, then verify again.
 sleep 3
 state=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" | jq -r '.data.state // empty')
 case "$state" in

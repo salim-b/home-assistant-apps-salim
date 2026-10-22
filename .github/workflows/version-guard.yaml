@@ -1,13 +1,10 @@
 name: Version guard
 
-# The Supervisor detects app updates by comparing the `version` string in the
-# app's config against the installed version - the container image is
-# published under exactly that version as its image tag. A change to
-# device-visible app files without a version bump therefore ships to nobody:
-# existing installs never see it, and the already-published version tag gets
-# silently repointed, so "the same version" means different images depending
-# on install time. This workflow fails when device-visible files changed
-# without a bump.
+# The Supervisor detects app updates by comparing the `version` string in the app's config against
+# the installed version - the image is published under exactly that version as its tag. Device-
+# visible app files changed without a bump therefore ship to nobody and silently repoint an
+# already-published version tag; this workflow fails when that happens (bump discipline:
+# .agents/skills/ha-app-workflow).
 
 on:
   pull_request:
@@ -31,26 +28,18 @@ jobs:
       - name: Guard version bumps
         env:
           EVENT_NAME: ${{ github.event_name }}
-          # pull_request: the merge base of the PR; push: the previous tip of
-          # the pushed branch (the whole push range is guarded)
+          # pull_request: the PR's merge base; push: the previous tip (the whole push range is guarded)
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          # the checked-out revision: PRs check out the merge ref, so this is
-          # always present in the object store
+          # the checked-out revision: PRs check out the merge ref, so always in the object store
           HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          # Device-visible app artifacts: image content (rootfs, Dockerfile) and
-          # app data that installed users only receive via an app update
-          # (config.yaml schema/defaults, AppArmor profile, translations - the
-          # Supervisor snapshots these into the installed app at install and
-          # update time, supervisor apps/app.py App.data). Docs (DOCS.md,
-          # README.md, CHANGELOG.md) are deliberately excluded: they are
-          # served from the store source folder and refreshed by store
-          # refresh, so they reach users without an app update. config.yaml
-          # is both trigger and fix: any change to it needs a version bump
-          # (the image is tagged with exactly that version, and the bump is
-          # what refreshes the snapshot for installed apps).
+          # Device-visible app artifacts: image content (rootfs, Dockerfile) and app data that
+          # installed users only receive via an app update (config.yaml, apparmor.txt, translations
+          # - the Supervisor snapshots these into the installed app). Docs (DOCS.md, README.md,
+          # CHANGELOG.md) are deliberately excluded: store-refreshed, they reach users without an
+          # app update. config.yaml is both trigger and fix: any change needs a version bump.
           is_device_visible() { # is_device_visible <repo-relative path> <app dir>
             local rel="$1" app="$2" sub
             sub="${rel#"$app"/}"

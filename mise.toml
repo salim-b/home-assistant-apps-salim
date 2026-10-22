@@ -2,10 +2,8 @@
 
 [env]
 DOCKER_BUILDKIT = "1"
-# hk: resolve mise environments in hooks (HK_MISE) and keep `hk check --all`
-# a tracked-files-only gate: untracked files are never selected, while
-# unstaged changes stay in place and ARE checked (HK_STASH=git would stash
-# them away and lint the index instead - verified with hk 2.7.0).
+# hk: resolve mise environments in hooks (HK_MISE); HK_STASH_UNTRACKED=0 keeps `hk check --all` a
+# tracked-files-only gate (HK_STASH=git would lint the index instead of the worktree; verified hk 2.7.0).
 HK_MISE = "1"
 HK_STASH_UNTRACKED = "0"
 
@@ -35,8 +33,7 @@ description = "Run all pre-commit checks (lint + validate)"
 depends = ["lint", "validate"]
 output = "keep-order"
 
-# Panache owns ALL Markdown autoformatting (see panache.toml); rumdl stays a
-# check-only second linter.
+# Panache owns ALL Markdown autoformatting (.panache.toml, .agents/skills/ha-app-markdown); rumdl stays check-only.
 [tasks.fmt]
 description = "Auto-format the repository's Markdown via Panache"
 run = "panache format ."
@@ -59,9 +56,6 @@ uv = "0.13.1"
 yq = "4.54.1"
 
 [vars]
-# supervisor ref the validate task fetches schemas from (single source of
-# the pin). Renovate bumps this to the newest home-assistant/supervisor
-# release (github-tags) and automerges when the CI check job is green -
-# green means the new schemas still validate our app configs (see
-# .github/renovate.json, custom.regex manager).
+# Single source of the supervisor-ref pin the validate task fetches schemas from. Renovate bumps it
+# to the newest supervisor release and automerges once CI check is green (.github/renovate.json).
 supervisor_ref = "2026.10.2"

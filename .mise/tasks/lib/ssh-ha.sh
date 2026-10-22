@@ -2,22 +2,17 @@
 # shellcheck shell=bash
 #MISE hide=true
 #MISE description="⚠️ internal helper (sourced by device tasks, not runnable on its own)"
-# SSH + supervisor-readiness helpers shared by the device tasks (deploy,
-# deploy-registry). Sourced into the caller's shell: the functions use the
-# caller's SSH_OPTS array (set it before sourcing) and the caller's `host`
-# variable, and expect `set -euo pipefail` semantics.
+# Sourced by the device tasks (see .agents/skills/ha-app-device-testing): the caller's
+# SSH_OPTS array and `host` variable are the sourcing task's contract (set before sourcing).
 # shellcheck disable=SC2154  # SSH_OPTS + host are the sourcing task's contract variables
 # shellcheck disable=SC2029  # the remote commands intentionally embed client-side values (function args)
 
-# The supervisor may still be settling after a device reboot (the ha CLI then
-# fails with e.g. "System is not ready with state: shutdown" or "Supervisor is
-# not ready to perform this operation"): wait for readiness up front, and
-# retry the mutating operations below on those transient messages.
+# The supervisor may still be settling after a device reboot (transient "not ready" /
+# "is shutdown" messages from the ha CLI): wait up front, retry the mutators below on those.
 wait_supervisor() { # poll until the supervisor API answers
   local n=1 probe rc
   while true; do
-    # '|| rc=$?' keeps this out of errexit (set -e) so the failure can be
-    # inspected instead of killing the script from inside the assignment
+    # '|| rc=$?' keeps the probe out of errexit so the failure stays inspectable
     probe=$(ssh "${SSH_OPTS[@]}" "$host" \
       "ha supervisor info --raw-json 2>&1 | jq -e '.result == \"ok\"' >/dev/null" 2>&1) && rc=0 || rc=$?
     [ "$rc" -eq 0 ] && return 0
@@ -59,8 +54,7 @@ ha_retry() { # ha_retry <timeout-s> <cmd...>: retry commands failing with known 
   done
 }
 
-# --- app options helpers (read-only probes skip ha_retry: wait_supervisor has
-# already established readiness, and 'not installed' is an expected outcome) --
+# --- app options helpers (read-only probes skip ha_retry: readiness established, 'not installed' expected) ---
 
 ha_app_options() { # ha_app_options <slug>: the install's current options as compact JSON ('' when none/unreadable)
   ssh "${SSH_OPTS[@]}" "$host" "ha apps info $1 --raw-json" 2>/dev/null \
@@ -85,15 +79,15 @@ ha_schema_keys() { # ha_schema_keys <slug>: the app's schema keys as a JSON arra
 }
 
 ha_filter_options() { # ha_filter_options <options-json> <target-slug>: the options filtered to the target's schema
-  # keys. A fresh options POST replaces the whole set and silently DROPS keys unknown to the schema (device-verified
-  # 2026-10-16) - the filter makes those drops explicit so they can be reported.
+  # keys. A fresh options POST silently DROPS keys unknown to the schema (device-verified 2026-10-16) - the
+  # filter makes those drops explicit (fact: root KNOWLEDGE.md §Supervisor: option schema quirks).
   local keys
   keys=$(ha_schema_keys "$2")
   jq -c --argjson keys "$keys" 'with_entries(select(.key as $k | $keys | index($k)))' <<<"$1"
 }
 
-ha_backup_options() { # ha_backup_options <app-name> <options-json>: back the options up to a local file before any
-  # destructive operation; prints the backup path
+ha_backup_options() { # ha_backup_options <app-name> <options-json>: back the options up to a local file (they die
+  # with any destructive operation); prints the backup path
   local f
   f=$(mktemp "${TMPDIR:-/tmp}/ha-options-backup-${1}.XXXXXX.json")
   printf '%s' "$2" >"$f"

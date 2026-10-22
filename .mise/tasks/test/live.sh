@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2029  # remote/docker commands intentionally embed client-side values
 #MISE description="Deploy an app to a HAOS device and run live checks against it (app hook provides the checks)"
-# NOTE: the docs (mise.jdx.dev, "Passing parent task arguments to dependencies",
-# depends = [{ task = "deploy", args = ["{{ usage.app }}", ...] }]) describe
-# arg/env forwarding to dependencies — but as of mise 2026.10.6 NO released
-# version implements it (table/string/env forms all silently drop the args,
-# tested empirically). Forward from the run script instead; switch to the
-# native depends form once mise ships it.
+# NOTE: mise's documented depends arg-forwarding is implemented in NO released mise (all forms
+# silently drop the args, checked up to 2026.10.6) - forward from the run script; revisit when mise ships it.
 #USAGE arg "<app>" help="App to test (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
@@ -23,23 +19,14 @@ host="${usage_host?}"
 case "$host" in *@*) ;; *) host="root@$host" ;; esac
 SSH_OPTS=(-o ConnectTimeout=10)
 
-# Forward the shared flags to deploy (native depends arg forwarding is not
-# implemented in released mise versions — see the header note)
+# Forward the shared flags to deploy (native depends forwarding unimplemented - see header note)
 forward=()
 [ "${usage_replace:-false}" = "true" ] && forward+=(--replace)
 mise run deploy "$app" "$host" "${forward[@]}"
 
 # --------------------------------------------------------------------------
-# Generic live-test harness. App-specific checks live in the per-app hook
-# (.mise/tasks/test/live/<app>.sh), analogous to the lab hooks:
-#   - live_prepare()      optional; runs after deploy but before the app is
-#                         restarted with the test options applied (e.g. create
-#                         directories the options reference)
-#   - live_runtime_check() optional; runs once the app is up — the actual
-#                         app-specific live checks
-# Contract variables (exported): LIVE_APP, LIVE_LOCAL_SLUG, LIVE_HOST,
-#   LIVE_SSH_OPTS, LIVE_DEVICE_IP, LIVE_HOST_IP, LIVE_CLIENT_IMAGE,
-#   LIVE_TEST_OPTIONS_FILE, LIVE_SHARES (JSON of the device options' shares)
+# Generic live-test harness; per-app checks live in .mise/tasks/test/live/<app>.sh - hook contract
+# (live_prepare/live_runtime_check, LIVE_* contract vars): .agents/skills/ha-app-device-testing.
 # --------------------------------------------------------------------------
 slug=$(yq -r '.slug' "$app/config.yaml")
 local_slug="local_${slug}"
@@ -88,8 +75,7 @@ LIVE_APP="$app" \
 export LIVE_APP LIVE_LOCAL_SLUG LIVE_HOST LIVE_DEVICE_IP LIVE_HOST_IP \
   LIVE_CLIENT_IMAGE LIVE_TEST_OPTIONS_FILE LIVE_SHARES LIVE_SSH_OPTS
 
-# Drop a previous app's hook functions first: on a default all-apps run,
-# an app without prepare/check functions must not inherit the last app's
+# Drop a previous app's hooks first: an all-apps run must not inherit the last app's functions
 unset -f live_prepare live_runtime_check 2>/dev/null || true
 hook=".mise/tasks/test/live/$app.sh"
 if [ -f "$hook" ]; then
@@ -112,10 +98,8 @@ if [ "${usage_test_options:-false}" = "true" ]; then
     exit 1
   }
 
-  # Back up the original options next to the app folder for the restore step;
-  # the next deploy wipes it together with the app folder. Keep a pre-existing
-  # backup intact: re-running --test-options must not turn the (already
-  # active) test options into the "original".
+  # Backup next to the app folder (the next deploy wipes it with the folder). Keep a pre-existing
+  # backup: re-running --test-options must not save the already-active test options as "original".
   backup="/local_apps/$app/.test-options-original.json"
   if ! ssh "${SSH_OPTS[@]}" "$host" "test -f '$backup'"; then
     printf '%s' "$current" | ssh "${SSH_OPTS[@]}" "$host" "cat > '$backup'"
@@ -123,9 +107,8 @@ if [ "${usage_test_options:-false}" = "true" ]; then
 
   if [ "$(declare -f live_prepare)" != "" ]; then live_prepare; fi
 
-  # POST body shape: {"options": {...}} (supervisor SCHEMA_OPTIONS wrapper);
-  # the fixture's top-level keys override, missing keys are kept (deep merge:
-  # objects merge, arrays — e.g. shares — are replaced)
+  # POST body: {"options": {...}} (SCHEMA_OPTIONS wrapper); top-level keys override, missing keys
+  # kept (objects merge, arrays e.g. shares are replaced)
   merged=$(jq -c -s '{options: (.[0] * .[1])}' <(printf '%s' "$current") \
     <(yq -o json '.' "$LIVE_TEST_OPTIONS_FILE"))
   result=$(printf '%s' "$merged" | ssh "${SSH_OPTS[@]}" "$host" \
@@ -141,11 +124,8 @@ if [ "${usage_test_options:-false}" = "true" ]; then
   echo "   (restored automatically when this task exits)"
 fi
 
-# Runs on every exit path (trap): leaving the test options active on the
-# device would be the worst possible failure mode of a test tool. Defined
-# and trapped BEFORE the runtime checks — a failing check aborts under
-# `set -e`, and a trap installed later would never fire (device-verified:
-# the first device run left the test options active because of this).
+# Runs on every exit path: leaving test options active is the worst failure mode. Define+trap BEFORE
+# the checks - a failing check aborts under set -e and a later trap would never fire (device-verified).
 restore_options() {
   local suspicious test_keys tkey
   [ "${usage_test_options:-false}" = "true" ] || return 0
@@ -156,13 +136,9 @@ restore_options() {
         curl -s -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" -H 'Content-Type: application/json' \
         -X POST --data-binary @- http://supervisor/addons/$local_slug/options") \
       && echo "$restore_result" | jq -e '.result == "ok"' >/dev/null 2>&1; then
-      # Refuse to delete the backup if it turns out to contain the test
-      # options (a previous failed run may have saved them as the
-      # "original"): suspicious when EVERY top-level key overridden by the
-      # test options file carries exactly the test value in the backup.
-      # Generic key comparison - no app-specific field name (like the
-      # nfs-server shares) may be hardwired here, or apps without that key
-      # would always compare equal and never get their options restored.
+      # Refuse to apply a backup that IS the test options (a failed run may have saved them as
+      # "original"): suspicious when every overridden top-level key carries exactly the test value.
+      # Generic key comparison - no app-specific field name may be hardwired here.
       suspicious=0
       if [ -f "$LIVE_TEST_OPTIONS_FILE" ]; then
         test_keys=$(yq '. | keys | .[]' "$LIVE_TEST_OPTIONS_FILE")
@@ -170,9 +146,7 @@ restore_options() {
           suspicious=1
           while IFS= read -r tkey; do
             [ "$tkey" != "" ] || continue
-            ## -n: keep the loop's stdin away from ssh (without it, ssh eats
-            ## the remaining keys and the check silently degenerates to the
-            ## first key only)
+            ## -n: keep the loop's stdin away from ssh (it would eat the remaining keys)
             if [ "$(ssh -n "${SSH_OPTS[@]}" "$host" \
               "jq -c --arg k '$tkey' '.[\$k] // \"<key-missing>\"' '$backup'")" \
               != "$(yq -o json ".$tkey" "$LIVE_TEST_OPTIONS_FILE" | jq -c .)" ]; then
@@ -204,16 +178,12 @@ trap restore_options EXIT
 
 wait_started
 
-# The runtime checks test the app's ACTUAL share configuration (device
-# options), not the repo defaults: the user may have edited the shares in the
-# HA UI.
+# The checks run against the app's ACTUAL device options, not the repo defaults (user-editable in the HA UI).
 LIVE_SHARES=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \
   | jq -c '.data.options.shares // []') || LIVE_SHARES="[]"
 export LIVE_SHARES
-# No gate on LIVE_SHARES here: that key is app-specific (nfs-server). A hook
-# decides itself whether its checks make sense with the device's current
-# options (the nfs-server hook refuses to roundtrip without a /share/nfs
-# share; the hd-idle hook has no shares at all).
+# No gate on LIVE_SHARES: that key is app-specific; each hook decides itself whether its checks fit
+# the device's current options (nfs-server refuses without /share/nfs; hd-idle has no shares).
 if [ "$(declare -f live_runtime_check)" != "" ]; then
   live_runtime_check
 fi

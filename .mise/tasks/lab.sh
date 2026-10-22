@@ -6,10 +6,8 @@
 #USAGE flag "--keep" help="Keep lab containers/dirs for debugging"
 #USAGE flag "--spindown-drives <drives>" help="Comma-separated `sd*` kernel names an app hook may spin down for real (hd-idle smoke test; read-only: no data is written)"
 #
-# Per-app specifics (docker args, a runtime roundtrip) live in the
-# .mise/tasks/lab/<app>.sh hook, fixture adaptation (optional) in
-# .mise/tasks/lab/<app>.py - see AGENTS.md. Apps without a hook get a
-# boot-only lab (config fetch via fake API, full s6-rc boot, graceful stop).
+# Per-app hooks: .mise/tasks/lab/<app>.sh (docker args + runtime check), optional fixture
+# adapter .mise/tasks/lab/<app>.py - see .agents/skills/ha-app-lab-testing. No hook: boot-only lab.
 
 set -euo pipefail
 cd "$MISE_PROJECT_ROOT"
@@ -17,9 +15,8 @@ cd "$MISE_PROJECT_ROOT"
 # shellcheck disable=SC2124
 apps=("${usage_app:-$(git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1 | sort -u)}")
 
-# Drives a lab hook may spin down for real (hd-idle smoke test; read-only:
-# standby commands + state queries only). Consumed by the app hook and the
-# fixture adapter (both read LAB_SPINDOWN_DRIVES).
+# Consumed by the app hook and the fixture adapter (both read LAB_SPINDOWN_DRIVES;
+# read-only standby commands + state queries only).
 spindown_drives="${usage_spindown_drives:-}"
 export LAB_SPINDOWN_DRIVES="$spindown_drives"
 
@@ -28,8 +25,7 @@ ts() { echo "[t+${1}s] $2"; }
 tmpdir=$(mktemp -d /tmp/nfslab-XXXXXX)
 fails=0
 
-## Lab convenience images (built once, reused across runs): python3+yaml for
-## the fake API, plus a client image with common runtime-check tools
+## Lab images, built once and reused: python3+yaml for the fake API; client image with runtime-check tools
 api_image="local/nfslab-api:alpine3.24"
 client_image="local/nfslab-client:alpine3.24"
 if ! docker image inspect "$api_image" >/dev/null 2>&1; then
@@ -50,8 +46,7 @@ cleanup() {
   if [ "${usage_keep:-false}" != "true" ]; then
     docker rm -f "$net-fakesup" "$net-app" "$net-client" >/dev/null 2>&1 || true
     docker network rm "$net" >/dev/null 2>&1 || true
-    # root-owned leftovers in the temp dirs (created by the container) need
-    # container-root privileges to remove
+    # root-owned leftovers (created by the container) need container-root privileges to remove
     docker run --rm -v "$tmpdir":/lab "$client_image" sh -c 'rm -rf /lab/*' >/dev/null 2>&1 || true
     rmdir "$tmpdir" 2>/dev/null || true
   else
@@ -61,8 +56,7 @@ cleanup() {
 trap cleanup EXIT
 
 docker network create "$net" >/dev/null
-# fixture adaptation target: the actual subnet of the created network (no
-# hardcoded subnet: docker's pool may be occupied, docker picks freely)
+# fixture adaptation target: the network's actual subnet (docker picks freely; no hardcoded pool)
 subnet=$(docker network inspect "$net" --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}')
 
 for app in "${apps[@]}"; do
@@ -123,16 +117,14 @@ PYEOF' >/dev/null
   }
 
   ts "$SECONDS" "-- booting the app container (full s6-rc tree, config via API)"
-  ## App-provided docker args (volumes, capabilities, devices...); the
-  ## defaults work for any app, hooks extend rather than replace them
+  ## App-provided docker args (defaults work for any app; hooks append, never overwrite)
   lab_docker_args=("-v" "$tmpdir/data:/data")
   LAB_NET_NAME="$net"
   LAB_APP_DIR="$PWD/$app"
   LAB_TMPDIR="$tmpdir"
   LAB_SUBNET="$subnet"
   export LAB_NET_NAME LAB_APP_DIR LAB_TMPDIR LAB_SUBNET
-  # Drop a previous app's hook function first: on a default all-apps run,
-  # an app without a runtime check must not inherit the last app's
+  # Drop a previous app's hook first: an all-apps run must not inherit the last app's check
   unset -f lab_runtime_check 2>/dev/null || true
   if [ -f "$hook" ]; then
     # shellcheck source=/dev/null
@@ -143,8 +135,7 @@ PYEOF' >/dev/null
     "${lab_docker_args[@]}" \
     -e SUPERVISOR_TOKEN=fake -e SUPERVISOR_API="http://$net-fakesup:8000" \
     "local/$app:$version" >/dev/null
-  # serve the app's fixture adapter to the fake API, if one exists
-  # (convention over configuration: .mise/tasks/lab/<app>.py)
+  # serve the app's fixture adapter to the fake API, if one exists (convention: .mise/tasks/lab/<app>.py)
   fixture_py=".mise/tasks/lab/$app.py"
   if [ -f "$fixture_py" ]; then
     docker cp "$PWD/$fixture_py" "$net-fakesup:/lab-hook.py" >/dev/null

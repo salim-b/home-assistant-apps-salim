@@ -1,10 +1,8 @@
-# Test OPTIONS for the hd-idle app, applied to the device app's options by
-# `mise run test:live hd-idle <host> --test-options` (backing up the previous
-# options for the live task to restore afterwards). Top-level keys override
-# the current options; keys not present here are kept.
+# Test OPTIONS for the hd-idle app, applied to the device app by
+# `mise run test:live hd-idle <host> --test-options` (previous options backed up, restored on exit).
+# Top-level keys override the current options; keys not present here are kept.
 #
-# Safe no-op by design: an empty drive list - the app boots, runs and
-# manages nothing until real drives are configured. Extend with
-# device-specific drives + a short idle once drives are attached to the test device
-# attached (see hd-idle/TODO.md).
+# Safe no-op by design: an empty drive list - the app boots, runs and manages nothing until real
+# drives are configured. Extend with device-specific drives + a short idle once drives are attached
+# to the test device (see hd-idle/TODO.md).
 disks: []

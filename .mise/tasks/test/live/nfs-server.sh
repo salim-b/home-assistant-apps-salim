@@ -2,24 +2,18 @@
 # shellcheck disable=SC2029  # remote/docker commands intentionally embed client-side values
 #MISE hide=true
 #MISE description="⚠️ internal helper script"
-# App-specific live-test hook for nfs-server, sourced by the generic
-# .mise/tasks/test/live.sh harness (same split as the lab tasks). Uses the
-# harness contract variables (LIVE_*); defines:
-#   - live_prepare()       create the share directories the test options
-#                          reference (the app validates that they exist) and
-#                          hand the writable ones to the squashed uid
-#   - live_runtime_check() the NFS client roundtrips: per-share mount /
-#                          write+read+delete (rw) or EROFS assertion (ro) /
-#                          pseudo-root browse
+# App-specific live-test hook for nfs-server, sourced by .mise/tasks/test/live.sh; hook contract:
+# .agents/skills/ha-app-device-testing. Defines:
+#   - live_prepare()       create the share directories the test options reference (the app
+#                          validates that they exist), hand writable ones to the squashed uid
+#   - live_runtime_check() the NFS client roundtrips: per-share mount / write+read+delete (rw) or
+#                          EROFS assertion (ro) / pseudo-root browse
 
 # shellcheck disable=SC2034  # LIVE_* are the harness contract variables
 
 live_prepare() {
-  # Make sure every test share directory exists and is writable by the
-  # squashed uid (default_uid 1000). The app itself creates missing dirs with
-  # its configured defaults, but never modifies existing ones — pre-made
-  # root-owned dirs would break the rw roundtrip. (-n: keep the loop's stdin
-  # away from ssh)
+  # The app creates missing dirs with its configured defaults but never modifies existing ones - pre-made
+  # root-owned dirs would break the rw roundtrip (default_uid 1000). (-n: keep the loop's stdin away from ssh)
   while IFS=$'\t' read -r spath sopts; do
     [ "$spath" != "" ] || continue
     case ",$sopts," in
@@ -37,16 +31,12 @@ live_prepare() {
 live_runtime_check() {
   local fails=0 spath snetwork soptions smode rc row
 
-  # Client-recovery tracker (cld): the kernel's host-journal lines are the
-  # authoritative end-to-end proof — "NFSD: Using nfsdcld client tracking
-  # operations." only appears after the daemon answered the kernel's
-  # GetVersion + GraceStart upcalls (which requires daemon, rpc_pipefs
-  # channel and store all working). "NFSD: Unable to initialize client
-  # recovery tracking" is the failure signature (the kernel fell through to
-  # the container-refusing legacy trackers — daemon or channel missing).
-  # NOTE: HAOS ships no docker CLI on the host, so container-internal probes
-  # (ps/sqlite/pipe) are not reachable from here; the journal check is the
-  # strictly stronger assertion.
+  # Client-recovery tracker (cld): the kernel's host-journal lines are the authoritative end-to-end
+  # proof - "NFSD: Using nfsdcld client tracking operations." appears only after the daemon answered
+  # the kernel's GetVersion + GraceStart upcalls (daemon, rpc_pipefs channel and store all working);
+  # "NFSD: Unable to initialize client recovery tracking" is the failure signature (the kernel fell
+  # through to the container-refusing legacy trackers). NOTE: HAOS ships no docker CLI, so
+  # container-internal probes are not reachable from here - the journal check is strictly stronger.
   echo "-- checking the client-recovery tracker (host kernel journal)"
   klog=$(ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
     "ha host logs 2>/dev/null | grep -E 'NFSD:' | tail -10") || true
@@ -62,8 +52,7 @@ live_runtime_check() {
     echo "         app log lines about nfsdcld would indicate a daemon problem)"
   fi
 
-  # Mode detection per share: exports(5) defaults to read-only — writable
-  # only with an explicit rw
+  # Mode detection per share: exports(5) defaults to read-only - writable only with an explicit rw
   share_mode() {
     case ",$1," in
       *,rw,*) echo "rw" ;;
@@ -71,11 +60,9 @@ live_runtime_check() {
     esac
   }
 
-  # Roundtrip against one share: mount, listing, write + read-back + delete
-  # (rw; grace-aware retries) or EROFS assertion (ro; the write is attempted
-  # after the grace period has surely passed — its error message cannot be
-  # captured through the shell redirect, so rc-only judgement after a settled
-  # state)
+  # Roundtrip against one share: mount, listing, write+read-back+delete (rw; grace-aware retries) or
+  # EROFS assertion (ro; rc-only judgement after the grace period has surely passed - the write's
+  # error message cannot be captured through the shell redirect)
   test_share() { # test_share <path> <mode>
     local target="$LIVE_DEVICE_IP:$1" mode="$2" testfile rc
     testfile="goose-live-test-$(date +%s)"
@@ -89,12 +76,10 @@ live_runtime_check() {
     echo "   -- share listing:"; ls -la /mnt/test
 
     if [ "$MODE" = rw ]; then
-      # With the recovery tracker, a grace period only runs when client
-      # records exist (fresh boots skip it) and it ends early once all
-      # recorded clients have reclaimed; during it, writes BLOCK (client
-      # retries the open) instead of failing - the subshell captures the
-      # message if the retries never succeed. A failed redirection is
-      # diagnosed by the shell itself and would bypass the per-command
+      # With the recovery tracker, a grace period only runs when client records exist (fresh boots
+      # skip it) and ends early once recorded clients reclaimed; during it, writes BLOCK (the client
+      # retries the open) instead of failing - the subshell captures the message if the retries never
+      # succeed. A failed redirection is diagnosed by the shell itself and would bypass the per-command
       # 2>/dev/null.
       i=0
       until out=$( (echo live-test-ok > "/mnt/test/$TESTFILE") 2>&1); do
@@ -107,12 +92,10 @@ live_runtime_check() {
       rm "/mnt/test/$TESTFILE" || { echo "FAIL: cleanup delete failed"; exit 1; }
       echo "   PASS: delete via NFS"
     else
-      # The write attempt may block during a running grace period (the
-      # client retries its open) - bound it so a device with active clients
-      # does not stall this check until the grace ends; on a read-only
-      # export the attempt cannot succeed once the grace is over either.
-      # subshell: a failed redirection is diagnosed by the shell itself
-      # and would bypass the per-command 2>/dev/null (see above)
+      # The write attempt may block during a running grace period (the client retries its open) -
+      # bound it so a device with active clients does not stall this check; on a read-only export the
+      # attempt cannot succeed once the grace is over either. subshell: a failed redirection is
+      # diagnosed by the shell itself and would bypass the per-command 2>/dev/null (see above)
       if timeout 30 sh -ec "(echo x > /mnt/test/\$TESTFILE) 2>/dev/null"; then
         rm -f "/mnt/test/$TESTFILE" 2>/dev/null
         echo "FAIL: read-only share accepted a write"; exit 1
@@ -128,8 +111,7 @@ live_runtime_check() {
       echo "   ERROR: roundtrip against $1 failed (rc=$rc)" >&2
       return "$rc"
     }
-    # Confirm the written file really landed on (and disappeared from) the
-    # device filesystem (needs the path to be visible from the SSH session)
+    # Confirm the written file really landed on (and disappeared from) the device filesystem (needs the path visible from the SSH session)
     if [ "$mode" = rw ]; then
       if ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" "test -d '$1'" 2>/dev/null; then
         ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" "test ! -e '$1/$testfile'" \
@@ -145,8 +127,7 @@ live_runtime_check() {
     return 0
   }
 
-  # The roundtrip is anchored on the default share (/share/nfs): refuse the
-  # run without it (only perform roundtrips if the default share exists)
+  # The roundtrip is anchored on the default share (/share/nfs): refuse the run without it
   if [ "$(jq -r 'map(select(.path == "/share/nfs")) | length' <<<"$LIVE_SHARES")" -eq 0 ]; then
     echo "ERROR: no share with path /share/nfs is configured; refusing the roundtrip." >&2
     echo "       Configured shares:" >&2
@@ -154,11 +135,9 @@ live_runtime_check() {
     return 1
   fi
 
-  # Per-share roundtrips; shares whose network does not contain this host's
-  # IP cannot be mounted from here (the server denies them) — skipped with a
-  # note; their export generation is still covered by the app booting with
-  # them configured.
-  # mapfile: the loop body (docker/ssh) must not consume a streaming stdin
+  # Shares whose network does not contain this host's IP cannot be mounted (the server denies them) -
+  # skipped with a note; their export generation is still covered by the app booting with them
+  # configured. mapfile: the loop body (docker/ssh) must not consume a streaming stdin
   mapfile -t share_rows < <(jq -r '.[] | [.path, .network, .options] | @tsv' <<<"$LIVE_SHARES")
   for row in "${share_rows[@]}"; do
     IFS=$'\t' read -r spath snetwork soptions <<<"$row"
@@ -185,10 +164,9 @@ sys.exit(0 if ipaddress.ip_address('$LIVE_HOST_IP') in ipaddress.ip_network('$sn
   echo "   -- pseudo-root listing:"; ls /mnt/root
   ls /mnt/root | grep -q share || { echo "FAIL: pseudo-root does not list the share tree"; exit 1; }
   echo "   PASS: pseudo-root (fsid=0) export browsable"
-  # The write attempt may block during a running grace period (the client
-  # retries its open) - bound it (same as the ro share check above).
-  # subshell: a failed redirection is diagnosed by the shell itself and
-  # would bypass the per-command 2>/dev/null (same as in test_share)
+  # The write attempt may block during a running grace period - bound it (as in the ro share check).
+  # subshell: a failed redirection is diagnosed by the shell itself and would bypass the per-command
+  # 2>/dev/null (same as in test_share)
   if timeout 30 sh -ec "(echo x > /mnt/root/probe) 2>/dev/null"; then
     rm -f /mnt/root/probe
     echo "FAIL: pseudo-root accepted a write"; exit 1

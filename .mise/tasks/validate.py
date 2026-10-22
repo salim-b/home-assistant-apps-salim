@@ -3,26 +3,17 @@
 #USAGE arg "[app]" help="App directory to validate (default: all apps)"
 #USAGE flag "--schemas-only" help="Only refetch the pinned Supervisor schemas"
 
-"""Validation harness: supervisor-side semantics that the CI app linter
-(HA-side expectations) does not cover, at a pinned supervisor ref.
+"""Validation harness: supervisor-side semantics the CI app linter does not
+cover, at a pinned supervisor ref (what each check is for: .agents/skills/ha-app-tooling).
 
-- parses all YAML files (catching parse errors early; the translations file
-  famously failed to parse with zero UI feedback)
-- validates translations against the supervisor's voluptuous schemas
-  (SCHEMA_APP_TRANSLATIONS / SCHEMA_TRANSLATION_CONFIGURATION), extracted
-  faithfully from the pinned ref via AST - no drifting copies in-repo
-- validates the AppArmor profile file against the supervisor's profile-name
-  regex (exactly one top-level profile)
-- cross-checks: translation 'configuration' keys vs schema keys (incl. the
-  nested 'fields'), 'network' keys (lowercase!) vs config.yaml 'ports' keys
-- validates .github/renovate.json against the published Renovate config
-  schema (option typos fail at `mise run check`, not on Renovate's next run)
-- validates .rumdl.toml against rumdl's published config schema (fetched at
-  the installed rumdl version's tag; the pin lives in mise.toml [tools])
-- canary-checks that rumdl's autofix is disabled (fmt must not rewrite any
-  file - panache owns formatting; see .rumdl.toml `fixable`)
-- validates panache.toml against panache's published config schema (fetched
-  once per installed panache version; the pin lives in mise.toml [tools])
+Parses all app YAML files (catching parse errors early); validates translations against the
+supervisor's voluptuous schemas (AST-extracted from the pinned ref - no drifting copies) and the
+AppArmor profile against the supervisor's profile-name regex (exactly one top-level profile);
+cross-checks translation 'configuration' keys vs schema keys (incl. nested 'fields') and
+'network' keys (lowercase!) vs config.yaml 'ports'; schema-validates .github/renovate.json,
+.rumdl.toml and panache.toml against their published schemas; canary-checks that rumdl's
+autofix stays disabled (panache owns formatting; see .rumdl.toml `fixable`); verifies apk pins
+against the Alpine binary indexes (policy: root KNOWLEDGE.md §apk package version policy).
 """
 from __future__ import annotations
 
@@ -67,8 +58,7 @@ CACHE = pathlib.Path(
     os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache")
 ) / "ha-apps-supervisor-schemas" / REF
 
-# values of the supervisor.const ATTR_* names the schemas reference; fetched
-# from const.py at the pinned ref (see _supervisor_constants)
+# supervisor.const ATTR_* names the schemas reference; fetched from const.py at the pinned ref
 CONST_NAMES: set[str] = set()
 SCHEMA_NAMES = ("SCHEMA_TRANSLATION_CONFIGURATION", "SCHEMA_APP_TRANSLATIONS")
 APPARMOR_RE_NAME = "RE_PROFILE"
@@ -173,10 +163,9 @@ def validate_renovate_config() -> None:
 
 
 def validate_rumdl_config() -> None:
-    """Schema-validate .rumdl.toml against rumdl's published config schema,
-    fetched at the *installed* rumdl version's tag (the single source of the
-    pin is mise.toml [tools] + mise.lock; refetched when the version
-    changes). Requires rumdl on PATH, i.e. run via `mise run validate`."""
+    """Schema-validate .rumdl.toml against rumdl's published config schema, fetched at the
+    installed rumdl version's tag (pin: mise.toml [tools] + mise.lock). Requires rumdl on
+    PATH (`mise run validate`)."""
     import jsonschema
 
     config_file = ROOT / ".rumdl.toml"
@@ -208,14 +197,10 @@ def validate_rumdl_config() -> None:
 
 
 def validate_rumdl_no_autofix() -> None:
-    """Behavioral canary: rumdl must not rewrite ANY file (panache owns all
-    markdown formatting). The `.rumdl.toml` fix allow-list pins an inert
-    `all` entry (see the comment there) - this canary runs `rumdl fmt` on a
-    scratch violation file with the repo config and fails if the file
-    changed, so a rumdl upgrade that flips the semantics (e.g. implementing
-    `all` as a fix wildcard) is caught at `mise run check`, not by silently
-    reformatted files. Requires rumdl on PATH, i.e. run via `mise run
-    validate`."""
+    """Behavioral canary: rumdl must not rewrite ANY file (panache owns all markdown
+    formatting). Runs `rumdl fmt` on a scratch violation file with the repo config and fails if
+    it changed - a rumdl upgrade that flips the inert-`all` fixable semantics (see the comment in
+    .rumdl.toml) is caught at `mise run check`. Requires rumdl on PATH (`mise run validate`)."""
     canary = "# canary\n\nSome  text with fixable issues.   \n\n- item one\n+ item two\nTab\there\n"
     with tempfile.TemporaryDirectory() as td:
         canary_file = pathlib.Path(td) / "canary.md"
@@ -243,12 +228,9 @@ def validate_rumdl_no_autofix() -> None:
 
 
 def validate_panache_config() -> None:
-    """Schema-validate panache.toml against panache's published config schema,
-    fetched at the *installed* panache version's tag (the single source of
-    the pin is mise.toml [tools] + mise.lock; refetched when the version
-    changes) - same pattern as rumdl. The `#:schema` directive in
-    panache.toml itself points at the unversioned panache.bz URL for
-    editors. Requires panache on PATH, i.e. run via `mise run validate`."""
+    """Schema-validate panache.toml against panache's published config schema, fetched at the
+    installed panache version's tag (pin: mise.toml [tools] + mise.lock) - same pattern as rumdl.
+    Requires panache on PATH (`mise run validate`)."""
     import jsonschema
 
     config_file = ROOT / "panache.toml"
@@ -286,13 +268,10 @@ APKINDEX_TTL = 24 * 3600  # the daily CI cron should see Alpine-side repoints
 
 
 def _apkindex_versions(branch: str, package: str) -> dict[str, str]:
-    """Version of <package> in the Alpine v<branch> binary indexes, per
-    arch. The BINARY index (dl-cdn APKINDEX) is the authoritative truth for
-    what `apk add` resolves - not the aports APKBUILD source branch (a
-    pkgrel commit can outrun the published packages: verified hd-idle
-    APKBUILD=r8 while both arches' indexes still served r7). Cached for
-    APKINDEX_TTL so local `mise run check` stays snappy while the daily
-    cron always sees fresh data."""
+    """Version of <package> in the Alpine v<branch> binary indexes, per arch - the BINARY index
+    (dl-cdn APKINDEX) is what `apk add` resolves, not the aports APKBUILD source branch (a pkgrel
+    commit can outrun the published packages; policy: root KNOWLEDGE.md §apk package version
+    policy). Cached for APKINDEX_TTL so local runs stay snappy while the daily cron sees fresh data."""
     versions: dict[str, str] = {}
     for arch in ("x86_64", "aarch64"):
         dest = CACHE.parent / f"apkindex-v{branch}-{arch}"
@@ -328,12 +307,8 @@ def _apkindex_versions(branch: str, package: str) -> dict[str, str]:
 
 
 def validate_apk_pins() -> None:
-    """Verify apk package version pins in app Dockerfiles against the
-    Alpine binary indexes of the pinned base-image branch. Pins are how an
-    app release reacts to package updates (see the apk policy section in
-    the repository-root KNOWLEDGE.md); this check turns an Alpine-side
-    repoint into a guided release instead of a silent image drift or a
-    surprise build breakage."""
+    """Verify apk package version pins in app Dockerfiles against the Alpine binary indexes of
+    the pinned base-image branch (policy + why: root KNOWLEDGE.md §apk package version policy)."""
     for app in find_apps():
         dockerfile = ROOT / app / "Dockerfile"
         if not dockerfile.is_file():

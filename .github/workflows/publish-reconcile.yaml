@@ -1,31 +1,18 @@
 name: Publish reconcile
 
-# Daily reconciliation of the published GHCR state against main's app configs:
-# every app's version tag must exist in the registry - the per-arch images
-# (`<prefix>/<arch>-<image_name>:<version>` for every arch in config.yaml) and
-# the multi-arch manifest (`<prefix>/<image_name>:<version>`).
+# Daily reconciliation of the published GHCR state against main's app configs: every app's version
+# tag must exist in the registry (per-arch images + multi-arch manifest). A missing tag (e.g. a
+# transient build/publish failure on the push-fired Builder) is self-healed by dispatching
+# build-app.yaml (publish=true, ref=main) - only a real miss dispatches, so a healthy registry is a
+# green no-op run; the dispatched Builder run is the loud signal when publishing keeps failing.
+# GHCR unreachable (after backoff retries) or a failed dispatch fails this run (red).
 #
-# A missing tag (e.g. a transient build/publish failure on the push-fired
-# Builder) is self-healed by dispatching build-app.yaml (publish=true,
-# ref=main). Idempotent: only a real miss dispatches - the push-fired Builder
-# still publishes on merge, so a healthy registry means a green no-op run.
-# The dispatched Builder run is the loud signal when publishing keeps failing;
-# this run stays green with a summary note. GHCR unreachable (after backoff
-# retries) or a failed dispatch fails this run (red).
+# Known limitation: reconciles TAG EXISTENCE only - stale tag content is version-guard's and
+# validate.py's domain (both fail loudly on source drift).
 #
-# Known limitation: this reconciles TAG EXISTENCE only. A tag that exists but
-# carries stale content (e.g. an image built from a pre-merge state) is not
-# detected here - content drift is version-guard's and validate.py's domain
-# (both fail loudly on source drift).
-#
-# Cron offset: 03:15 UTC - away from the lint workflow's daily 00:00 cron and
-# the apk-bump nudge (01:30 UTC). GHCR is probed anonymously with the runner's
-# preinstalled docker buildx CLI (`docker buildx imagetools inspect`; the
-# packages are public); only ghcr.io is supported. Unclassified probe failures
-# are retried with exponential backoff, so transient network/registry blips
-# neither go red nor trigger dispatches; an unclassified failure that survives
-# the retries is dumped (with its last error) to the log and fails the run
-# (red).
+# Cron offset: 03:15 UTC - away from the lint cron (00:00) and the apk-bump nudge (01:30). GHCR is
+# probed anonymously with the runner's preinstalled docker buildx CLI (public packages; only
+# ghcr.io supported); unclassified probe failures are retried with exponential backoff.
 
 on:
   schedule:
@@ -77,10 +64,9 @@ jobs:
       - name: Normalize app information
         id: normalize
         run: |
-          # helpers/info emits its string outputs JSON-quoted (`yq -o=json`).
-          # Shell-assigning the interpolated output strips the quotes (quotes
-          # are shell syntax there) - the same pattern build-app.yaml relies
-          # on. Never feed the raw outputs to env:, they keep their quotes.
+          # helpers/info emits its string outputs JSON-quoted (`yq -o=json`); shell-assigning the
+          # interpolated output strips the quotes (same pattern as build-app.yaml; never feed raw
+          # outputs to env: - they keep their quotes).
           image=${{ steps.info.outputs.image }}
           echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
           echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
@@ -98,19 +84,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Existence probe via the runner's preinstalled docker buildx CLI:
-          # `docker buildx imagetools inspect` talks to the registry directly -
-          # no docker daemon and no login needed for the public packages.
-          # Classification follows project-copacetic's ensure-tag-absent.sh:
-          # success -> ok, registry not-found-class errors -> missing, anything
-          # else is treated as unreachable. Unclassified failures (DNS blips,
-          # 429/5xx, timeouts) are retried with exponential backoff first, so a
-          # transient outage neither goes red nor causes a dispatch decision.
-          # Each attempt is time-bounded (SIGTERM then SIGKILL - buildx traps
-          # SIGTERM for graceful shutdown and would outlive plain `timeout`);
-          # "404 not found" also matches the error-text variants of buildx
-          # versions other than the tested one. RECONCILE_RETRIES overrides the
-          # retry count (testing/ops knob).
+          # Existence probe via the runner's preinstalled docker buildx CLI (talks to the registry
+          # directly - no daemon, no login for the public packages). Classification follows
+          # project-copacetic's ensure-tag-absent.sh: success -> ok, not-found-class errors ->
+          # missing, anything else unreachable (retried with exponential backoff). Each attempt is
+          # time-bounded (SIGTERM then SIGKILL - buildx traps SIGTERM and would outlive plain
+          # `timeout`); "404 not found" also matches the error-text variants of other buildx
+          # versions. RECONCILE_RETRIES overrides the retry count (testing/ops knob).
           retries="${RECONCILE_RETRIES:-3}"
           probe() {
             local ref="$1" out attempt=0

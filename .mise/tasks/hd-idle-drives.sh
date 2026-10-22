@@ -11,15 +11,15 @@ case "$host" in *@*) ;; *) host="root@$host" ;; esac
 SSH_OPTS=(-o ConnectTimeout=10)
 OUT_FILE="hd-idle/.drives.md"
 
-## The sheet carries the drives' stable by-id IDs - it must never be tracked by git (per-machine device
-## inventory). The gitignore entry ships with the repo; refuse to write if it went missing.
+## The sheet carries stable by-id IDs (per-machine inventory) - must stay gitignored; refuse to
+## write if the .gitignore entry went missing.
 if ! git check-ignore --quiet "$OUT_FILE"; then
   echo "ERROR: ${OUT_FILE} is not gitignored - refusing to write drive IDs into a trackable file (add it to .gitignore first)" >&2
   exit 1
 fi
 
-## Choose one link from a space-separated candidate list (stdout). Multiple candidates are not fatal for
-## the sheet - warn and pick deterministically (lexicographically first). No candidates: return 1.
+## Pick one by-id link from a space-separated candidate list (stdout); multiple candidates warn and
+## pick deterministically (lexicographically first). No candidates: return 1.
 pick_from() { # $1 disk, $2 candidates, $3 class description
   local disk="$1" class="$3"
   local -a arr=()
@@ -31,9 +31,8 @@ pick_from() { # $1 disk, $2 candidates, $3 class description
   printf '%s\n' "${arr[@]}" | sort | head -1
 }
 
-## Physical-drive identity for a disk (stdout): the ata-<MODEL>_<SERIAL> by-id link, which names the drive
-## itself (model and serial as printed on it) - present for SATA disks and USB bridges with a SAT layer,
-## i.e. every data drive hd-idle manages on a HAOS host. Partition links (-partN) are skipped.
+## Physical-drive identity (stdout): the ata-<MODEL>_<SERIAL> by-id link (model + serial as printed on
+## the drive; present for SATA and SAT-capable USB bridges) - partition links (-partN) are skipped.
 pick_phys() {
   local disk="$1" name links=() ata="" out
   read -ra links <<<"${DISK_LINKS[$disk]:-}"
@@ -131,8 +130,7 @@ if [ "${#rows[@]}" -eq 0 ]; then
   exit 1
 fi
 
-## Alphabetical by label (the first table column): sort the assembled rows - they share the table prefix,
-## so sorting the row strings sorts by the label cell.
+## Alphabetical by label (first column): rows share the prefix, so sorting the row strings sorts by the label cell.
 mapfile -t rows < <(printf '%s\n' "${rows[@]}" | sort)
 
 {
@@ -151,8 +149,8 @@ EOF
   printf '%s\n' "${rows[@]}"
 } >"$OUT_FILE"
 
-## Panache owns ALL markdown formatting in this repo; its repo-wide pass skips gitignored files, so the task
-## formats its output explicitly (in place - a formatter failure fails the task, per set -e).
+## Panache owns ALL markdown formatting (.agents/skills/ha-app-markdown) but skips gitignored files, so
+## the task formats its output explicitly (a formatter failure fails the task).
 panache format "$OUT_FILE"
 
 echo "-- wrote ${OUT_FILE} (${#rows[@]} drive(s) on $host)"

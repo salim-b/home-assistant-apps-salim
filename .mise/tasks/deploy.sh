@@ -47,13 +47,9 @@ local_slug="local_${slug}"
 
 echo "== deploying $app v$version to $host (store slug: $local_slug) =="
 
-# Apps installed from app repositories get the slug '<repo-hash>_<app-slug>'
-# (repo hash = first 8 hex chars of the sha1 over the lowercased repository
-# URL, supervisor store/utils.py get_hash_from_repository — f8b2d53d_nfs-server for
-# this repo). A second installation alongside the local one would conflict on
-# the published port, so refuse (or --replace) when one exists. Matching by
-# slug suffix instead of reproducing the hash keeps working when the app
-# moves between repositories.
+# Repository installs get the hashed store slug (fact: root KNOWLEDGE.md §Supervisor: store slugs);
+# a second installation would conflict on the published port, so refuse (or --replace). Matching by
+# slug suffix instead of reproducing the hash keeps working when the app moves between repositories.
 store_apps=$(ssh "${SSH_OPTS[@]}" "$host" 'ha store apps --raw-json' 2>/dev/null || true)
 repo_installs=$(echo "$store_apps" | jq -c --arg slug "$slug" --arg local "$local_slug" \
   '[.data.addons[] | select(.installed == true and .slug != $local and ((.slug | split("_")) | last) == $slug)]' 2>/dev/null || true)
@@ -64,8 +60,7 @@ if [ "$repo_installs" != "" ] && [ "$repo_installs" != "[]" ]; then
   if [ "${usage_replace:-false}" = "true" ]; then
     echo "-- --replace given: uninstalling the repository-installed copy first"
     for repo_slug in "${repo_slugs[@]}"; do
-      # Back the copy's options up before the uninstall (they die with it);
-      # --config migrate additionally carries them to the local install.
+      # Options die with the uninstall - back them up first (--config migrate additionally carries them over).
       repo_opts=$(ha_app_options "$repo_slug")
       if [ "$repo_opts" != "" ] && [ "$repo_opts" != "{}" ]; then
         echo "-- options of $repo_slug backed up locally: $(ha_backup_options "$app" "$repo_opts")"
@@ -85,10 +80,8 @@ ssh "${SSH_OPTS[@]}" "$host" 'mkdir -p /local_apps'
 ssh "${SSH_OPTS[@]}" "$host" "rm -rf /local_apps/$app"
 scp -r "${SSH_OPTS[@]}" "$app" "$host:/local_apps/"
 
-# Comment out the top-level `image:` key in the DEVICE copy only: with an
-# image key set, the Supervisor would pull that image from GHCR instead of
-# building locally from these files (same guidance as the official dev
-# docs), and `ha apps rebuild` would refuse an image-based app.
+# DEVICE copy only: the Supervisor must build locally instead of pulling GHCR (an image-based app
+# would never rebuild) - see .agents/skills/ha-app-device-testing.
 if ssh "${SSH_OPTS[@]}" "$host" \
   "sed -i 's|^image:|#image:|' /local_apps/$app/config.yaml && grep -q '^#image:' /local_apps/$app/config.yaml"; then
   echo "-- commented out top-level 'image:' key in the device copy (forces local build)"
@@ -122,16 +115,9 @@ else
 fi
 
 # --- --config handling -------------------------------------------------------
-# The local install's options are user data and survive update/rebuild
-# untouched. POSTed options apply at the app's next start - restart after
-# posting (idempotent; both apps tolerate restarts fine). Reset posts the
-# app's config.yaml DEFAULTS, not {}: a fresh options POST is validated
-# against the schema and {} is rejected for schemas with required option
-# keys (device-verified 2026-10-16) - the defaults always satisfy it. The
-# reset POST runs on every install state: options never survive an
-# uninstall (device-verified 2026-10-16), so a fresh install already has
-# the defaults (the POST is a no-op there) and an existing install gets
-# its options wiped deterministically.
+# Stored options are user data (survive update/rebuild); POSTed options apply at the app's next
+# start - restart after posting. Reset posts the config.yaml DEFAULTS, never {} (rejected for
+# schemas with required keys; the defaults always satisfy it) - see .agents/skills/ha-app-device-testing.
 if [ "$CONFIG_MODE" = "reset" ]; then
   old=$(ha_app_options "$local_slug")
   if [ "$old" != "" ] && [ "$old" != "{}" ]; then

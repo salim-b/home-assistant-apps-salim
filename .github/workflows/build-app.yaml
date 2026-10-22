@@ -11,12 +11,9 @@ on:
         description: Whether or not to publish the built image to GHCR.
         required: true
         type: boolean
-  # Manual/reconcile dispatch: the publish-reconcile workflow fires this when
-  # a published version tag is missing from GHCR (transient build/publish
-  # failure on the push-fired Builder). workflow_dispatch is the documented
-  # GITHUB_TOKEN exception that always creates runs - a dispatched run is not
-  # subject to the push-event workflow suppression. The prepare job's
-  # github.repository guard below applies to dispatches the same way.
+  # Manual/reconcile dispatch: publish-reconcile fires this when a version tag is missing from
+  # GHCR. workflow_dispatch is the documented GITHUB_TOKEN exception that always creates runs
+  # (not subject to the push-event workflow suppression).
   workflow_dispatch:
     inputs: *shared_inputs
 
@@ -87,10 +84,8 @@ jobs:
           persist-credentials: false
 
       - name: Pre-pull the buildkit driver image (Docker Hub flake hardening)
-        # docker/setup-buildx-action (used internally by the builder) pulls
-        # the buildkit driver from Docker Hub; transient auth.docker.io
-        # outages fail the whole build job — pre-pull with retries so the
-        # driver setup finds the image locally
+        # setup-buildx-action (used internally by the builder) pulls the buildkit driver from
+        # Docker Hub; transient auth.docker.io outages fail the whole job - pre-pull with retries
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           max_attempts: 3

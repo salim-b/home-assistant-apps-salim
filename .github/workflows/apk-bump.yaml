@@ -1,29 +1,19 @@
 name: Apk pin bump
 
-# Post-merge follow-up for Renovate apk-pin PRs (see the apk package version
-# policy in the repository-root KNOWLEDGE.md):
+# Post-merge follow-up for Renovate apk-pin PRs (policy: root KNOWLEDGE.md §apk package version
+# policy):
 #
-# changelog: a merged renovate[bot] PR labeled apk_pin gets its templated
-# changelog section inserted post-merge (Renovate automerges pkgrel bumps
-# without a changelog entry; bumpVersions bumps the app's config.{yaml,yml}
-# version in the same PR). The commit is docs-only (CHANGELOG.md) and pushed
-# with the GITHUB_TOKEN - whose workflow suppression is intended: CHANGELOG.md
-# is excluded by version-guard and the image is byte-identical, so no rebuild
-# is needed.
+# changelog: a merged renovate[bot] apk_pin PR gets its templated changelog section inserted
+# post-merge (Renovate automerges pkgrel bumps without one). Docs-only CHANGELOG.md commit pushed
+# with the GITHUB_TOKEN - its workflow suppression is intended (no rebuild is needed).
 #
-# nudge: Alpine repushes land per-arch asynchronously (aarch64 can serve a new
-# pkgrel days before x86_64), so an early bump PR legitimately stays red
-# (validate_apk_pins fails until every arch index serves the new pin). This
-# daily job rebases such PRs (@renovate rebase) once ALL of the app's arch
-# indexes serve the new pin - a rebase creates fresh check runs, while
-# re-running failed check runs can still count as red in Renovate's automerge
-# evaluation. While an arch index still lags the job does nothing: the daily
-# lint cron on main remains the drift alarm. workflow_dispatch runs accept a
-# dry_run boolean input: the nudge job then logs would-be rebase comments
-# without posting them (manual verification runs).
+# nudge: Alpine repushes land per-arch asynchronously, so an early bump PR legitimately stays red
+# until every arch index serves the new pin (validate_apk_pins fails). Rebases such PRs daily
+# (@renovate rebase - fresh check runs; re-running failed runs can still count as red) once ALL
+# arch indexes serve the pin; while an index lags it does nothing. workflow_dispatch accepts
+# dry_run for log-only verification runs.
 #
-# Cron offset: 01:30 UTC - away from the lint workflow's daily 00:00 cron and
-# the publish-reconcile run (03:15 UTC).
+# Cron offset: 01:30 UTC - away from the lint cron (00:00) and publish-reconcile (03:15).
 
 on:
   pull_request:
@@ -58,8 +48,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: read
-    # Serialize changelog jobs (merge races with Renovate's own merges are
-    # possible; queued jobs rebase cleanly instead of conflicting)
+    # Serialize changelog jobs - merge races with Renovate's own merges are possible
     concurrency:
       group: apk-bump-changelog
       cancel-in-progress: false
@@ -271,12 +260,10 @@ jobs:
             exit 0
           fi
 
-          # merge races with Renovate's own merges are possible: rebase before
-          # pushing (the concurrency group serializes changelog jobs)
+          # merge races with Renovate's own merges are possible: rebase before pushing
           git fetch origin main
           git rebase origin/main
-          # GITHUB_TOKEN push: workflow suppression intended (docs-only; see
-          # the workflow comment header)
+          # GITHUB_TOKEN push: workflow suppression intended (docs-only; see the workflow header)
           git push origin HEAD:main
 
   nudge:
@@ -287,10 +274,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       # issues: write - PR comments are issue comments (@renovate rebase)
-      # pull-requests: read - PR + files listing
-      # contents: read - Dockerfile/config.{yaml,yml} at the PR head via the
-      # contents API (job permissions replace top-level, so the read must be
-      # restated here)
+      # pull-requests: read - PR + files listing; contents: read - PR head files via the contents
+      # API (job permissions replace top-level, so the read must be restated here)
       issues: write
       pull-requests: read
       contents: read

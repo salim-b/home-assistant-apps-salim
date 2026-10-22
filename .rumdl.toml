@@ -1,50 +1,32 @@
-# rumdl configuration - Markdown linter (https://github.com/rvben/rumdl)
-#
-# Second, markdownlint-rules-rich linter behind panache (see panache.toml),
-# which owns ALL markdown autoformatting. Runs as part of `mise run lint`
-# (all git-tracked .md files); the config is schema-validated against
-# rumdl's published JSON schema (see .mise/tasks/validate.py).
+# rumdl configuration - second, markdownlint-rules-rich Markdown linter behind panache, which owns
+# ALL markdown autoformatting (.agents/skills/ha-app-markdown). Runs over tracked .md files as part
+# of `mise run lint`; schema-validated against rumdl's published JSON schema (.mise/tasks/validate.py).
 
 [global]
-# rumdl must never rewrite files: panache (panache.toml) owns ALL markdown
-# formatting, and a rumdl `fmt` / `check --fix` pass would rewrite the very
-# wrapping panache just shaped. `fixable` is rumdl's fix allow-list (empty =
-# everything fixable; entries = only the listed rules fix, all fix paths go
-# through this gate - the fix coordinator and the LSP). There is no
-# "fix nothing" wildcard, so pin an *inert* allow-list entry instead: `all`
-# is preserved by rumdl's rule-list canonicalization and never matched
-# against a rule name (verified on 0.2.79: fmt/check --fix change nothing,
-# `disable = ["all"]` is equally inert). The behavioral canary in
-# validate.py fails loudly if a rumdl upgrade ever flips this (e.g.
-# implementing `all` as a fix wildcard, which would silently allow
-# everything again).
+# rumdl must never rewrite files - panache owns ALL markdown formatting. `fixable` is rumdl's fix
+# allow-list with no "fix nothing" wildcard, so an *inert* entry is pinned: `all` is preserved by
+# rule-list canonicalization and never matched against a rule name (verified 0.2.79). The
+# behavioral canary in validate.py fails loudly if a rumdl upgrade ever flips this.
 fixable = ["all"]
 
-# AI_POLICY.md is the Open Home Foundation's policy text, kept verbatim for
-# upstream syncs - not this repo's prose to style: excluded from linting
-# entirely.
+# AI_POLICY.md is the Open Home Foundation's policy text, kept verbatim for upstream syncs - not
+# this repo's prose to style.
 exclude = ["AI_POLICY.md"]
 
-# Line length enforced (MD013, see its section below). READMEs ignore MD033:
-# badges/my.home-assistant.io embeds are conventional GitHub README content.
+# Line length enforced (MD013 below). READMEs ignore MD033: badges/my.home-assistant.io embeds are conventional GitHub README content.
 [per-file-ignores]
 "README.md" = ["MD033"]
 "*/README.md" = ["MD033"]
-# Changelog version placeholders are conventionally emphasis lines
-# (e.g. *Unreleased*), not headings - MD036's "emphasis instead of a
-# heading" is not a useful signal there.
+# Changelog version placeholders are conventionally emphasis lines (e.g. *Unreleased*), not
+# headings - MD036 is not a useful signal there.
 "*/CHANGELOG.md" = ["MD036"]
 
 [MD013]
 line-length = 120
-# Code is not prose: fenced/indented code blocks (shell commands, config
-# snippets) keep their natural length.
+# Code is not prose: fenced/indented code blocks keep their natural length.
 code-block-line-length = 0
-# A line whose only overflow is an unbreakable inline code span must not
-# fail the check (nothing to wrap without rewriting the code).
+# A line whose only overflow is an unbreakable inline code span must not fail the check.
 code-spans = false
-# Panache (see panache.toml) owns prose wrapping, so rumdl's own reflow
-# stays off - its documented default (`reflow = false`). MD013 remains as
-# a pure width check: flag lines over the limit, never rewrite them.
-# Without this, rumdl would enforce ITS normalized fill state, which
-# disagrees with panache's packing.
+# Panache owns prose wrapping (.panache.toml, .agents/skills/ha-app-markdown), so rumdl's own
+# reflow stays off (documented default): MD013 remains a pure width check - flag over the limit,
+# never rewrite (rumdl's normalized fill state disagrees with panache's packing).

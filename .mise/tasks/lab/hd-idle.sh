@@ -1,51 +1,34 @@
 #!/usr/bin/env bash
 #MISE hide=true
 #MISE description="⚠️ internal helper script"
-# App hook for .mise/tasks/lab.sh (hd-idle specifics).
+# App hook for .mise/tasks/lab.sh (hd-idle specifics); general contract:
+# .agents/skills/ha-app-lab-testing. May set lab_docker_args, may define lab_runtime_check.
 #
-# Contract: this file may set lab_docker_args (the app requires no volumes
-# beyond the harness-provided /dev/disk mirror and /data, and the harness
-# already runs the app container --privileged) and may define
-# lab_runtime_check.
-#
-# HAOS binds the host's /dev read-only into every app container
-# (supervisor/docker/const.py MOUNT_DEV, with
-# read_only_non_recursive=True), so /dev/disk/by-* udev symlink trees are
-# visible to the app on a real device - config.sh's system-disk detection
-# and the by-id inventory rely on that. Plain Docker only creates bare
-# device nodes (no /dev/disk), so mirror the HAOS behavior here (hd-idle's
-# whole by-id UX would be lab-invisible otherwise).
+# HAOS binds the host's /dev read-only into every app container, so /dev/disk/by-* udev
+# symlink trees are visible to the app on a real device (config.sh's system-disk detection
+# and by-id inventory rely on it); plain Docker creates bare device nodes only - mirror
+# the HAOS behavior here (hd-idle's whole by-id UX would be lab-invisible otherwise).
 
 lab_docker_args=()
 if [ -d /dev/disk ]; then
   lab_docker_args+=(-v /dev/disk:/dev/disk:ro)
 fi
-## Short watcher interval (the 5 s floor) so the watcher roundtrips in
-## lab_runtime_check complete within their poll windows (mirrors the
-## nfs-server lab's NFSD_WATCH_INTERVAL).
+## Short watcher interval (the 5 s floor) so the watcher roundtrips complete within their poll
+## windows (mirrors the nfs-server lab's NFSD_WATCH_INTERVAL).
 lab_docker_args+=(-e HD_IDLE_WATCH_INTERVAL=5)
 #
-# The lab container sees this machine's real /dev and /proc/diskstats. The
-# optional spindown smoke test is driven by LAB_SPINDOWN_DRIVES (comma-
-# separated sd* kernel names, e.g. "sda,sdb" — set via
-# `mise run lab hd-idle --spindown-drives sda,sdb`). It performs READ-ONLY
-# standby commands + state queries (smartctl -n standby) only. The fixture
-# adapter (.mise/tasks/lab/hd-idle.py) configures these drives on a
-# 30 s idle so the daemon also exercises its natural spindown path within
-# the check window.
+# Optional spindown smoke test driven by LAB_SPINDOWN_DRIVES (`mise run lab hd-idle
+# --spindown-drives sda,sdb`): READ-ONLY standby commands + state queries only; the fixture
+# adapter (.mise/tasks/lab/hd-idle.py) configures a 30 s idle for the natural spindown path.
 #
-# Host-side interference: OS-level spindown mechanisms (udisks2 stored drive
-# settings, hdparm.conf, TLP, smartd, ...) and desktop IO on mounted drives
-# can skew spindown tests — a read-only preflight sweep warns about them
-# (background in hd-idle/KNOWLEDGE.md). Assertions are therefore event-based
-# (hd-idle's own log lines, drive state right after the forced command),
-# never "stays spundown for N minutes".
+# Host-side spindown mechanisms (udisks2, hdparm.conf, TLP, smartd, ...) and desktop IO on mounted
+# drives can skew spindown tests (background: hd-idle/KNOWLEDGE.md; lab_preflight warns) - assertions
+# are therefore event-based, never "stays spundown for N minutes".
 
 # shellcheck disable=SC2034  # contract variables are consumed by the harness
 
 lab_preflight() {
-  ## Read-only warning sweep for host-side disk power-management mechanisms
-  ## that could interfere with spindown tests.
+  ## Read-only warning sweep for host-side disk power-management mechanisms that could interfere with spindown tests.
   local found=0 unit
   for unit in udisks2 tlp laptop-mode smartd smartmontools powertop hd-idle; do
     if systemctl is-active "$unit" >/dev/null 2>&1; then
@@ -110,25 +93,17 @@ lab_runtime_check() {
 
   lab_preflight
 
-  ## Watcher mechanics (drive re-resolution) - run for EVERY lab, before the
-  ## LAB_SPINDOWN_DRIVES gate: the roundtrips below need no spindownable
-  ## drives. The watcher must detect configuration drift by replaying the
-  ## recorded resolution baseline (hd-idle-genargs --check) and regenerate +
-  ## restart hd-idle when it changed. A kernel-name move cannot be simulated
-  ## in the lab (renames happen kernel-side), so verify the mechanism
-  ## deterministically: first the hermetic --check exit-code matrix below
-  ## (every detection path against a known mutation), then the roundtrips -
-  ## corrupt /etc/hd-idle.args (content drift) and the baseline state file
-  ## (state drift) and expect the watcher to restore within a poll interval -
-  ## restarting hd-idle for the content roundtrip, while the state roundtrip
-  ## must be resynced WITHOUT a restart (asserted via the watcher's
-  ## change-tick log line, which only the restart path emits).
+  ## Watcher mechanics: run for EVERY lab, before the LAB_SPINDOWN_DRIVES gate (the roundtrips need no
+  ## spindownable drives). Kernel-name moves cannot be simulated in the lab (renames happen kernel-side),
+  ## so verify deterministically: first the hermetic --check exit-code matrix below (every detection
+  ## path against a known mutation), then the roundtrips - corrupt /etc/hd-idle.args (content drift) and
+  ## the baseline state file (state drift), expecting restoration within a poll interval - content drift
+  ## restarts hd-idle, state drift must resync WITHOUT a restart (only the restart path emits the
+  ## watcher's change-tick log line).
   if docker exec "$app" sh -c "test -x /usr/bin/hd-idle-genargs" 2>/dev/null; then
-    ## Hermetic --check exit-code matrix: every detection path of the
-    ## baseline replay, each run against a mutation with a known expected
-    ## exit code (0 = unchanged, 3 = regeneration due). The watcher is
-    ## paused for the matrix so no tick can race the mutations (its exit is
-    ## confirmed via s6-svstat before the first mutation).
+    ## Every detection path of the baseline replay against a known mutation (0 = unchanged,
+    ## 3 = regeneration due); the watcher is paused so no tick races the mutations (exit confirmed
+    ## via s6-svstat before the first mutation).
     echo "-- verifying the hd-idle-genargs --check exit-code matrix (watcher paused)"
     docker exec "$app" /command/s6-svc -d /run/service/hd-idle-watch
     mx_down=0
@@ -151,8 +126,7 @@ lab_runtime_check() {
         echo "   FAIL: backing up the generated files for the --check matrix failed"
         return 1
       }
-    ## The boot generation must have written a state file that replays as
-    ## unchanged (the matrix's clean case).
+    ## The boot generation must have written a state file that replays as unchanged (the matrix's clean case).
     docker exec "$app" sh -c "test -s /etc/hd-idle.resolution" \
       || {
         echo "   FAIL: /etc/hd-idle.resolution baseline missing after boot"
@@ -195,9 +169,8 @@ lab_runtime_check() {
         "sed -i 's/^dev \(.*\) .*/dev \1 mx-fake-outcome/' /etc/hd-idle.resolution" 3 \
         || return 1
     else
-      ## No configured drives: inject a dev line with an outcome the replay
-      ## cannot confirm (the device does not exist -> PASSTHRU) - a drift
-      ## nonetheless, since the recorded outcome is a kernel name.
+      ## No configured drives: inject a dev line whose outcome the replay cannot confirm (the device
+      ## does not exist -> PASSTHRU) - a drift nonetheless, the recorded outcome is a kernel name.
       mx_case "device outcome drift (injected)" \
         "printf 'dev /dev/mx-no-such-device sda\n' >> /etc/hd-idle.resolution" 3 \
         || return 1
@@ -239,9 +212,9 @@ lab_runtime_check() {
       echo "   FAIL: args file not restored within 50 s (watcher not running?)"
       return 1
     }
-    ## The restore (the watcher's args mv) precedes the restart by ~1 s (drives+state mv, pmfix, s6-svc -r, then
-    ## the daemon's run script logs 'Starting hd-idle' again) - a single grep right after the cmp success can land
-    ## in that window and count 1 (observed twice). Poll for the restarted daemon instead.
+    ## The restore precedes the restart by ~1 s (drives+state mv, pmfix, s6-svc -r, then the daemon logs
+    ## 'Starting hd-idle' again) - a single grep right after the cmp success can land in that window and
+    ## count 1 (observed twice). Poll for the restarted daemon instead.
     restarts=0
     for _ in {1..10}; do
       restarts=$(docker logs "$app" 2>&1 | grep -c "Starting hd-idle" || true)
@@ -299,12 +272,9 @@ lab_runtime_check() {
     return 0
   fi
 
-  ## Drive-PM treatment plumbing (per-drive override): the drives file
-  ## carries the effective per-drive flag in a 4th column (1 = treat, 0 =
-  ## leave the drive's own power management alone); the fixture adapter
-  ## sets disable_drive_pm=no on the FIRST drive so the override is
-  ## exercised end to end (pm-flag 0 in the file, hd-idle-pmfix logs the
-  ## skip at boot).
+  ## Per-drive drive-PM override: the drives file carries the effective per-drive flag in a 4th column
+  ## (1 = treat, 0 = leave the drive's own power management alone); the fixture sets disable_drive_pm=no
+  ## on the FIRST drive so the override is exercised end to end (pm-flag 0, hd-idle-pmfix logs the skip).
   if ! docker exec "$app" sh -c "awk 'NF > 0 && NF != 4 { exit 1 }' /etc/hd-idle.drives"; then
     echo "   FAIL: /etc/hd-idle.drives lines are not 4 columns (pm-flag column missing)"
     return 1
@@ -324,13 +294,9 @@ lab_runtime_check() {
 
   ## Spindown smoke test (read-only on the drives).
   ##
-  ## hd-idle -t quirks (verified, see hd-idle/KNOWLEDGE.md):
-  ## - needs the FULL /dev path - unlike the daemon path, single-shot mode
-  ##   does not prepend /dev/ (bare kernel names fail with "open sda: no
-  ##   such file or directory"; the usage string's "-t sda" is misleading)
-  ## - uses the GLOBAL default command type (single-shot mode has no
-  ##   per-device config) - config.yaml's scsi default is what USB drives
-  ##   need; the fixture sets it per drive, which -t ignores
+  ## hd-idle -t quirks (verified, see hd-idle/KNOWLEDGE.md): needs the FULL /dev path (single-shot
+  ## mode does not prepend /dev/; the usage string's "-t sda" is misleading) and uses the GLOBAL
+  ## default command type (single-shot has no per-device config; the fixture's per-drive set is ignored).
   check_img="local/hdidle-lab-check:smartctl"
   if ! docker image inspect "$check_img" >/dev/null 2>&1; then
     echo "-- building the spindown-check image ($check_img)"
@@ -351,14 +317,10 @@ EOF
       fail=1
       continue
     fi
-    ## Verify the standby state with smartctl -n standby - the probe
-    ## DESIGNED not to wake drives. Verified against this machine's USB
-    ## bridges: hdparm -C is NOT usable here - it races the spin-down
-    ## window (NOT READY / "becoming ready" sense data) and actually WAKES
-    ## the bridge's drive (empirical, see hd-idle/KNOWLEDGE.md): STOP ->
-    ## smartctl says SLEEP -> hdparm -C -> smartctl says active.
-    ## Desktop IO on a mounted drive may wake it between the command and
-    ## the probe - hence the polling retries instead of a single read.
+    ## smartctl -n standby: the probe designed not to wake drives (hdparm -C is NOT usable here - it
+    ## races the spindown window and actually wakes the bridge's drive; empirical, see
+    ## hd-idle/KNOWLEDGE.md). Desktop IO on a mounted drive may wake it between command and probe -
+    ## hence the polling retries instead of a single read.
     local tries=0 pass="" rc
     while [ "$tries" -lt 6 ]; do
       sleep 5
@@ -381,11 +343,9 @@ EOF
   done
   [ "$fail" = 0 ] || return 1
 
-  ## Natural-path assertion: the daemon (fixture idle: 30 s) must log its
-  ## own spindown events for the smoke-test drives. Desktop IO on mounted
-  ## drives can delay this (the drive gets woken, the daemon spins it down
-  ## again) - the event must appear, the drive does not need to STAY in
-  ## standby.
+  ## Natural-path assertion: the daemon (fixture idle: 30 s) must log its own spindown events; desktop
+  ## IO can delay this (drive gets woken, daemon spins it down again) - the event must appear, the
+  ## drive does not need to STAY in standby.
   echo "-- waiting for the daemon's own spindown events (fixture idle: 30 s)"
   while [ "$waited" -lt 180 ]; do
     missing=""

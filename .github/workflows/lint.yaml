@@ -36,11 +36,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: ⤵️ Check out the linter source
-        # run frenck's app linter natively instead of via its Docker action:
-        # the action builds its image from Docker Hub at run time, where
-        # transient auth.docker.io outages/429 rate limits (runner IP pools,
-        # unauthenticated pulls) otherwise flake the job — python + pypi are
-        # the reliable path. Renovate digest-pins this checkout.
+        # run frenck's app linter natively instead of via its Docker action, whose Docker Hub
+        # image builds flake on transient auth.docker.io outages/429 rate limits; Renovate
+        # digest-pins this checkout.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: frenck/action-addon-linter
@@ -51,11 +49,9 @@ jobs:
         run: python3 -m pip install --no-cache-dir --prefer-binary -r linter/src/requirements.txt
 
       - name: 🚀 Run Home Assistant App Lint
-        # lint.py reads its configuration from the GitHub action-input env
-        # convention (INPUT_*); `path` is the app directory, `community`
-        # stays false (same as the action's default). The two JSON schemas
-        # are loaded from absolute paths (in the original Docker image they
-        # were copied to /) — provide them there.
+        # lint.py reads its configuration from the GitHub action-input env convention (INPUT_*):
+        # `path` is the app directory, `community` stays false (the action's default). The two
+        # JSON schemas are loaded from absolute paths (the Docker image copied them to /) - provide them.
         run: |
           sudo cp linter/src/config.schema.json linter/src/build.schema.json /
           INPUT_PATH="./${{ matrix.path }}" \
