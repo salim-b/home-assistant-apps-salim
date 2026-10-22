@@ -2,6 +2,13 @@
 
 # Changelog
 
+## 0.1.10
+
+- Maintainability: no behavior change (the comment-stripped scripts and the AppArmor rule lines are unchanged) - code
+  comments slimmed to purpose + references, `KNOWLEDGE.md` tightened to durable facts and `TODO.md` pruned to open
+  items. The narratives and procedures now live in the repository's `KNOWLEDGE.md` and agent skills, their single
+  canonical homes.
+
 ## 0.1.9
 
 - Internals: the drive re-resolution watcher's per-tick detection now replays a recorded resolution baseline
