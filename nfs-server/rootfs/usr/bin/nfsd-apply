@@ -330,7 +330,8 @@ fi
 
 ## Generate /etc/nfsd.args: the rpc.nfsd command line consumed by nfsd-start (one shared generator for boot and the
 ## watcher's restarts); the app IP is re-detected per apply so a restart cycle always binds the current address.
-## Facts: nfs-server/KNOWLEDGE.md §"`rpc.nfsd` is not a daemon" / §"Grace period".
+## --host pins the bind to that IP (what the healthcheck probes); --no-udp: NFSv4 is TCP-only. Flag rationale:
+## nfs-server/KNOWLEDGE.md §"`rpc.nfsd` is not a daemon" / §"Grace period".
 APP_IP=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1 | head -n 1) || true
 if [ "$APP_IP" = "" ]; then
   bashio::log.fatal "Unable to determine the app's IP address for the NFS server bind."

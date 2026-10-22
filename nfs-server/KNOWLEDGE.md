@@ -57,6 +57,9 @@ Runtime semantics of the generated `/etc/exports` content (schema-side constrain
   of `/share` and `/media` at `/data/pseudo_root/{share,media}`, shares exported from the mirrored paths with their own
   client networks, the pseudo root itself read-only walkable for the union of all networks. Per-share options are
   enforced at the export boundary; client paths stay unchanged.
+- A removed share leaves its mirror directory behind: nfsd-apply creates mirrors (`mkdir -p` + bind) but never removes
+  orphaned ones — the empty directory of a deleted share stays visible to clients under the pseudo root (cosmetic wart;
+  cleanup: `TODO.md`).
 - Distinct numeric `fsid=` per export is essential: mountd's synthesized intermediate pseudo entries carry the
   filesystem's UUID, and filehandles keyed by that UUID are ambiguous once multiple exports share one filesystem (binds
   of the same fs) — they resolve back to the wrong export (mounts land on the read-only pseudo root → `EROFS` on write).
@@ -136,6 +139,13 @@ work for a process that is gone. Consequences for the version set:
 - `-N`/`-V` only accept 3 and 4: `--no-nfs-version 2` exits with `2: Unsupported version` (NFSv2 server support is not
   compiled into current kernels, `CONFIG_NFSD_V2` defaults to off).
 
+The generated command line (`nfsd-apply` writes `/etc/nfsd.args`, `nfsd-start` executes it) is
+`rpc.nfsd --no-nfs-version 3 --no-udp --host <app-ip> --lease-time <s> --grace-time <s> <threads>`: `--host` binds the
+kernel server's sockets to the app's current IP — the address the Docker HEALTHCHECK probes (the recorded one,
+§"Automatic mirror refresh (nfsd-watch)"), so a passing probe means the server is reachable where clients reach it;
+`--no-udp` drops the UDP listeners a v4-only server has no use for (NFSv4 is TCP-only by design); the lease/grace
+options: §"Grace period".
+
 ## The NFS version set is fixed while the server runs
 
 Once a server instance exists in the kernel (i.e. `rpc.nfsd` started it), writes to `/proc/fs/nfsd/versions` fail with
@@ -206,5 +216,9 @@ mechanics"; authoring procedure: skill `ha-app-apparmor`. Device-verified on HAO
   `KNOWLEDGE.md` §"AppArmor: mediation and profile mechanics"). Without the rule it exits in a restart loop ("Unable to
   prune capability 0 from bounding set: Operation not permitted"); the lab cannot catch this (no enforcement there). The
   grant only enables the self-pruning — the daemon ends up with zero capabilities anyway.
+- The nfsd sub-profile's `capability net_bind_service,` is inert by construction — its `deny network,` means no socket
+  can exist to bind (capability mediation is independent of the network class). It is kept deliberately: relaxing the
+  network deny later must force a fresh decision on privileged-port binding rather than silently inheriting the grant
+  (mountd's grant accompanies its network allowlist — its comment in `apparmor.txt`).
 - Denial signatures seen with busybox `mount`: `mounting SRC on DST failed: Permission denied` (EACCES, mount-rule
   denial) vs `permission denied (are you root?)` (EPERM, capability denial).

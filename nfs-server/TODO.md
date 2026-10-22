@@ -46,3 +46,26 @@ Open work items only (resolved items live in git history). Underlying technical 
   Submitted [`home-assistant/frontend#54839`](https://github.com/home-assistant/frontend/pull/54839), rejected. Seems we
   have to wait for [OpenHomeFoundation/roadmap#57](https://github.com/OpenHomeFoundation/roadmap/issues/57) to get
   implemented.
+
+- Device-side verification of the real HAOS trigger path for nfsd-watch: rslave propagation of drive mounts under
+  `/media` into the app container (`KNOWLEDGE.md` §"Automatic mirror refresh (nfsd-watch)" states the expectation from
+  supervisor `docker/app.py`; the lab's plain-Docker mirrors cannot reproduce it). Plug a drive in, mount it under
+  `/media`, and confirm the watcher's detection + rebind cycle fires without an app restart.
+
+- Unit-test nfsd-apply's share-validation matrix and exit codes (out-of-root path, non-absolute path,
+  whitespace/backslash, duplicate (path, network) with identical vs conflicting options) — zero coverage today. Use the
+  `bashio::config` stubbing procedure (root `KNOWLEDGE.md` §"HA base image: shell gotchas", skill `ha-app-base-image`).
+
+- Stale mirror directories of removed shares accumulate on `/data`: nfsd-apply only creates mirrors (`mkdir -p` + bind),
+  it never removes the mirror of a deleted share — empty leftovers stay visible to NFSv4 clients under the pseudo root.
+  Track removed (path, network) pairs and rmdir an orphaned mirror once no remaining share uses the path (mind the
+  dedup: a path may back several shares across networks).
+
+- Resolve the rpc.mountd socket-behavior contradiction (device strace): `KNOWLEDGE.md` §"mountd and the pseudo file
+  system root" and the runtime skill say "binds no ports, only services upcalls" while the `apparmor.txt` mountd comment
+  says "actual RPC server (MNT service sockets TCP/UDP, v4+v6)" — both cannot be true; the answer decides whether
+  mountd's `net_bind_service` + network grants are live surface.
+
+- AppArmor sub-profiles: the unscoped `signal (send)` grants are template-inherited and unused (nothing in the app sends
+  signals; s6-svc talks to s6 over its control fifo, not kill(2)). Scope or drop them — device-verify first (no audit
+  logs on HAOS: skill `ha-app-apparmor`).

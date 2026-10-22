@@ -5,7 +5,9 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
   ## Conventions & references (device-enforcement-verified on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7):
   ## shape modeled on the official dev-docs AppArmor template and the shipped dnsmasq app profile; sub-profile
-  ## signal receive is peer-scoped per the docs template; `file,` blanket per upstream convention - HAOS produces
+  ## signal receive is peer-scoped per the docs template (the unscoped send grants there are template-inherited
+  ## headroom - nothing in them sends signals; nfs-server/TODO.md tracks scoping/dropping them); `file,` blanket per
+  ## upstream convention - HAOS produces
   ## no AppArmor audit/denial logs, so tightening file rules risks silent breakage (the confinement value sits in
   ## the non-file classes: mount/capability). Facts:
   ## nfs-server/KNOWLEDGE.md §"AppArmor profile — app-specific grants";
@@ -91,7 +93,7 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   ## Sub-profiles: the privileged NFS binaries run under their own tighter profiles (cx = change profile on
   ## execute). They still need the procfs/exports access listed above, hence re-granted here.
 
-  # exportfs (runs twice: config.sh + nfsd-start/stop)
+  # exportfs (nfsd-start: exportfs -a; nfsd-stop: exportfs -au)
   /usr/sbin/exportfs cx -> exportfs,
 
   profile exportfs flags=(attach_disconnected,mediate_deleted) {
@@ -133,6 +135,9 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     # installed slug on the device, e.g. local_nfs-server — the *_nfs-server glob covers repo installs too).
     signal (receive) peer=*_nfs-server,
 
+    # Inert under the network deny below (no socket can exist to bind; capability mediation is independent of the
+    # network class) - kept deliberately: relaxing the deny must force a fresh privileged-port decision. Facts:
+    # nfs-server/KNOWLEDGE.md §"AppArmor profile — app-specific grants".
     capability net_bind_service,
     capability setgid,
     capability setuid,

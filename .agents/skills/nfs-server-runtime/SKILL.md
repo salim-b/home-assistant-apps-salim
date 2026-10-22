@@ -50,6 +50,11 @@ s6-rc.d"), in dependency order:
 6. **`nfsd-healthcheck`**: the Docker HEALTHCHECK probe — TCP connect to port 2049 at the recorded app IP, with a
    self-detection fallback; there is no daemon process to probe (rpc.nfsd exited).
 
+Teardown order: `nfsd-watch` declares a dependency on the `nfsd` oneshot (`dependencies.d/nfsd`), making the watcher a
+dependent — s6-rc tears services down in reverse dependency order, so the watcher always stops before the nfsd oneshot
+and cannot race its shutdown. A mid-cycle SIGTERM of the whole service tree is safe regardless: every nfsd-apply write
+is atomic (`.tmp` + `mv`), and the next boot re-applies the mirrors from the options.
+
 ## nfsd-apply modes and the watcher change cycle
 
 `nfsd-apply [--boot] [--check] [--quiet]` — exit 0 success/unchanged, 3 (would) change, 1 failure. `--boot` is boot-time
