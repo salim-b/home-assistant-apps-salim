@@ -7,7 +7,8 @@ in `TODO.md`.
 
 Facts about version-sensitive components (supervisor, AppArmor, HAOS kernels) cite their source (URL plus ref) and must
 be re-verified before relying on them for new work (skill `ha-app-workflow`). Supervisor facts below were verified at
-ref 2026.10.1 (the pin in `mise.toml`), some also at 2026.09.3 as noted.
+refs 2026.09.3–2026.10.2 (Renovate keeps the `mise.toml` `supervisor_ref` pin fresh — re-check against the current pin
+when relying on them), some at specific refs as noted.
 
 ## Supervisor: app security rating
 
@@ -83,6 +84,18 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
   saving a config while the device is detached fails with a clear message. At app **startup** the validation result is
   suppressed (`App.devices` does `with suppress(vol.Invalid)`); a detached device at boot does not prevent the app from
   starting.
+
+## Supervisor: health events and the app watchdog
+
+- The supervisor does not poll Docker HEALTHCHECK status — it listens to Docker events: `docker/monitor.py` translates
+  `health_status: healthy|unhealthy` into `DOCKER_CONTAINER_STATE_CHANGE` bus events (the exit code is populated only
+  for `die` transitions; supervisor 2026.10.2).
+- The restart decision is per-component: each component registers its own `watchdog_container` on that bus event — for
+  apps it is `apps/app.py::watchdog_container`, which restarts on FAILED/STOPPED/UNHEALTHY only when the app's
+  `watchdog` option is enabled and the container was not manually stopped.
+- Consequence for app design: s6 supervises processes *inside* the container, but only a HEALTHCHECK turns a
+  persistently wedged or crash-looping daemon into a container-level signal the supervisor can act on (hd-idle relies on
+  exactly this: hd-idle/KNOWLEDGE.md §"Daemon failure semantics").
 
 ## Supervisor: store slugs (in-app documentation links)
 
@@ -164,10 +177,15 @@ digest until the next versioned release.
   ecosystem whose kernel-consistency matters more than the exact userspace version).
 
 Enforcement: `validate.py` (`validate_apk_pins`) extracts the BUILD_FROM default branch and the apk pins from each app's
-Dockerfile and compares them against the Alpine **binary indexes** (dl-cdn APKINDEX, x86_64 + aarch64, community then
-main, cached 24 h). A mismatch fails `mise run check`, and the CI lint workflow's **daily cron** flags drift within a
-day. The index serves only the current pkgrel (old ones disappear), so the next build would break anyway — the drift
-check turns an Alpine-side repoint into a guided release instead of silent image drift.
+Dockerfile and compares them against the Alpine **binary indexes** (dl-cdn APKINDEX, cached 24 h). The comparison is
+per-arch against ONE index per arch — x86_64 and aarch64 are hardcoded (not derived from the apps' `arch:` lists) and
+community is fetched with main only as a fetch fallback, so a package that lives only in main, or whose main version
+diverges from community's, is validated against community's version or silently skipped. The apk-bump workflow's nudge
+job merges main+community instead (main wins) and derives the arch list from each app's `config.yaml` — gate and nudge
+can disagree in principle (alignment + parser dedupe: `TODO.md`). A mismatch fails `mise run check`, and the CI lint
+workflow's **daily cron** flags drift within a day. The index serves only the current pkgrel (old ones disappear), so
+the next build would break anyway — the drift check turns an Alpine-side repoint into a guided release instead of silent
+image drift.
 
 **Renovate opens the update PR, including the `config.yaml` version bump**: the Dockerfile manager extracts
 `apk add pkg=version` pins into the `apk` datasource, and the apk packageRule in `.github/renovate.json` supplies the
@@ -260,3 +278,12 @@ longrun can start BEFORE `legacy-cont-init` (the compat oneshot running `/etc/co
 as a daemon crash-looping until s6-supervise's restart loop finally started it after its cont-init-generated inputs
 existed. Empty dependency *directories* are equally broken in a subtler way: git does not track them, so they silently
 vanish from the image.
+
+**Boot-completion oracle**: `legacy-services successfully started` (from
+`s6-rc: info: service legacy-services successfully started`) is s6-rc's completion line for the compat oneshot that
+links the classic `/etc/services.d` tree into `/run/s6/legacy-services` — the last thing s6-rc starts (after the user
+bundle), and it starts and logs even when no classic services exist. That makes the line a reliable boot-complete marker
+for any s6-overlay v3 container; the lab boot wait and the nfs-server live test rely on it. Version-sensitive
+(s6-overlay v3 legacy compat; source: [just-containers/s6-overlay v3.2.3.2,
+`doc/init.txt`](https://github.com/just-containers/s6-overlay/blob/v3.2.3.2/doc/init.txt) — re-verify on
+base-image/s6-overlay bumps).
