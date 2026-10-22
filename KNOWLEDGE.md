@@ -1,13 +1,13 @@
 # Development knowledge (repository-wide)
 
 Non-obvious facts and gotchas that apply to **Home Assistant apps in general** — supervisor behaviors, AppArmor, the HA
-base image, testing — collected here for human developers and agents alike, so they don't have to be re-learned per app.
-Root causes and design facts specific to one app live in its `<app>/KNOWLEDGE.md`; process and commands for agents live
-in `AGENTS.md`; end-user documentation in `<app>/DOCS.md`.
+base image, HAOS specifics — for human developers and agents alike. Procedures (how to do things step by step) live in
+the skills under `.agents/skills/` (index in `AGENTS.md`); app-specific facts in `<app>/KNOWLEDGE.md`; open work items
+in `TODO.md`.
 
-Facts about version-sensitive components (supervisor, AppArmor, HAOS kernels) cite their source (URL + ref) and must be
-re-verified before relying on them for new work (see `AGENTS.md`, workflow rules). Supervisor facts below were verified
-at ref 2026.10.1 (the pin in `mise.toml`), some also at 2026.09.3 as noted.
+Facts about version-sensitive components (supervisor, AppArmor, HAOS kernels) cite their source (URL plus ref) and must
+be re-verified before relying on them for new work (skill `ha-app-workflow`). Supervisor facts below were verified at
+ref 2026.10.1 (the pin in `mise.toml`), some also at 2026.09.3 as noted.
 
 ## Supervisor: app security rating
 
@@ -15,8 +15,8 @@ at ref 2026.10.1 (the pin in `mise.toml`), some also at 2026.09.3 as noted.
 
 - AppArmor: disabled −1 / custom profile **+1** (not +2 — easy to miscount)
 - Ingress +2; *else* no host network **and no published ports** +2; *else* supervisor-auth-API access +1
-- signed +1 — **unreachable**: `AppModel.signed` is a hardcoded `False` stub ("Currently no signing support"; verified
-  in 2026.09.3 and 2026.10.1). Images may well be cosign-signed (our CI does keyless signing), but the supervisor cannot
+- signed +1 — **unreachable**: `AppModel.signed` is a hardcoded `False` stub ("Currently no signing support"; supervisor
+  2026.09.3 and 2026.10.1). Images may well be cosign-signed (our CI does keyless signing), but the supervisor cannot
   credit it — treat signing as supply-chain hygiene only.
 - High-risk capabilities −1 (a single deduction for the whole branch): `BPF`, `CHECKPOINT_RESTORE`, `DAC_READ_SEARCH`,
   `NET_ADMIN`, `NET_RAW`, `PERFMON`, `SYS_ADMIN`, `SYS_MODULE`, `SYS_PTRACE`, `SYS_RAWIO` — or `kernel_modules: true`
@@ -27,12 +27,11 @@ at ref 2026.10.1 (the pin in `mise.toml`), some also at 2026.09.3 as noted.
   are gated by protection mode; supervisor `docker/app.py`).
 
 Store listing vs. installed app can differ by the AppArmor +1 — expected, not a device quirk: `AppModel.apparmor`
-(supervisor `apps/model.py`, verified 2026.09.3) returns `SECURITY_PROFILE` only when a profile *for this app is already
-installed on the host* (`sys_host.apparmor.exists(slug)` checks the supervisor's AppArmor profile store, which
-`install_apparmor()` fills during app install/update). A store-listed app has no profile on the host yet →
-`SECURITY_DEFAULT` → the branch contributes 0 → the store shows one less than the installed rating. It is *not* related
-to AppArmor support on the device — hosts without AppArmor support don't show different ratings; they reject installing
-such apps outright (`UnsupportedReason.APPARMOR`).
+(supervisor `apps/model.py`) returns `SECURITY_PROFILE` only when a profile *for this app is already installed on the
+host* (`sys_host.apparmor.exists(slug)` checks the supervisor's AppArmor profile store, filled during app
+install/update). A store-listed app has no profile on the host yet → `SECURITY_DEFAULT` → the branch contributes 0 → the
+store shows one less than the installed rating. Hosts without AppArmor support don't show different ratings; they reject
+installing such apps outright (`UnsupportedReason.APPARMOR`).
 
 ## Supervisor: option schema quirks
 
@@ -42,33 +41,33 @@ such apps outright (`UnsupportedReason.APPARMOR`).
   control characters) — express whitespace classes as `\\s` instead.
 - The options DSL (`supervisor/apps/options.py` `RE_SCHEMA_ELEMENT`) has **no uniqueness construct** — list-of-objects
   options are validated entry by entry, cross-entry constraints cannot be expressed (the supervisor itself uses
-  `vol.Unique()`, but only in its *own* config schemas, e.g. the `machine` list). Cross-entry guards therefore belong in
-  the app's runtime scripts (defense in depth), backed by `match()` regexes on the fields.
+  `vol.Unique()`, but only in its *own* config schemas). Cross-entry guards therefore belong in the app's runtime
+  scripts (defense in depth), backed by `match()` regexes on the fields.
 - Options are validated **at save time** (schema incl. device-path existence) and delivered to the running app only at
   its next (re)start — option values cannot change under a running app (`supervisor/api/apps.py` options endpoint →
   `app.save_persist()`).
-- Installed options are **user data**: config.yaml default changes do NOT reach existing installs (options.json is
-  written at first install and at save time only) - new options therefore need absent-key handling in app code
-  (`bashio::config '<key>' <default>`), and changing a default is not a behavior change for existing users. Options
-  REMOVED from the schema stay in stored options.json and are simply inert: the supervisor logs a one-line warning
-  ("Option 'X' does not exist in the schema") on each options read until the user re-saves the options — device-verified
-  2026-10-16 (hd-idle 0.1.5 dropping `mode`; the stale key never broke the boot, only warned). A fresh options POST
-  replaces the whole set and silently DROPS keys unknown to the schema (device-verified 2026-10-16: full valid set +
-  bogus keys → ok, bogus keys not stored; a set missing required keys → rejected); a migration tool therefore filters to
-  the target's schema keys to make the drops explicit and reported. `ha apps uninstall` purges the app's OPTIONS in
-  every case (device-verified 2026-10-16 with a same-slug uninstall+reinstall: the reinstall had the app's DEFAULT
-  options, not the previously stored ones) — the `--remove-config` flag only additionally deletes the app's persistent
-  `/data` config folder. Consequently: a reinstall ("fresh install") always runs the app's default options, update and
-  rebuild preserve stored options, and a tool that keeps options across an uninstall must read + re-POST them (the
-  deploy-registry migration does).
+- Installed options are **user data**: `config.yaml` default changes do NOT reach existing installs (`options.json` is
+  written at first install and at save time only) — new options need absent-key handling in app code
+  (`bashio::config '<key>' <default>`), and changing a default is not a behavior change for existing users.
+- Options REMOVED from the schema stay in stored `options.json` and are simply inert: the supervisor logs a one-line
+  warning ("Option 'X' does not exist in the schema") on each options read until the user re-saves — device-verified
+  2026-10-16 (hd-idle 0.1.5 dropping `mode`; the stale key never broke the boot, only warned).
+- A fresh options POST replaces the whole set and silently DROPS keys unknown to the schema (a set missing required keys
+  is rejected) — a migration tool therefore filters to the target's schema keys to make the drops explicit and reported.
+- `ha apps uninstall` purges the app's OPTIONS in every case (device-verified 2026-10-16 with a same-slug
+  uninstall+reinstall: the reinstall had the app's DEFAULT options, not the previously stored ones) — the
+  `--remove-config` flag only additionally deletes the app's persistent `/data` config folder. Consequently: a reinstall
+  ("fresh install") always runs the app's default options, update and rebuild preserve stored options, and a tool that
+  keeps options across an uninstall must read + re-POST them (the deploy-registry migration does; task semantics: skill
+  `ha-app-device-testing`).
 
 ## Supervisor: device access
 
 - Every app container gets the **host `/dev` bind-mounted read-only** (`supervisor/docker/const.py` `MOUNT_DEV`, with
   `read_only_non_recursive=True`), so the udev symlink trees (`/dev/disk/by-id`, `by-uuid`, `by-partlabel`, …) are
   visible to the app on a real device. Plain Docker containers get a tmpfs `/dev` with bare device nodes instead — no
-  `/dev/disk` (the lab mirrors it, see below). What actually gates access are Docker `DeviceCgroupRules`, computed per
-  app from the sources below.
+  `/dev/disk` (the lab mirrors it; skill `ha-app-lab-testing`). What actually gates access are Docker
+  `DeviceCgroupRules`, computed per app from the sources below.
 - **Device-typed option fields** (`device` schema type, optionally `device(subsystem=<udev-subsystem>` — values from
   `hardware/const.py` `UdevSubsystem`, e.g. `block`, `usb`, `tty`) grant the cgroup rules (`c`/`b <major>:<minor> rwm`).
   `AppOptions._collect_device_paths` **recurses into list-of-objects schemas**, so `disks[].device` fields of a list
@@ -94,26 +93,22 @@ such apps outright (`UnsupportedReason.APPARMOR`).
 - In-app links (`README.md`/`DOCS.md` `/config/app/<hash>_<slug>/...`) must use the hashed form to work for the
   repository install (the normal user case); they are dead links for local test installs — expected, those are dev-only.
 
-## AppArmor: mediation gotchas and profile mechanics
+## AppArmor: mediation and profile mechanics
 
-Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7.
+Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7. Authoring and denial-forensics procedures: skill
+`ha-app-apparmor`.
 
 - **Capabilities are mediated**: a profile without explicit `capability …` rules denies all capabilities it is asked
   about at the LSM hook — including the `capable(CAP_SYS_ADMIN)` check inside the mount(2) syscall path, even when the
   `mount …` rule itself grants the mount. Docker's default profile carries a blanket `capability,`, so plain Docker
   containers never hit this. List every capability the binaries need. Sub-profile subtlety: capabilities a binary needs
-  *for its own self-management* also need rules — `prctl(PR_CAPBSET_DROP)` and `capset(2)` require `CAP_SETPCAP` (found
-  via nfsdcld, which prunes its whole bounding set at startup: without the rule it exits in a restart loop, "Unable to
-  prune capability 0 from bounding set: Operation not permitted"). The lab cannot catch such issues — it has no AppArmor
-  enforcement.
+  *for its own self-management* also need rules — `prctl(PR_CAPBSET_DROP)` and `capset(2)` require `CAP_SETPCAP`
+  (without the rule, a bounding-set-pruning daemon exits in a restart loop).
 - **Errno forensics replace missing denial logs**: HAOS produces *no* AppArmor audit messages in the host journal
-  (`ha host logs` carries kernel lines but nothing apparmor/DENIED — no usable audit plumbing), so complain-mode
-  iteration is impossible; enforcement bugs must be diagnosed from boot progress. Useful signals:
-  - busybox `mount` prints `mounting SRC on DST failed: Permission denied` for **EACCES** (`%m`; observed for a
-    *mount-rule* denial) and `permission denied (are you root?)` for **EPERM** (dedicated abort path; observed for a
-    *capability* denial).
-  - In-container ground truth is file-rule-accessible: `cat /proc/self/attr/current` (profile + mode) and
-    `grep CapEff /proc/self/status`.
+  (`ha host logs` carries kernel lines but nothing apparmor/DENIED — no usable audit plumbing). Useful signals: busybox
+  `mount` prints `mounting SRC on DST failed: Permission denied` for **EACCES** (mount-rule denial) and
+  `permission denied (are you root?)` for **EPERM** (capability denial); in-container ground truth is
+  file-rule-accessible: `cat /proc/self/attr/current` (profile plus mode) and `grep CapEff /proc/self/status`.
 - **Mount rule grammar** (parser `apparmor.d.pod`): the mount-flags conditional is `options=` (there is no `flags=`);
   `fstype=` matching only applies to *new* mounts — not bind/remount — so `mount --bind` rules are conditioned on
   `options=(bind)` instead. Mount sources are matched as passed: busybox passes the device string for pseudo-filesystems
@@ -121,10 +116,9 @@ Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7.
 - **Ioctls**: AppArmor mediates ioctls only via the file's r/w permission. Per-command ioctl mediation does not exist in
   any released AppArmor (re-verified 2026-10 against the AppArmor 4.0 release notes and the 6.17-era upstream pulls: new
   mediation covers POSIX mqueue, user namespaces, io_uring and AF_UNIX; fine-grained inet/inet6 is still
-  work-in-progress
-  - ioctls are not on the roadmap) — e.g. `SG_IO` on disk nodes is covered by `/dev/sd* rwk`-style file rules, and no
-    capability rules are needed for the ioctl itself (kernel-side `capable()` checks inside command paths are a separate
-    gate — capabilities are mediated, see above).
+  work-in-progress) — e.g. `SG_IO` on disk nodes is covered by `/dev/sd* rwk`-style file rules, and no capability rules
+  are needed for the ioctl itself (kernel-side `capable()` checks inside command paths are a separate gate —
+  capabilities are mediated, see above).
 - **Network mediation is opt-in per class**: a profile without any `network` rules has networking *entirely unmediated*
   (everything allowed) — "no rules" is not "no networking". Adding any network rule (allow or deny) enables mediation,
   and everything not matched by an allow rule is then denied; `deny network,` denies a class outright. The parser
@@ -132,14 +126,12 @@ Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7.
   `network inet6 …`, `network netlink raw`, …).
 - **File-rule tightening is impractical**: without audit logs there is no way to iterate file rules safely, so a `file,`
   blanket is the upstream HA convention (docs template, dnsmasq, this repo's apps). The profile's confinement value sits
-  in the non-file classes (network, capability, mount), which Docker's default profile would otherwise grant broadly.
-  The asymmetry is the point: a missed rule in a tightened file set fails silently and undiagnosably on the device (the
-  capability forensics above only worked because errno clues existed), while the marginal gain is near zero - the real
-  boundaries are the supervisor's cgroup device rules plus the non-file classes. A strace-derived access inventory (the
-  hd-idle 2026-10 review recorded the clean- and change-tick file surfaces) is not a safe basis for tightening either:
-  the lab cannot exercise device-only paths (real drives, SG_IO on hardware, hotplug), and AppArmor mediates more than
-  strace shows (directory reads behind globs, mmap exec bits, locks, disconnected/deleted-file mediation). Revisit only
-  if HAOS ever ships usable AppArmor audit plumbing.
+  in the non-file classes (network, capability, mount), which Docker's default profile would otherwise grant broadly. A
+  missed rule in a tightened file set fails silently and undiagnosably on the device, while the marginal gain is near
+  zero — the real boundaries are the supervisor's cgroup device rules plus the non-file classes. A strace-derived access
+  inventory is not a safe basis for tightening either: the lab cannot exercise device-only paths, and AppArmor mediates
+  more than strace shows (directory reads behind globs, mmap exec bits, locks, disconnected/deleted-file mediation).
+  Revisit only if HAOS ever ships usable AppArmor audit plumbing.
 - **Supervisor profile mechanics**: the profile is installed from the app folder's `apparmor.txt` on install/update and
   **renamed to the installed slug** (`local_<slug>` for repo-folder installs, `<hash>_<slug>` when installed from a
   repository) — the declared profile name is otherwise arbitrary. Requirements: exactly one top-level (non-indented)
@@ -159,195 +151,112 @@ Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7.
 
 **Official apps' practice** (home-assistant/addons, verified 2026-10): apk packages **float** (`dnsmasq`, `samba`,
 `mariadb`, `vlc`: bare `apk add --no-cache <pkg>`), while version-sensitive *cores* are pinned explicitly via
-`build.yaml` ARGs and used in build/pip (`mosquitto` 2.1.2, `letsencrypt`'s certbot/cryptography stack, `whisper`'s pip
-stack). Base images float within their branch tag. Floating apk packages means their released images get newer package
-content on rebuilds without a version bump (fresh installs drift; existing installs keep the old digest until the next
-versioned release).
+`build.yaml` ARGs (mosquitto, letsencrypt's certbot/cryptography stack, whisper's pip stack). Floating apk packages
+means released images get newer package content on rebuilds without a version bump; existing installs keep the old
+digest until the next versioned release.
 
 **Our policy** splits by coupling:
 
-- **Pin** (full `pkgver-pkgrel`, e.g. `hd-idle=1.22-r8`) when the app's runtime logic encodes the package's interface:
-  hd-idle's arg generator (`hd-idle/rootfs/usr/bin/hd-idle-genargs`) relies on hd-idle's CLI semantics, so every package
-  change must be a deliberate app change - one app release (pin + `config.yaml` version + changelog) per package
-  version.
+- **Pin** (full `pkgver-pkgrel`, e.g. `hd-idle=1.22-r8`) when the app's runtime logic encodes the package's interface
+  (hd-idle's arg generator relies on hd-idle's CLI semantics): every package change becomes a deliberate app release
+  (pin plus `config.yaml` version plus changelog).
+- **Float** when chasing pkgrel rebuilds adds churn without user value (nfs-server's `nfs-utils` — a multi-binary
+  ecosystem whose kernel-consistency matters more than the exact userspace version).
 
-- **Float** when chasing pkgrel rebuilds adds churn without user value: nfs-server's `nfs-utils` (multi-binary ecosystem
-  whose kernel-consistency matters more than the exact userspace version).
+Enforcement: `validate.py` (`validate_apk_pins`) extracts the BUILD_FROM default branch and the apk pins from each app's
+Dockerfile and compares them against the Alpine **binary indexes** (dl-cdn APKINDEX, x86_64 + aarch64, community then
+main, cached 24 h). A mismatch fails `mise run check`, and the CI lint workflow's **daily cron** flags drift within a
+day. The index serves only the current pkgrel (old ones disappear), so the next build would break anyway — the drift
+check turns an Alpine-side repoint into a guided release instead of silent image drift.
 
-- Both are enforced/verified by `validate.py` (`validate_apk_pins`): it extracts the BUILD_FROM default branch and the
-  apk pins from each app's Dockerfile and compares them against the Alpine **binary indexes** (dl-cdn APKINDEX, x86_64 +
-  aarch64, community then main, cached 24 h). A mismatch fails with the release workflow — turning an Alpine-side
-  repoint into a guided release instead of silent image drift. It runs in `mise run check`, and the CI lint workflow's
-  **daily cron** flags drift within a day; until the pin is chased, the *next* build would break anyway (the index
-  serves only the current pkgrel, old ones disappear).
+**Renovate opens the update PR, including the `config.yaml` version bump**: the Dockerfile manager extracts
+`apk add pkg=version` pins into the `apk` datasource, and the apk packageRule in `.github/renovate.json` supplies the
+dl-cdn APKINDEX `registryUrls` (branch plus arch pinned — without them Renovate silently skips the pins, it cannot infer
+the Alpine branch from the base-image ARG) plus a `bumpVersions` entry that patch-bumps the app's `config.yaml` in the
+same PR (matchString anchored at line start via `(?:^|\n)` emulation — Renovate compiles matchStrings without the `m`
+flag, so a plain `^` would bind to file offset 0; only the FIRST match per file is bumped). The version-guard workflow
+still passes on the Renovate PR as opened. `postUpgradeTasks` need `allowedPostUpgradeCommands` — a self-hosted-only
+option — so the changelog entry is filled post-merge by the CI changelog job instead. The rule's registryUrls branch
+value must be updated together with the Dockerfile's `BUILD_FROM` default on a base-image bump; the validate.py drift
+check derives the branch dynamically and remains the config-independent net. Floating apk packages are skipped
+(`unspecified-version`), as intended.
 
-- **Renovate opens the update PR — including the config.yaml version bump** (verified with a local
-  `npx renovate@latest --platform=local --dry-run=full` run: extraction + APKINDEX lookup + rule resolution; the branch
-  edit itself only happens in a real run — safe by construction, see below): the Dockerfile manager extracts
-  `apk add pkg=version` pins into the `apk` datasource, and the `.github/renovate.json` apk packageRule supplies the
-  `registryUrls` (dl-cdn APKINDEX URLs, branch + arch pinned) without which Renovate silently skips the pins
-  (`skipReason: unknown-registry` — it cannot infer the Alpine branch from the base-image ARG). The rule also carries a
-  `bumpVersions` entry (experimental Renovate feature): the app's `config.yaml` version is patch-bumped in the same PR
-  (`{{packageFileDir}}/config.{yaml,yml}`). The matchString anchors at line start via `(?:^|\n)` emulation: Renovate
-  compiles matchStrings without the `m` flag (`bump-versions.ts` runs `regEx(templated)`), so a plain `^` would bind to
-  file offset 0 (config.yaml's first line is a comment → zero matches → silent no-bump), and an unanchored match would
-  let a future comment containing `version: "..."` hijack the bump (both verified against our config with node); only
-  the FIRST match per file is bumped (single `exec`, no `g` flag). The version-guard workflow still passes on the
-  Renovate PR as opened. What Renovate cannot do on the hosted app: run post-upgrade tasks — `postUpgradeTasks.commands`
-  need `allowedPostUpgradeCommands`, a **self-hosted-only** option — so the changelog entry is filled post-merge by the
-  CI changelog job instead (see the release-automation bullet below). The rule's registryUrls branch value must be
-  updated together with the Dockerfile's `BUILD_FROM` default on a base-image bump; the validate.py drift check derives
-  the branch dynamically and remains the config-independent net (if `bumpVersions` ever misbehaves, version-guard fails
-  the PR loudly — no silent drift). Floating apk packages (nfs-utils) are skipped (`unspecified-version`), as intended.
+**Release automation (since 2026-10-18)**, chained apk rules in `.github/renovate.json`: pkgrel-only bumps (`1.22-r7` →
+`1.22-r8`, classified `patch`) **automerge once CI is green** (rebase strategy — linear history); pkgver bumps get the
+`needs-review` label and stay manual (CLI semantics may change). `platformAutomerge: false` keeps merges on Renovate's
+own path (branch protection and "Allow auto-merge" are off today; the explicit setting prevents a later repo-toggle
+enablement from merging before CI finishes). Post-merge, the apk-bump workflow's changelog job (a merged `renovate[bot]`
+PR labeled `apk_pin`) inserts the templated `## <version>` section via the shared `apk-changelog` mise task —
+idempotent, a pre-written section is never touched. The same workflow's nudge job (daily 01:30 UTC,
+`workflow_dispatch`-able with a `dry_run` input) comments `@renovate rebase` (capped at 3 per PR) once ALL of the app's
+arch indexes serve the new pin: an early bump PR legitimately stays red until the lagging arch's index catches up, and
+re-running failed check runs can still count as red in Renovate's automerge evaluation. Missed image publishes self-heal
+via the publish-reconcile workflow (daily 03:15 UTC): GHCR version-tag probes for every app (per-arch tags plus the
+multi-arch manifest, anonymous `docker buildx imagetools inspect`; not-found-class errors mean a missing tag, other
+failures are retried with backoff then fail red) dispatch `build-app.yaml` (`workflow_dispatch`-able; publish=true,
+ref=main) on a genuine miss — idempotent, a healthy registry is a green no-op. Tag existence only: stale-content tags
+are not detected. Tooling landscape (researched 2026-10-18): no OSS tooling exists for apk-pin bumping with arch gates
+(linuxserver.io's scheduled external-trigger workflows are the closest precedent); Dependabot cannot bump apk pins at
+all (dependabot-core#2129), updatecli has no apk/APKINDEX plugin, and Chainguard's `melange bump` rewrites melange build
+YAML, not Dockerfiles.
 
-- **Release automation (since 2026-10-18)**: the guided release above is followed up automatically end-to-end. Merge
-  behavior by update type (`.github/renovate.json` chained apk rules): pkgrel-only bumps (`1.22-r7` -> `1.22-r8` — the
-  apk datasource's `apk` versioning classifies them as `patch`) **automerge once CI is green**
-  (`automergeStrategy: rebase`, same linear-history rationale as the supervisor-pin rule), while pkgver bumps (upstream
-  version changes, `minor`/`major`) get the `needs-review` label and stay manual — CLI semantics may change, cf.
-  `hd-idle-genargs`. Top-level `platformAutomerge: false` keeps merges on Renovate's own path (no branch protection and
-  "Allow auto-merge" are off today; the explicit setting prevents a later repo-toggle enablement from merging before CI
-  finishes). The changelog section is filled post-merge by the apk-bump workflow's changelog job (a merged
-  `renovate[bot]` PR labeled `apk_pin` — covering Renovate automerges and manually merged pkgver PRs alike): it parses
-  the full Dockerfile contents at the PR's base and head SHAs (apk pins old -> new, robust against patch hunk boundary
-  truncation for future apps with long apk blocks) and the `config.{yaml,yml}` version bump, and runs the
-  `apk-changelog` mise task (`.mise/tasks/apk-changelog.py`, shared with local runs; flags declared `required=true` in
-  the usage spec — mise enforces them natively, no duplicated validation) to insert the templated `## <version>` section
-  — idempotent, a pre-written section is never touched (a PR touching several pins of the same app records only the
-  first; Renovate opens one PR per package anyway). The resulting docs-only commit is pushed with the `GITHUB_TOKEN`,
-  whose push-event workflow suppression is intended: CHANGELOG.md is excluded by version-guard and the image is
-  byte-identical, so no rebuild is needed. The same workflow's nudge job (daily 01:30 UTC, also `workflow_dispatch`-able
-  with a `dry_run` boolean input to log would-be comments without posting them; it accepts both `config.yaml` and
-  `config.yml`) handles the per-arch repush skew documented in the gotchas below: an early bump PR legitimately stays
-  red until the lagging arch's index catches up; once ALL of the app's arch indexes serve the new pin, the job comments
-  `@renovate rebase` (capped at 3 per PR) — a rebase creates fresh check runs, while re-running failed check runs can
-  still count as red in Renovate's automerge evaluation; while an arch still lags it does nothing and the daily lint
-  cron remains the drift alarm. Missed image publishes self-heal via the publish-reconcile workflow (daily 03:15 UTC):
-  it checks GHCR for every app's version tags (per-arch `ghcr.io/salim-b/<arch>-app-<name>:<version>` plus the
-  multi-arch manifest) via anonymous `docker buildx imagetools inspect` probes with the runner-preinstalled buildx
-  (copacetic-style classification: not-found-class errors mean a missing tag, any other failure is retried with
-  exponential backoff and then fails the run red - so transient outages neither dispatch nor silently pass) and
-  dispatches `build-app.yaml` (now also `workflow_dispatch`-able; publish=true, ref=main) on a genuine miss —
-  idempotent, a healthy registry is a green no-op. Tag existence only: stale-content tags are not detected (content
-  drift is version-guard's/validate's domain). The tooling landscape was researched 2026-10-18: no OSS tooling exists
-  for apk-pin bumping with arch gates — Renovate's native support plus a hand-rolled gate is the state of the art
-  (linuxserver.io precedent: their scheduled external-trigger workflows enforce the same all-arches condition before
-  rebuilding, cf. linuxserver/docker-wireguard `.github/workflows/external_trigger.yml`). Dependabot cannot bump apk
-  pins at all (dependabot-core#2129, open since 2019), updatecli has no apk/APKINDEX plugin, and Chainguard's
-  `melange bump` rewrites melange build YAML, not Dockerfiles.
+Version-sensitive gotchas:
 
-Version-sensitive gotchas learned while implementing:
-
-- **The aports source branch can outrun the binary index**: verified 2026-10 — the `3.24-stable` APKBUILD said
-  `pkgrel=8` while both arches' APKINDEX still served `1.22-r7`. A pin must be compared against what `apk add` actually
-  resolves (the APKINDEX), not the APKBUILD source.
+- **The aports source branch can outrun the binary index** (verified 2026-10: the `3.24-stable` APKBUILD said `pkgrel=8`
+  while both arches' APKINDEX still served `1.22-r7`): a pin must be compared against what `apk add` actually resolves
+  (the APKINDEX), not the APKBUILD source.
 - The GitHub aports mirror (alpinelinux/aports) names stable branches `3.24-stable` (no `v` prefix, unlike the GitLab
   branches); raw fetches there are for source inspection only — version checks use dl-cdn.
-- **The binary-index repush is per-arch and can skew between the arches**: verified 2026-10-16 — after the Go 1.26.5
-  rebuild above, the v3.24 aarch64 APKINDEX began serving `1.22-r8` (package built 2026-10-14) while x86_64 still served
-  `1.22-r7`; the daily cron flagged the drift the same day. In such a window the arches' indexes disagree, so *no* pin
-  passes `validate_apk_pins` (strict per-arch equality). Bump to the newest index version anyway: the repointed arch no
-  longer serves the old package, so a cold-cache build of the stale pin breaks there (the builder's layer cache can mask
-  this for a while), while the lagging arch's mismatch is transient and self-heals when its repush lands — pinning the
-  older version instead would leave both arches failing once the lagging arch repushes. During the window, a red check
-  on the lagging arch is accurate signal: that arch's cold-cache builds cannot yet resolve the new pin.
+- **The binary-index repush is per-arch and can skew between the arches** (verified 2026-10-16): in such a window the
+  arches' indexes disagree, so *no* pin passes the strict per-arch equality check. Bump to the newest index version
+  anyway: the repointed arch no longer serves the old package, so a cold-cache build of the stale pin breaks there (the
+  builder's layer cache can mask this for a while), while the lagging arch's mismatch is transient and self-heals when
+  its repush lands. Pinning the older version instead would leave both arches failing once the lagging arch repushes.
+  During the window, a red check on the lagging arch is accurate signal.
 
 ## HA base image: shell gotchas
+
+Facts; the safe procedures (procfs writes, suppression of failed-redirection diagnostics, environment passing, PATH,
+bashio stubbing): skill `ha-app-base-image`.
 
 - **`echo`/`printf` emit a single `writev(2)`**: the base image's bash (5.3.9) implements the output of its `echo` and
   `printf` builtins as one `writev(2)` call, with the text and the trailing newline as separate iovecs. Kernel files
   that only implement the old-style single-buffer `.write` and no `.write_iter` (many procfs/sysfs transaction files,
-  e.g. `/proc/fs/nfsd/*`) reject `writev(2)` with `EINVAL` on modern kernels — producing a misleading
-  `write error: Invalid argument` that is about the syscall *shape*, not the written content. Callers that do a single
-  `write(2)` (busybox `echo`, `cat`, many C daemons' own writes) succeed. Workaround when a direct write is unavoidable:
-  stage the string in a regular file (e.g. on tmpfs) and `cat` it into the target. (Which files this bites in a given
-  app: see the app's `KNOWLEDGE.md`.)
+  e.g. `/proc/fs/nfsd/*`) reject `writev(2)` with `EINVAL` — producing a misleading `write error: Invalid argument` that
+  is about the syscall *shape*, not the written content. Callers that do a single `write(2)` (busybox `echo`, `cat`,
+  many C daemons' own writes) succeed. (Which files this bites in a given app: the app's `KNOWLEDGE.md`.)
 - **Failed redirections bypass the command's `2>/dev/null`**: a failed redirection is diagnosed by the shell itself,
-  *before* the command's own redirections are in effect — `echo x > /some/ro/path 2>/dev/null` still prints
-  `sh: can't create /some/ro/path: …`. To suppress (or capture) the shell's diagnostic, run the attempt in a subshell:
-  `out=$( (echo x > /some/ro/path) 2>&1 )` captures message *and* exit code.
+  *before* the command's own redirections are in effect.
 - **`with-contenv` wipes the inherited environment unless `S6_KEEP_ENV=1`**: the s6-overlay shebang helper runs
   `emptyenv -p` and then imports only `/run/s6/container_environment` (the variables the supervisor/s6 boot provides).
   Anything exported by a calling shell or `docker run -e` is erased — unless `S6_KEEP_ENV=1` is set, which makes
   `with-contenv` pass the inherited environment through untouched (production s6-rc boots are unaffected: there the env
   arrives via `container_environment` either way).
 - **PATH differs between `docker exec` and s6 services**: the image's ENV PATH (HA base image default, no `/command`) is
-  what `docker exec` inherits, so exec-driven commands must call s6 tools by absolute path (`/command/s6-svc`). Services
-  started by s6-rc see an *augmented* PATH instead: s6-overlay v3's preinit writes `/run/s6/container_environment` with
-  `/command` prepended, and service run scripts take their environment from it — a bare `s6-svc` inside a run script
-  therefore resolves (observed in `local/hd-idle:0.1.9`, 2026-10-21:
-  `docker exec … cat /run/s6/container_environment/PATH` vs the service process's `/proc/<pid>/environ`).
-  Version-sensitive: re-verify against the s6-overlay version shipped by the base image before relying on it.
+  what `docker exec` inherits; services started by s6-rc see an *augmented* PATH instead (s6-overlay v3's preinit writes
+  `/command` into `/run/s6/container_environment`; observed 2026-10-21, hd-idle 0.1.9). Version-sensitive: re-verify
+  against the s6-overlay version shipped by the base image before relying on it.
 - **Stubbing `bashio::config` in bare-container script tests**: `bashio::config` fetches the app options from the
   Supervisor API (`bashio::app.config` → `GET /addons/self/options/config`), backed by a file cache — it never reads
   `/data/options.json`. Seeding `${CACHE_DIR}/addons.self.options.config.cache` (env override `CACHE_DIR`; the key is
   fixed, `bashio::cache` appends `.cache` and validates `^[A-Za-z0-9._-]+$`) with the crafted options JSON stubs the API
   exactly (the cache stores the raw response). Requires the `S6_KEEP_ENV=1` gotcha above, since `CACHE_DIR` is an
-  inherited variable. (Used for the hd-idle per-drive-PM decision-matrix tests, 2026-10.)
+  inherited variable.
 
 ## s6-overlay: user bundles live OUTSIDE s6-rc.d
 
 Adding a service to a bundle (e.g. the default `user` bundle) is done via
 `/etc/s6-overlay/user-bundles.d/<bundle>/contents.d/<service>` — a path that must NOT be under `s6-rc.d/`. A stray
 directory under `s6-rc.d/` (e.g. `s6-rc.d/user-bundles.d/`) is scanned by `s6-rc-compile` as a *service source
-directory* and fails the whole boot with
-`fatal: unable to read /etc/s6-overlay/s6-rc.d/user-bundles.d/type: No such file or directory` — the container
-crash-loops at preinit while the supervisor still reports the app state as "started" (device-verified 2026-10-15). The
-symptom is invisible to health checks (the container never reaches them), so any change under
-`rootfs/etc/s6-overlay/s6-rc.d/` or `user-bundles.d/` must be lab-booted (`mise run lab <app>`) before deploy.
+directory* and fails the whole boot
+(`fatal: unable to read /etc/s6-overlay/s6-rc.d/user-bundles.d/type: No such file or directory`) — the container
+crash-loops at preinit while the supervisor still reports the app state as "started". The symptom is invisible to health
+checks (the container never reaches them), so any change under `rootfs/etc/s6-overlay/s6-rc.d/` or `user-bundles.d/`
+must be lab-booted before deploy (skill `ha-app-lab-testing`).
 
 **User-bundle services must declare a `dependencies.d/base` dependency** (empty *file*, per s6-overlay's MOVING-TO-V3
-guidance; see the nfs-server app's services): s6-rc brings the user bundle up in dependency order, and without a
-dependency on the built-in `base` bundle a longrun can start BEFORE `legacy-cont-init` (the compat oneshot running
-`/etc/cont-init.d/*`) has completed — device-verified 2026-10-15: the hd-idle app's daemon started before its cont-init
-phase wrote the generated configuration and crashed twice
-(`./run: line 9: /etc/hd-idle.args: No such file or directory`) until s6-supervise's restart loop finally started it;
-the lab missed it because its checks only grepped positive markers that also exist after the self-healing restart. Empty
-dependency *directories* are equally broken in a subtler way: git does not track them, so they silently vanish from the
-image.
-
-## Testing: hardware-behavior checks in the lab
-
-The lab boots app containers `--privileged` **on the lab host**, so host-side hardware state interacts with tests:
-
-- **Host-side interference sweep**: OS-level power-management mechanisms can skew hardware tests (for disk spindown:
-  udisks2 stored drive settings — re-applied on every hotplug; `/etc/hdparm.conf` directives; TLP `DISK_*`; smartd;
-  powertop auto-tune; the per-device runtime-PM `power/control` state) — and the inverse, desktop IO on mounted devices
-  waking them. Mainstream distros ship none of these active by default; they are user-configured. App hooks doing
-  hardware tests should run a read-only preflight sweep and warn (see `hd-idle`'s lab hook for the pattern).
-- **Assert event-based, never "stays in state for N minutes"**: hardware state can legitimately change (a drive woken by
-  unrelated IO is correct system behavior) — assert the event/transition (log lines, state probes right after a
-  triggered command) rather than persistence of a state.
-- **Probe tools can themselves disturb the state**: verify your probe is side-effect-free (e.g. `hdparm -C` both races
-  spin-down windows and can *wake* USB-attached drives; `smartctl -n standby` is designed not to).
-  Device/bridge-specific findings live in the apps' `KNOWLEDGE.md`.
-- **Plain Docker vs. HAOS `/dev`**: see the device-access section — when an app's behavior depends on the udev symlink
-  trees, the lab hook must mirror the supervisor's read-only host-`/dev` bind (e.g. `-v /dev/disk:/dev/disk:ro`).
-
-## YAML linting: ryl (replaced yamllint)
-
-YAML is linted by [ryl](https://ryl-docs.pages.dev/) — the hk `ryl` step with config `.ryl.toml`, pinned as
-`aqua:owenlamont/ryl` in `mise.toml`. Facts that outlive the swap:
-
-- **ryl parses YAML 1.2; yamllint defaulted to 1.1** (ryl docs, [YAML version
-  compatibility](https://ryl-docs.pages.dev/yaml-version/), observed on ryl 0.26.0): bareword booleans
-  (`yes`/`no`/`on`/`off`, any case) are plain strings to ryl and leading-zero integers like `0755` are decimal — while
-  YAML 1.1 parsers (PyYAML and kin) still coerce both. Don't predict what a parser will load from ryl's lint view.
-- **Warnings fail via `--strict`**: the hk step runs `ryl check --strict`, so warning-level rules (line-length,
-  comments, document-start, truthy — see `.ryl.toml`) fail the gate like yamllint's `--strict` did (warning-only runs
-  exit `2` under `--strict`, errors `1`).
-- **The hk step is `Builtins.ryl` with `--strict` added to both `check` and `fix`**: the builtin's commands omit
-  `--strict`, which would demote the config's warning-level rules (line-length, comments, document-start, truthy) to
-  non-blocking; yamllint's builtin failed on warnings too. The builtin's fix step auto-fixes mechanical issues
-  (braces/brackets/commas spacing, comment spacing, final newline, quoting) in pre-commit.
-- **The builtin's `check_diff` wiring is cleared (`check_diff = null`, `check_after_diff = false`)**: ryl's `--diff`
-  exit code only reflects patch presence — it exits `0` whenever nothing is fixable, including files with unfixable
-  warnings *or errors* (verified on ryl 0.26.0) — and hk's fix mode skips the fixer when `check_diff` exits `0`, so
-  violating files would pass pre-commit untouched. With `check_diff` gone, fix mode runs `fix` (carrying `--strict`) on
-  every staged YAML file and its exit code decides: `0` only when nothing remains to fix or flag.
-- **`line-length` ignores comments by default** (yamllint parity): long comment lines don't fail the gate — the 140
-  limit bites YAML scalars only.
-- **Config is TOML with `[lint.rules]`**: `[rules]` still parses but is deprecated as of ryl 0.26 (the built-in
-  migrator, `ryl --migrate-configs`, emits the `[lint.rules]` form), and a rule with an option table must not also
-  appear as a `"<name> = "enable"` string in the same table — TOML duplicate key, and ryl exits `2` loudly instead of
-  linting.
+guidance): s6-rc brings the user bundle up in dependency order, and without a dependency on the built-in `base` bundle a
+longrun can start BEFORE `legacy-cont-init` (the compat oneshot running `/etc/cont-init.d/*`) has completed — observed
+as a daemon crash-looping until s6-supervise's restart loop finally started it after its cont-init-generated inputs
+existed. Empty dependency *directories* are equally broken in a subtler way: git does not track them, so they silently
+vanish from the image.
