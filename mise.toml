@@ -40,13 +40,9 @@ description = "Auto-format the repository's Markdown via Panache"
 run = "panache format ."
 
 [tools]
-# Dockerfile linter; hk ships a `droast` builtin. Rule IDs: DF0xx, inline
-# ignores `# droast ignore=DFxxx reason="..."` (https://github.com/immanuwell/dockerfile-roast).
 "github:immanuwell/dockerfile-roast" = "1.7.0"
 editorconfig-checker = "4.0.2"
-# Maintained actionlint fork by the hk author; profiles/exit codes: https://jactionlint.jdx.dev/.
 jactionlint = "2.3.0"
-# GitHub Actions security audit for the hk zizmor step; runs offline (--no-online-audits in hk.pkl).
 zizmor = "1.31.1"
 # hk's binary pin and the hk@X.Y.Z package imported by hk.pkl must move together (the package provides the builtin
 # step definitions the binary executes).

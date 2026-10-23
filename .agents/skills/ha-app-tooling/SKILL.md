@@ -79,23 +79,30 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 
 ## Workflow, Dockerfile and Renovate config linting
 
-- GitHub workflows, composite actions and Dependabot config: jactionlint (hk builtin; the maintained actionlint fork)
-  plus zizmor's security audits. jactionlint auto-reads `.github/jactionlint.yaml` — profile `default` = actionlint's
-  correctness checks plus the zizmor-parity regular-persona rules (`pedantic` adds auditor-persona noise). Its
-  `unpinned-uses` policy and `.github/zizmor.yml` mirror `.github/renovate.json`: `home-assistant/*` may float on a
-  branch (our own actions), everything else must be digest-pinned — keep all three in sync when adding actions.
-- The hk `zizmor` step runs `--no-online-audits --no-progress` so the gate stays offline and deterministic: zizmor
-  otherwise runs online audits whenever it finds a token in the environment, which would make pre-commit and CI diverge.
-  A finding that must stay (a checkout whose later step pushes, e.g. apk-bump's changelog job) carries an inline
-  `# zizmor: ignore[<audit-id>]` comment stating the reason.
+- GitHub workflows, composite actions and Dependabot config: jactionlint (hk builtin; the maintained actionlint fork,
+  <https://jactionlint.jdx.dev/>) plus zizmor's security audits. jactionlint auto-reads `.github/jactionlint.yaml` —
+  profile `default` = actionlint's correctness checks plus the zizmor-parity regular-persona rules (`pedantic` adds
+  auditor-persona noise); it replicates every zizmor audit as a same-ID rule, so the gate runs both deliberately: zizmor
+  keeps what jactionlint lacks (confidence grading, pre-commit/repo-slug auditing, LSP mode, its own zizmor.yml config)
+  and jactionlint's parity target lags zizmor releases. Its `unpinned-uses` policy and `.github/zizmor.yml` mirror
+  `.github/renovate.json`: `home-assistant/*` may float on a branch (the home-assistant org's actions), everything else
+  must be digest-pinned — keep all three in sync when adding actions.
+- The hk `zizmor` step runs `--no-online-audits --no-progress` so the gate stays offline and deterministic: a
+  `GH_TOKEN`/`GITHUB_TOKEN`/`ZIZMOR_GITHUB_TOKEN` in the environment flips zizmor to token-authenticated online audits
+  (networked; results depend on remote state at run time), and the flag disables exactly those — remote fetching stays
+  allowed, moot here since the step lints local files. The four online-only audits (impostor-commit,
+  known-vulnerable-actions, ref-confusion, stale-action-refs) are the deliberate trade-off: pin freshness is Renovate's
+  job, and a manual online pass is plain `zizmor` with a token exported. A finding that must stay (a checkout whose
+  later step pushes, e.g. apk-bump's changelog job) carries an inline `# zizmor: ignore[<audit-id>]` comment stating the
+  reason.
 - Local `uses:` references use GitHub's self-repository syntax (`$/.github/workflows/…`), not `./`: `$/` resolves the
   reference from the running commit by construction, so it counts as digest-pinned (zizmor `self-repository` audit;
   needs runner 2.336.0+).
-- Dockerfiles: droast (hadolint-compatible CLI; hk builtin) with project-level skips in `droast.toml` (DF020/DF036 — the
-  HA base image provides the runtime identity and init via s6-overlay; DF033 — no per-app `.dockerignore`, root
-  `TODO.md`). Rule IDs are `DF0xx`; a `# hadolint ignore=DLxxx` pragma is dead weight under droast — inline ignores are
-  `# droast ignore=DFxxx reason="…"`, and `droast --hadolint-compatible --hadolint-compatibility-report` maps old DL IDs
-  to their DF equivalents.
+- Dockerfiles: droast (hadolint-compatible CLI, <https://github.com/immanuwell/dockerfile-roast>; hk builtin) with
+  project-level skips in `droast.toml` (DF020/DF036 — the HA base image provides the runtime identity and init via
+  s6-overlay; DF033 — no per-app `.dockerignore`, root `TODO.md`). Rule IDs are `DF0xx`; a `# hadolint ignore=DLxxx`
+  pragma is dead weight under droast — inline ignores are `# droast ignore=DFxxx reason="…"`, and
+  `droast --hadolint-compatible --hadolint-compatibility-report` maps old DL IDs to their DF equivalents.
 - `.github/renovate.json` is validated by the official `renovate-config-validator` via a custom hk step
   (`--no-global --strict`). `--no-global` matters: bare file args are otherwise validated as a GLOBAL self-hosted
   config, which a repo config is not. `--strict` also fails while the installed Renovate flags a pending config
