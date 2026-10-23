@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.7.3
+
+- Maintainability: no behavior change - removed the stale `# hadolint ignore=DL3059` pragma from the Dockerfile (droast
+  has no rule with an equivalent finding, so it was dead weight).
+
 ## 0.7.2
 
 - Internals: pinned the nfs-utils apk package (2.6.4-r6): Alpine-side package updates now become explicit app releases

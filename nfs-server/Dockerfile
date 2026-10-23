@@ -10,7 +10,6 @@ RUN apk add --no-cache \
   nfs-utils=2.6.4-r6
 
 # Create necessary system directories (exportfs keeps its export table state in /var/lib/nfs)
-# hadolint ignore=DL3059
 RUN mkdir -p /var/lib/nfs
 
 # Copy root filesystem
