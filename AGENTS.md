@@ -11,8 +11,8 @@ subdirectory with a `config.yaml`, `Dockerfile`, `.dockerignore`, `rootfs/`, doc
 
 - `nfs-server` — an NFSv4 server app running the NFS server in the host kernel via the HAOS kernel module.
 - `hd-idle` — spins down idle USB/SATA hard disk drives via the Alpine `hd-idle` package (CLI-only configuration).
-- `hickory-dns` — a LAN-wide DNS server that forwards to user-configured encrypted upstream resolvers (DoT/DoH/DoQ) with
-  DNSSEC validation, wrapping the Alpine `hickory-dns` package (generated `named.toml` configuration).
+- `hickory-dns` — a DNS server that forwards to user-configured encrypted upstream resolvers (DoT/DoH/DoQ) with DNSSEC
+  validation, wrapping the Alpine `hickory-dns` package (generated `named.toml` configuration).
 
 Both apps' architecture and gotchas are non-obvious: consult their runtime skills (index below) before touching their
 runtime code.

@@ -2,7 +2,7 @@
 name: hickory-dns
 version: "0.1.0"
 slug: hickory-dns
-description: LAN-wide DNS server resolving via encrypted upstream DNS (DoT/DoH/DoQ) with DNSSEC validation
+description: DNS server resolving via encrypted upstream DNS (DoT/DoH/DoQ) with DNSSEC validation
 # Generic image name; CI publishes per-arch images and a multi-arch manifest under this name on pushes to main.
 image: "ghcr.io/salim-b/app-hickory-dns"
 url: "https://github.com/salim-b/home-assistant-apps-salim/tree/main/hickory-dns"

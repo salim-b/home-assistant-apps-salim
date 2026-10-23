@@ -5,8 +5,8 @@
 ## 0.1.0
 
 - Initial release.
-- LAN-wide DNS server (hickory-dns in forwarding-resolver mode): the app binds DNS port 53 in the host network
-  namespace; the router advertises the HAOS device IP once and all LAN devices resolve through it.
+- DNS server (hickory-dns in forwarding-resolver mode): the app binds DNS port 53 in the host network namespace; the
+  router advertises the HAOS device IP once and all LAN devices resolve through it.
 - Encrypted upstream resolution (DoT, DoH, DoQ; plaintext udp/tcp for special cases) with per-upstream URLs
   (`<scheme>://<ip-or-host>[:<port>][#<sni>]`), queried in configured order; hostname upstreams are resolved once at
   startup with a last-known-good cache in `/data`.
