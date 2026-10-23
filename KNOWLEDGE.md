@@ -44,6 +44,17 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
   options are validated entry by entry, cross-entry constraints cannot be expressed (the supervisor itself uses
   `vol.Unique()`, but only in its *own* config schemas). Cross-entry guards therefore belong in the app's runtime
   scripts (defense in depth), backed by `match()` regexes on the fields.
+- There is **no single-value select matcher**: `list(a|b|c)` validates with `vol.In` (a single value out of the
+  alternatives) and the UI renders it as a single-value dropdown — also inside list-of-object items
+  (`supervisor/apps/options.py` at 2026.10.2; frontend `supervisor-app-config.ts` passes the UI schema's non-`multiple`
+  select through as-is). Dropdown values get no labels: the translation schema (`SCHEMA_TRANSLATION_CONFIGURATION`)
+  supports only `name`/`description`/`fields`, so the UI shows the raw values. The UI schema has **no conditional
+  visibility** — a field cannot be shown only when another field has a particular value; use the field description
+  instead ("ignored unless …").
+- Empty optional fields inside list-of-object items are save-safe: the frontend emits `undefined` for cleared
+  number/select inputs and skips untouched optional fields entirely (`computeInitialHaFormData` does nothing for
+  non-required fields), and JSON serialization drops those keys; cleared *text* inputs emit `""`, which passes `str`
+  validation — app code should treat `""` like unset.
 - Options are validated **at save time** (schema incl. device-path existence) and delivered to the running app only at
   its next (re)start — option values cannot change under a running app (`supervisor/api/apps.py` options endpoint →
   `app.save_persist()`).

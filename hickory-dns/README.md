@@ -13,7 +13,7 @@ Turn your Home Assistant instance into a secure DNS server that resolves via enc
 - **DNSSEC validated by default**: Upstream answers are checked against the root trust anchors (embedded in the
   hickory-dns binary); bogus answers are rejected.
 - **Configurable upstream resolvers**: Quad9 by default (anycast, pure IPs with pinned TLS names); Cloudflare, AdGuard,
-  Google etc. via one-URL-per-entry configuration.
+  Google etc. via structured per-resolver entries (protocol, host, IP, port).
 - **Static entries**: `hosts.txt`-style hostname-to-IP answers served locally as authoritative zones – reach self-hosted
   services by name from every LAN device without touching public DNS.
 - **Client ACL**: Only queries from the configured networks are served (private ranges + loopback by default).
@@ -26,7 +26,7 @@ Turn your Home Assistant instance into a secure DNS server that resolves via enc
   another DNS app (e.g. [AdGuard Home](/config/app/a0d7b954_adguard/info) or [Dnsmasq](/config/app/core_dnsmasq/info))
   on the same device.
 - **DoH3 (HTTP/3) upstreams are not available yet**: the packaged binary's h3 feature is not in any tagged upstream
-  release; the app rejects `h3://` URLs until it lands (see `hickory-dns/TODO.md`).
+  release; the app rejects DoH3 upstreams until it lands (see `hickory-dns/TODO.md`).
 - **No ad/blocklist support yet** (tracked in `hickory-dns/TODO.md`): the upstream blocklist store exists but the
   feature ships after the first release.
 

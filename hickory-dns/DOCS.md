@@ -38,26 +38,37 @@ recursive resolvers you configure.
 The option reference (upstream resolvers, allowed networks, DNSSEC, static entries, debug mode) lives in the app's
 settings dialog: [Configuration](/config/app/f8b2d53d_hickory-dns/config).
 
-Common upstream examples (each form is one entry in the upstream resolver list):
+Each entry in the upstream resolver list is one resolver with its own protocol and address fields:
 
-  | Provider   | DoT                                      | DoH                                        | DoQ                                       |
-  | ---------- | ---------------------------------------- | ------------------------------------------ | ----------------------------------------- |
-  | Quad9      | `tls://9.9.9.9#dns.quad9.net` (default)  | `https://9.9.9.9#dns.quad9.net`            | `quic://9.9.9.9#dns.quad9.net`            |
-  | Cloudflare | `tls://1.1.1.1#cloudflare-dns.com`       | `https://1.1.1.1#cloudflare-dns.com`       | `quic://1.1.1.1#cloudflare-dns.com`       |
-  | AdGuard    | `tls://94.140.14.14#dns.adguard-dns.com` | `https://94.140.14.14#dns.adguard-dns.com` | `quic://94.140.14.14#dns.adguard-dns.com` |
-  | Google     | `tls://8.8.8.8#dns.google`               | `https://8.8.8.8#dns.google`               | `quic://8.8.8.8#dns.google`               |
+```yaml
+upstreams:
+  # Quad9 DoT (default): pure IP, pinned TLS name dns.quad9.net
+  - protocol: dot
+    host: dns.quad9.net
+    ip: 9.9.9.9
+  # Cloudflare DoH; no ip - the host is resolved once at app start
+  - protocol: doh
+    host: cloudflare-dns.com
+  # AdGuard DoQ on the protocol-default port
+  - protocol: doq
+    host: dns.adguard-dns.com
+    ip: 94.140.14.14
+  # Google DoT
+  - protocol: dot
+    host: dns.google
+    ip: 8.8.8.8
+```
 
 Notes:
 
-- The TLS server name after `#` is **required** for `tls://`, `https://` and `quic://` upstreams - it is what the
-  upstream's certificate is validated against. The defaults use Quad9's IPs with the pinned name `dns.quad9.net`, so no
-  name resolution is needed at startup.
-- A hostname may be used instead of an IP (`tls://dns.quad9.net`); the app resolves it once at startup and caches the
-  result in `/data` as a last-known-good fallback. IP-address upstreams are still recommended - they need no resolution
-  at all.
-- Non-default ports: `tls://9.9.9.9:8853#dns.quad9.net`. A custom DoH endpoint path:
-  `https://dns.example.com/custom/dns-query#dns.example.com`.
-- Plaintext upstreams (`udp://`, `tcp://`) are supported for special setups but defeat the point of this app.
+- The **Host** is the TLS server name the upstream certificate is validated against and is **required** for `dot`, `doh`
+  and `doq` - a bare IP address cannot be used without it. The defaults pair Quad9's IPs with the pinned name
+  `dns.quad9.net`, so no name resolution is needed at startup.
+- Leave **IP address** empty to resolve the host once at app start (the result is cached in `/data` as a last-known-good
+  fallback); IP-address upstreams are still recommended - they need no resolution at all.
+- **Port** defaults to 853 for `dot`/`doq`, 443 for `doh`, 53 for `udp`/`tcp`. A custom DoH endpoint **Path** (e.g.
+  `/custom/dns-query`) replaces the default `/dns-query`.
+- Plaintext upstreams (`udp`, `tcp`) are supported for special setups but defeat the point of this app.
 
 ## Static entries
 

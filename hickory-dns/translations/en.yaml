@@ -2,21 +2,42 @@ configuration:
   upstreams:
     name: Upstream resolvers
     description: >-
-      Recursive DNS resolvers that answer is forwarded to, queried in the given
-      order. One URL per entry:
-
-      `<scheme>://<ip-or-host>[:<port>][#<sni>]`
-
-      Schemes: `tls` (DNS-over-TLS), `https` (DNS-over-HTTPS, optional `/path`
-      after the host, default `/dns-query`), `quic` (DNS-over-QUIC), `udp` and
-      `tcp` (classic plaintext DNS). The `#sni` fragment pins the TLS server
-      name - for `tls`, `https` and `quic` it is REQUIRED (it is what the
-      upstream certificate is verified against), so an IP-address upstream must
-      carry it, e.g. `tls://9.9.9.9#dns.quad9.net`. A hostname upstream uses its
-      own name unless a fragment overrides it; the hostname is resolved once at
-      app start (result cached in `/data` as a last-known-good fallback), which
-      is why IP-address upstreams are recommended - they need no resolution at
-      all.
+      Recursive DNS resolvers that queries are forwarded to, queried in the
+      given order. Each entry is one resolver with its own fields below.
+      IP-address entries with a pinned TLS name are recommended - they need no
+      name resolution at app start.
+    fields:
+      protocol:
+        name: Protocol
+        description: >-
+          How the app talks to this resolver: `dot` (DNS-over-TLS), `doh`
+          (DNS-over-HTTPS) or `doq` (DNS-over-QUIC); `udp`/`tcp` are plaintext
+          fallbacks for special setups and defeat the purpose of this app.
+      host:
+        name: Host
+        description: >-
+          The resolver's DNS name, e.g. `dns.quad9.net`. Required for `dot`,
+          `doh` and `doq`: it is the TLS server name the upstream certificate
+          is validated against, so an IP-address entry cannot do without it.
+          When `ip` is left empty, this name is resolved once at app start
+          (with a last-known-good cache); for plaintext `udp`/`tcp` entries it
+          is only used as the connect target when `ip` is empty.
+      ip:
+        name: IP address
+        description: >-
+          The IPv4 or IPv6 address to connect to, e.g. `9.9.9.9`. Leave empty
+          to resolve the host at app start instead; IP-address upstreams are
+          recommended - they need no name resolution at all.
+      port:
+        name: Port
+        description: >-
+          The resolver's port. Leave empty for the protocol default: 853 for
+          `dot` and `doq`, 443 for `doh`, 53 for `udp` and `tcp`.
+      path:
+        name: Path
+        description: >-
+          HTTP path of the `doh` endpoint; ignored by the other protocols.
+          Leave empty for the standard `/dns-query`.
   allow_networks:
     name: Allowed networks
     description: >-

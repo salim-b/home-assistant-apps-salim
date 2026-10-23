@@ -94,7 +94,7 @@ is_cidr() {
 }
 
 ## ---------------------------------------------------------------------------
-## Upstream URL parsing and hostname resolution
+## Upstream hostname resolution
 ## ---------------------------------------------------------------------------
 
 ## Resolve an upstream hostname to an address: fresh system-resolver lookup first (A, then AAAA; the /data cache
@@ -136,101 +136,6 @@ record_cache() {
     printf '%s %s\n' "$name" "$ip"
   } >"${CACHE}.new"
   mv "${CACHE}.new" "$CACHE"
-}
-
-## Parse an upstream URL: <scheme>://<ip-or-host>[:<port>][/<path>][#<sni>].
-## Writes five lines to ${PARSE_OUT}: scheme, address, port ("" = protocol default), path ("" = none), sni
-## ("" = none). Runs in the caller's shell (NOT command substitution) so bashio::exit.nok terminates the
-## generator with a logged error instead of silently emptying the parsed fields.
-PARSE_OUT=/tmp/hickory-dns.parse
-parse_upstream() {
-  local url="${1}" scheme rest addr port path sni tmp
-
-  scheme="${url%%://*}"
-  if [ "$scheme" = "$url" ]; then
-    bashio::exit.nok "Invalid upstream '${url}': not a URL (expected <scheme>://<ip-or-host>...)."
-  fi
-  rest="${url#*://}"
-
-  if [[ "$rest" == *#* ]]; then
-    sni="${rest#*#}"
-    rest="${rest%%#*}"
-  else
-    sni=""
-  fi
-
-  if [[ "$rest" == */* ]]; then
-    path="/${rest#*/}"
-    rest="${rest%%/*}"
-    [ "$path" = "/" ] && path=""
-  else
-    path=""
-  fi
-
-  port=""
-  if [[ "$rest" == \[*\]* ]]; then
-    ## Bracketed IPv6 literal, optional :port after the closing bracket.
-    addr="${rest%%]*}"
-    addr="${addr#\[}"
-    tmp="${rest#*]}"
-    [[ "$tmp" == :* ]] && port="${tmp#:}"
-    is_ipv6 "$addr" \
-      || bashio::exit.nok "Invalid upstream '${url}': '${addr}' is not an IPv6 address."
-  elif [[ "$rest" == *:*:* ]]; then
-    ## Multiple colons without brackets: a bare IPv6 literal (no port can be expressed).
-    addr="$rest"
-    is_ipv6 "$addr" \
-      || bashio::exit.nok "Invalid upstream '${url}': '${addr}' is not an IPv6 address."
-  elif [[ "$rest" == *:* ]]; then
-    addr="${rest%:*}"
-    port="${rest##*:}"
-    [[ "$port" =~ ^[0-9]{1,5}$ ]] \
-      || bashio::exit.nok "Invalid upstream '${url}': port '${port}' is not a number."
-    ((port >= 1 && port <= 65535)) \
-      || bashio::exit.nok "Invalid upstream '${url}': port ${port} out of range."
-    is_ipv4 "$addr" || is_ipv6 "$addr" || is_hostname "$addr" \
-      || bashio::exit.nok "Invalid upstream '${url}': '${addr}' is neither an IP address nor a hostname."
-  else
-    addr="$rest"
-    is_ipv4 "$addr" || is_ipv6 "$addr" || is_hostname "$addr" \
-      || bashio::exit.nok "Invalid upstream '${url}': '${addr}' is neither an IP address nor a hostname."
-  fi
-
-  case "$scheme" in
-    h3)
-      bashio::exit.nok "Upstream '${url}': DoH3 (h3://) is not supported by the packaged hickory-dns yet (the bin h3 features are not in any tagged release; hickory-dns/TODO.md) - use tls://, https:// or quic://."
-      ;;
-    tls | https | quic)
-      ## server_name is mandatory in the serde ProtocolConfig for the TLS-based protocols, and it is what the
-      ## upstream certificate is verified against: with an IP-address upstream there is nothing to derive it
-      ## from, so require the fragment there (a hostname upstream uses its own name unless overridden).
-      if [ "$sni" = "" ]; then
-        if is_ipv4 "$addr" || is_ipv6 "$addr"; then
-          bashio::exit.nok "Invalid upstream '${url}': tls/https/quic upstreams need a TLS server name - add '#<name>' (e.g. tls://9.9.9.9#dns.quad9.net)."
-        fi
-        sni="$addr"
-      fi
-      is_hostname "$sni" \
-        || bashio::exit.nok "Invalid upstream '${url}': SNI name '${sni}' is not a valid hostname."
-      if [ "$scheme" != "https" ] && [ "$path" != "" ]; then
-        bashio::exit.nok "Invalid upstream '${url}': a /path only applies to https:// upstreams."
-      fi
-      if [ "$scheme" = "https" ] && [ "$path" = "" ]; then
-        path="/dns-query"
-      fi
-      ;;
-    udp | tcp)
-      [ "$sni" = "" ] \
-        || bashio::exit.nok "Invalid upstream '${url}': the '#sni' fragment only applies to tls/https/quic upstreams."
-      [ "$path" = "" ] \
-        || bashio::exit.nok "Invalid upstream '${url}': a /path only applies to https:// upstreams."
-      ;;
-    *)
-      bashio::exit.nok "Invalid upstream '${url}': unknown scheme '${scheme}' (supported: tls, https, quic, udp, tcp)."
-      ;;
-  esac
-
-  printf '%s\n%s\n%s\n%s\n%s\n' "$scheme" "$addr" "$port" "$path" "$sni" >"$PARSE_OUT"
 }
 
 ## ---------------------------------------------------------------------------
@@ -350,45 +255,96 @@ if [ "$N_STATIC" -gt 0 ]; then
 fi
 
 ## Upstream resolvers -> one name_servers block each, in option order (UserProvidedOrder makes the order the
-## priority). A hostname address is resolved once at generation time; its last-known-good address is cached.
-## The blocks are accumulated and emitted after the forward zone's [[zones]] header below (TOML table order).
+## priority). The per-upstream option fields map to the serde ProtocolConfig (dot -> tls, doh -> https,
+## doq -> quic; udp/tcp pass through; hickory-dns/KNOWLEDGE.md §"Upstream option model"). host is the TLS
+## server name for the encrypted protocols and the resolution source when ip is empty; ip is the CONNECT
+## TARGET (never DNS-resolved by the daemon itself). Hostname upstreams are resolved once at generation
+## time; their last-known-good address is cached. The blocks are accumulated and emitted after the forward
+## zone's [[zones]] header below (TOML table order).
 N_UPSTREAMS=0
 NS_TOML=""
 UPSTREAMS_RAW=$(bashio::config 'upstreams')
-while IFS= read -r url; do
-  [ "$url" != "" ] || continue
-  parse_upstream "$url"
-  {
-    read -r scheme
-    read -r addr
-    read -r port
-    read -r path
-    read -r sni
-  } <"$PARSE_OUT"
+while IFS= read -r entry; do
+  [ "$entry" != "" ] || continue
+  proto=$(bashio::jq "$entry" '.protocol // empty')
+  host=$(bashio::jq "$entry" '.host // empty')
+  ip=$(bashio::jq "$entry" '.ip // empty')
+  port=$(bashio::jq "$entry" '.port // empty')
+  path=$(bashio::jq "$entry" '.path // empty')
 
-  if ! is_ipv4 "$addr" && ! is_ipv6 "$addr"; then
-    if resolved=$(resolve_host "$addr"); then
-      bashio::log.info "Upstream hostname ${addr} resolved to ${resolved}"
-      record_cache "$addr" "$resolved"
-      addr="$resolved"
+  [ "$proto" != "" ] \
+    || bashio::exit.nok "Upstream '${entry}': protocol is required (dot, doh, doq, udp or tcp)."
+  if [ "$proto" = "h3" ]; then
+    bashio::exit.nok "Upstream protocol 'h3': DoH3 is not supported by the packaged hickory-dns yet (the bin h3 features are not in any tagged release; hickory-dns/TODO.md) - use doh (HTTP/2) for now."
+  fi
+  case "$proto" in
+    dot | doh | doq | udp | tcp) ;;
+    *) bashio::exit.nok "Invalid upstream protocol '${proto}': must be dot, doh, doq, udp or tcp." ;;
+  esac
+  if [ "$port" != "" ]; then
+    [[ "$port" =~ ^[0-9]{1,5}$ ]] \
+      || bashio::exit.nok "Invalid upstream port '${port}': not a port number."
+    ((port >= 1 && port <= 65535)) \
+      || bashio::exit.nok "Invalid upstream port ${port}: out of range (1-65535)."
+  fi
+
+  ## path is doh-only (no serde field on the other protocols - a stray value would be a silent
+  ## misconfiguration), defaults to /dns-query (no serde default) and carries a leading slash.
+  case "$proto" in
+    doh)
+      [ "$path" != "" ] || path="/dns-query"
+      [[ "$path" == /* ]] || path="/${path}"
+      ;;
+    *)
+      [ "$path" = "" ] \
+        || bashio::exit.nok "Upstream '${entry}': a path only applies to the doh protocol."
+      ;;
+  esac
+
+  ## host doubles as the TLS server name for the encrypted protocols - mandatory there (no serde
+  ## default, and with a bare ip there is nothing to derive it from).
+  if [ "$host" != "" ]; then
+    host="${host,,}"
+    host="${host%.}"
+    is_hostname "$host" \
+      || bashio::exit.nok "Invalid upstream host '${host}': not a DNS name."
+  fi
+  case "$proto" in
+    dot | doh | doq)
+      [ "$host" != "" ] \
+        || bashio::exit.nok "Upstream '${entry}': protocol ${proto} needs a host (the TLS server name the upstream certificate is validated against, e.g. dns.quad9.net)."
+      ;;
+  esac
+
+  ## ip is the connect target; empty = resolve host once at generation time (fresh-first, then the
+  ## last-known-good cache) so upstream address changes are picked up on restart.
+  if ! is_ipv4 "$ip" && ! is_ipv6 "$ip"; then
+    [ "$ip" = "" ] \
+      || bashio::exit.nok "Upstream '${entry}': '${ip}' is neither an IPv4 nor an IPv6 address."
+    [ "$host" != "" ] \
+      || bashio::exit.nok "Upstream '${entry}': needs an ip to connect to, or a host to resolve."
+    if resolved=$(resolve_host "$host"); then
+      bashio::log.info "Upstream host ${host} resolved to ${resolved}"
+      record_cache "$host" "$resolved"
+      ip="$resolved"
     else
-      bashio::exit.nok "Upstream hostname '${addr}' could not be resolved (and no cached address exists) - use the IP form instead, e.g. tls://9.9.9.9#dns.quad9.net."
+      bashio::exit.nok "Upstream host '${host}' could not be resolved (and no cached address exists) - configure the ip directly (e.g. 9.9.9.9)."
     fi
   fi
 
-  case "$scheme" in
-    tls) proto="type = \"tls\", server_name = $(toml_str "$sni")" ;;
-    https) proto="type = \"https\", server_name = $(toml_str "$sni"), path = $(toml_str "$path")" ;;
-    quic) proto="type = \"quic\", server_name = $(toml_str "$sni")" ;;
-    udp) proto="type = \"udp\"" ;;
-    tcp) proto="type = \"tcp\"" ;;
+  case "$proto" in
+    dot) proto_toml="type = \"tls\", server_name = $(toml_str "$host")" ;;
+    doh) proto_toml="type = \"https\", server_name = $(toml_str "$host"), path = $(toml_str "$path")" ;;
+    doq) proto_toml="type = \"quic\", server_name = $(toml_str "$host")" ;;
+    udp) proto_toml="type = \"udp\"" ;;
+    tcp) proto_toml="type = \"tcp\"" ;;
   esac
-  conn="  { protocol = { ${proto} } }"
-  [ "$port" != "" ] && conn="  { port = ${port}, protocol = { ${proto} } }"
+  conn="  { protocol = { ${proto_toml} } }"
+  [ "$port" != "" ] && conn="  { port = ${port}, protocol = { ${proto_toml} } }"
 
   NS_TOML+="
 [[zones.stores.name_servers]]
-ip = $(toml_str "$addr")
+ip = $(toml_str "$ip")
 trust_negative_responses = false
 connections = [
 ${conn},

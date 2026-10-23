@@ -32,7 +32,7 @@ Open work items only (resolved items live in git history). Underlying technical 
   (sinkhole_ipv4 defaults 0.0.0.0), and absolute file paths are allowed since 0.26.2 (PR #3864).
 
 - **DoH3 upstreams (deferred)**: the bin `h3-aws-lc-rs`/`h3-ring` features are merged upstream (PRs #3993/#3994,
-  2026-09-25) but NOT in any tagged release, so no apk can ship them yet. The generator already rejects `h3://` URLs
+  2026-09-25) but NOT in any tagged release, so no apk can ship them yet. The generator already rejects `protocol = h3`
   with a pointed error; revisit when a tagged release + the apk carry the bin h3 features (the H3 protocol table also
   needs `path`, like https - `crates/resolver/src/config.rs` `ProtocolConfig::H3`).
 
@@ -43,7 +43,3 @@ Open work items only (resolved items live in git history). Underlying technical 
   (`crates/proto/src/rr/rdata/tlsa.rs`), not wired into upstream validation. This is a genuine gap for the app's threat
   model (a mis-issued CA could impersonate `dns.quad9.net`). Track/file an upstream feature request; revisit when a
   tagged release grows a pinning knob (not patchable into the apk binary). If/when one exists, expose an app option.
-
-- **Upstream-URL grammar niceties**: the generator currently rejects a `/path` on non-https schemes and `#sni` on
-  udp/tcp with explicit errors - reasonable, but URL-template style (multiple paths) and URL lists (several connections
-  per upstream) are unexplored; revisit if a user asks.

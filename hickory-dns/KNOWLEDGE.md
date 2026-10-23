@@ -40,9 +40,9 @@ truth (verified against v0.26.3 AND v0.26.1 source - the dev pin must parse the 
     (`tag = "type"`, snake_case, deny_unknown_fields): `{ type = "udp" }`, `{ type = "tcp" }`,
     `{ type = "tls", server_name = "..." }`, `{ type = "https", server_name = "...", path = "..." }`,
     `{ type = "quic", server_name = "..." }`.
-  - **`server_name` is MANDATORY** for tls/https/quic (no serde default) - an IP-address upstream must get it from the
-    URL fragment (`tls://9.9.9.9#dns.quad9.net`); the generator hard-rejects the missing fragment for IP literals and
-    derives it from the hostname otherwise.
+  - **`server_name` is MANDATORY** for tls/https/quic (no serde default) - nothing to derive it from a bare IP; the
+    generator requires the upstream `host` field for those protocols (the app default pins `dns.quad9.net` against the
+    Quad9 IPs).
   - **`path` has NO serde default** on `Https`/`H3` (only the programmatic constructor fills `/dns-query`) - generated
     TOML always emits `path` explicitly (default `/dns-query`).
 - Resolver options (`[zones.stores.options]`, `ResolverOpts`, serde default + deny_unknown_fields): the generator pins
@@ -57,13 +57,17 @@ truth (verified against v0.26.3 AND v0.26.1 source - the dev pin must parse the 
   allow AND deny lists = allow all** - the generator emits `allow_networks = []` when the option is cleared (with a
   warning). The ACL is server-wide (no per-zone recursion control).
 
-## Upstream URL grammar
+## Upstream option model
 
-`<scheme>://<ip-or-host>[:<port>][/<path>][#<sni>]` - schemes `tls`, `https` (with optional `/path`), `quic`, `udp`,
-`tcp`. Parsing rules implemented in the generator: bracketed IPv6 (`tls://[2001:db8::1]:853#n`), bare IPv6 (multiple
-colons, no port expressible), `host:port` (single colon), else IP/hostname. `#sni` is required for tls/https/quic (see
-above) and REJECTED on udp/tcp (with a `/path` likewise https-only) - silent ignoring would misconfigure. `h3://` is
-rejected with a pointed error until the packaged binary grows the h3 feature (hickory-dns/TODO.md).
+Each `upstreams` entry is a structured object: `protocol` (`dot`/`doh`/`doq`/`udp`/`tcp` - a single-value `list(...)`
+select in the option schema; repository-root KNOWLEDGE.md §"Supervisor: option schema quirks"), `host`, `ip`, `port`,
+`path`. Mapping to the serde ProtocolConfig: `dot` -> tls, `doh` -> https, `doq` -> quic; `udp`/`tcp` pass through.
+Generator-enforced field rules: `host` is the TLS server name for dot/doh/doq (mandatory there - nothing to derive from
+a bare IP) and doubles as the resolution source when `ip` is empty; `ip` is the connect target (validated literal, never
+resolved by the daemon); `port` defaults 53 (udp/tcp) / 853 (dot/doq) / 443 (doh) and is emitted only when set (the
+serde protocol-default applies otherwise); `path` is doh-only (default `/dns-query`, leading slash normalized) and
+rejected on the other protocols - silent ignoring would misconfigure. `protocol = h3` is rejected with a pointed error
+until the packaged binary grows the h3 feature (hickory-dns/TODO.md).
 
 Hostname upstreams are resolved once at generation time via the shipped `resolve` CLI from hickory-dns-utils
 (`resolve --system -t A|AAAA <name>` against `/etc/resolv.conf` = the supervisor's DNS forwarder; answer lines are

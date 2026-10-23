@@ -20,13 +20,19 @@ init: false
 # (hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges").
 host_network: true
 options:
-  # Upstream recursive resolvers, queried in the given order. URL syntax (hickory-dns/DOCS.md):
-  #   <scheme>://<ip|host>[:<port>][#<sni>]  with schemes tls, https (+ /path), quic, udp, tcp.
-  # Defaults are Quad9's anycast resolvers by IP with pinned SNI - pure IPs, so no boot-time name resolution
-  # is needed (the upstream `ip` is the connect target; `server_name` is only SNI/certificate validation).
+  # Upstream recursive resolvers, queried in the given order (hickory-dns/DOCS.md). Per entry: protocol
+  # (dot|doh|doq, or plaintext udp/tcp for special setups), host (the TLS server name for the encrypted
+  # protocols; also the resolution source when ip is empty), ip (the connect target; empty = the host is
+  # resolved once at app start with a last-known-good cache in /data), port (default 853 dot/doq,
+  # 443 doh, 53 udp/tcp) and path (doh only, default /dns-query). Defaults are Quad9's anycast resolvers
+  # by IP with pinned TLS names - pure IPs, so no boot-time name resolution is needed.
   upstreams:
-    - "tls://9.9.9.9#dns.quad9.net"
-    - "tls://149.112.112.112#dns.quad9.net"
+    - protocol: dot
+      host: dns.quad9.net
+      ip: 9.9.9.9
+    - protocol: dot
+      host: dns.quad9.net
+      ip: 149.112.112.112
   # Client ACL: CIDRs whose queries are served (everything else is refused). Clearing the list allows all
   # clients (hickory-dns/KNOWLEDGE.md §"Generated named.toml").
   allow_networks:
@@ -45,7 +51,11 @@ options:
   debug: false
 schema:
   upstreams:
-    - "str"
+    - protocol: "list(dot|doh|doq|udp|tcp)"
+      host: "str?"
+      ip: "str?"
+      port: "port?"
+      path: "str?"
   allow_networks:
     - "str"
   dnssec: "bool?"

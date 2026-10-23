@@ -7,9 +7,9 @@
 - Initial release.
 - DNS server (hickory-dns in forwarding-resolver mode): the app binds DNS port 53 in the host network namespace; the
   router advertises the HAOS device IP once and all LAN devices resolve through it.
-- Encrypted upstream resolution (DoT, DoH, DoQ; plaintext udp/tcp for special cases) with per-upstream URLs
-  (`<scheme>://<ip-or-host>[:<port>][#<sni>]`), queried in configured order; hostname upstreams are resolved once at
-  startup with a last-known-good cache in `/data`.
+- Encrypted upstream resolution (DoT, DoH, DoQ; plaintext udp/tcp for special cases) configured as structured
+  per-resolver entries (protocol, host, IP, port, path), queried in configured order; hostname upstreams are resolved
+  once at startup with a last-known-good cache in `/data`.
 - DNSSEC validation on by default (root KSKs embedded in the hickory-dns binary; no anchor file).
 - Client ACL (allowed networks, private ranges + loopback by default; empty list = serve everyone).
 - Static entries: hosts.txt-style hostname-to-IP pairs served as authoritative leaf zones, winning over the forwarded
