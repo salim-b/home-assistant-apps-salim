@@ -67,16 +67,18 @@ local linters = new Mapping<String, Step> {
   // (GH_TOKEN/GITHUB_TOKEN/ZIZMOR_GITHUB_TOKEN) enables zizmor's four online-only audits
   // (impostor-commit, known-vulnerable-actions, ref-confusion, stale-action-refs); without one,
   // the audit is fully offline. CI passes its default GITHUB_TOKEN for the strongest audit
-  // (lint.yaml check job). Rule policy: .github/zizmor.yml.
+  // (lint.yaml check job). Rule policy: .github/zizmor.yml. -qq trims zizmor's tracing noise
+  // (version banner, per-file completion notices, offline-mode and YAML-anchors beta notices -
+  // anchors are used by design); findings render regardless of verbosity.
   ["zizmor"] = (Builtins.zizmor) {
     check {
       command {
-        argv = List("zizmor", "--no-progress", "{{files}}")
+        argv = List("zizmor", "-qq", "--no-progress", "{{files}}")
       }
     }
     fix {
       command {
-        argv = List("zizmor", "--no-progress", "--fix", "{{files}}")
+        argv = List("zizmor", "-qq", "--no-progress", "--fix", "{{files}}")
       }
     }
   }
