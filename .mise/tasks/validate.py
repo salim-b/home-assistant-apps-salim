@@ -401,7 +401,9 @@ def main() -> int:
                 fields = sub.get("fields") or {}
                 schema = config.get("schema") or {}
                 entry = schema.get(opt)
-                is_list_of_objects = isinstance(entry, list)
+                # A list schema entry is list-of-objects only when its item spec is a mapping; a scalar item
+                # (`- "str"`) is a list-of-strings, which has no fields (official apps: Let's Encrypt `domains`).
+                is_list_of_objects = isinstance(entry, list) and bool(entry) and isinstance(entry[0], dict)
                 if fields and not is_list_of_objects:
                     fail(app, f"translations[{lang}].configuration.{opt} has fields but schema entry is not a list-of-objects")
                 if not fields and is_list_of_objects:
