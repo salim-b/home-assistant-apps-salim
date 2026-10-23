@@ -7,9 +7,9 @@ description: How to create a new Home Assistant app in this repository — requi
 
 # Creating a new app
 
-An app is a subdirectory containing: `config.yaml`, `Dockerfile`, `rootfs/` (s6-overlay tree), `translations/en.yaml`,
-`DOCS.md`, `CHANGELOG.md`, `README.md`, `KNOWLEDGE.md`, `TODO.md`, `apparmor.txt`, and icons (`icon.svg`, `icon.png`,
-`logo.svg`, `logo.png`). See the existing apps as references.
+An app is a subdirectory containing: `config.yaml`, `Dockerfile`, `.dockerignore` (build-context allow-list), `rootfs/`
+(s6-overlay tree), `translations/en.yaml`, `DOCS.md`, `CHANGELOG.md`, `README.md`, `KNOWLEDGE.md`, `TODO.md`,
+`apparmor.txt`, and icons (`icon.svg`, `icon.png`, `logo.svg`, `logo.png`). See the existing apps as references.
 
 ## Steps
 
@@ -27,10 +27,11 @@ An app is a subdirectory containing: `config.yaml`, `Dockerfile`, `rootfs/` (s6-
 2. **translations/en.yaml** — the option field descriptions live here (rendered in the HA UI). `DOCS.md` must NOT
    duplicate them — it points at the UI instead.
 3. **Dockerfile** — must not pull from Docker Hub at build time, including the `# syntax=docker/dockerfile:1` directive
-   (its frontend image comes from Docker Hub; buildx's builtin frontend suffices). Decide the apk pin/float policy per
-   package: pin with full `pkgver-pkgrel` when the app's runtime logic encodes the package's interface, float when
-   chasing pkgrel rebuilds adds churn without user value. Policy and drift-check mechanics: root `KNOWLEDGE.md` §"apk
-   package version policy".
+   (its frontend image comes from Docker Hub; buildx's builtin frontend suffices). `.dockerignore` allow-lists the build
+   context (`*` then `!rootfs/` and `!Dockerfile`): the image content is the rootfs tree; if a COPY ever reads beyond
+   `rootfs/`, re-include the file there. Decide the apk pin/float policy per package: pin with full `pkgver-pkgrel` when
+   the app's runtime logic encodes the package's interface, float when chasing pkgrel rebuilds adds churn without user
+   value. Policy and drift-check mechanics: root `KNOWLEDGE.md` §"apk package version policy".
 4. **rootfs** — s6-overlay layout: user-bundle service directories live under `/etc/s6-overlay/user-bundles.d/` (never
    under `s6-rc.d/` — a stray directory there fails the whole boot while the supervisor still reports "started"), and
    every user-bundle service needs an empty `dependencies.d/base` file. Facts: root `KNOWLEDGE.md` §"s6-overlay: user

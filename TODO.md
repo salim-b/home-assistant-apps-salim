@@ -76,8 +76,3 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   (community preferred, main only as fetch fallback; hardcoded x86_64/aarch64, packages absent from the index are
   silently skipped) while apk-bump.yaml merges main+community (main wins) and derives arches from each app's
   `config.yaml` (facts: root `KNOWLEDGE.md` §"apk package version policy").
-
-- Per-app `.dockerignore`: droast's DF033 (no `.dockerignore`) is skipped repo-wide (`droast.toml`) because each app
-  directory is the entire build context (rootfs/ + Dockerfile, all Git-tracked), so the context is already minimal. If
-  an app ever grows generated or auxiliary files next to its Dockerfile, give that app its own `.dockerignore` and
-  narrow the skip.

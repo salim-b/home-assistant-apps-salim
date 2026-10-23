@@ -8,7 +8,4 @@ skip = [
   # ENTRYPOINT here would be dead weight. DF020 (no USER), DF036 (no CMD/ENTRYPOINT).
   "DF020",
   "DF036",
-  # Build context hygiene: each app dir is the context (rootfs/ + Dockerfile only, all Git-tracked).
-  # A per-app .dockerignore is a possible follow-up - root TODO.md.
-  "DF033",
 ]

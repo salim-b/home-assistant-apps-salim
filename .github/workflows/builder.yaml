@@ -3,8 +3,10 @@ name: Builder
 env:
   # apparmor.txt and translations/ are deliberately absent: the supervisor consumes both from the app repository, not
   # from the image, so changing them needs no image rebuild. config.yaml stays because its version bump is what
-  # publishes the tag (version-guard requires one for any device-visible change).
-  MONITORED_FILES: "config.json config.yaml config.yml Dockerfile rootfs"
+  # publishes the tag (version-guard requires one for any device-visible change). .dockerignore (the per-app
+  # build-context allow-list) is included like the Dockerfile: a change that breaks the context — e.g. dropping
+  # rootfs/ — must fail CI in the PR that introduced it, not at a later release; no-op changes just cache-hit.
+  MONITORED_FILES: "config.json config.yaml config.yml Dockerfile .dockerignore rootfs"
 
 on:
   pull_request:

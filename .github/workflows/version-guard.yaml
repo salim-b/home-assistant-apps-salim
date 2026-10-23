@@ -46,7 +46,9 @@ jobs:
           # installed users only receive via an app update (config.yaml, apparmor.txt, translations
           # - the Supervisor snapshots these into the installed app). Docs (DOCS.md, README.md,
           # CHANGELOG.md) are deliberately excluded: store-refreshed, they reach users without an
-          # app update. config.yaml is both trigger and fix: any change needs a version bump.
+          # app update. .dockerignore is excluded too: it shapes the build context but never changes
+          # the image the device receives (builder.yaml monitors it, so context breakage fails CI).
+          # config.yaml is both trigger and fix: any change needs a version bump.
           is_device_visible() { # is_device_visible <repo-relative path> <app dir>
             local rel="$1" app="$2" sub
             sub="${rel#"$app"/}"

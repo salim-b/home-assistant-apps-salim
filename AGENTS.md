@@ -6,8 +6,8 @@ placement rule below.
 ## What this repository is
 
 A [Home Assistant app repository](https://contributors.home-assistant.io/apps/) (formerly "add-ons"): each app is a
-subdirectory with a `config.yaml`, `Dockerfile`, `rootfs/`, docs, translations, and its own `TODO.md` / `KNOWLEDGE.md`.
-Currently contains:
+subdirectory with a `config.yaml`, `Dockerfile`, `.dockerignore`, `rootfs/`, docs, translations, and its own `TODO.md` /
+`KNOWLEDGE.md`. Currently contains:
 
 - `nfs-server` — an NFSv4 server app running the NFS server in the host kernel via the HAOS kernel module.
 - `hd-idle` — spins down idle USB/SATA hard disk drives via the Alpine `hd-idle` package (CLI-only configuration).
