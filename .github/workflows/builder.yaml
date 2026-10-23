@@ -95,7 +95,4 @@ jobs:
     with:
       app: ${{ matrix.app }}
       publish: ${{ github.event_name == 'push' }}
-    # Explicit passing (secrets: inherit would forward every repo secret): build-app.yaml only
-    # reads secrets.GITHUB_TOKEN (GHCR auth for the build/manifest jobs).
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # No secrets block: GITHUB_TOKEN is automatically available in the called workflow.

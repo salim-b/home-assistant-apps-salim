@@ -11,13 +11,8 @@ on:
         description: Whether or not to publish the built image to GHCR.
         required: true
         type: boolean
-    secrets:
-      # Passed explicitly by the caller (builder.yaml avoids secrets: inherit). Direct
-      # workflow_dispatch runs (publish-reconcile) fall back to the implicit GITHUB_TOKEN,
-      # hence required: false.
-      GITHUB_TOKEN:
-        description: GitHub token for GHCR authentication in the build/manifest jobs.
-        required: false
+        # No secrets block: GitHub automatically passes GITHUB_TOKEN into reusable workflows, and
+        # declaring a secret of that reserved name here is a workflow-validation error.
   # Manual/reconcile dispatch: publish-reconcile fires this when a version tag is missing from
   # GHCR. workflow_dispatch is the documented GITHUB_TOKEN exception that always creates runs
   # (not subject to the push-event workflow suppression).
