@@ -256,9 +256,12 @@ directory = \"${ZONES_DIR}\"
 ## app's own healthcheck probe (UDP from 127.0.0.1) is refused and the app shows unhealthy while serving.
 NETS=""
 LOOPBACK=0
-while IFS= read -r line; do
-  [ "$line" != "" ] || continue
-  cidr=$(bashio::jq "$line" '.')
+## bashio::config emits string-array options as one RAW (unquoted) element per line with NO trailing newline -
+## feed the captured value through `echo` so `read` sees the last element, and never jq the raw line
+## (hickory-dns/KNOWLEDGE.md §"Option consumption").
+NETS_RAW=$(bashio::config 'allow_networks')
+while IFS= read -r cidr; do
+  [ "$cidr" != "" ] || continue
   is_cidr "$cidr" \
     || bashio::exit.nok "Invalid allowed network '${cidr}': not a CIDR (e.g. 192.168.0.0/16)."
   [ "$NETS" != "" ] && NETS+=", "
@@ -266,7 +269,7 @@ while IFS= read -r line; do
   case "$cidr" in
     127.0.0.0/8 | 127.0.0.1/32 | ::1/128 | ::1) LOOPBACK=1 ;;
   esac
-done < <(bashio::config 'allow_networks')
+done < <(echo "$NETS_RAW")
 
 if [ "$NETS" != "" ]; then
   CONFIG_BODY+="allow_networks = [${NETS}]
@@ -296,6 +299,8 @@ done <<<"$DEFAULT_ZONE_FILES"
 ## (hickory-dns/KNOWLEDGE.md §"Generated named.toml").
 declare -A SEEN_ZONES=()
 N_STATIC=0
+## Object-array options differ: each line is a compact JSON object, so per-line jq IS correct here.
+ENTRIES_RAW=$(bashio::config 'static_entries')
 while IFS= read -r entry; do
   [ "$entry" != "" ] || continue
   host=$(bashio::jq "$entry" '.hostname // empty')
@@ -338,7 +343,7 @@ zone = $(toml_str "$host")
 zone_type = \"Primary\"
 file = $(toml_str "static/${file}")
 "
-done < <(bashio::config 'static_entries')
+done < <(echo "$ENTRIES_RAW")
 
 if [ "$N_STATIC" -gt 0 ]; then
   bashio::log.info "Serving ${N_STATIC} static entries as local authoritative zones"
@@ -349,9 +354,8 @@ fi
 ## The blocks are accumulated and emitted after the forward zone's [[zones]] header below (TOML table order).
 N_UPSTREAMS=0
 NS_TOML=""
-while IFS= read -r line; do
-  [ "$line" != "" ] || continue
-  url=$(bashio::jq "$line" '.')
+UPSTREAMS_RAW=$(bashio::config 'upstreams')
+while IFS= read -r url; do
   [ "$url" != "" ] || continue
   parse_upstream "$url"
   {
@@ -391,7 +395,7 @@ ${conn},
 ]
 "
   N_UPSTREAMS=$((N_UPSTREAMS + 1))
-done < <(bashio::config 'upstreams')
+done < <(echo "$UPSTREAMS_RAW")
 
 ((N_UPSTREAMS >= 1)) \
   || bashio::exit.nok "At least one upstream resolver is required in the 'upstreams' option."

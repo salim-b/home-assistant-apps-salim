@@ -69,6 +69,18 @@ Hostname upstreams are resolved once at generation time via the shipped `resolve
 last-known-good cache `/data/hickory-dns.upstreams.cache` (`name ip` lines) - so upstream address changes are picked up
 automatically and a resolution outage at boot degrades to the cached address instead of failing.
 
+## Option consumption (bashio)
+
+`bashio::config '<array option>'` (bashio `lib/config.sh`: the array branch iterates `.key[]` through `jq -r -c -M`)
+emits string-array options as one RAW (unquoted) element per line, object-array options as one compact JSON object per
+line. The output has NO trailing newline (`printf '%s'` of the `$()`-stripped jq stream), so a `while read` fed directly
+from `bashio::config` silently drops the last element - capture the value into a variable and feed the loop via
+`< <(echo "${RAW}")` (`echo` re-terminates the final line; the hd-idle-genargs idiom). A raw string line must NOT go
+through `bashio::jq` (jq parses it as JSON: `127.0.0.0/8` fails with `Invalid numeric literal` and exit 5) - only object
+lines do. Read from `/usr/lib/bashio/{config,jq}.sh` inside the built image (ghcr.io/home-assistant/base:3.24, 2026-10);
+the lab surfaced the failure as `jq: parse error: Invalid numeric literal at line 2, column 0` with the generator
+exiting 5.
+
 ## Static entries (no hosts-file store upstream)
 
 The server binary has NO hosts-file store (store types: file/in_memory/sqlite/forwarder/recursor/blocklist -
