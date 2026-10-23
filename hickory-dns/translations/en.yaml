@@ -10,18 +10,16 @@ configuration:
       protocol:
         name: Protocol
         description: >-
-          How the app talks to this resolver: `dot` (DNS-over-TLS), `doh`
-          (DNS-over-HTTPS) or `doq` (DNS-over-QUIC); `udp`/`tcp` are plaintext
-          fallbacks for special setups and defeat the purpose of this app.
+          How the app talks to this resolver: `tls` (DNS-over-TLS), `quic`
+          (DNS-over-QUIC) or `https` (DNS-over-HTTPS). Every upstream connection
+          is encrypted - plaintext DNS is not supported.
       host:
         name: Host
         description: >-
-          The resolver's DNS name, e.g. `dns.quad9.net`. Required for `dot`,
-          `doh` and `doq`: it is the TLS server name the upstream certificate
-          is validated against, so an IP-address entry cannot do without it.
-          When `ip` is left empty, this name is resolved once at app start
-          (with a last-known-good cache); for plaintext `udp`/`tcp` entries it
-          is only used as the connect target when `ip` is empty.
+          The resolver's DNS name, e.g. `dns.quad9.net`. Required: it is the TLS
+          server name the upstream certificate is validated against, so an
+          IP-address entry cannot do without it. When `ip` is left empty, this
+          name is resolved once at app start (with a last-known-good cache).
       ip:
         name: IP address
         description: >-
@@ -32,11 +30,11 @@ configuration:
         name: Port
         description: >-
           The resolver's port. Leave empty for the protocol default: 853 for
-          `dot` and `doq`, 443 for `doh`, 53 for `udp` and `tcp`.
+          `tls` and `quic`, 443 for `https`.
       path:
         name: Path
         description: >-
-          HTTP path of the `doh` endpoint; ignored by the other protocols.
+          HTTP path of the `https` endpoint; ignored by the other protocols.
           Leave empty for the standard `/dns-query`.
   allow_networks:
     name: Allowed networks

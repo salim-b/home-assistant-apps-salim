@@ -255,12 +255,12 @@ if [ "$N_STATIC" -gt 0 ]; then
 fi
 
 ## Upstream resolvers -> one name_servers block each, in option order (UserProvidedOrder makes the order the
-## priority). The per-upstream option fields map to the serde ProtocolConfig (dot -> tls, doh -> https,
-## doq -> quic; udp/tcp pass through; hickory-dns/KNOWLEDGE.md §"Upstream option model"). host is the TLS
-## server name for the encrypted protocols and the resolution source when ip is empty; ip is the CONNECT
-## TARGET (never DNS-resolved by the daemon itself). Hostname upstreams are resolved once at generation
-## time; their last-known-good address is cached. The blocks are accumulated and emitted after the forward
-## zone's [[zones]] header below (TOML table order).
+## priority). The protocol option values are the serde ProtocolConfig type values verbatim (tls/https/quic;
+## hickory-dns/KNOWLEDGE.md §"Upstream option model" - plaintext upstreams are not supported). host is the TLS
+## server name and the resolution source when ip is empty; ip is the CONNECT TARGET (never DNS-resolved by
+## the daemon itself). Hostname upstreams are resolved once at generation time; their last-known-good address
+## is cached. The blocks are accumulated and emitted after the forward zone's [[zones]] header below (TOML
+## table order).
 N_UPSTREAMS=0
 NS_TOML=""
 UPSTREAMS_RAW=$(bashio::config 'upstreams')
@@ -273,13 +273,13 @@ while IFS= read -r entry; do
   path=$(bashio::jq "$entry" '.path // empty')
 
   [ "$proto" != "" ] \
-    || bashio::exit.nok "Upstream '${entry}': protocol is required (dot, doh, doq, udp or tcp)."
+    || bashio::exit.nok "Upstream '${entry}': protocol is required (tls, quic or https)."
   if [ "$proto" = "h3" ]; then
-    bashio::exit.nok "Upstream protocol 'h3': DoH3 is not supported by the packaged hickory-dns yet (the bin h3 features are not in any tagged release; hickory-dns/TODO.md) - use doh (HTTP/2) for now."
+    bashio::exit.nok "Upstream protocol 'h3': DoH3 is not supported by the packaged hickory-dns yet (the bin h3 features are not in any tagged release; hickory-dns/TODO.md) - use https (HTTP/2) for now."
   fi
   case "$proto" in
-    dot | doh | doq | udp | tcp) ;;
-    *) bashio::exit.nok "Invalid upstream protocol '${proto}': must be dot, doh, doq, udp or tcp." ;;
+    tls | quic | https) ;;
+    *) bashio::exit.nok "Invalid upstream protocol '${proto}': must be tls, quic or https." ;;
   esac
   if [ "$port" != "" ]; then
     [[ "$port" =~ ^[0-9]{1,5}$ ]] \
@@ -288,41 +288,34 @@ while IFS= read -r entry; do
       || bashio::exit.nok "Invalid upstream port ${port}: out of range (1-65535)."
   fi
 
-  ## path is doh-only (no serde field on the other protocols - a stray value would be a silent
+  ## path is https-only (no serde field on the other protocols - a stray value would be a silent
   ## misconfiguration), defaults to /dns-query (no serde default) and carries a leading slash.
   case "$proto" in
-    doh)
+    https)
       [ "$path" != "" ] || path="/dns-query"
       [[ "$path" == /* ]] || path="/${path}"
       ;;
     *)
       [ "$path" = "" ] \
-        || bashio::exit.nok "Upstream '${entry}': a path only applies to the doh protocol."
+        || bashio::exit.nok "Upstream '${entry}': a path only applies to the https protocol."
       ;;
   esac
 
-  ## host doubles as the TLS server name for the encrypted protocols - mandatory there (no serde
-  ## default, and with a bare ip there is nothing to derive it from).
-  if [ "$host" != "" ]; then
-    host="${host,,}"
-    host="${host%.}"
-    is_hostname "$host" \
-      || bashio::exit.nok "Invalid upstream host '${host}': not a DNS name."
-  fi
-  case "$proto" in
-    dot | doh | doq)
-      [ "$host" != "" ] \
-        || bashio::exit.nok "Upstream '${entry}': protocol ${proto} needs a host (the TLS server name the upstream certificate is validated against, e.g. dns.quad9.net)."
-      ;;
-  esac
+  ## host is the TLS server name - mandatory for every supported protocol (no serde default, and with a
+  ## bare ip there is nothing to derive it from).
+  [ "$host" != "" ] \
+    || bashio::exit.nok "Upstream '${entry}': needs a host (the TLS server name the upstream certificate is validated against, e.g. dns.quad9.net)."
+  host="${host,,}"
+  host="${host%.}"
+  is_hostname "$host" \
+    || bashio::exit.nok "Invalid upstream host '${host}': not a DNS name."
 
   ## ip is the connect target; empty = resolve host once at generation time (fresh-first, then the
-  ## last-known-good cache) so upstream address changes are picked up on restart.
+  ## last-known-good cache) so upstream address changes are picked up on restart. host is guaranteed
+  ## non-empty here (required above).
   if ! is_ipv4 "$ip" && ! is_ipv6 "$ip"; then
     [ "$ip" = "" ] \
       || bashio::exit.nok "Upstream '${entry}': '${ip}' is neither an IPv4 nor an IPv6 address."
-    [ "$host" != "" ] \
-      || bashio::exit.nok "Upstream '${entry}': needs an ip to connect to, or a host to resolve."
     if resolved=$(resolve_host "$host"); then
       bashio::log.info "Upstream host ${host} resolved to ${resolved}"
       record_cache "$host" "$resolved"
@@ -332,13 +325,10 @@ while IFS= read -r entry; do
     fi
   fi
 
-  case "$proto" in
-    dot) proto_toml="type = \"tls\", server_name = $(toml_str "$host")" ;;
-    doh) proto_toml="type = \"https\", server_name = $(toml_str "$host"), path = $(toml_str "$path")" ;;
-    doq) proto_toml="type = \"quic\", server_name = $(toml_str "$host")" ;;
-    udp) proto_toml="type = \"udp\"" ;;
-    tcp) proto_toml="type = \"tcp\"" ;;
-  esac
+  proto_toml="type = $(toml_str "$proto"), server_name = $(toml_str "$host")"
+  if [ "$proto" = "https" ]; then
+    proto_toml+=", path = $(toml_str "$path")"
+  fi
   conn="  { protocol = { ${proto_toml} } }"
   [ "$port" != "" ] && conn="  { port = ${port}, protocol = { ${proto_toml} } }"
 

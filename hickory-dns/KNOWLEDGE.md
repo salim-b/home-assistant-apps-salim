@@ -59,15 +59,15 @@ truth (verified against v0.26.3 AND v0.26.1 source - the dev pin must parse the 
 
 ## Upstream option model
 
-Each `upstreams` entry is a structured object: `protocol` (`dot`/`doh`/`doq`/`udp`/`tcp` - a single-value `list(...)`
-select in the option schema; repository-root KNOWLEDGE.md §"Supervisor: option schema quirks"), `host`, `ip`, `port`,
-`path`. Mapping to the serde ProtocolConfig: `dot` -> tls, `doh` -> https, `doq` -> quic; `udp`/`tcp` pass through.
-Generator-enforced field rules: `host` is the TLS server name for dot/doh/doq (mandatory there - nothing to derive from
-a bare IP) and doubles as the resolution source when `ip` is empty; `ip` is the connect target (validated literal, never
-resolved by the daemon); `port` defaults 53 (udp/tcp) / 853 (dot/doq) / 443 (doh) and is emitted only when set (the
-serde protocol-default applies otherwise); `path` is doh-only (default `/dns-query`, leading slash normalized) and
-rejected on the other protocols - silent ignoring would misconfigure. `protocol = h3` is rejected with a pointed error
-until the packaged binary grows the h3 feature (hickory-dns/TODO.md).
+Each `upstreams` entry is a structured object: `protocol` (`tls`/`quic`/`https` - the serde ProtocolConfig type values
+verbatim; a single-value `list(...)` select in the option schema, repository-root KNOWLEDGE.md §"Supervisor: option
+schema quirks"; plaintext upstreams are NOT offered), `host`, `ip`, `port`, `path`. Generator-enforced field rules:
+`host` is the TLS server name (mandatory for every protocol - nothing to derive from a bare IP) and doubles as the
+resolution source when `ip` is empty; `ip` is the connect target (validated literal, never resolved by the daemon);
+`port` defaults 853 (tls/quic) / 443 (https) and is emitted only when set (the serde protocol-default applies
+otherwise); `path` is https-only (default `/dns-query`, leading slash normalized) and rejected on the other protocols -
+silent ignoring would misconfigure. `protocol = h3` (the serde H3 type) is rejected with a pointed error until the
+packaged binary grows the h3 feature (hickory-dns/TODO.md).
 
 Hostname upstreams are resolved once at generation time via the shipped `resolve` CLI from hickory-dns-utils
 (`resolve --system -t A|AAAA <name>` against `/etc/resolv.conf` = the supervisor's DNS forwarder; answer lines are

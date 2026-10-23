@@ -21,16 +21,16 @@ init: false
 host_network: true
 options:
   # Upstream recursive resolvers, queried in the given order (hickory-dns/DOCS.md). Per entry: protocol
-  # (dot|doh|doq, or plaintext udp/tcp for special setups), host (the TLS server name for the encrypted
-  # protocols; also the resolution source when ip is empty), ip (the connect target; empty = the host is
-  # resolved once at app start with a last-known-good cache in /data), port (default 853 dot/doq,
-  # 443 doh, 53 udp/tcp) and path (doh only, default /dns-query). Defaults are Quad9's anycast resolvers
-  # by IP with pinned TLS names - pure IPs, so no boot-time name resolution is needed.
+  # (tls|quic|https - DNS-over-TLS/QUIC/HTTPS; plaintext upstreams are not supported), host (the TLS
+  # server name; also the resolution source when ip is empty), ip (the connect target; empty = the host
+  # is resolved once at app start with a last-known-good cache in /data), port (default 853 tls/quic,
+  # 443 https) and path (https only, default /dns-query). Defaults are Quad9's anycast resolvers by IP
+  # with pinned TLS names - pure IPs, so no boot-time name resolution is needed.
   upstreams:
-    - protocol: dot
+    - protocol: tls
       host: dns.quad9.net
       ip: 9.9.9.9
-    - protocol: dot
+    - protocol: tls
       host: dns.quad9.net
       ip: 149.112.112.112
   # Client ACL: CIDRs whose queries are served (everything else is refused). Clearing the list allows all
@@ -51,7 +51,7 @@ options:
   debug: false
 schema:
   upstreams:
-    - protocol: "list(dot|doh|doq|udp|tcp)"
+    - protocol: "list(tls|quic|https)"
       host: "str?"
       ip: "str?"
       port: "port?"

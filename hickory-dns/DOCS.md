@@ -43,32 +43,31 @@ Each entry in the upstream resolver list is one resolver with its own protocol a
 ```yaml
 upstreams:
   # Quad9 DoT (default): pure IP, pinned TLS name dns.quad9.net
-  - protocol: dot
+  - protocol: tls
     host: dns.quad9.net
     ip: 9.9.9.9
   # Cloudflare DoH; no ip - the host is resolved once at app start
-  - protocol: doh
+  - protocol: https
     host: cloudflare-dns.com
   # AdGuard DoQ on the protocol-default port
-  - protocol: doq
+  - protocol: quic
     host: dns.adguard-dns.com
     ip: 94.140.14.14
   # Google DoT
-  - protocol: dot
+  - protocol: tls
     host: dns.google
     ip: 8.8.8.8
 ```
 
 Notes:
 
-- The **Host** is the TLS server name the upstream certificate is validated against and is **required** for `dot`, `doh`
-  and `doq` - a bare IP address cannot be used without it. The defaults pair Quad9's IPs with the pinned name
+- The **Host** is the TLS server name the upstream certificate is validated against and is **required** for every
+  protocol - a bare IP address cannot be used without it. The defaults pair Quad9's IPs with the pinned name
   `dns.quad9.net`, so no name resolution is needed at startup.
 - Leave **IP address** empty to resolve the host once at app start (the result is cached in `/data` as a last-known-good
   fallback); IP-address upstreams are still recommended - they need no resolution at all.
-- **Port** defaults to 853 for `dot`/`doq`, 443 for `doh`, 53 for `udp`/`tcp`. A custom DoH endpoint **Path** (e.g.
+- **Port** defaults to 853 for `tls`/`quic` and 443 for `https`. A custom DoH endpoint **Path** (e.g.
   `/custom/dns-query`) replaces the default `/dns-query`.
-- Plaintext upstreams (`udp`, `tcp`) are supported for special setups but defeat the point of this app.
 
 ## Static entries
 
