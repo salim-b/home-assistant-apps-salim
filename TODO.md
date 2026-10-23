@@ -115,3 +115,13 @@ into `hickory-dns/TODO.md` when the app is scaffolded.
 - Later: DoH3 (`h3://`) upstreams — the bin-level `h3-aws-lc-rs` feature exists only in unreleased code (PRs
   #3993/#3994, merged 2026-09-25, no tagged release carries it as of v0.26.3); once a tagged release ships it and the
   apk picks it up, accept `h3://` upstream URLs (the app's upstream-URL schema is designed to accept them from day one).
+
+- Investigate: SPKI pinning for the configured upstream resolvers (DoT/DoH/DoQ/H3) — pinning the upstream's
+  subject-public-key-info hash would let users defend against a mis-issued CA certificate silently impersonating their
+  chosen upstream (Quad9 and Cloudflare publish SPKI hashes for this purpose); if supported, expose a suitable app
+  option (e.g. a per-upstream pin). Ground truth as of v0.26.3: there is NO config surface for it — upstream connection
+  config is `ip` + `protocol` tables (`server_name`/`path` only, `deny_unknown_fields`, `crates/resolver/src/config.rs`
+  `ProtocolConfig`), TLS verification is fixed to rustls-platform-verifier / webpki-roots (`crates/net/src/tls.rs`
+  `client_config()`), and the only SPKI-adjacent code is TLSA record parsing (`crates/proto/src/rr/rdata/tlsa.rs`) which
+  is not wired into upstream validation. Track/file an upstream feature request; revisit when a tagged release grows a
+  pinning knob (not patchable into the apk binary).
