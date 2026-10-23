@@ -18,11 +18,6 @@ Open work items only (resolved items live in git history). Underlying technical 
      pin must be bumped in the same app release: pin + config.yaml version + changelog, per the repository-root
      `KNOWLEDGE.md` apk package version policy).
 
-- **Lab hook with DNS probes**: the boot-only lab boots the app as is; add `.mise/tasks/lab/hickory-dns.sh` with runtime
-  checks per skill `ha-app-lab-testing` (daemon process, port-53 bind, a real `dns -n 127.0.0.1:53 query` probe against
-  the authoritative localhost zone, a static-entry zone answer, and a forwarded query through the upstreams - the lab
-  has full network access).
-
 - **Device verification** (only on explicit user request; the lab has NO AppArmor enforcement, so capability denials are
   device-only findings): verify `capability net_bind_service` (the :53 bind) and `capability setgid`/`setuid` (the
   post-bind privilege drop) on a real device; re-check after the apk bump (0.26.3 introduces the `drop_privileges`
