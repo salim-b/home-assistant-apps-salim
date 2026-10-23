@@ -33,9 +33,20 @@ Never duplicate information across files. Place it where it belongs and referenc
 - `<app>/CHANGELOG.md` — user-visible changes per version.
 - `TODO.md` (repo root) and `<app>/TODO.md` — open work items only (cross-app vs. app-specific). Resolved items are
   deleted, not archived: Git history is the record.
-- Code and config comments — purpose plus pointer (`# See <app>/KNOWLEDGE.md §…`, `# see .agents/skills/<skill>…`). Only
-  invariants whose loss would cause misbehavior stay fully inline.
+- Code and config comments — purpose plus pointer (`# See <app>/KNOWLEDGE.md §…`, `# see .agents/skills/<skill>…`);
+  parsimony rules below.
 - `AGENTS.md` (this file) — agent process, placement rule, and the skill index. No facts, no procedures, no task usage.
+
+### Prose parsimony
+
+Applies to comments and documentation alike:
+
+- No "episodic" content — references to past states of the code, working history ("this used to…", "we switched from X
+  to Y"), or anything of little future relevance. Git history is the record of what was; prose describes what is.
+- A comment is an exception, not the default: write one only if the code cannot say it itself (naming, structure).
+- If the information matters beyond a single file, put it in its canonical home (placement rule above) and leave only a
+  pointer in the comment. Inline comments (invariants whose loss would cause misbehavior) must not restate anything
+  recorded elsewhere: every significant piece of information has exactly one home.
 
 ## Skills index
 
