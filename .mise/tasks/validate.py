@@ -10,8 +10,9 @@ Parses all app YAML files (catching parse errors early); validates translations 
 supervisor's voluptuous schemas (AST-extracted from the pinned ref - no drifting copies) and the
 AppArmor profile against the supervisor's profile-name regex (exactly one top-level profile);
 cross-checks translation 'configuration' keys vs schema keys (incl. nested 'fields') and
-'network' keys (lowercase!) vs config.yaml 'ports'; schema-validates .github/renovate.json,
-.rumdl.toml and .panache.toml against their published schemas; canary-checks that rumdl's
+'network' keys (lowercase!) vs config.yaml 'ports'; schema-validates .rumdl.toml and
+.panache.toml against their published schemas (.github/renovate.json is instead gated by the
+official renovate-config-validator in the hk lint stack); canary-checks that rumdl's
 autofix stays disabled (panache owns formatting; see .rumdl.toml `fixable`); verifies apk pins
 against the Alpine binary indexes (policy: root KNOWLEDGE.md §apk package version policy).
 """
@@ -127,39 +128,6 @@ def _flag(name: str) -> bool:
         if os.environ.get(env, "").lower() in ("true", "1"):
             return True
     return False
-
-
-def validate_renovate_config() -> None:
-    """Schema-validate .github/renovate.json against the published Renovate
-    config schema (schema self-describing; cached next to the supervisor
-    schemas, refetched whenever the config file changed)."""
-    import jsonschema
-
-    config_file = ROOT / ".github" / "renovate.json"
-    if not config_file.is_file():
-        return
-    try:
-        config = json.loads(config_file.read_text())
-    except json.JSONDecodeError as err:
-        fail("renovate.json", f"does not parse: {err}")
-        return
-
-    schema_url = "https://docs.renovatebot.com/renovate-schema.json"
-    schema_file = CACHE.parent / "renovate-schema.json"
-    if (
-        not schema_file.is_file()
-        or schema_file.stat().st_mtime < config_file.stat().st_mtime
-    ):
-        schema_file.parent.mkdir(parents=True, exist_ok=True)
-        print(f"fetching {schema_url}")
-        schema_file.write_text(urllib.request.urlopen(schema_url).read().decode())
-    try:
-        jsonschema.validate(config, json.loads(schema_file.read_text()))
-    except jsonschema.ValidationError as err:
-        loc = "/".join(str(p) for p in err.absolute_path) or "<root>"
-        fail("renovate.json", f"schema mismatch at {loc}: {err.message[:200]}")
-    except jsonschema.SchemaError as err:
-        fail("renovate.json", f"fetched schema unusable: {err.message[:200]}")
 
 
 def validate_rumdl_config() -> None:
@@ -368,7 +336,6 @@ def main() -> int:
 
     if _flag("schemas-only"):
         return 0  # cache warmed by the fetches above
-    validate_renovate_config()
     validate_rumdl_config()
     validate_rumdl_no_autofix()
     validate_panache_config()

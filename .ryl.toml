@@ -2,6 +2,12 @@
 # TOML has no `extends`, so the tables below inline the `default` preset (ryl enables no rules by
 # default) with this repo's overrides applied.
 
+exclude = [
+  # Machine-generated mise lock artifacts (aube-lock.yaml): minified JSON blobs with unwrappable
+  # URLs - not prose to lint.
+  ".mise/locks/**",
+]
+
 [files]
 yaml = [
     "*.yaml",

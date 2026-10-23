@@ -1,0 +1,13 @@
+# zizmor (https://docs.zizmor.sh/) configuration - read by the hk `zizmor` step (pre-commit +
+# `mise run lint`), which runs it with --no-online-audits (offline, deterministic; online audits
+# would need a token and make the gate environment-dependent).
+
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        # The home-assistant org's actions intentionally float on a branch - same policy as
+        # .github/renovate.json (matchPackageNames home-assistant/** with pinDigests: false).
+        # Everything else must be hash-pinned; the workflows digest-pin every other `uses:`.
+        home-assistant/*: any
+        "*": hash-pin

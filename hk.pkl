@@ -57,8 +57,36 @@ local linters = new Mapping<String, Step> {
       new FileSelector { glob = s6Globs },
     )
   }
-  ["actionlint"] = Builtins.actionlint
-  ["hadolint"] = Builtins.hadolint
+  // jactionlint (maintained actionlint fork, hk builtin): workflows, composite actions and
+  // Dependabot config. Profile and per-rule policy live in .github/jactionlint.yaml (applies to
+  // hk, CI and editors alike; `default` = actionlint checks + zizmor-parity regular-persona rules).
+  ["jactionlint"] = Builtins.jactionlint
+  // droast (Dockerfile linter, hk builtin); project-level skips: droast.toml.
+  ["droast"] = Builtins.droast
+  // zizmor (GitHub Actions security audit, hk builtin): run with --no-online-audits so the gate
+  // is offline/deterministic - zizmor otherwise runs online audits whenever it finds a token in
+  // the environment (pre-commit and CI would diverge). Rule policy: .github/zizmor.yml.
+  ["zizmor"] = (Builtins.zizmor) {
+    check {
+      command {
+        argv = List("zizmor", "--no-online-audits", "--no-progress", "{{files}}")
+      }
+    }
+    fix {
+      command {
+        argv = List("zizmor", "--no-online-audits", "--no-progress", "--fix", "{{files}}")
+      }
+    }
+  }
+  // Official Renovate config validation. --no-global matters: bare file args are validated as
+  // GLOBAL self-hosted config by default (renovate CLI), but .github/renovate.json is a repo
+  // config. --strict also fails when the installed renovate flags a needed config migration
+  // (renovate bumps surface it immediately). RE2 falls back to RegExp with a warning if the
+  // native module does not load - our regexes are RE2-safe, so that is non-fatal.
+  ["renovate-config-validator"] {
+    glob = List(".github/renovate.json", ".github/renovate.json5")
+    check = "renovate-config-validator --no-global --strict {{files}}"
+  }
   // ryl (Rust yamllint re-implementation, configured in .ryl.toml); --strict on check and fix so
   // the .ryl.toml warning-level rules keep blocking (fix's exit code is then self-verifying).
   // check_diff/check_after_diff are cleared: hk's fix mode skips the fixer when check_diff exits

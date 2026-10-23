@@ -1,0 +1,14 @@
+# droast (https://github.com/immanuwell/dockerfile-roast) configuration - read by the hk `droast`
+# step (pre-commit + `mise run lint`); failure threshold stays at the default `error`, so
+# info-level findings report but do not fail the gate.
+
+skip = [
+  # HA app images inherit the runtime identity and init from the base image
+  # (ghcr.io/home-assistant/base): s6-overlay runs the rootfs services, so declaring USER/CMD/
+  # ENTRYPOINT here would be dead weight. DF020 (no USER), DF036 (no CMD/ENTRYPOINT).
+  "DF020",
+  "DF036",
+  # Build context hygiene: each app dir is the context (rootfs/ + Dockerfile only, all Git-tracked).
+  # A per-app .dockerignore is a possible follow-up - root TODO.md.
+  "DF033",
+]
