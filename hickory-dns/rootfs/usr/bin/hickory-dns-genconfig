@@ -37,12 +37,12 @@ DEFAULT_ZONE_FILES="localhost=default/localhost.zone
 0.in-addr.arpa=default/0.zone"
 
 ## Fixed forward-store options. EDNS 1232 avoids UDP fragmentation trouble on tunneled paths; the cache holds
-## full responses; user_provided_order makes the upstreams option's order the failover priority. TTL caps keep
+## full responses; UserProvidedOrder makes the upstreams option's order the failover priority. TTL caps keep
 ## stale answers bounded without hammering the upstreams. hickory-dns/KNOWLEDGE.md §"Generated named.toml".
 OPTIONS_BLOCK='timeout = 5
 attempts = 2
 num_concurrent_reqs = 1
-server_ordering_strategy = "user_provided_order"
+server_ordering_strategy = "UserProvidedOrder"
 positive_max_ttl = 3600
 negative_max_ttl = 3600
 edns_payload_len = 1232
@@ -349,7 +349,7 @@ if [ "$N_STATIC" -gt 0 ]; then
   bashio::log.info "Serving ${N_STATIC} static entries as local authoritative zones"
 fi
 
-## Upstream resolvers -> one name_servers block each, in option order (user_provided_order makes the order the
+## Upstream resolvers -> one name_servers block each, in option order (UserProvidedOrder makes the order the
 ## priority). A hostname address is resolved once at generation time; its last-known-good address is cached.
 ## The blocks are accumulated and emitted after the forward zone's [[zones]] header below (TOML table order).
 N_UPSTREAMS=0

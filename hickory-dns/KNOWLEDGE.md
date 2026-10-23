@@ -46,11 +46,13 @@ truth (verified against v0.26.3 AND v0.26.1 source - the dev pin must parse the 
   - **`path` has NO serde default** on `Https`/`H3` (only the programmatic constructor fills `/dns-query`) - generated
     TOML always emits `path` explicitly (default `/dns-query`).
 - Resolver options (`[zones.stores.options]`, `ResolverOpts`, serde default + deny_unknown_fields): the generator pins
-  `timeout = 5`, `attempts = 2`, `num_concurrent_reqs = 1`, `server_ordering_strategy = "user_provided_order"` (makes
-  the upstreams option order the failover priority; the default `query_statistics` adaptive ordering would silently
-  reorder), `positive_max_ttl = 3600`, `negative_max_ttl = 3600`, `edns_payload_len = 1232` (avoids UDP fragmentation on
-  tunneled paths), `cache_size = 8192`, and `validate = <dnssec option>` (DNSSEC validation; the root KSKs - KSK-2017
-  tag 20326, KSK-2024 tag 38696 - are embedded via `TrustAnchors::default()`, no anchor file needed).
+  `timeout = 5`, `attempts = 2`, `num_concurrent_reqs = 1`, `server_ordering_strategy = "UserProvidedOrder"` (makes the
+  upstreams option order the failover priority; the default `QueryStatistics` adaptive ordering would silently reorder),
+  `positive_max_ttl = 3600`, `negative_max_ttl = 3600`, `edns_payload_len = 1232` (avoids UDP fragmentation on tunneled
+  paths), `cache_size = 8192`, and `validate = <dnssec option>` (DNSSEC validation; the root KSKs - KSK-2017 tag 20326,
+  KSK-2024 tag 38696 - are embedded via `TrustAnchors::default()`, no anchor file needed). Enum VALUES in the generated
+  TOML are the Rust variant names verbatim (`ServerOrderingStrategy` has no `rename_all`; the lab's real `--validate`
+  rejected a snake_case value that hand-written prose had slipped in).
 - ACL semantics (`crates/server/src/access.rs`, verified): allow-only configuration denies every other client; **empty
   allow AND deny lists = allow all** - the generator emits `allow_networks = []` when the option is cleared (with a
   warning). The ACL is server-wide (no per-zone recursion control).
