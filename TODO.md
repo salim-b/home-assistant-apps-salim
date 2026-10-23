@@ -81,9 +81,3 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   directory is the entire build context (rootfs/ + Dockerfile, all Git-tracked), so the context is already minimal. If
   an app ever grows generated or auxiliary files next to its Dockerfile, give that app its own `.dockerignore` and
   narrow the skip.
-
-- renovate-config-validator noise: the aube npm backend installs packages without lifecycle scripts, so Renovate's
-  optional `re2` dependency never builds its native module and the validator falls back to RegExp with a verbose stack
-  trace on every gate run (non-fatal — our regexes are RE2-safe; documented in `hk.pkl` and skill `ha-app-tooling`).
-  Investigate whether aube/mise can build or prebuild native deps; otherwise consider trimming the step's stderr in
-  `hk.pkl`.

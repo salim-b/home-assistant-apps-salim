@@ -341,11 +341,12 @@ url = "https://nodejs.org/dist/v26.12.1/node-v26.12.1-win-x64.zip"
 
 [[tools."npm:renovate"]]
 version = "44.176.2"
-aube = { path = ".mise/locks/npm-renovate/44.176.2~aa673d8d", digest = "sha256:d9f954449ed5f518eb10bedb138bc74ae7051925ffa1b2761854537583530582" }
+aube = { path = ".mise/locks/npm-renovate/44.176.2~026f02c4", digest = "sha256:d9f954449ed5f518eb10bedb138bc74ae7051925ffa1b2761854537583530582" }
 backend = "npm:renovate"
 specifiers = ["44.176.2"]
 
 [tools."npm:renovate".options]
+allow_builds = '["re2"]'
 trust_policy_excludes = '["@yarnpkg/libzip@3.2.2"]'
 
 [[tools.python]]

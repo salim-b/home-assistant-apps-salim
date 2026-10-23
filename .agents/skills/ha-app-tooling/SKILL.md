@@ -109,9 +109,7 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 - `.github/renovate.json` is validated by the official `renovate-config-validator` via a custom hk step
   (`--no-global --strict`). `--no-global` matters: bare file args are otherwise validated as a GLOBAL self-hosted
   config, which a repo config is not. `--strict` also fails while the installed Renovate flags a pending config
-  migration, so Renovate bumps that deprecate config keys surface immediately. The validator's RE2→RegExp fallback
-  (native `re2` module absent — the aube npm backend installs without lifecycle scripts) prints a verbose stack trace on
-  every run: expected noise, non-fatal (our regexes are RE2-safe; root `TODO.md`).
+  migration, so Renovate bumps that deprecate config keys surface immediately.
 - Renovate also manages the mise.toml `[tools]` pins (manager `mise`; weekly, Monday, like the other managers) and keeps
   `mise.lock` in sync — except `hk`, whose binary pin and the `hk@X.Y.Z` package imported by `hk.pkl` must move together
   in one manual change (excluded via packageRule in `.github/renovate.json`).

@@ -62,7 +62,10 @@ yq = "4.54.1"
 # trust_policy_excludes: @yarnpkg/libzip@3.2.2 (a renovate dependency) lost npm provenance vs 3.2.1
 # because the release branch lacked `npmPublishProvenance: true` (yarnpkg/berry#7182); aube
 # otherwise blocks the tool tree.
-"npm:renovate" = { version = "44.176.2", trust_policy_excludes = ["@yarnpkg/libzip@3.2.2"] }
+# allow_builds: re2 (renovate's optional regex accelerator) ships a prebuilt native binary that its
+# install script downloads; aube's default-deny lifecycle policy would skip it, leaving the module
+# absent and renovate logging a verbose RegExp-fallback stack trace on every gate run.
+"npm:renovate" = { version = "44.176.2", trust_policy_excludes = ["@yarnpkg/libzip@3.2.2"], allow_builds = ["re2"] }
 node = "26.12.1"
 
 [vars]

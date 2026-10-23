@@ -85,8 +85,7 @@ local linters = new Mapping<String, Step> {
   // Official Renovate config validation. --no-global matters: bare file args are validated as
   // GLOBAL self-hosted config by default (renovate CLI), but .github/renovate.json is a repo
   // config. --strict also fails when the installed renovate flags a needed config migration
-  // (renovate bumps surface it immediately). RE2 falls back to RegExp with a warning if the
-  // native module does not load - our regexes are RE2-safe, so that is non-fatal.
+  // (renovate bumps surface it immediately).
   ["renovate-config-validator"] {
     glob = List(".github/renovate.json", ".github/renovate.json5")
     check = "renovate-config-validator --no-global --strict {{files}}"
