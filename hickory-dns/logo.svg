@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- hickory-dns app logo: shield glyph (protected name resolution) wrapping a globe (DNS), with wordmark -->
+<svg width="5e3" height="2e3" version="1.1" viewBox="0 0 5000 2000" xmlns="http://www.w3.org/2000/svg">
+ <g transform="translate(120 420) scale(0.58)" fill="none" stroke="#18bcf2">
+  <path d="m1000 130 680 260v560c0 400-270 710-680 930-410-220-680-530-680-930v-560z" stroke-width="155"/>
+  <circle cx="1000" cy="1000" r="400" stroke-width="155"/>
+  <ellipse cx="1000" cy="1000" rx="170" ry="400" stroke-width="138"/>
+  <path d="m660 845h680m-680 310h680" stroke-width="138" stroke-linecap="round"/>
+ </g>
+ <g transform="translate(120 420) scale(0.58)">
+  <circle cx="1000" cy="130" r="120" fill="#18bcf2"/>
+  <circle cx="1680" cy="390" r="120" fill="#18bcf2"/>
+ </g>
+ <text x="1420" y="1440" font-family="sans-serif" font-size="540" font-weight="bold" fill="#18bcf2">hickory-dns</text>
+</svg>

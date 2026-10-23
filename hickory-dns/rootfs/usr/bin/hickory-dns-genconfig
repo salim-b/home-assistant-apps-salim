@@ -1,0 +1,444 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+## Generate the hickory-dns configuration from the app options. Writes:
+##   /data/named.toml                      the daemon's configuration (persistent, user-inspectable)
+##   /etc/hickory-dns/zones/static/*.zone  one leaf zone file per static entry (regenerated every boot)
+##   /etc/hickory-dns.args                 the s6 service's command line
+##   /data/hickory-dns.upstreams.cache     last-known-good hostname->ip resolutions (boot-time fallback)
+## The generated config is validated with the real binary (--validate parses the config AND loads every zone
+## file) before it replaces the previous one. Config shape and upstream ground truth:
+## hickory-dns/KNOWLEDGE.md §"Generated named.toml". Options are user data: every value is re-validated here
+## regardless of the option schema (hand-edited options.json defense in depth,
+## hd-idle/KNOWLEDGE.md §"bashio option parsing (list-of-object options)").
+
+CONFIG=/data/named.toml
+CONFIG_NEW=/data/named.toml.new
+ARGS_FILE=/etc/hickory-dns.args
+ZONES_DIR=/etc/hickory-dns/zones
+STATIC_DIR=/etc/hickory-dns/zones/static
+CACHE=/data/hickory-dns.upstreams.cache
+
+## Zone names shipped under ${ZONES_DIR}/default (static entries must not shadow them).
+DEFAULT_ZONES=(
+  localhost
+  0.0.127.in-addr.arpa
+  0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa
+  255.in-addr.arpa
+  0.in-addr.arpa
+)
+
+## Zone files of the shipped default zones, relative to ${ZONES_DIR} (directory key).
+DEFAULT_ZONE_FILES="localhost=default/localhost.zone
+0.0.127.in-addr.arpa=default/127.0.0.1.zone
+0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa=default/ipv6_1.zone
+255.in-addr.arpa=default/255.zone
+0.in-addr.arpa=default/0.zone"
+
+## Fixed forward-store options. EDNS 1232 avoids UDP fragmentation trouble on tunneled paths; the cache holds
+## full responses; user_provided_order makes the upstreams option's order the failover priority. TTL caps keep
+## stale answers bounded without hammering the upstreams. hickory-dns/KNOWLEDGE.md §"Generated named.toml".
+OPTIONS_BLOCK='timeout = 5
+attempts = 2
+num_concurrent_reqs = 1
+server_ordering_strategy = "user_provided_order"
+positive_max_ttl = 3600
+negative_max_ttl = 3600
+edns_payload_len = 1232
+cache_size = 8192'
+
+## ---------------------------------------------------------------------------
+## Small helpers
+## ---------------------------------------------------------------------------
+
+## TOML basic string: escape backslashes and quotes (control characters are rejected by the validators below).
+toml_str() {
+  local s="${1}"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '"%s"' "$s"
+}
+
+is_ipv4() {
+  local ip="${1}" octet
+  [[ "$ip" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 1
+  for octet in "${BASH_REMATCH[@]:1}"; do
+    ((octet <= 255)) || return 1
+  done
+}
+
+## Structural check only - the authoritative IP parse is the generated config's TOML IpAddr deserialization,
+## exercised by the --validate gate below.
+is_ipv6() {
+  [[ "${1}" =~ ^[0-9a-fA-F:.]+$ && "${1}" == *:* ]]
+}
+
+is_hostname() {
+  [[ "${1}" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.?$ ]]
+}
+
+is_cidr() {
+  local cidr="${1}" addr prefix
+  [[ "$cidr" == */* ]] || return 1
+  addr="${cidr%/*}"
+  prefix="${cidr##*/}"
+  [[ "$prefix" =~ ^[0-9]{1,3}$ ]] || return 1
+  if is_ipv4 "$addr"; then
+    ((prefix <= 32)) || return 1
+  elif is_ipv6 "$addr"; then
+    ((prefix <= 128)) || return 1
+  else
+    return 1
+  fi
+}
+
+## ---------------------------------------------------------------------------
+## Upstream URL parsing and hostname resolution
+## ---------------------------------------------------------------------------
+
+## Resolve an upstream hostname to an address: fresh system-resolver lookup first (A, then AAAA; the /data cache
+## is only a last-known-good fallback, so upstream address changes are picked up automatically). Prints the
+## address; returns 1 when nothing is found. Uses the shipped `resolve` CLI (hickory-dns-utils) against the
+## system resolver (/etc/resolv.conf -> the supervisor's DNS forwarder).
+resolve_host() {
+  local name="${1}" out ip type
+  for type in A AAAA; do
+    if out=$(/usr/bin/resolve --system -t "$type" "$name" 2>/dev/null); then
+      ## Answer lines are "\t<name> <ttl> <class> <type> <rdata>"; pick the first record of the wanted type
+      ## (skips CNAME chains) and print its rdata (last field).
+      ip=$(printf '%s\n' "$out" | awk -v T="$type" '/ANSWER SECTION/{f=1; next} f && NF>=5 && $(NF-1)==T {print $NF; exit}')
+      if [ "$ip" != "" ]; then
+        printf '%s' "$ip"
+        return 0
+      fi
+    fi
+  done
+  if [ -r "$CACHE" ]; then
+    local c_name c_ip
+    while read -r c_name c_ip; do
+      if [ "$c_name" = "$name" ]; then
+        printf '%s' "$c_ip"
+        return 0
+      fi
+    done <"$CACHE"
+  fi
+  return 1
+}
+
+## Record a successful resolution in the cache (one "name ip" line per entry, deduplicated by name).
+record_cache() {
+  local name="${1}" ip="${2}"
+  {
+    if [ -r "$CACHE" ]; then
+      awk -v n="$name" '$1 != n' "$CACHE" || true
+    fi
+    printf '%s %s\n' "$name" "$ip"
+  } >"${CACHE}.new"
+  mv "${CACHE}.new" "$CACHE"
+}
+
+## Parse an upstream URL: <scheme>://<ip-or-host>[:<port>][/<path>][#<sni>].
+## Writes five lines to ${PARSE_OUT}: scheme, address, port ("" = protocol default), path ("" = none), sni
+## ("" = none). Runs in the caller's shell (NOT command substitution) so bashio::exit.nok terminates the
+## generator with a logged error instead of silently emptying the parsed fields.
+PARSE_OUT=/tmp/hickory-dns.parse
+parse_upstream() {
+  local url="${1}" scheme rest addr port path sni tmp
+
+  scheme="${url%%://*}"
+  if [ "$scheme" = "$url" ]; then
+    bashio::exit.nok "Invalid upstream '${url}': not a URL (expected <scheme>://<ip-or-host>...)."
+  fi
+  rest="${url#*://}"
+
+  if [[ "$rest" == *#* ]]; then
+    sni="${rest#*#}"
+    rest="${rest%%#*}"
+  else
+    sni=""
+  fi
+
+  if [[ "$rest" == */* ]]; then
+    path="/${rest#*/}"
+    rest="${rest%%/*}"
+    [ "$path" = "/" ] && path=""
+  else
+    path=""
+  fi
+
+  port=""
+  if [[ "$rest" == \[*\]* ]]; then
+    ## Bracketed IPv6 literal, optional :port after the closing bracket.
+    addr="${rest%%]*}"
+    addr="${addr#\[}"
+    tmp="${rest#*]}"
+    [[ "$tmp" == :* ]] && port="${tmp#:}"
+    is_ipv6 "$addr" \
+      || bashio::exit.nok "Invalid upstream '${url}': '${addr}' is not an IPv6 address."
+  elif [[ "$rest" == *:*:* ]]; then
+    ## Multiple colons without brackets: a bare IPv6 literal (no port can be expressed).
+    addr="$rest"
+    is_ipv6 "$addr" \
+      || bashio::exit.nok "Invalid upstream '${url}': '${addr}' is not an IPv6 address."
+  elif [[ "$rest" == *:* ]]; then
+    addr="${rest%:*}"
+    port="${rest##*:}"
+    [[ "$port" =~ ^[0-9]{1,5}$ ]] \
+      || bashio::exit.nok "Invalid upstream '${url}': port '${port}' is not a number."
+    ((port >= 1 && port <= 65535)) \
+      || bashio::exit.nok "Invalid upstream '${url}': port ${port} out of range."
+    is_ipv4 "$addr" || is_ipv6 "$addr" || is_hostname "$addr" \
+      || bashio::exit.nok "Invalid upstream '${url}': '${addr}' is neither an IP address nor a hostname."
+  else
+    addr="$rest"
+    is_ipv4 "$addr" || is_ipv6 "$addr" || is_hostname "$addr" \
+      || bashio::exit.nok "Invalid upstream '${url}': '${addr}' is neither an IP address nor a hostname."
+  fi
+
+  case "$scheme" in
+    h3)
+      bashio::exit.nok "Upstream '${url}': DoH3 (h3://) is not supported by the packaged hickory-dns yet (the bin h3 features are not in any tagged release; hickory-dns/TODO.md) - use tls://, https:// or quic://."
+      ;;
+    tls | https | quic)
+      ## server_name is mandatory in the serde ProtocolConfig for the TLS-based protocols, and it is what the
+      ## upstream certificate is verified against: with an IP-address upstream there is nothing to derive it
+      ## from, so require the fragment there (a hostname upstream uses its own name unless overridden).
+      if [ "$sni" = "" ]; then
+        if is_ipv4 "$addr" || is_ipv6 "$addr"; then
+          bashio::exit.nok "Invalid upstream '${url}': tls/https/quic upstreams need a TLS server name - add '#<name>' (e.g. tls://9.9.9.9#dns.quad9.net)."
+        fi
+        sni="$addr"
+      fi
+      is_hostname "$sni" \
+        || bashio::exit.nok "Invalid upstream '${url}': SNI name '${sni}' is not a valid hostname."
+      if [ "$scheme" != "https" ] && [ "$path" != "" ]; then
+        bashio::exit.nok "Invalid upstream '${url}': a /path only applies to https:// upstreams."
+      fi
+      if [ "$scheme" = "https" ] && [ "$path" = "" ]; then
+        path="/dns-query"
+      fi
+      ;;
+    udp | tcp)
+      [ "$sni" = "" ] \
+        || bashio::exit.nok "Invalid upstream '${url}': the '#sni' fragment only applies to tls/https/quic upstreams."
+      [ "$path" = "" ] \
+        || bashio::exit.nok "Invalid upstream '${url}': a /path only applies to https:// upstreams."
+      ;;
+    *)
+      bashio::exit.nok "Invalid upstream '${url}': unknown scheme '${scheme}' (supported: tls, https, quic, udp, tcp)."
+      ;;
+  esac
+
+  printf '%s\n%s\n%s\n%s\n%s\n' "$scheme" "$addr" "$port" "$path" "$sni" >"$PARSE_OUT"
+}
+
+## ---------------------------------------------------------------------------
+## Configuration generation
+## ---------------------------------------------------------------------------
+
+bashio::log.info "Generating the hickory-dns configuration..."
+mkdir -p "$STATIC_DIR"
+rm -f "$STATIC_DIR"/*.zone
+
+## All top-level keys MUST precede the first [[zones]] header (bare keys after one would land inside it), and
+## every [[zones]] header must precede the forward zone's stores sub-tables (dotted sub-table headers implicitly
+## define their parents - emitting [[zones.stores.name_servers]] before the [[zones]] headers would make zones a
+## table that cannot be redefined as an array afterwards). Assembly order: top-level keys, default zones, static
+## zones, forward zone header, name_servers blocks, options table.
+CONFIG_BODY="listen_addrs_ipv4 = [\"0.0.0.0\"]
+listen_addrs_ipv6 = [\"::0\"]
+listen_port = 53
+directory = \"${ZONES_DIR}\"
+"
+
+## Client ACL. Empty list = allow every client (verified upstream semantics); without a loopback entry the
+## app's own healthcheck probe (UDP from 127.0.0.1) is refused and the app shows unhealthy while serving.
+NETS=""
+LOOPBACK=0
+while IFS= read -r line; do
+  [ "$line" != "" ] || continue
+  cidr=$(bashio::jq "$line" '.')
+  is_cidr "$cidr" \
+    || bashio::exit.nok "Invalid allowed network '${cidr}': not a CIDR (e.g. 192.168.0.0/16)."
+  [ "$NETS" != "" ] && NETS+=", "
+  NETS+="$(toml_str "$cidr")"
+  case "$cidr" in
+    127.0.0.0/8 | 127.0.0.1/32 | ::1/128 | ::1) LOOPBACK=1 ;;
+  esac
+done < <(bashio::config 'allow_networks')
+
+if [ "$NETS" != "" ]; then
+  CONFIG_BODY+="allow_networks = [${NETS}]
+"
+  [ "$LOOPBACK" = 1 ] \
+    || bashio::log.warning "No loopback network in the allowed networks - the app's own healthcheck probe (from 127.0.0.1) will be refused and the app shows unhealthy; include e.g. 127.0.0.0/8."
+else
+  bashio::log.warning "Allowed networks is empty - every client is served."
+  CONFIG_BODY+="allow_networks = []
+"
+fi
+
+## Shipped default zones (localhost and the built-in reverse zones).
+while IFS= read -r mapping; do
+  zone="${mapping%%=*}"
+  file="${mapping#*=}"
+  CONFIG_BODY+="
+[[zones]]
+zone = $(toml_str "$zone")
+zone_type = \"Primary\"
+file = $(toml_str "$file")
+"
+done <<<"$DEFAULT_ZONE_FILES"
+
+## Static entries -> one authoritative leaf zone each (SOA + NS + A/AAAA at the apex). The catalog answers the
+## most specific zone first, so these win over the '.' forward zone. There is no hosts-file store upstream
+## (hickory-dns/KNOWLEDGE.md §"Generated named.toml").
+declare -A SEEN_ZONES=()
+N_STATIC=0
+while IFS= read -r entry; do
+  [ "$entry" != "" ] || continue
+  host=$(bashio::jq "$entry" '.hostname // empty')
+  ip=$(bashio::jq "$entry" '.ip // empty')
+  [ "$host" != "" ] && [ "$ip" != "" ] \
+    || bashio::exit.nok "Static entry '${entry}': hostname and ip are both required."
+  host="${host,,}"
+  host="${host%.}"
+  is_hostname "$host" \
+    || bashio::exit.nok "Invalid static entry hostname '${host}': not a DNS name."
+  if ! is_ipv4 "$ip" && ! is_ipv6 "$ip"; then
+    bashio::exit.nok "Static entry '${host}': '${ip}' is not an IPv4 or IPv6 address."
+  fi
+  for zone in "${DEFAULT_ZONES[@]}"; do
+    [ "$host" != "$zone" ] \
+      || bashio::exit.nok "Static entry '${host}' conflicts with the shipped default zone of the same name."
+  done
+  [[ -z "${SEEN_ZONES[${host}]+x}" ]] \
+    || bashio::exit.nok "Static entry '${host}' is configured more than once - remove the redundant entry."
+  SEEN_ZONES["${host}"]=1
+  [[ "$host" == *.* ]] \
+    || bashio::log.warning "Static entry '${host}' is a single-label name - only queries for exactly '${host}.' match it; enter a fully qualified name (e.g. nas.lan.example.org)."
+
+  N_STATIC=$((N_STATIC + 1))
+  slug=$(printf '%s' "$host" | tr -c 'a-zA-Z0-9' '_')
+  file="$(printf '%02d' "$N_STATIC")_${slug:0:64}.zone"
+  rectype="A"
+  is_ipv6 "$ip" && rectype="AAAA"
+  {
+    # shellcheck disable=SC2016  # '$ORIGIN'/'$TTL' are zone-file directives, not shell expansions
+    printf '$ORIGIN %s.\n$TTL 300\n' "$host"
+    printf '@   IN  SOA   %s. hostmaster.hickory-dns.invalid. (\n                1 3600 900 86400 300 )\n' "$host"
+    printf '@   IN  NS    %s.\n' "$host"
+    printf '@   IN  %-5s %s\n' "$rectype" "$ip"
+  } >"${STATIC_DIR}/${file}"
+
+  CONFIG_BODY+="
+[[zones]]
+zone = $(toml_str "$host")
+zone_type = \"Primary\"
+file = $(toml_str "static/${file}")
+"
+done < <(bashio::config 'static_entries')
+
+if [ "$N_STATIC" -gt 0 ]; then
+  bashio::log.info "Serving ${N_STATIC} static entries as local authoritative zones"
+fi
+
+## Upstream resolvers -> one name_servers block each, in option order (user_provided_order makes the order the
+## priority). A hostname address is resolved once at generation time; its last-known-good address is cached.
+## The blocks are accumulated and emitted after the forward zone's [[zones]] header below (TOML table order).
+N_UPSTREAMS=0
+NS_TOML=""
+while IFS= read -r line; do
+  [ "$line" != "" ] || continue
+  url=$(bashio::jq "$line" '.')
+  [ "$url" != "" ] || continue
+  parse_upstream "$url"
+  {
+    read -r scheme
+    read -r addr
+    read -r port
+    read -r path
+    read -r sni
+  } <"$PARSE_OUT"
+
+  if ! is_ipv4 "$addr" && ! is_ipv6 "$addr"; then
+    if resolved=$(resolve_host "$addr"); then
+      bashio::log.info "Upstream hostname ${addr} resolved to ${resolved}"
+      record_cache "$addr" "$resolved"
+      addr="$resolved"
+    else
+      bashio::exit.nok "Upstream hostname '${addr}' could not be resolved (and no cached address exists) - use the IP form instead, e.g. tls://9.9.9.9#dns.quad9.net."
+    fi
+  fi
+
+  case "$scheme" in
+    tls) proto="type = \"tls\", server_name = $(toml_str "$sni")" ;;
+    https) proto="type = \"https\", server_name = $(toml_str "$sni"), path = $(toml_str "$path")" ;;
+    quic) proto="type = \"quic\", server_name = $(toml_str "$sni")" ;;
+    udp) proto="type = \"udp\"" ;;
+    tcp) proto="type = \"tcp\"" ;;
+  esac
+  conn="  { protocol = { ${proto} } }"
+  [ "$port" != "" ] && conn="  { port = ${port}, protocol = { ${proto} } }"
+
+  NS_TOML+="
+[[zones.stores.name_servers]]
+ip = $(toml_str "$addr")
+trust_negative_responses = false
+connections = [
+${conn},
+]
+"
+  N_UPSTREAMS=$((N_UPSTREAMS + 1))
+done < <(bashio::config 'upstreams')
+
+((N_UPSTREAMS >= 1)) \
+  || bashio::exit.nok "At least one upstream resolver is required in the 'upstreams' option."
+
+## Forward zone: everything not answered by a local zone goes to the configured upstreams, encrypted.
+CONFIG_BODY+="
+[[zones]]
+zone = \".\"
+zone_type = \"External\"
+
+[zones.stores]
+type = \"forward\"
+"
+CONFIG_BODY+="$NS_TOML"
+
+## DNSSEC: the root KSKs are embedded in the binary (TrustAnchors::default()); no anchor file.
+case "$(bashio::config 'dnssec' true)" in
+  true) validate_line="validate = true" ;;
+  false) validate_line="validate = false" ;;
+  *)
+    bashio::exit.nok "Invalid dnssec option '$(bashio::config 'dnssec' true)': must be true or false."
+    ;;
+esac
+
+CONFIG_BODY+="
+[zones.stores.options]
+${OPTIONS_BLOCK}
+${validate_line}
+"
+
+printf '%s' "$CONFIG_BODY" >"$CONFIG_NEW"
+
+## ---------------------------------------------------------------------------
+## Validation gate + service command line
+## ---------------------------------------------------------------------------
+
+if ! validate_out=$(/usr/bin/hickory-dns --config "$CONFIG_NEW" --validate 2>&1); then
+  bashio::log.error "The generated hickory-dns configuration is invalid: ${validate_out//$'\n'/ | }"
+  bashio::exit.nok "Fix the offending app option and restart the app."
+fi
+mv "$CONFIG_NEW" "$CONFIG"
+
+ARGS=(--config "$CONFIG")
+if bashio::config.true 'debug'; then
+  ARGS+=(--debug)
+fi
+printf '%s\n' "${ARGS[*]}" >"$ARGS_FILE"
+
+bashio::log.info "hickory-dns will forward to ${N_UPSTREAMS} upstream resolver(s): hickory-dns ${ARGS[*]}"
+bashio::log.info "hickory-dns configuration completed"

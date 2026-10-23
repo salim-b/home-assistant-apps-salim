@@ -1,0 +1,7 @@
+# Build-context allow-list (last matching pattern wins): only what the image build consumes
+# enters the build. The Dockerfile reads only rootfs/ — the Supervisor consumes everything else
+# in the app dir (config.yaml, apparmor.txt, translations/, docs, icons) from the repo, not the
+# image. If a Dockerfile ever COPYs beyond rootfs/, re-include that file here.
+*
+!rootfs/
+!Dockerfile

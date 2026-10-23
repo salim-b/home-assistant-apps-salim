@@ -1,0 +1,6 @@
+#!/bin/bash
+# Docker HEALTHCHECK probe: a real DNS query for the authoritative localhost zone via hickory-dns-utils' `dns`
+# CLI, UDP to 127.0.0.1:53 (the daemon listens on 0.0.0.0/:53 and the default ACL covers loopback). Exercises
+# the daemon end-to-end (socket, catalog, response) without depending on upstream reachability - a dead
+# upstream must not mark a healthy local DNS server unhealthy.
+exec /usr/bin/dns -n 127.0.0.1:53 query localhost A >/dev/null

@@ -1,0 +1,69 @@
+#include <tunables/global>
+
+profile hickory-dns flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  ## Modeled on the hd-idle profile and the official dev-docs AppArmor template. Mediation mechanics and
+  ## gotchas: repository-root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics"; app facts:
+  ## hickory-dns/KNOWLEDGE.md.
+
+  # Generic file access, signals (s6 supervision, bash job control). `file,` is the upstream HA convention - the
+  # confinement value sits in the non-file classes (network, capability); repository-root
+  # KNOWLEDGE.md §"AppArmor: mediation and profile mechanics".
+  file,
+  signal,
+
+  # The daemon binds DNS port 53 (listener) and, right after, drops privileges to nobody:nobody (setgid+setuid;
+  # bin/src/lib.rs check_drop_privs). AppArmor mediates the kernel's capable() checks themselves - without these
+  # rules the :53 bind and the privilege drop fail with EPERM even though the container runs as root:
+  # hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges".
+  capability net_bind_service,
+  capability setgid,
+  capability setuid,
+
+  # DNS traffic both ways: the :53 listeners (tcp/udp, v4/v6) and the encrypted upstream connections
+  # (DoT/DoQ = stream/dgram, DoH = stream over TCP). bashio's supervisor-API HTTP also rides these classes.
+  network inet stream,
+  network inet dgram,
+  network inet6 stream,
+  network inet6 dgram,
+
+  # S6-Overlay
+  /init rix,
+  /bin/** ix,
+  /usr/bin/** ix,
+  /run/{s6,s6-rc*,service}/** rwix,
+  /package/** ix,
+  /command/** ix,
+  /etc/s6-overlay/** rix,
+  /run/{,**} rwk,
+
+  # Bashio
+  /usr/lib/bashio/** ix,
+  /tmp/** rwk,
+
+  # Options file and the app's persistent data dir (generated named.toml, upstream-resolution cache)
+  /data/** rw,
+
+  # AppArmor status reporting (s6 sets this up; harmless otherwise)
+  /sys/kernel/security/apparmor/** r,
+
+  # App config surface: shipped default zone files (read), generated static zone files + service args
+  # (written by the cont-init generator, read by the daemon). Not load-bearing under the `file,` blanket;
+  # documents what the scripts read and write.
+  /etc/hickory-dns/{,**} rw,
+
+  # Privilege-drop lookups (check_drop_privs getpwnam/getgrnam) and the system resolver config
+  # (hickory-dns-genconfig resolves hostname upstreams via `resolve --system`). Blanket-covered; enumerated as
+  # documentation. The daemon parses every zone file BEFORE dropping privileges, so the post-drop process
+  # neither reads nor writes anything.
+  /etc/passwd r,
+  /etc/group r,
+  /etc/resolv.conf r,
+  # System trust store read by rustls-platform-verifier when connecting to DoT/DoH/DoQ upstreams
+  # (ca-certificates-bundle). Blanket-covered documentation rule.
+  /etc/ssl/certs/{,**} r,
+
+  # Runtime check scripts
+  /etc/cont-init.d/config.sh rix,
+}

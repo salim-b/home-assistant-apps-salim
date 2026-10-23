@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- hickory-dns app icon: shield glyph (protected name resolution) wrapping a globe (DNS) -->
+<svg width="2e3" height="2e3" version="1.1" viewBox="0 0 2000 2000" xmlns="http://www.w3.org/2000/svg">
+ <g fill="none" stroke="#18bcf2">
+  <path d="m1000 130 680 260v560c0 400-270 710-680 930-410-220-680-530-680-930v-560z" stroke-width="90"/>
+  <circle cx="1000" cy="1000" r="400" stroke-width="90"/>
+  <ellipse cx="1000" cy="1000" rx="170" ry="400" stroke-width="80"/>
+  <path d="m660 845h680m-680 310h680" stroke-width="80" stroke-linecap="round"/>
+ </g>
+ <circle cx="1000" cy="130" r="70" fill="#18bcf2"/>
+ <circle cx="1680" cy="390" r="70" fill="#18bcf2"/>
+</svg>

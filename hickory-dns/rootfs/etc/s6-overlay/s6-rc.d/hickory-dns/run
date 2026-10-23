@@ -1,0 +1,19 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+## hickory-dns daemon (longrun service). Reads the generated command line (/etc/hickory-dns.args; written by
+## cont-init config.sh via hickory-dns-genconfig, see hickory-dns/KNOWLEDGE.md). `exec` makes the daemon this
+## service's process: s6 signals it directly on stop, and its stdout lands in the app log. After binding port 53
+## the binary drops privileges to nobody:nobody unconditionally on 0.26.1 and by default (drop_privileges=true)
+## on 0.26.2+ (bin/src/lib.rs check_drop_privs - post-bind, see hickory-dns/KNOWLEDGE.md §"Port 53 binding and
+## privileges"); the AppArmor profile grants the setuid/setgid capabilities for it.
+## Fail with a clear message (s6 restarts this service) instead of bash's raw redirect error if config.sh did
+## not finish.
+if [ ! -r /etc/hickory-dns.args ]; then
+  bashio::log.error "/etc/hickory-dns.args is missing - the hickory-dns configuration did not complete (see the earlier log lines for the configuration error)."
+  exit 1
+fi
+read -r -a HICKORY_ARGS </etc/hickory-dns.args
+bashio::log.info "Starting hickory-dns: /usr/bin/hickory-dns ${HICKORY_ARGS[*]}"
+exec /usr/bin/hickory-dns "${HICKORY_ARGS[@]}"

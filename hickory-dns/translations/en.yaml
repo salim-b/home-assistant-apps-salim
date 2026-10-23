@@ -1,0 +1,60 @@
+configuration:
+  upstreams:
+    name: Upstream resolvers
+    description: >-
+      Recursive DNS resolvers that answer is forwarded to, queried in the given
+      order. One URL per entry:
+
+      `<scheme>://<ip-or-host>[:<port>][#<sni>]`
+
+      Schemes: `tls` (DNS-over-TLS), `https` (DNS-over-HTTPS, optional `/path`
+      after the host, default `/dns-query`), `quic` (DNS-over-QUIC), `udp` and
+      `tcp` (classic plaintext DNS). The `#sni` fragment pins the TLS server
+      name - for `tls`, `https` and `quic` it is REQUIRED (it is what the
+      upstream certificate is verified against), so an IP-address upstream must
+      carry it, e.g. `tls://9.9.9.9#dns.quad9.net`. A hostname upstream uses its
+      own name unless a fragment overrides it; the hostname is resolved once at
+      app start (result cached in `/data` as a last-known-good fallback), which
+      is why IP-address upstreams are recommended - they need no resolution at
+      all.
+  allow_networks:
+    name: Allowed networks
+    description: >-
+      Client access list: only queries from these networks (CIDR notation, e.g.
+      `192.168.0.0/16`) are answered, everything else is refused. The defaults
+      cover loopback and the private LAN ranges. Clearing the list entirely
+      allows every client - not recommended on a network-exposed host.
+  dnssec:
+    name: DNSSEC validation
+    description: >-
+      Cryptographically validate upstream answers against the DNSSEC root
+      trust anchors (the root KSKs are embedded in the hickory-dns binary -
+      nothing to configure). Bogus answers are rejected. Leave this enabled
+      unless a resolver interoperability problem forces you off.
+  static_entries:
+    name: Static entries
+    description: >-
+      Local hostname-to-IP answers (hosts.txt-style) served directly by this
+      app, never forwarded to an upstream resolver. Each entry becomes its own
+      authoritative zone, so it wins over any public record - useful for
+      reaching self-hosted services by name from every LAN device. Only A/AAAA
+      (address) lookups of the exact hostname are answered; other record types
+      get an authoritative empty answer.
+    fields:
+      hostname:
+        name: Hostname
+        description: >-
+          The fully qualified domain name to answer locally, e.g.
+          `nas.lan.example.org`. A bare name like `nas` is treated as the
+          top-level name `nas.` and will only match queries for exactly that -
+          enter the full name your devices actually look up.
+      ip:
+        name: IP address
+        description: >-
+          The IPv4 or IPv6 address the hostname resolves to.
+  debug:
+    name: Debug mode
+    description: >-
+      Verbose hickory-dns logging (every query and its handling). Useful for
+      diagnosing blocked queries or upstream failures - and noisy under normal
+      LAN traffic.
