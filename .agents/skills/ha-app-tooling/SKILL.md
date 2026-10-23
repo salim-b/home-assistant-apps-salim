@@ -87,12 +87,13 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   and jactionlint's parity target lags zizmor releases. Its `unpinned-uses` policy and `.github/zizmor.yml` mirror
   `.github/renovate.json`: `home-assistant/*` may float on a branch (the home-assistant org's actions), everything else
   must be digest-pinned — keep all three in sync when adding actions.
-- The hk `zizmor` step runs `--no-online-audits --no-progress` so the gate stays offline and deterministic: a
-  `GH_TOKEN`/`GITHUB_TOKEN`/`ZIZMOR_GITHUB_TOKEN` in the environment flips zizmor to token-authenticated online audits
-  (networked; results depend on remote state at run time), and the flag disables exactly those — remote fetching stays
-  allowed, moot here since the step lints local files. The four online-only audits (impostor-commit,
-  known-vulnerable-actions, ref-confusion, stale-action-refs) are the deliberate trade-off: pin freshness is Renovate's
-  job, and a manual online pass is plain `zizmor` with a token exported. A finding that must stay (a checkout whose
+- The hk `zizmor` step runs `--no-progress`; its mode follows the environment: a `GH_TOKEN`/`GITHUB_TOKEN`/
+  `ZIZMOR_GITHUB_TOKEN` enables zizmor's four online-only audits (impostor-commit, known-vulnerable-actions,
+  ref-confusion, stale-action-refs), without one the audit is fully offline. CI passes its default `GITHUB_TOKEN` for
+  the strongest audit; locally the gate stays offline unless a token is exported (opt out with
+  `ZIZMOR_NO_ONLINE_AUDITS=1`). Online results depend on remote state: a once-green run can go red when, e.g., a
+  security advisory lands for a pinned action - that is signal; re-run or fix forward. zizmor caches API responses
+  (~/.cache/zizmor), so a local run shortly after another can reuse them. A finding that must stay (a checkout whose
   later step pushes, e.g. apk-bump's changelog job) carries an inline `# zizmor: ignore[<audit-id>]` comment stating the
   reason.
 - Local `uses:` references use GitHub's self-repository syntax (`$/.github/workflows/…`), not `./`: `$/` resolves the

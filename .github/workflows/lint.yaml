@@ -87,7 +87,12 @@ jobs:
           persist-credentials: false
 
       - name: ⚙️ Set up mise (installs pinned tools via mise.lock)
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
 
       - name: ✅ Run mise tasks (lint + validate)
+        # GITHUB_TOKEN enables zizmor's online-only audits (impostor-commit, known-vulnerable-actions,
+        # ref-confusion, stale-action-refs); the default token's public-data reads suffice (rate
+        # limit 1k req/hr per repo, a few dozen calls here). Tokenless runs fall back to offline.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mise run check

@@ -197,7 +197,7 @@ jobs:
 
       - name: Set up mise
         if: steps.pins.outputs.has_pins == 'true'
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
 
       - name: Insert changelog sections
         if: steps.pins.outputs.has_pins == 'true'
