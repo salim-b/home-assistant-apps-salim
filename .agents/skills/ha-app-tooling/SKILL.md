@@ -40,10 +40,10 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   merge strategy, `.github/renovate.json`) — green means the new schemas validate our app configs. Renovate does not
   track schema-*behavior* changes: re-verify version-sensitive supervisor facts against the new ref before relying on
   them (skill `ha-app-workflow`).
-- Also schema-validates `.github/renovate.json` against the published Renovate config schema (refetched whenever that
-  file changes), `.rumdl.toml` against rumdl's and `.panache.toml` against panache's config schema, and compares pinned
-  apk package versions in app Dockerfiles against the Alpine binary indexes (drift = guided release — root
-  `KNOWLEDGE.md` §"apk package version policy").
+- Schema-validates `.rumdl.toml` against rumdl's and `.panache.toml` against panache's published config schemas, and
+  compares pinned apk package versions in app Dockerfiles against the Alpine binary indexes (drift = guided release —
+  root `KNOWLEDGE.md` §"apk package version policy"). `.github/renovate.json` is gated by the official
+  `renovate-config-validator` hk step instead (see the linting section below).
 
 ## YAML linting: ryl
 
@@ -76,6 +76,35 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   executions (`if "$NFSD_CMD"`) where quoting changes what is *executed*: the whole string becomes one literal command
   name (`command not found` — this broke nfs-server 0.6.1 on-device). Build such commands as arrays
   (`NFSD_CMD=(...); "${NFSD_CMD[@]}"`) so quoting is stable either way. (Upstream items: root `TODO.md`.)
+
+## Workflow, Dockerfile and Renovate config linting
+
+- GitHub workflows, composite actions and Dependabot config: jactionlint (hk builtin; the maintained actionlint fork)
+  plus zizmor's security audits. jactionlint auto-reads `.github/jactionlint.yaml` — profile `default` = actionlint's
+  correctness checks plus the zizmor-parity regular-persona rules (`pedantic` adds auditor-persona noise). Its
+  `unpinned-uses` policy and `.github/zizmor.yml` mirror `.github/renovate.json`: `home-assistant/*` may float on a
+  branch (our own actions), everything else must be digest-pinned — keep all three in sync when adding actions.
+- The hk `zizmor` step runs `--no-online-audits --no-progress` so the gate stays offline and deterministic: zizmor
+  otherwise runs online audits whenever it finds a token in the environment, which would make pre-commit and CI diverge.
+  A finding that must stay (a checkout whose later step pushes, e.g. apk-bump's changelog job) carries an inline
+  `# zizmor: ignore[<audit-id>]` comment stating the reason.
+- Local `uses:` references use GitHub's self-repository syntax (`$/.github/workflows/…`), not `./`: `$/` resolves the
+  reference from the running commit by construction, so it counts as digest-pinned (zizmor `self-repository` audit;
+  needs runner 2.336.0+).
+- Dockerfiles: droast (hadolint-compatible CLI; hk builtin) with project-level skips in `droast.toml` (DF020/DF036 — the
+  HA base image provides the runtime identity and init via s6-overlay; DF033 — no per-app `.dockerignore`, root
+  `TODO.md`). Rule IDs are `DF0xx`; a `# hadolint ignore=DLxxx` pragma is dead weight under droast — inline ignores are
+  `# droast ignore=DFxxx reason="…"`, and `droast --hadolint-compatible --hadolint-compatibility-report` maps old DL IDs
+  to their DF equivalents.
+- `.github/renovate.json` is validated by the official `renovate-config-validator` via a custom hk step
+  (`--no-global --strict`). `--no-global` matters: bare file args are otherwise validated as a GLOBAL self-hosted
+  config, which a repo config is not. `--strict` also fails while the installed Renovate flags a pending config
+  migration, so Renovate bumps that deprecate config keys surface immediately. The validator's RE2→RegExp fallback
+  (native `re2` module absent — the aube npm backend installs without lifecycle scripts) prints a verbose stack trace on
+  every run: expected noise, non-fatal (our regexes are RE2-safe; root `TODO.md`).
+- Renovate also manages the mise.toml `[tools]` pins (manager `mise`; weekly, Monday, like the other managers) and keeps
+  `mise.lock` in sync — except `hk`, whose binary pin and the `hk@X.Y.Z` package imported by `hk.pkl` must move together
+  in one manual change (excluded via packageRule in `.github/renovate.json`).
 
 ## bashio shebang note
 

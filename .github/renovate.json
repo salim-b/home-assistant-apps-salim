@@ -7,6 +7,7 @@
   "enabledManagers": [
     "dockerfile",
     "github-actions",
+    "mise",
     "custom.regex"
   ],
   "semanticCommits": "disabled",
@@ -112,6 +113,28 @@
       ],
       "matchCurrentValue": "/^(dev|main|master)$/",
       "pinDigests": false
+    },
+    {
+      "description": "mise [tools] pins (mise manager; registry-backed: github/aqua/npm/core backends): weekly, same cadence as the actions manager. Renovate updates the pinned version and runs `mise lock` in safe mode so mise.lock stays in sync; the CI check job (hk lint gate + validate) validates the bumped toolset before merge.",
+      "matchManagers": [
+        "mise"
+      ],
+      "addLabels": [
+        "mise_tools"
+      ],
+      "schedule": [
+        "before 8am on monday"
+      ]
+    },
+    {
+      "description": "hk stays out of the mise manager: its mise.toml binary pin and the hk@X.Y.Z package imported by hk.pkl must move together in one manual change (the package provides the builtin step definitions the binary executes - bumping only one leaves hk.pkl importing a version the binary or registry cannot resolve).",
+      "matchManagers": [
+        "mise"
+      ],
+      "matchPackageNames": [
+        "hk"
+      ],
+      "enabled": false
     },
     {
       "description": "Supervisor schema pin: weekly, same cadence as the actions manager; automerges once the CI check job (mise run validate against the new ref) is green. The Renovate PR body lists the upstream changelog for an audit trail. automergeStrategy rebase: linear history without merge bubbles (GitHub rebase-merge; conflicts block the automerge until resolved — same as manual). Applies on both merge paths (Renovate's own merge today, platform-native automerge if branch protection ever arrives).",

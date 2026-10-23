@@ -17,10 +17,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Per-PR/ref cancellation; the -caller suffix keeps this group distinct from build-app.yaml's
+  # own group (a called workflow sees the caller's name in github.workflow, so an unmodified
+  # ${{ github.workflow }} prefix would put both in one group and cancel each other).
+  group: ${{ github.workflow }}-caller-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   init:
     name: Initialize builds
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       changed: ${{ steps.filter.outputs.changed }}
       changed_apps: ${{ steps.filter.outputs.changed_apps }}
@@ -29,6 +37,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Get changed files
         id: changed_files
@@ -80,8 +89,11 @@ jobs:
       fail-fast: false
       matrix:
         app: ${{ fromJSON(needs.init.outputs.changed_apps) }}
-    uses: ./.github/workflows/build-app.yaml
+    uses: $/.github/workflows/build-app.yaml
     with:
       app: ${{ matrix.app }}
       publish: ${{ github.event_name == 'push' }}
-    secrets: inherit
+    # Explicit passing (secrets: inherit would forward every repo secret): build-app.yaml only
+    # reads secrets.GITHUB_TOKEN (GHCR auth for the build/manifest jobs).
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

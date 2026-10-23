@@ -20,8 +20,8 @@ on:
   workflow_dispatch:
 
 permissions:
+  # Read-only baseline; the dispatch (actions: write) is granted to the reconcile job only.
   contents: read
-  actions: write
 
 concurrency:
   group: publish-reconcile
@@ -32,11 +32,14 @@ jobs:
     name: Find apps
     if: github.repository == 'salim-b/home-assistant-apps-salim'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       addons_list: ${{ steps.addons.outputs.addons_list }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Find app directories
         id: addons
@@ -47,6 +50,13 @@ jobs:
     needs: find
     if: github.repository == 'salim-b/home-assistant-apps-salim'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # actions: write - dispatching build-app.yaml via gh workflow run; contents: read - job
+    # permissions replace top-level, so the checkout's read must be restated here. Bounded by the
+    # probe's own retries (worst case ~3.5 min/tag across arches + the multi-arch manifest tag).
+    permissions:
+      contents: read
+      actions: write
     strategy:
       fail-fast: false
       matrix:
@@ -54,6 +64,8 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Get app information
         id: info
@@ -63,15 +75,19 @@ jobs:
 
       - name: Normalize app information
         id: normalize
+        # helpers/info emits its string outputs JSON-quoted (`yq -o=json`); env values keep those
+        # quotes, so they are unquoted with jq (which also handles escapes). Referencing the raw
+        # outputs directly in the script would be a template-injection surface (zizmor).
+        env:
+          INFO_IMAGE: ${{ steps.info.outputs.image }}
+          INFO_VERSION: ${{ steps.info.outputs.version }}
         run: |
-          # helpers/info emits its string outputs JSON-quoted (`yq -o=json`); shell-assigning the
-          # interpolated output strips the quotes (same pattern as build-app.yaml; never feed raw
-          # outputs to env: - they keep their quotes).
-          image=${{ steps.info.outputs.image }}
-          echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
-          echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
-          version=${{ steps.info.outputs.version }}
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          image=$(jq -r . <<<"${INFO_IMAGE}")
+          {
+            echo "image_name=${image##*/}"
+            echo "registry_prefix=${image%/*}"
+            echo "version=$(jq -r . <<<"${INFO_VERSION}")"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Check published tags in GHCR
         id: tags
@@ -165,7 +181,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          # matrix values are plain strings (no JSON quoting) - safe to pass through env:.
+          DISPATCH_APP: ${{ matrix.app }}
         run: |
-          gh workflow run build-app.yaml --ref main -f app=${{ matrix.app }} -f publish=true
-          echo "Dispatched build-app.yaml (app=${{ matrix.app }}, publish=true, ref=main)."
+          gh workflow run build-app.yaml --ref main -f app="$DISPATCH_APP" -f publish=true
+          echo "Dispatched build-app.yaml (app=${DISPATCH_APP}, publish=true, ref=main)."
           echo "Its run is the loud signal if publishing keeps failing."

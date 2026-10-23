@@ -11,17 +11,39 @@ on:
         description: Whether or not to publish the built image to GHCR.
         required: true
         type: boolean
+    secrets:
+      # Passed explicitly by the caller (builder.yaml avoids secrets: inherit). Direct
+      # workflow_dispatch runs (publish-reconcile) fall back to the implicit GITHUB_TOKEN,
+      # hence required: false.
+      GITHUB_TOKEN:
+        description: GitHub token for GHCR authentication in the build/manifest jobs.
+        required: false
   # Manual/reconcile dispatch: publish-reconcile fires this when a version tag is missing from
   # GHCR. workflow_dispatch is the documented GITHUB_TOKEN exception that always creates runs
   # (not subject to the push-event workflow suppression).
   workflow_dispatch:
     inputs: *shared_inputs
 
+permissions:
+  # Baseline for jobs without their own permissions block (prepare is read-only); the build and
+  # manifest jobs declare their elevated grants at job level. As a reusable workflow these must
+  # not exceed what callers grant (builder.yaml: contents/id-token/packages).
+  contents: read
+
+concurrency:
+  # github.workflow is the CALLER's name inside a called workflow, and each called run evaluates
+  # this group - inputs.app keeps the caller's per-app matrix children in distinct groups so they
+  # do not cancel each other, and the caller (builder.yaml) uses a -caller suffix so the two
+  # never share a group (mutual cancellation would deadlock, GitHub docs).
+  group: ${{ github.workflow }}-${{ inputs.app }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   prepare:
     name: Prepare
     if: github.repository == 'salim-b/home-assistant-apps-salim'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       architectures: ${{ steps.info.outputs.architectures }}
       build_matrix: ${{ steps.matrix.outputs.matrix }}
@@ -34,6 +56,8 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Get app information
         id: info
@@ -43,17 +67,25 @@ jobs:
 
       - name: Normalize app information
         id: normalize
+        # helpers/info emits its string outputs JSON-quoted (`yq -o=json`); env values keep those
+        # quotes, so they are unquoted with jq (which also handles escapes). Referencing the raw
+        # outputs directly in the script would be a template-injection surface (zizmor).
+        env:
+          INFO_IMAGE: ${{ steps.info.outputs.image }}
+          INFO_VERSION: ${{ steps.info.outputs.version }}
+          INFO_NAME: ${{ steps.info.outputs.name }}
+          INFO_DESCRIPTION: ${{ steps.info.outputs.description }}
+          INFO_URL: ${{ steps.info.outputs.url }}
         run: |
-          image=${{ steps.info.outputs.image }}
-          echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
-          echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
-          version=${{ steps.info.outputs.version }}
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          name=${{ steps.info.outputs.name }}
-          echo "name=${name}" >> "$GITHUB_OUTPUT"
-          description=${{ steps.info.outputs.description }}
-          echo "description=${description}" >> "$GITHUB_OUTPUT"
-          url=${{ steps.info.outputs.url }}
+          image=$(jq -r . <<<"${INFO_IMAGE}")
+          url=$(jq -r . <<<"${INFO_URL}")
+          {
+            echo "image_name=${image##*/}"
+            echo "registry_prefix=${image%/*}"
+            echo "version=$(jq -r . <<<"${INFO_VERSION}")"
+            echo "name=$(jq -r . <<<"${INFO_NAME}")"
+            echo "description=$(jq -r . <<<"${INFO_DESCRIPTION}")"
+          } >> "$GITHUB_OUTPUT"
           if [[ -n "$url" && "$url" != "null" ]]; then
             echo "url=${url}" >> "$GITHUB_OUTPUT"
           fi
@@ -70,6 +102,7 @@ jobs:
     name: Build ${{ matrix.arch }} image
     needs: prepare
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     permissions:
       contents: read
       id-token: write
@@ -116,6 +149,7 @@ jobs:
     needs: [prepare, build]
     if: inputs.publish
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       id-token: write
       packages: write

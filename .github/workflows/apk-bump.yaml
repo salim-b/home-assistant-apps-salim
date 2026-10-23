@@ -45,6 +45,7 @@ jobs:
       github.event.pull_request.user.login == 'renovate[bot]' &&
       contains(github.event.pull_request.labels.*.name, 'apk_pin')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
       pull-requests: read
@@ -186,6 +187,9 @@ jobs:
 
       - name: Check out main
         if: steps.pins.outputs.has_pins == 'true'
+        # zizmor: ignore[artipacked] - the "Commit and push changelog entries" step below pushes
+        # with the persisted GITHUB_TOKEN, so credentials must survive the checkout (docs-only
+        # commit; the workflow header records the resulting workflow suppression as intended).
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
@@ -272,6 +276,7 @@ jobs:
       github.repository == 'salim-b/home-assistant-apps-salim' &&
       (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       # issues: write - PR comments are issue comments (@renovate rebase)
       # pull-requests: read - PR + files listing; contents: read - PR head files via the contents
