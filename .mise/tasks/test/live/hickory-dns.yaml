@@ -1,0 +1,29 @@
+# Test OPTIONS for the hickory-dns app, applied to the device app by
+# `mise run test:live hickory-dns <host> --test-options` (previous options backed up, restored on
+# exit). Top-level keys override the current options; keys not present here are kept.
+#
+# Pins ALL option keys to the app's repo defaults (Quad9 DoT x2, the default client ACL, DNSSEC
+# on, no debug) so the run is deterministic regardless of the device's stored options, plus one
+# reserved-TLD static entry as the authoritative leaf-zone probe. live_prepare() additionally
+# appends the querying machine's /32 to allow_networks so the hook's dig checks pass the client
+# ACL regardless of the dev host's network (generated options file, hd-idle hook precedent).
+upstreams:
+  - protocol: tls
+    host: dns.quad9.net
+    ip: 9.9.9.9
+  - protocol: tls
+    host: dns.quad9.net
+    ip: 149.112.112.112
+allow_networks:
+  - "127.0.0.0/8"
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "192.168.0.0/16"
+  - "::1/128"
+  - "fe80::/10"
+  - "fd00::/8"
+dnssec: true
+static_entries:
+  - hostname: live-check.test
+    ip: 192.0.2.1
+debug: false
