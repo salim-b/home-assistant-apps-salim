@@ -284,6 +284,9 @@ while IFS= read -r entry; do
   if [ "$port" != "" ]; then
     [[ "$port" =~ ^[0-9]{1,5}$ ]] \
       || bashio::exit.nok "Invalid upstream port '${port}': not a port number."
+    ## Normalize to base 10 before the range check: bash arithmetic reads a leading zero as octal (and the
+    ## normalized decimal is also what gets emitted into the TOML - TOML rejects leading zeros).
+    port=$((10#$port))
     ((port >= 1 && port <= 65535)) \
       || bashio::exit.nok "Invalid upstream port ${port}: out of range (1-65535)."
   fi
