@@ -106,6 +106,19 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
   suppressed (`App.devices` does `with suppress(vol.Invalid)`); a detached device at boot does not prevent the app from
   starting.
 
+## Device SSH: sessions run in the Terminal & SSH app
+
+- HAOS' host SSH server is not enabled by default (and would listen on port 22222); the standard SSH port 22 is mapped
+  from the host into the running *Terminal & SSH* app ([`home-assistant/addons` `ssh/DOCS.md`
+  §"Network"](https://github.com/home-assistant/addons/blob/master/ssh/DOCS.md)). An `ssh root@<host>` session therefore
+  runs INSIDE that app's container: s6 is PID 1 and the session sees the SSH app's own PID namespace only.
+- Consequences for live testing (the hooks' evidence model, skill `ha-app-device-testing`): processes of other apps are
+  invisible — `ps`/`pgrep`/`pidof` list the SSH app's namespace, `/proc/<pid>` of an app daemon is unreachable;
+  `netstat`/`/proc/net` reflect the SSH app's network namespace (with default port publishing, not the host's); there is
+  no docker CLI. What works: the `ha` CLI (supervisor API), the `/local_apps` mount (app-store writes), `ha apps logs`
+  and `ha host logs`. So: process/socket-level assertions come from the app's own log, network-level ground truth from
+  client probes run on the dev host.
+
 ## Supervisor: health events and the app watchdog
 
 - The supervisor does not poll Docker HEALTHCHECK status — it listens to Docker events: `docker/monitor.py` translates
