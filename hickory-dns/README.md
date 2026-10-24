@@ -10,16 +10,15 @@ Turn your Home Assistant instance into a secure DNS server that resolves via enc
 - **Encrypted home DNS**: Simply point your home router's DHCP DNS at your Home Assistant device once and all LAN
   devices resolve through the app, with all outgoing DNS traffic being encrypted (DoT, DoH, DoQ) instead of plaintext
   port-53 queries leaving the home.
-- **DNSSEC validated by default**: Upstream answers are checked against the root trust anchors (embedded in the
-  hickory-dns binary); bogus answers are rejected.
+- **DNSSEC validated by default**: Upstream answers are validated against the DNSSEC root trust anchors; bogus answers
+  are rejected.
 - **Configurable upstream resolvers**: Quad9 by default (anycast, pure IPs with pinned TLS names); Cloudflare, AdGuard,
   Google etc. via structured per-resolver entries (protocol, host, IP, port).
 - **Static entries**: `hosts.txt`-style hostname-to-IP answers served locally as authoritative zones – reach self-hosted
   services by name from every LAN device without touching public DNS.
 - **Client ACL**: Only queries from the configured networks are served (private ranges + loopback by default).
-- **Hardened runtime**: Ships a custom [AppArmor](https://apparmor.net/) profile that restricts capabilities to what the
-  launcher needs, and the daemon never runs as root: it starts as `nobody` with exactly the ambient capability the
-  port-53 bind requires (`no_new_privs` set).
+- **Hardened runtime**: Ships a custom [AppArmor](https://apparmor.net/) profile, and the daemon never runs as root: it
+  starts as `nobody` holding only the capability the port-53 bind requires.
 
 ## Limitations
 
@@ -27,9 +26,8 @@ Turn your Home Assistant instance into a secure DNS server that resolves via enc
   another DNS app (e.g. [AdGuard Home](/config/app/a0d7b954_adguard/info) or [Dnsmasq](/config/app/core_dnsmasq/info))
   on the same device.
 - **DoH3 (HTTP/3) upstreams are not available yet**: the packaged binary's h3 feature is not in any tagged upstream
-  release; the app rejects DoH3 upstreams until it lands (see `hickory-dns/TODO.md`).
-- **No ad/blocklist support yet** (tracked in `hickory-dns/TODO.md`): the upstream blocklist store exists but the
-  feature ships after the first release.
+  release, so the app rejects DoH3 upstreams for now.
+- **No ad/blocklist support yet**: planned for a later release.
 
 ## Documentation
 
