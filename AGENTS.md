@@ -14,7 +14,7 @@ subdirectory with a `config.yaml`, `Dockerfile`, `.dockerignore`, `rootfs/`, doc
 - `hickory-dns` — a DNS server that forwards to user-configured encrypted upstream resolvers (DoT/DoH/DoQ) with DNSSEC
   validation, wrapping the Alpine `hickory-dns` package (generated `named.toml` configuration).
 
-Both apps' architecture and gotchas are non-obvious: consult their runtime skills (index below) before touching their
+All apps' architecture and gotchas are non-obvious: consult their runtime skills (index below) before touching their
 runtime code.
 
 ## Information placement rule
@@ -66,6 +66,7 @@ Load a skill's full text before doing the kind of work it covers:
   | `ha-app-scaffolding`    | adding or bootstrapping a new app subdirectory                                      |
   | `nfs-server-runtime`    | touching nfs-server runtime code or s6 services; debugging it on a device           |
   | `hd-idle-runtime`       | touching hd-idle runtime code or s6 services; debugging it on a device              |
+  | `hickory-dns-runtime`   | touching hickory-dns runtime code or s6 services; debugging it on a device          |
 
 ## Environment setup
 
