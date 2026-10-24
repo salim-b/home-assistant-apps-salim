@@ -167,16 +167,24 @@ Verified against v0.26.3 source; revisit when a tagged release + the apk carry t
 
 ## Healthcheck
 
-`/usr/bin/hickory-dns-healthcheck` probes with a REAL query (`dns -n 127.0.0.1:53 query localhost A`, hickory-dns-utils'
-client CLI) - socket + catalog + response, authoritative (no upstream dependency: a dead upstream must not mark a
-healthy local DNS server unhealthy). HEALTHCHECK timeout 10s (client query timeout is smaller). The daemon has no HTTP
-endpoint (the apk compiles without metrics features), so there is no watchdog URL - HEALTHCHECK is the only
-container-level wedge signal (repository-root KNOWLEDGE.md §"Supervisor: health events / watchdog"). A configured ACL
-without loopback entries gets them appended by the generator (with a warning) - loopback clients are always served.
-Upstream-benign (v0.26.1 `crates/server/src/zone_handler/catalog.rs`: the negative-response NSEC lookup returns `None`
-for the unsigned default zones; the answer completes NoError/AA regardless): the daemon logs
-`WARN hickory_server::zone_handler::catalog: unexpected lookup skip` per loopback healthcheck query - expected in the
-app log, not a hygiene failure.
+`/usr/bin/hickory-dns-healthcheck` probes with a REAL query (`dns -n 127.0.0.1:53 query localhost SOA`,
+hickory-dns-utils' client CLI) - socket + catalog + response, authoritative (no upstream dependency: a dead upstream
+must not mark a healthy local DNS server unhealthy). HEALTHCHECK timeout 10s (client query timeout is smaller). The
+daemon has no HTTP endpoint (the apk compiles without metrics features), so there is no watchdog URL - HEALTHCHECK is
+the only container-level wedge signal (repository-root KNOWLEDGE.md §"Supervisor: health events / watchdog"). A
+configured ACL without loopback entries gets them appended by the generator (with a warning) - loopback clients are
+always served.
+
+- **The probe queries SOA, not the A record** (device-verified 2026-10-24: A and AAAA positive answers WARN + exit 0;
+  SOA and MX-NODATA stay silent + exit 0; a dead server exits 1): a positive non-SOA answer from the app's unsigned
+  authoritative zones makes the daemon log
+  `WARN hickory_server::zone_handler::catalog: unexpected lookup skip for request` per query - v0.26.1 AND v0.26.3
+  `crates/server/src/zone_handler/catalog.rs` `build_authoritative_response`: the NSEC-proof match's `_ => None` arm
+  (`nx_proof_kind() == None` for unsigned zones, likewise NSEC zones without a wildcard match) is warned as an
+  "unexpected lookup skip", with no `dnssec_ok` gate on that branch. The SOA query takes the `is_soa()` branch instead
+  (NS companion lookup - the zone ships NS records) and the NODATA branch never warns. The WARN remains for OTHER
+  clients' positive answers to authoritative-zone names (localhost, static zones) - benign, not a hygiene failure;
+  forwarded (external-zone) answers never take that path.
 
 ## apk package pins and CA trust
 

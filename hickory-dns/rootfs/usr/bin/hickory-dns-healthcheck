@@ -1,4 +1,6 @@
 #!/bin/bash
 # Docker HEALTHCHECK probe: a real DNS query exercising the daemon end-to-end without upstream dependency
-# (hickory-dns/KNOWLEDGE.md §"Healthcheck").
-exec /usr/bin/dns -n 127.0.0.1:53 query localhost A >/dev/null
+# (hickory-dns/KNOWLEDGE.md §"Healthcheck"). SOA, not A: positive answers from the app's unsigned
+# authoritative zones make the daemon log a catalog WARN per query (§"Healthcheck"); the SOA query is
+# answered from the is_soa() path and stays silent while still returning a real record.
+exec /usr/bin/dns -n 127.0.0.1:53 query localhost SOA >/dev/null

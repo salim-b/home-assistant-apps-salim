@@ -14,6 +14,8 @@
 - DNSSEC validation on by default; bogus answers are rejected.
 - Client ACL (allowed networks): private LAN ranges + loopback by default; an empty list serves everyone; loopback is
   always served so the app's own health probe works.
+- Quiet logs: the health probe queries the zone's SOA record instead of an A record - positive answers from the unsigned
+  local zones make the daemon log a warning per query, the SOA query is answered without one.
 - Static entries: hosts.txt-style hostname-to-IP pairs served as authoritative local zones, winning over public records.
 - Boot-time configuration generation with fail-fast validation: the generated config is parsed and every zone file is
   loaded by the real binary before the daemon starts.

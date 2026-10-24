@@ -180,7 +180,7 @@ live_runtime_check() {
   fi
 
   # --- loopback path (the healthcheck's exact query shape, log-asserted) --------------------------
-  echo "-- loopback serving (healthcheck probes: localhost A via 127.0.0.1)"
+  echo "-- loopback serving (healthcheck probes: localhost SOA via 127.0.0.1)"
   if grep -Eq 'src:udp://127\.0\.0\.1.*response:NoError' <<<"$seg"; then
     echo "   PASS: the healthcheck's loopback queries are served (NoError; ACL + catalog + UDP path)"
   else
