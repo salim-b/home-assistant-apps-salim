@@ -30,61 +30,35 @@ recursive resolvers you configure.
 - **IPv6 networks**: routers advertise DNS servers both via DHCP (IPv4) and via Router Advertisement (RDNSS, IPv6). Make
   sure the IPv6 advertisement points at the HAOS device too (or disable it), otherwise IPv6-capable devices may bypass
   the app with an IPv6 DNS server learned from the router.
-- The app's own health probe queries the server from localhost. Loopback networks (127.0.0.0/8, ::1/128) are therefore
-  always served: if the **Allowed networks** list does not cover them, the generator appends the missing entries at
-  startup (with a warning).
 
 ## Configuration
 
 The option reference (upstream resolvers, allowed networks, DNSSEC, static entries, debug mode) lives in the app's
-settings dialog: [Configuration](/config/app/f8b2d53d_hickory-dns/config).
+settings dialog: [Configuration](/config/app/f8b2d53d_hickory-dns/config) - the per-field descriptions there are
+authoritative.
 
-Each entry in the upstream resolver list is one resolver with its own protocol and address fields:
+For orientation, each entry in the upstream resolver list is one resolver with its own protocol and address fields:
 
 ```yaml
 upstreams:
-  # Quad9 DoT (default): pure IP, pinned TLS name dns.quad9.net
   - protocol: tls
     host: dns.quad9.net
     ip: 9.9.9.9
-  # Cloudflare DoH; no ip - the host is resolved once at app start
   - protocol: https
     host: cloudflare-dns.com
-  # AdGuard DoQ on the protocol-default port
   - protocol: quic
     host: dns.adguard-dns.com
     ip: 94.140.14.14
-  # Google DoT
   - protocol: tls
     host: dns.google
     ip: 8.8.8.8
 ```
 
-Notes:
-
-- The **Host** is the TLS server name the upstream certificate is validated against and is **required** for every
-  protocol - a bare IP address cannot be used without it. The defaults pair Quad9's IPs with the pinned name
-  `dns.quad9.net`, so no name resolution is needed at startup.
-- Leave **IP address** empty to resolve the host once at app start (the result is cached in `/data` as a last-known-good
-  fallback); IP-address upstreams are still recommended - they need no resolution at all.
-- **Port** defaults to 853 for `tls`/`quic` and 443 for `https`. A custom DoH endpoint **Path** (e.g.
-  `/custom/dns-query`) replaces the default `/dns-query`.
-
-## Static entries
-
-Each entry in the static list makes the app answer the hostname locally with the given IPv4/IPv6 address (authoritative
-A/AAAA record; other record types get an authoritative empty answer). This is a hosts-file-style override: the query
-never reaches the upstream resolvers, and the answer wins over any public record - useful for reaching self-hosted
-services by name from every LAN device. Enter fully qualified names (`nas.lan.example.org`, not just `nas`).
-
 ## Security notes
 
-- The app ships a custom AppArmor profile; the daemon runs confined with only the network and file access it needs, and
-  drops privileges to an unprivileged user right after binding port 53.
-- DNSSEC validation is on by default: upstream answers are cryptographically validated against the root trust anchors
-  (embedded in the hickory-dns binary), and bogus answers are rejected.
-- The client ACL (**Allowed networks**) defaults to loopback plus the private LAN ranges; queries from anything else are
-  refused.
+- The daemon runs confined in a custom AppArmor profile and never runs as root: an s6 launcher drops to an unprivileged
+  user before the daemon starts, and the daemon holds only the single capability the port-53 bind requires
+  (`no_new_privs` set).
 
 ## Troubleshooting
 
