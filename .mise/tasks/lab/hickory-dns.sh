@@ -6,9 +6,35 @@
 # see .agents/skills/ha-app-lab-testing.
 
 ## Fixture adaptation: .mise/tasks/lab/hickory-dns.py adds one static entry so the runtime check can
-## probe an authoritative leaf-zone answer (the default options serve none).
+## probe an authoritative leaf-zone answer (the default options serve none). LAB_FIXTURE_ENV (forwarded by
+## the harness to the fake API) selects the upstream-pool variant: `upstreams=https` / `upstreams=quic`
+## replace the default pool with a single hostname-only upstream, so the forwarded probe proves exactly
+## that transport end-to-end through the real daemon (DoT is covered by the default pool; the resolve CLI
+## cannot dial DoH/DoQ directly). Run all three after transport-affecting changes:
+##   LAB_FIXTURE_ENV=upstreams=https mise run lab hickory-dns   # Cloudflare DoH
+##   LAB_FIXTURE_ENV=upstreams=quic mise run lab hickory-dns    # AdGuard DoQ
+## Hostname-only upstreams additionally exercise the boot-time name resolution path (fresh lookup +
+## last-known-good cache) that the default IP-based pool skips.
 
 lab_runtime_check() {
+  ## The fixture variant must have taken effect: a lost docker-cp race would otherwise serve the default
+  ## options and silently test the default pool instead of the selected transport.
+  case "${LAB_FIXTURE_ENV:-}" in
+    *upstreams=https*)
+      grep -q 'type = "https"' "$LAB_TMPDIR/data/named.toml" \
+        || {
+          echo "https variant not in effect (no https upstream in the generated pool)"
+          return 1
+        }
+      ;;
+    *upstreams=quic*)
+      grep -q 'type = "quic"' "$LAB_TMPDIR/data/named.toml" \
+        || {
+          echo "quic variant not in effect (no quic upstream in the generated pool)"
+          return 1
+        }
+      ;;
+  esac
   ## Wait for the daemon to accept queries: the boot-complete oracle fires when s6 marks the longrun
   ## started, a beat before the socket is live.
   local tries=0

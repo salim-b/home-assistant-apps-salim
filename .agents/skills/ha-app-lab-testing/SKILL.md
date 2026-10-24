@@ -28,8 +28,11 @@ apps (skill `ha-app-scaffolding`).
 - define `lab_runtime_check`.
 
 The optional fixture adapter is a separate file `.mise/tasks/lab/<app>.py` defining `lab_adapt_fixture(options)` with
-`LABNETWORK` as the subnet placeholder; the harness serves it to the fake API whenever the file exists. Convention over
-configuration — never place hook files inside the app dir (app-dir contents get copied to devices by `deploy`).
+`LABNETWORK` as the subnet placeholder; the harness serves it to the fake API whenever the file exists. A generic
+`LAB_FIXTURE_ENV` string from the invoking environment is forwarded to the fake-API container; adapters may parse it to
+select fixture variants (hickory-dns uses it for per-protocol upstream pools:
+`LAB_FIXTURE_ENV=upstreams=https mise run lab hickory-dns`). Convention over configuration — never place hook files
+inside the app dir (app-dir contents get copied to devices by `deploy`).
 
 Reference implementations: `.mise/tasks/lab/nfs-server.sh` and `nfs-server.py`.
 

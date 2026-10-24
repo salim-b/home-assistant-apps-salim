@@ -69,7 +69,8 @@ for app in "${apps[@]}"; do
   docker run -d --name "$net-fakesup" --network "$net" \
     -v "$PWD/$app/config.yaml:/src/config.yaml:ro" \
     -e LAB_NETWORK="$subnet" \
-    -e LAB_SPINDOWN_DRIVES="$spindown_drives" "$api_image" sh -c '
+    -e LAB_SPINDOWN_DRIVES="$spindown_drives" \
+    -e LAB_FIXTURE_ENV="${LAB_FIXTURE_ENV:-}" "$api_image" sh -c '
       python3 - <<PYEOF
 import http.server, json, os, yaml
 config = yaml.safe_load(open("/src/config.yaml"))
