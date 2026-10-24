@@ -16,13 +16,9 @@ procedures in the skill `hickory-dns-runtime`.
      the maintainer (msrd0) has been inactive since 2026-06; an "Upgrade Request" issue on the aports tracker is the
      nudge if the MRs stall. **Gate the first app release on a 3.24-stable APKINDEX serving >= 0.26.3** (the Dockerfile
      pin must be bumped in the same app release: pin + config.yaml version + changelog, per the repository-root
-     `KNOWLEDGE.md` apk package version policy).
-
-- **Device verification** (only on explicit user request; the lab has NO AppArmor enforcement, so capability denials are
-  device-only findings - skill `ha-app-lab-testing`): verify the never-root launcher under AppArmor enforcement - the
-  daemon runs as nobody (65534) with exactly the ambient CAP_NET_BIND_SERVICE (the lab asserts those credentials), the
-  launcher's setgid/setuid/setpcap use (setpriv) is not denied, and no error/denial lines appear in the app log.
-  Re-check after the apk bump (`KNOWLEDGE.md` §"Port 53 binding and privileges").
+     `KNOWLEDGE.md` apk package version policy). When the bumped daemon lands on the device, re-run the device
+     verification: `mise run test:live hickory-dns <host> --replace --test-options` (never-root launcher path,
+     device-verified for 0.26.1 on 2026-10-24 - `KNOWLEDGE.md` §"Port 53 binding and privileges").
 
 - **Blocklist support (deferred)**: upstream ground truth and the design sketch: `KNOWLEDGE.md` §"Deferred feature
   ground truth (upstream gaps)". Pursue after the first release.

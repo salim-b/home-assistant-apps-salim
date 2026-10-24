@@ -71,6 +71,7 @@ facts: `hickory-dns/KNOWLEDGE.md` §"Generator regression sandbox"). Recreate pe
 
 ## Device-only verification
 
-The lab has no AppArmor enforcement, so the launcher's capability path (setpriv drop under enforcement) is verified on a
-real device only — current items and procedure: `hickory-dns/TODO.md` (skills `ha-app-lab-testing`,
-`ha-app-device-testing`, `ha-app-apparmor`).
+The launcher's capability path (setpriv drop under enforcement) was device-verified on 2026-10-24 (facts and
+re-verification trigger: `hickory-dns/KNOWLEDGE.md` §"Port 53 binding and privileges"); the live hook is
+`.mise/tasks/test/live/hickory-dns.sh` (contract: skills `ha-app-lab-testing`, `ha-app-device-testing`,
+`ha-app-apparmor`). Re-run it after the apk bump.

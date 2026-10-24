@@ -47,6 +47,10 @@ truth (verified against v0.26.3 AND v0.26.1 source - the dev pin must parse the 
   KSK-2024 tag 38696 - are embedded via `TrustAnchors::default()`, no anchor file needed). Enum VALUES in the generated
   TOML are the Rust variant names verbatim (`ServerOrderingStrategy` has no `rename_all`; the lab's real `--validate`
   rejected a snake_case value that hand-written prose had slipped in).
+- Device-verified DNSSEC behavior (2026-10-24, 0.26.1, AppArmor-enforcing device): fresh DO-flagged queries come back
+  validated - positives with AD + RRSIG, negatives with AD + NSEC/NSEC3 + RRSIG, bogus data (dnssec-failed.org)
+  SERVFAILs. Unsigned zones correctly carry NO AD (e.g. wikipedia.org has no DNSKEY - the live hook's AD check uses
+  `www.ietf.org`).
 - ACL semantics (`crates/server/src/access.rs`, verified): allow-only configuration denies every other client; **empty
   allow AND deny lists = allow all** - the generator emits `allow_networks = []` when the option is cleared (with a
   warning). The ACL is server-wide (no per-zone recursion control). Loopback (127.0.0.0/8, ::1/128) is always served:
@@ -154,8 +158,12 @@ Verified against v0.26.3 source; revisit when a tagged release + the apk carry t
   AppArmor mediates the kernel's capable() LSM hook (repository-root KNOWLEDGE.md §"AppArmor: mediation and profile
   mechanics"). The grants serve the launcher; the daemon exec's holding exactly one capability.
 - The `dns` healthcheck binary runs as root (docker HEALTHCHECK exec) - a plain UDP query, no capabilities.
-- **Device verification** remains the only check for the launcher's capability path under AppArmor enforcement (the lab
-  has none - skill ha-app-lab-testing): hickory-dns/TODO.md.
+- **Device-verified (2026-10-24, HAOS 18.3, app 0.1.0 / daemon 0.26.1)** via `.mise/tasks/test/live/hickory-dns.sh` (log +
+  dev-host client evidence per repository-root `KNOWLEDGE.md` §"Device SSH: sessions run in the Terminal & SSH app"):
+  the launcher's setpriv path ran exactly once per boot (its setgid/setuid/setpcap use is not denied), the daemon logged
+  its dropped uid/gid 65534, the :53 binds serve real queries (UDP + TCP from a LAN client, plus the healthcheck's
+  loopback probes), and neither the app log nor the host journal carries an error/denial/AppArmor line. Re-verify after
+  the apk bump (app `TODO.md`).
 
 ## Healthcheck
 
@@ -165,6 +173,10 @@ healthy local DNS server unhealthy). HEALTHCHECK timeout 10s (client query timeo
 endpoint (the apk compiles without metrics features), so there is no watchdog URL - HEALTHCHECK is the only
 container-level wedge signal (repository-root KNOWLEDGE.md §"Supervisor: health events / watchdog"). A configured ACL
 without loopback entries gets them appended by the generator (with a warning) - loopback clients are always served.
+Upstream-benign (v0.26.1 `crates/server/src/zone_handler/catalog.rs`: the negative-response NSEC lookup returns `None`
+for the unsigned default zones; the answer completes NoError/AA regardless): the daemon logs
+`WARN hickory_server::zone_handler::catalog: unexpected lookup skip` per loopback healthcheck query - expected in the
+app log, not a hygiene failure.
 
 ## apk package pins and CA trust
 
@@ -196,4 +208,4 @@ profile, and documented (blanket-covered) rules for the app's config surface (`/
 privilege-drop lookups (`/etc/passwd`, `/etc/group`), `/etc/resolv.conf` (hostname upstreams), and
 `/etc/ssl/certs/{,**}` (rustls-platform-verifier trust store). No sub-profile: the daemon needs network in the same
 profile. The lab has no AppArmor enforcement - the capability rules (`net_bind_service` for the bind,
-`setgid`/`setuid`/`setpcap` for the drop) are device-verified findings (see hickory-dns/TODO.md).
+`setgid`/`setuid`/`setpcap` for the drop) are device-verified (2026-10-24 - §"Port 53 binding and privileges").
