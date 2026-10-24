@@ -184,7 +184,9 @@ always served.
   "unexpected lookup skip", with no `dnssec_ok` gate on that branch. The SOA query takes the `is_soa()` branch instead
   (NS companion lookup - the zone ships NS records) and the NODATA branch never warns. The WARN remains for OTHER
   clients' positive answers to authoritative-zone names (localhost, static zones) - benign, not a hygiene failure;
-  forwarded (external-zone) answers never take that path.
+  forwarded (external-zone) answers never take that path. Upstream status (verified 2026-10-24): introduced in the
+  0.26.0 cycle (commit e7fed0e, 2025-10-30), present unchanged in 0.26.0/0.26.1/0.26.3 and main (c6b2e6d, 2026-10-22);
+  no duplicate on the tracker - the skip is the normal path (RFC 4035 §3.1.3), so the WARN is spurious.
 
 ## apk package pins and CA trust
 
