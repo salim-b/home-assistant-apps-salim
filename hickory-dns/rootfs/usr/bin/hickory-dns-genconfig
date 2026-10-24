@@ -100,15 +100,21 @@ is_cidr() {
 ## Resolve an upstream hostname to an address: fresh system-resolver lookup first (A, then AAAA; the /data cache
 ## is only a last-known-good fallback, so upstream address changes are picked up automatically). Prints the
 ## address; returns 1 when nothing is found. Uses the shipped `resolve` CLI (hickory-dns-utils) against the
-## system resolver (/etc/resolv.conf -> the supervisor's DNS forwarder).
+## system resolver (/etc/resolv.conf -> the supervisor's DNS forwarder). Each lookup is bounded by `timeout`
+## (the CLI has no timeout of its own) and only a structurally valid address is accepted, fresh or cached.
 resolve_host() {
   local name="${1}" out ip type
   for type in A AAAA; do
-    if out=$(/usr/bin/resolve --system -t "$type" "$name" 2>/dev/null); then
+    ## `timeout` bounds each lookup: the resolve CLI has no timeout of its own, and a wedged system resolver
+    ## would otherwise stall cont-init (and with it the boot) indefinitely. 10s is generous for a healthy
+    ## lookup; a lookup killed at the bound falls through to the next type / the last-known-good cache.
+    if out=$(/usr/bin/timeout 10 /usr/bin/resolve --system -t "$type" "$name" 2>/dev/null); then
       ## Answer lines are "\t<name> <ttl> <class> <type> <rdata>"; pick the first record of the wanted type
       ## (skips CNAME chains) and print its rdata (last field).
       ip=$(printf '%s\n' "$out" | awk -v T="$type" '/ANSWER SECTION/{f=1; next} f && NF>=5 && $(NF-1)==T {print $NF; exit}')
-      if [ "$ip" != "" ]; then
+      ## Only a structurally valid address is accepted: anything else falls through to the cache instead of
+      ## reaching the generated TOML.
+      if [ "$ip" != "" ] && { is_ipv4 "$ip" || is_ipv6 "$ip"; }; then
         printf '%s' "$ip"
         return 0
       fi
@@ -117,7 +123,10 @@ resolve_host() {
   if [ -r "$CACHE" ]; then
     local c_name c_ip
     while read -r c_name c_ip; do
-      if [ "$c_name" = "$name" ]; then
+      ## A cache line is trusted only when its address field parses (is_ipv4/is_ipv6): a truncated or
+      ## corrupted line is skipped - returning it unvalidated would emit `ip = ""` or garbage into the
+      ## generated TOML and fail the --validate gate with a confusing error.
+      if [ "$c_name" = "$name" ] && { is_ipv4 "$c_ip" || is_ipv6 "$c_ip"; }; then
         printf '%s' "$c_ip"
         return 0
       fi

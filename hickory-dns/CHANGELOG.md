@@ -10,6 +10,8 @@
 - Encrypted upstream resolution (DoT, DoH, DoQ - plaintext upstreams are rejected) configured as structured per-resolver
   entries (protocol tls/https/quic, host, IP, port, path), queried in configured order; hostname upstreams are resolved
   once at startup with a last-known-good cache in `/data`.
+- Upstream hostname lookups at startup are time-bounded so a wedged system resolver cannot stall the boot, and the
+  last-known-good cache is only trusted for entries that parse as IP addresses (corrupted cache lines are skipped).
 - DNSSEC validation on by default (root KSKs embedded in the hickory-dns binary; no anchor file).
 - Client ACL (allowed networks, private ranges + loopback by default; empty list = serve everyone; loopback is always
   served so the app's own health probe works).

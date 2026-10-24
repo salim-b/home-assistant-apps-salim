@@ -88,6 +88,23 @@ lines do. Read from `/usr/lib/bashio/{config,jq}.sh` inside the built image (ghc
 the lab surfaced the failure as `jq: parse error: Invalid numeric literal at line 2, column 0` with the generator
 exiting 5.
 
+## Generator regression sandbox
+
+The generator (`rootfs/usr/bin/hickory-dns-genconfig`) is regression-tested offline in a disposable sandbox
+(`/tmp/hickory-test/`, recreated per session - the lab covers the real-image path instead). Two non-obvious mechanics:
+
+- **The copy adaptation is mandatory**: the generator is meant to be sourced under `set -euo pipefail` with absolute
+  `/data` and `/etc` paths; outside the app container those writes hit the dev host's real filesystem
+  (`mkdir: Permission denied`, misleading scenario failures). After copying, rewrite the path variables (`CONFIG`,
+  `CONFIG_NEW`, `ARGS_FILE`, `ZONES_DIR`, `STATIC_DIR`, `CACHE`) to a temp tree and replace `/usr/bin/resolve` and
+  `/usr/bin/hickory-dns` with PATH stubs.
+- **The stubs replicate real bashio semantics**: string-array options as one RAW element per line, object-array options
+  as one compact JSON object per line, both without a trailing newline (§"Option consumption"); the `resolve` stub
+  serves canned ANSWER sections for known names and exits 1 otherwise. Scenarios cover the validation rejections
+  (protocol, host, IP, port, CIDR, path charset), the ACL handling (loopback append, empty list), the resolution paths
+  (fresh lookup, cache fallback, corrupted cache line, lookup timeout), and the default options' full output
+  (named.toml, args file, zone files) diffed byte-for-byte against a snapshot from the last verified revision.
+
 ## Static entries (no hosts-file store upstream)
 
 The server binary has NO hosts-file store (store types: file/in_memory/sqlite/forwarder/recursor/blocklist -
