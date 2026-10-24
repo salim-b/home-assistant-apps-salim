@@ -297,6 +297,11 @@ while IFS= read -r entry; do
     https)
       [ "$path" != "" ] || path="/dns-query"
       [[ "$path" == /* ]] || path="/${path}"
+      ## RFC 3986 pchar plus '/': the apostrophe is fine inside a TOML basic string, but control characters
+      ## would break the generated TOML and a raw space the HTTP request line.
+      path_re="^/[A-Za-z0-9._~!\$&'()*+,;=:@%-]*\$"
+      [[ "$path" =~ $path_re ]] \
+        || bashio::exit.nok "Invalid https path '${path}': only URL path characters are allowed (RFC 3986 pchar and '/'), e.g. /dns-query."
       ;;
     *)
       [ "$path" = "" ] \
