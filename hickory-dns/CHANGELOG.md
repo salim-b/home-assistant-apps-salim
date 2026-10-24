@@ -5,23 +5,19 @@
 ## 0.1.0
 
 - Initial release.
-- DNS server (hickory-dns in forwarding-resolver mode): the app binds DNS port 53 in the host network namespace; the
-  router advertises the HAOS device IP once and all LAN devices resolve through it.
-- Encrypted upstream resolution (DoT, DoH, DoQ - plaintext upstreams are rejected) configured as structured per-resolver
-  entries (protocol tls/https/quic, host, IP, port, path), queried in configured order; hostname upstreams are resolved
-  once at startup with a last-known-good cache in `/data`.
-- Upstream hostname lookups at startup are time-bounded so a wedged system resolver cannot stall the boot, and the
-  last-known-good cache is only trusted for entries that parse as IP addresses (corrupted cache lines are skipped).
-- DNSSEC validation on by default (root KSKs embedded in the hickory-dns binary; no anchor file).
-- Client ACL (allowed networks, private ranges + loopback by default; empty list = serve everyone; loopback is always
-  served so the app's own health probe works).
-- Static entries: hosts.txt-style hostname-to-IP pairs served as authoritative leaf zones, winning over the forwarded
-  public namespace.
-- Boot-time configuration generation with fail-fast validation (`hickory-dns --validate` parses the generated config and
-  loads every zone file before the daemon starts).
-- Custom AppArmor profile (launcher capabilities, network mediation, enumerated file surface); the daemon never runs as
-  root: an s6 launcher drops to `nobody` before the exec and hands down exactly the ambient `CAP_NET_BIND_SERVICE` the
-  port-53 bind needs, with `no_new_privs` set - the daemon never holds a privilege-change capability.
-- hickory-dns apk packages pinned (0.26.1-r0): Alpine-side package updates become explicit app releases, guided by the
-  CI drift check (see the repository-root `KNOWLEDGE.md` apk package version policy). The first release is gated on a
-  3.24-stable APKINDEX serving >= 0.26.3 (hickory-dns/TODO.md).
+- DNS server in forwarding-resolver mode: point the router's DHCP DNS at the Home Assistant device once and all LAN
+  devices resolve through it (DNS port 53 on the host network).
+- Encrypted upstream resolution (DoT, DoH, DoQ - plaintext upstreams are rejected), configured as structured
+  per-resolver entries (protocol, host, IP, port, path) queried in the configured order. Hostname upstreams are resolved
+  once at startup - time-bounded so a slow system resolver cannot stall the boot, with a last-known-good address cache
+  as fallback.
+- DNSSEC validation on by default; bogus answers are rejected.
+- Client ACL (allowed networks): private LAN ranges + loopback by default; an empty list serves everyone; loopback is
+  always served so the app's own health probe works.
+- Static entries: hosts.txt-style hostname-to-IP pairs served as authoritative local zones, winning over public records.
+- Boot-time configuration generation with fail-fast validation: the generated config is parsed and every zone file is
+  loaded by the real binary before the daemon starts.
+- Custom AppArmor profile; the daemon never runs as root - it starts as `nobody` holding only the capability the port-53
+  bind requires.
+- hickory-dns apk packages pinned (0.26.1-r0): Alpine-side package updates become explicit app releases guided by the CI
+  drift check. The first release is gated on a 3.24-stable APKINDEX serving >= 0.26.3.
