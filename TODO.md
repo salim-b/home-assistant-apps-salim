@@ -76,3 +76,7 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   (community preferred, main only as fetch fallback; hardcoded x86_64/aarch64, packages absent from the index are
   silently skipped) while apk-bump.yaml merges main+community (main wins) and derives arches from each app's
   `config.yaml` (facts: root `KNOWLEDGE.md` §"apk package version policy").
+
+- Align the per-app `image:` comment in hd-idle's and nfs-server's `config.yaml` with hickory-dns's one-line pointer
+  style (the CI image-name contract now lives in the repository README §"CI"). `config.yaml` is device-visible, so each
+  alignment needs a version bump + changelog entry — fold into the apps' next natural bumps.

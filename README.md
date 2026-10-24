@@ -21,6 +21,13 @@ server.
 
 Spins down idle USB and SATA hard disk drives automatically.
 
+### [hickory-dns](./hickory-dns)
+
+![Supports aarch64 Architecture][aarch64-shield] ![Supports amd64 Architecture][amd64-shield]
+
+Turn your Home Assistant instance into a secure DNS server with encrypted upstream resolution (DNS-over-TLS/HTTPS/QUIC)
+and DNSSEC validation.
+
 ## Development
 
 The structure of all apps in this repository follows Home Assistant's [best
@@ -28,8 +35,9 @@ practices](https://contributors.home-assistant.io/apps/) as far as possible.
 
 Non-obvious development knowledge lives in [`KNOWLEDGE.md`](./KNOWLEDGE.md) (repository-wide: supervisor behaviors,
 AppArmor, base-image gotchas, testing) and in each app's own `KNOWLEDGE.md` (e.g.
-[`hd-idle/KNOWLEDGE.md`](./hd-idle/KNOWLEDGE.md), [`nfs-server/KNOWLEDGE.md`](./nfs-server/KNOWLEDGE.md)); step-by-step
-procedures live in the skills under [`.agents/skills/`](./.agents/skills) (index in [`AGENTS.md`](./AGENTS.md)).
+[`hd-idle/KNOWLEDGE.md`](./hd-idle/KNOWLEDGE.md), [`nfs-server/KNOWLEDGE.md`](./nfs-server/KNOWLEDGE.md),
+[`hickory-dns/KNOWLEDGE.md`](./hickory-dns/KNOWLEDGE.md)); step-by-step procedures live in the skills under
+[`.agents/skills/`](./.agents/skills) (index in [`AGENTS.md`](./AGENTS.md)).
 
 To test an app on your Home Assistant server (device), use the deploy mise tasks — `mise run <task> --help` has the
 full, current usage (options, flags and what happens to the app's stored options); the examples below cover the common
@@ -74,8 +82,9 @@ mise run test:live nfs-server root@homeassistant.local --test-options
 On every push to `main`, the [Builder](./.github/workflows/builder.yaml) workflow builds each app whose relevant files
 changed and publishes its container images to GHCR via the [Build app](./.github/workflows/build-app.yaml) workflow:
 per-arch images (e.g. `ghcr.io/salim-b/amd64-app-nfs-server`) plus a multi-arch manifest (e.g.
-`ghcr.io/salim-b/app-nfs-server`), tagged with the app's `version` and `latest`. Pull requests only build without
-publishing.
+`ghcr.io/salim-b/app-nfs-server`), tagged with the app's `version` and `latest`. Each app's `image:` key in
+`config.yaml` is the generic manifest name — the Builder derives the per-arch image names (`{arch}-app-<slug>`) from it
+and the app's `arch:` list, so the key needs no per-arch maintenance. Pull requests only build without publishing.
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg
