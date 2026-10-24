@@ -3,30 +3,26 @@
 profile hickory-dns flags=(attach_disconnected,mediate_deleted) {
   #include <abstractions/base>
 
-  ## Modeled on the hd-idle profile and the official dev-docs AppArmor template. Mediation mechanics and
-  ## gotchas: repository-root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics"; app facts:
-  ## hickory-dns/KNOWLEDGE.md.
+  ## Mediation mechanics and gotchas: repository-root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics";
+  ## app facts and the full profile surface: hickory-dns/KNOWLEDGE.md §"AppArmor profile surface".
 
-  # Generic file access, signals (s6 supervision, bash job control). `file,` is the upstream HA convention - the
-  # confinement value sits in the non-file classes (network, capability); repository-root
-  # KNOWLEDGE.md §"AppArmor: mediation and profile mechanics".
+  # Generic file access + signals (s6 supervision, bash job control) - the upstream HA convention; the confinement
+  # value sits in the non-file classes (repository-root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics").
   file,
   signal,
 
-  # The s6 launcher execs the daemon as nobody:nobody with an ambient CAP_NET_BIND_SERVICE for the :53 bind
-  # (never-root, setpriv --reuid/--ambient-caps). Its syscall set needs setgroups/setresgid/setresuid
-  # (setgid+setuid), capset + prctl(ambient raise, no_new_privs) (setpcap), and the daemon's bind needs
-  # net_bind_service. AppArmor mediates the kernel's capable() checks themselves - without these rules the
-  # launcher's drop and the :53 bind fail with EPERM even though the container runs as root: hickory-dns/
-  # KNOWLEDGE.md §"Port 53 binding and privileges". The grants serve the launcher; the daemon exec's as uid 65534
-  # holding exactly one capability and never possesses the privilege-change ones.
+  # The never-root launcher (hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges"): the drop syscalls need
+  # setgid/setuid/setpcap (setpriv: setgroups/setresgid/setresuid, capset + prctl ambient-raise), the daemon's
+  # :53 bind needs net_bind_service - AppArmor mediates the kernel's capable() checks themselves (repository-root
+  # KNOWLEDGE.md §"AppArmor: mediation and profile mechanics"). The grants serve the launcher; the daemon exec's
+  # as uid 65534 holding exactly one capability.
   capability net_bind_service,
   capability setgid,
   capability setuid,
   capability setpcap,
 
-  # DNS traffic both ways: the :53 listeners (tcp/udp, v4/v6) and the encrypted upstream connections
-  # (DoT/DoQ = stream/dgram, DoH = stream over TCP). bashio's supervisor-API HTTP also rides these classes.
+  # DNS both ways (:53 listeners v4/v6, encrypted upstream connections) and bashio's supervisor-API HTTP -
+  # enumerated surface: hickory-dns/KNOWLEDGE.md §"AppArmor profile surface".
   network inet stream,
   network inet dgram,
   network inet6 stream,
@@ -52,15 +48,12 @@ profile hickory-dns flags=(attach_disconnected,mediate_deleted) {
   # AppArmor status reporting (s6 sets this up; harmless otherwise)
   /sys/kernel/security/apparmor/** r,
 
-  # App config surface: shipped default zone files (read), generated static zone files + service args
-  # (written by the cont-init generator, read by the daemon). Not load-bearing under the `file,` blanket;
-  # documents what the scripts read and write.
+  # App config surface (generated named.toml + zones + service args; hickory-dns/KNOWLEDGE.md §"Config-file and
+  # data layout"). Blanket-covered; documents what the scripts read and write.
   /etc/hickory-dns/{,**} rw,
 
-  # The system resolver config (hickory-dns-genconfig resolves hostname upstreams via `resolve --system`) and the
-  # identity lookups the binary's own no-op-under-never-root privilege drop would use (check_drop_privs
-  # getpwnam/getgrnam). Blanket-covered; enumerated as documentation. The daemon runs as nobody from the start and
-  # parses every zone file under that identity (world-readable, generator-written), writing nothing to disk.
+  # Hostname-upstream resolution (resolve --system) and the identity lookups (hickory-dns/KNOWLEDGE.md §"Port 53
+  # binding and privileges"). Blanket-covered; enumerated as documentation.
   /etc/passwd r,
   /etc/group r,
   /etc/resolv.conf r,

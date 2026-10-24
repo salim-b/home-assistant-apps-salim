@@ -3,7 +3,7 @@ name: hickory-dns
 version: "0.1.0"
 slug: hickory-dns
 description: DNS server resolving via encrypted upstream DNS (DoT/DoH/DoQ) with DNSSEC validation
-# Generic image name; CI publishes per-arch images and a multi-arch manifest under this name on pushes to main.
+# Generic multi-arch manifest name; per-arch image names are derived by CI - repository README §"CI".
 image: "ghcr.io/salim-b/app-hickory-dns"
 url: "https://github.com/salim-b/home-assistant-apps-salim/tree/main/hickory-dns"
 panel_icon: mdi:dns
@@ -12,20 +12,13 @@ arch:
   - amd64
 startup: services
 init: false
-# The daemon binds DNS port 53 in the HOST network namespace (the HAOS host itself binds nothing on 53:
-# systemd-resolved runs with DNSStubListener=no in the operating-system rootfs) - the AdGuard Home/Pi-hole app
-# precedent. The router advertises the HAOS device IP as the LAN DNS once, and every LAN device's outbound DNS
-# flows through this app. Source IPs stay intact for the allow_networks ACL (no DNAT/conntrack as with port
-# publishing); the s6 launcher execs the daemon as nobody with an ambient CAP_NET_BIND_SERVICE
-# (hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges").
+# Binds DNS port 53 in the HOST network namespace (host_network: true): LAN clients talk to the host's :53
+# directly, keeping their source IPs intact for the allow_networks ACL. Rationale (privileges, precedent):
+# hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges".
 host_network: true
 options:
-  # Upstream recursive resolvers, queried in the given order (hickory-dns/DOCS.md). Per entry: protocol
-  # (tls|quic|https - DNS-over-TLS/QUIC/HTTPS; plaintext upstreams are not supported), host (the TLS
-  # server name; also the resolution source when ip is empty), ip (the connect target; empty = the host
-  # is resolved once at app start with a last-known-good cache in /data), port (default 853 tls/quic,
-  # 443 https) and path (https only, default /dns-query). Defaults are Quad9's anycast resolvers by IP
-  # with pinned TLS names - pure IPs, so no boot-time name resolution is needed.
+  # Structured upstream resolvers, queried in the given order - field semantics, defaults and resolution:
+  # hickory-dns/KNOWLEDGE.md §"Upstream option model". Defaults are Quad9 anycast IPs with a pinned TLS name.
   upstreams:
     - protocol: tls
       host: dns.quad9.net
@@ -33,9 +26,8 @@ options:
     - protocol: tls
       host: dns.quad9.net
       ip: 149.112.112.112
-  # Client ACL: CIDRs whose queries are served (everything else is refused); loopback (127.0.0.0/8, ::1/128) is
-  # always served so the app's own healthcheck works - missing entries are appended at startup. Clearing the
-  # list allows all clients (hickory-dns/KNOWLEDGE.md §"Generated named.toml").
+  # Client ACL: CIDRs whose queries are served, everything else refused - semantics incl. the loopback handling:
+  # hickory-dns/KNOWLEDGE.md §"Generated named.toml".
   allow_networks:
     - "127.0.0.0/8"
     - "10.0.0.0/8"
@@ -44,8 +36,7 @@ options:
     - "::1/128"
     - "fe80::/10"
     - "fd00::/8"
-  # DNSSEC validation of upstream answers; the root KSKs are embedded in the hickory-dns binary
-  # (TrustAnchors::default(), KSK-2017 tag 20326 + KSK-2024 tag 38696) - no anchor file to ship.
+  # Root KSKs are embedded in the binary (no anchor file) - hickory-dns/KNOWLEDGE.md §"Generated named.toml".
   dnssec: true
   # Static hostname -> IP answers served locally (hosts.txt-style), never forwarded upstream.
   static_entries: []

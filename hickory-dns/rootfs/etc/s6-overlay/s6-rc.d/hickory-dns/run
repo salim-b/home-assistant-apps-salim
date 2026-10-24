@@ -2,17 +2,13 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-## hickory-dns daemon (longrun service). Reads the generated command line (/etc/hickory-dns.args; written by
-## cont-init config.sh via hickory-dns-genconfig, see hickory-dns/KNOWLEDGE.md). `exec` makes the daemon this
-## service's process: s6 signals it directly on stop, and its stdout lands in the app log.
+## hickory-dns daemon (longrun service): runs the command line cont-init generated (/etc/hickory-dns.args, see
+## hickory-dns/KNOWLEDGE.md §"Config-file and data layout"). `exec` makes the daemon this service's process, so
+## s6 signals it directly on stop and its stdout lands in the app log.
 ##
-## The daemon NEVER runs as root: this launcher drops to nobody:nobody (65534/65534) BEFORE the exec and hands
-## CAP_NET_BIND_SERVICE down as an ambient capability for the :53 bind. Ambient capabilities are runtime prctl
-## state (kernel >= 4.3), not exec-acquired, so they survive no_new_privs - which this launcher also sets, so the
-## daemon cannot gain privileges via execve at all. hickory-dns's own post-bind drop (bin/src/lib.rs
-## check_drop_privs) is a no-op when not running as root ("if uid == 0 || euid == 0", v0.26.1): the daemon's
-## credential set never includes a privilege-change capability - hickory-dns/KNOWLEDGE.md §"Port 53 binding and
-## privileges". /bin/setpriv is util-linux setpriv (the busybox applet has no --reuid; the apk replaces it).
+## The daemon NEVER runs as root: the launcher drops to nobody (65534) before the exec, handing down exactly the
+## ambient CAP_NET_BIND_SERVICE the :53 bind needs - mechanics and why: hickory-dns/KNOWLEDGE.md §"Port 53
+## binding and privileges" (the busybox setpriv applet has no --reuid; /bin/setpriv is the util-linux package).
 ##
 ## Fail with a clear message (s6 restarts this service) instead of bash's raw redirect error if config.sh did
 ## not finish.

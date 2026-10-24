@@ -2,15 +2,9 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-## Generate the hickory-dns configuration from the app options. Writes:
-##   /data/named.toml                      the daemon's configuration (persistent, user-inspectable)
-##   /etc/hickory-dns/zones/static/*.zone  one leaf zone file per static entry (regenerated every boot)
-##   /etc/hickory-dns.args                 the s6 service's command line
-##   /data/hickory-dns.upstreams.cache     last-known-good hostname->ip resolutions (boot-time fallback)
-## The generated config is validated with the real binary (--validate parses the config AND loads every zone
-## file) before it replaces the previous one. Config shape and upstream ground truth:
-## hickory-dns/KNOWLEDGE.md §"Generated named.toml". Options are user data: every value is re-validated here
-## regardless of the option schema (hand-edited options.json defense in depth,
+## Generate the hickory-dns configuration from the app options (outputs and the --validate gate:
+## hickory-dns/KNOWLEDGE.md §"Config-file and data layout"; config shape: §"Generated named.toml").
+## Options are user data: every value is re-validated here regardless of the option schema (defense in depth,
 ## hd-idle/KNOWLEDGE.md §"bashio option parsing (list-of-object options)").
 
 CONFIG=/data/named.toml
@@ -36,9 +30,7 @@ DEFAULT_ZONE_FILES="localhost=default/localhost.zone
 255.in-addr.arpa=default/255.zone
 0.in-addr.arpa=default/0.zone"
 
-## Fixed forward-store options. EDNS 1232 avoids UDP fragmentation trouble on tunneled paths; the cache holds
-## full responses; UserProvidedOrder makes the upstreams option's order the failover priority. TTL caps keep
-## stale answers bounded without hammering the upstreams. hickory-dns/KNOWLEDGE.md §"Generated named.toml".
+## Fixed forward-store options - per-option rationale: hickory-dns/KNOWLEDGE.md §"Generated named.toml".
 OPTIONS_BLOCK='timeout = 5
 attempts = 2
 num_concurrent_reqs = 1
@@ -97,17 +89,12 @@ is_cidr() {
 ## Upstream hostname resolution
 ## ---------------------------------------------------------------------------
 
-## Resolve an upstream hostname to an address: fresh system-resolver lookup first (A, then AAAA; the /data cache
-## is only a last-known-good fallback, so upstream address changes are picked up automatically). Prints the
-## address; returns 1 when nothing is found. Uses the shipped `resolve` CLI (hickory-dns-utils) against the
-## system resolver (/etc/resolv.conf -> the supervisor's DNS forwarder). Each lookup is bounded by `timeout`
-## (the CLI has no timeout of its own) and only a structurally valid address is accepted, fresh or cached.
+## Resolve an upstream hostname to an address (mechanics: hickory-dns/KNOWLEDGE.md §"Upstream option model").
+## Prints the address; returns 1 when nothing is found.
 resolve_host() {
   local name="${1}" out ip type
   for type in A AAAA; do
-    ## `timeout` bounds each lookup: the resolve CLI has no timeout of its own, and a wedged system resolver
-    ## would otherwise stall cont-init (and with it the boot) indefinitely. 10s is generous for a healthy
-    ## lookup; a lookup killed at the bound falls through to the next type / the last-known-good cache.
+    ## Bounded lookup: the CLI has no timeout of its own - a wedged system resolver must not stall the boot.
     if out=$(/usr/bin/timeout 10 /usr/bin/resolve --system -t "$type" "$name" 2>/dev/null); then
       ## Answer lines are "\t<name> <ttl> <class> <type> <rdata>"; pick the first record of the wanted type
       ## (skips CNAME chains) and print its rdata (last field).
@@ -123,9 +110,8 @@ resolve_host() {
   if [ -r "$CACHE" ]; then
     local c_name c_ip
     while read -r c_name c_ip; do
-      ## A cache line is trusted only when its address field parses (is_ipv4/is_ipv6): a truncated or
-      ## corrupted line is skipped - returning it unvalidated would emit `ip = ""` or garbage into the
-      ## generated TOML and fail the --validate gate with a confusing error.
+      ## Trust a cache line only when its address field parses - garbage would fail the --validate gate with a
+      ## confusing error.
       if [ "$c_name" = "$name" ] && { is_ipv4 "$c_ip" || is_ipv6 "$c_ip"; }; then
         printf '%s' "$c_ip"
         return 0
@@ -155,26 +141,21 @@ bashio::log.info "Generating the hickory-dns configuration..."
 mkdir -p "$STATIC_DIR"
 rm -f "$STATIC_DIR"/*.zone
 
-## All top-level keys MUST precede the first [[zones]] header (bare keys after one would land inside it), and
-## every [[zones]] header must precede the forward zone's stores sub-tables (dotted sub-table headers implicitly
-## define their parents - emitting [[zones.stores.name_servers]] before the [[zones]] headers would make zones a
-## table that cannot be redefined as an array afterwards). Assembly order: top-level keys, default zones, static
-## zones, forward zone header, name_servers blocks, options table.
+## TOML ordering rule (hickory-dns/KNOWLEDGE.md §"Generated named.toml"): top-level keys first, then the zone
+## headers, then the forward zone's stores sub-tables - the assembly below mirrors that order.
 CONFIG_BODY="listen_addrs_ipv4 = [\"0.0.0.0\"]
 listen_addrs_ipv6 = [\"::0\"]
 listen_port = 53
 directory = \"${ZONES_DIR}\"
 "
 
-## Client ACL. Empty list = allow every client (verified upstream semantics). Loopback is always served: the app's
-## own healthcheck probe (UDP from 127.0.0.1) is a client like any other, so a configured ACL that does not cover
-## it would mark the app unhealthy while it serves - missing loopback entries are appended (with a warning).
+## Client ACL - semantics (empty list = serve everyone, loopback append for the healthcheck):
+## hickory-dns/KNOWLEDGE.md §"Generated named.toml".
 NETS=""
 V4_LOOPBACK=0
 V6_LOOPBACK=0
-## bashio::config emits string-array options as one RAW (unquoted) element per line with NO trailing newline -
-## feed the captured value through `echo` so `read` sees the last element, and never jq the raw line
-## (hickory-dns/KNOWLEDGE.md §"Option consumption").
+## bashio option-consumption idioms (raw lines, no trailing newline): hickory-dns/KNOWLEDGE.md §"Option
+## consumption".
 NETS_RAW=$(bashio::config 'allow_networks')
 while IFS= read -r cidr; do
   [ "$cidr" != "" ] || continue
@@ -214,9 +195,8 @@ file = $(toml_str "$file")
 "
 done <<<"$DEFAULT_ZONE_FILES"
 
-## Static entries -> one authoritative leaf zone each (SOA + NS + A/AAAA at the apex). The catalog answers the
-## most specific zone first, so these win over the '.' forward zone. There is no hosts-file store upstream
-## (hickory-dns/KNOWLEDGE.md §"Generated named.toml").
+## Static entries -> one authoritative leaf zone each; semantics and why (no hosts-file store upstream):
+## hickory-dns/KNOWLEDGE.md §"Static entries (no hosts-file store upstream)".
 declare -A SEEN_ZONES=()
 N_STATIC=0
 ## Object-array options differ: each line is a compact JSON object, so per-line jq IS correct here.
@@ -269,13 +249,9 @@ if [ "$N_STATIC" -gt 0 ]; then
   bashio::log.info "Serving ${N_STATIC} static entries as local authoritative zones"
 fi
 
-## Upstream resolvers -> one name_servers block each, in option order (UserProvidedOrder makes the order the
-## priority). The protocol option values are the serde ProtocolConfig type values verbatim (tls/https/quic;
-## hickory-dns/KNOWLEDGE.md §"Upstream option model" - plaintext upstreams are not supported). host is the TLS
-## server name and the resolution source when ip is empty; ip is the CONNECT TARGET (never DNS-resolved by
-## the daemon itself). Hostname upstreams are resolved once at generation time; their last-known-good address
-## is cached. The blocks are accumulated and emitted after the forward zone's [[zones]] header below (TOML
-## table order).
+## Upstream resolvers -> one name_servers block each, in option order (the order is the failover priority);
+## field semantics, validation and resolution: hickory-dns/KNOWLEDGE.md §"Upstream option model". The blocks
+## are accumulated and emitted after the forward zone's [[zones]] header below (TOML table order).
 N_UPSTREAMS=0
 NS_TOML=""
 UPSTREAMS_RAW=$(bashio::config 'upstreams')
@@ -324,8 +300,7 @@ while IFS= read -r entry; do
       ;;
   esac
 
-  ## host is the TLS server name - mandatory for every supported protocol (no serde default, and with a
-  ## bare ip there is nothing to derive it from).
+  ## host is the TLS server name, mandatory for every supported protocol (hickory-dns/KNOWLEDGE.md §"Upstream option model").
   [ "$host" != "" ] \
     || bashio::exit.nok "Upstream '${entry}': needs a host (the TLS server name the upstream certificate is validated against, e.g. dns.quad9.net)."
   host="${host,,}"
@@ -333,9 +308,8 @@ while IFS= read -r entry; do
   is_hostname "$host" \
     || bashio::exit.nok "Invalid upstream host '${host}': not a DNS name."
 
-  ## ip is the connect target; empty = resolve host once at generation time (fresh-first, then the
-  ## last-known-good cache) so upstream address changes are picked up on restart. host is guaranteed
-  ## non-empty here (required above).
+  ## ip is the connect target; empty = resolve the host here (fresh-first, then the cache). host is
+  ## guaranteed non-empty (required above).
   if ! is_ipv4 "$ip" && ! is_ipv6 "$ip"; then
     [ "$ip" = "" ] \
       || bashio::exit.nok "Upstream '${entry}': '${ip}' is neither an IPv4 nor an IPv6 address."
