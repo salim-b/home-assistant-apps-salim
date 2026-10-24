@@ -1,12 +1,12 @@
 # TODOs
 
-Open work items only (resolved items live in git history). Underlying technical facts live in `KNOWLEDGE.md`.
+Open work items only (resolved items live in git history). Underlying technical facts live in `KNOWLEDGE.md`, runtime
+procedures in the skill `hickory-dns-runtime`.
 
 ## Tasks
 
 - **Alpine aports bump MRs (blocking the first release)**: `community/hickory-dns` is at 0.26.1-r0 on 3.24-stable and
-  master (identical), missing v0.26.2 which fixed ~38 GHSA advisories (DNSSEC validation bypasses, DoS amplification,
-  UDP spoofing) plus v0.26.3 regressions fixes. Submit both:
+  master (identical) - facts: `KNOWLEDGE.md` §"apk package pins and CA trust". Submit both:
   1. master: fork gitlab.alpinelinux.org/alpine/aports, branch, bump `pkgver=0.26.3` with `pkgrel=0` (pkgrel resets on
      pkgver bumps; NO DCO sign-off needed), update sha512sums, run `apkbuild-lint` + `abuild -r` (the build needs
      `cargo cargo-auditable clang-dev cmake samurai`; consider a docker-based abuild), commit
@@ -19,27 +19,18 @@ Open work items only (resolved items live in git history). Underlying technical 
      `KNOWLEDGE.md` apk package version policy).
 
 - **Device verification** (only on explicit user request; the lab has NO AppArmor enforcement, so capability denials are
-  device-only findings): verify the never-root launcher under AppArmor enforcement - the daemon runs as nobody (65534)
-  with exactly the ambient CAP_NET_BIND_SERVICE (the lab asserts those credentials), the launcher's
-  setgid/setuid/setpcap use (setpriv) is not denied, and no error/denial lines appear in the app log. Re-check after the
-  apk bump (hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges").
+  device-only findings - skill `ha-app-lab-testing`): verify the never-root launcher under AppArmor enforcement - the
+  daemon runs as nobody (65534) with exactly the ambient CAP_NET_BIND_SERVICE (the lab asserts those credentials), the
+  launcher's setgid/setuid/setpcap use (setpriv) is not denied, and no error/denial lines appear in the app log.
+  Re-check after the apk bump (`KNOWLEDGE.md` §"Port 53 binding and privileges").
 
-- **Blocklist support (deferred)**: upstream has a `blocklist` store (compiled into the apk: the `_cargo_opts_bin`
-  feature list includes `blocklist`). Design: download list URLs in cont-init into `/data` (curl), chain a
-  `[[zones.stores]] type = "blocklist"` ahead of the forward store. Ground truth at v0.26.3: plain domain lists and
-  `0.0.0.0 <domain>` hosts lines only (no other hosts-file flavors), local files read once at startup with NO hot reload
-  (upstream issue #3460 - restart the app to refresh), non-address query types sink to a forged sinkhole A/AAAA
-  (sinkhole_ipv4 defaults 0.0.0.0), and absolute file paths are allowed since 0.26.2 (PR #3864).
+- **Blocklist support (deferred)**: upstream ground truth and the design sketch: `KNOWLEDGE.md` §"Deferred feature
+  ground truth (upstream gaps)". Pursue after the first release.
 
-- **DoH3 upstreams (deferred)**: the bin `h3-aws-lc-rs`/`h3-ring` features are merged upstream (PRs #3993/#3994,
-  2026-09-25) but NOT in any tagged release, so no apk can ship them yet. The generator already rejects `protocol = h3`
-  with a pointed error; revisit when a tagged release + the apk carry the bin h3 features (the H3 protocol table also
-  needs `path`, like https - `crates/resolver/src/config.rs` `ProtocolConfig::H3`).
+- **DoH3 upstreams (deferred)**: blocked on a tagged upstream release plus the apk carrying the bin h3 features
+  (`KNOWLEDGE.md` §"Deferred feature ground truth (upstream gaps)"). The generator already rejects `protocol = h3` with
+  a pointed error - revisit when that unblocks.
 
-- **SPKI pinning for configured upstreams**: ground truth at v0.26.3 - there is NO config surface for it. Upstream
-  connection config is `ip` + protocol tables (`server_name`/`path` only, `deny_unknown_fields`,
-  `crates/resolver/src/config.rs` `ProtocolConfig`), TLS verification is fixed to rustls-platform-verifier /
-  webpki-roots (`crates/net/src/tls.rs` `client_config()`), and the only SPKI-adjacent code is TLSA record parsing
-  (`crates/proto/src/rr/rdata/tlsa.rs`), not wired into upstream validation. This is a genuine gap for the app's threat
-  model (a mis-issued CA could impersonate `dns.quad9.net`). Track/file an upstream feature request; revisit when a
-  tagged release grows a pinning knob (not patchable into the apk binary). If/when one exists, expose an app option.
+- **SPKI pinning for configured upstreams (deferred)**: no upstream config surface exists (`KNOWLEDGE.md` §"Deferred
+  feature ground truth (upstream gaps)"). File the upstream feature request; revisit when a tagged release grows a
+  pinning knob, then expose an app option.
