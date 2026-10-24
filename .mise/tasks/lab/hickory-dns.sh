@@ -21,6 +21,31 @@ lab_runtime_check() {
     sleep 1
   done
 
+  ## Never-root credentials: the daemon must run as nobody (65534) holding exactly one capability - the ambient
+  ## CAP_NET_BIND_SERVICE (bit 10 = 0x400). Regresses if the launcher ever runs the daemon as root again or the
+  ## ambient hand-off breaks (a root daemon would show Uid 0 and the full default capability set).
+  local pid creds
+  pid=$(docker exec "$LAB_NET_NAME-app" pidof hickory-dns) || {
+    echo "hickory-dns pid not found in the app container"
+    return 1
+  }
+  creds=$(docker exec "$LAB_NET_NAME-app" grep -E '^(Uid|CapEff|CapAmb):' "/proc/$pid/status")
+  grep -q '^Uid:[[:space:]]*65534[[:space:]]*65534[[:space:]]*65534[[:space:]]*65534$' <<<"$creds" \
+    || {
+      echo "daemon does not run as nobody (65534): $creds"
+      return 1
+    }
+  grep -q '^CapEff:[[:space:]]*0000000000000400$' <<<"$creds" \
+    || {
+      echo "CapEff is not exactly the ambient CAP_NET_BIND_SERVICE: $creds"
+      return 1
+    }
+  grep -q '^CapAmb:[[:space:]]*0000000000000400$' <<<"$creds" \
+    || {
+      echo "CAP_NET_BIND_SERVICE is not in the ambient set: $creds"
+      return 1
+    }
+
   ## Shipped authoritative zone: end-to-end socket + catalog + response, no upstream dependency.
   local out
   out=$(docker exec "$LAB_NET_NAME-app" /usr/bin/dns -n 127.0.0.1:53 query localhost A) \

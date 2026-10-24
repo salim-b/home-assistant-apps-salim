@@ -103,21 +103,32 @@ is validated by the `--validate` boot gate (zone loading happens in `DnsServer::
 
 ## Port 53 binding and privileges
 
-- **CAP_NET_BIND_SERVICE is needed in the AppArmor profile even though the container runs as root**: the :53 bind
-  triggers `ns_capable(CAP_NET_BIND_SERVICE)`, and AppArmor mediates the kernel's capable() LSM hook itself (the hd-idle
-  `sys_rawio` precedent). No `privileged:` entry is needed - HA app containers run as root with the default capability
-  set.
-- **Privilege drop**: `bin/src/lib.rs` `check_drop_privs` - post-bind (doc: "must be called after binding to low
-  numbered sockets is complete"), syscalls getuid/getgid/geteuid/getegid + getpwnam/getgrnam (reads /etc/passwd,
-  /etc/group) + setgid + setuid. NO setgroups, NO prctl/capset - so no `setpcap`-style AppArmor rule can ever be needed.
-  The profile grants `capability setgid,` + `capability setuid,` for the drop.
-- v0.26.1 calls `check_drop_privs` UNCONDITIONALLY (no config key); v0.26.2 added the `drop_privileges` option (default
-  true, "Set to false in container/namespace environments where /etc/passwd is not available"). This app does NOT emit
-  the key: the drop to `nobody:nobody` (Alpine baselayout has the user/group) is harmless here - every zone file is
-  parsed BEFORE the drop, the daemon writes nothing to disk (cache in memory, logs to stdout), and SETUID/SETGID are not
-  on the supervisor's high-risk capability list (repository-root KNOWLEDGE.md §"Supervisor: app security rating"). Not
-  emitting the key also keeps the generated config parseable by the 0.26.1 dev pin (deny_unknown_fields).
+- **Host network + port 53**: the daemon binds DNS port 53 in the HOST network namespace (`host_network: true` - the
+  AdGuard Home/Pi-hole precedent). The HAOS host itself binds nothing on 53 (systemd-resolved runs with
+  DNSStubListener=no). No `privileged:` entry is needed: the launcher's capabilities come from the Docker default set,
+  none is on the supervisor's high-risk rating list, and none is in `REDUCED_CAPABILITIES_DROP` (repository-root
+  KNOWLEDGE.md §"Supervisor: app security rating").
+- **Never-root launcher**: the s6 run script execs the daemon as `nobody:nobody` (65534/65534, Alpine baselayout) via
+  util-linux `setpriv` (`/bin/setpriv`, apk `setpriv` - floats per the apk policy; the busybox applet has no `--reuid`
+  and is replaced by the package):
+  `--no-new-privs --reuid 65534 --regid 65534 --clear-groups --inh-caps=+net_bind_service --ambient-caps=+net_bind_service`.
+  The daemon's credential set is exactly ONE capability - ambient `CAP_NET_BIND_SERVICE` for the :53 bind -
+  lab-verified: `Uid`/`Gid` all 65534, `CapEff`/ `CapPrm`/`CapAmb` = `0000000000000400`, and the bind works even with
+  `NoNewPrivs: 1`. Ambient capabilities are runtime prctl state (kernel >= 4.3), not exec-acquired, so they survive
+  `no_new_privs`, which the launcher also sets. The daemon never runs as root and never holds a privilege-change
+  capability - unlike a post-bind self-drop, which requires the daemon to run as root and to possess setuid/setgid
+  during its lifetime.
+- **The binary's own privilege drop is a no-op here**: `bin/src/lib.rs` `check_drop_privs` (v0.26.1, verified source)
+  looks up `user`/`group` from the config (defaults `nobody`/`nobody`) via getpwnam/getgrnam and drops via bare setgid +
+  setuid - but ONLY `if uid == 0 || euid == 0`. Running as 65534 it just logs the ids. NO setgroups, NO prctl/capset in
+  the binary.
+- **AppArmor grants** (`apparmor.txt`): `net_bind_service` (the :53 bind's ns_capable), `setgid`/`setuid` (setpriv's
+  setgroups/setresgid/setresuid), `setpcap` (capset raising the inheritable set, prctl ambient-raise/no_new_privs).
+  AppArmor mediates the kernel's capable() LSM hook (repository-root KNOWLEDGE.md §"AppArmor: mediation and profile
+  mechanics"). The grants serve the launcher; the daemon exec's holding exactly one capability.
 - The `dns` healthcheck binary runs as root (docker HEALTHCHECK exec) - a plain UDP query, no capabilities.
+- **Device verification** remains the only check for the launcher's capability path under AppArmor enforcement (the lab
+  has none - skill ha-app-lab-testing): hickory-dns/TODO.md.
 
 ## Healthcheck
 

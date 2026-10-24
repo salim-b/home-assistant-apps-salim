@@ -18,7 +18,8 @@ Turn your Home Assistant instance into a secure DNS server that resolves via enc
   services by name from every LAN device without touching public DNS.
 - **Client ACL**: Only queries from the configured networks are served (private ranges + loopback by default).
 - **Hardened runtime**: Ships a custom [AppArmor](https://apparmor.net/) profile that restricts capabilities to what the
-  server needs. Initially required privileges are dropped right after the port-53 bind.
+  launcher needs, and the daemon never runs as root: it starts as `nobody` with exactly the ambient capability the
+  port-53 bind requires (`no_new_privs` set).
 
 ## Limitations
 

@@ -4,10 +4,16 @@ set -euo pipefail
 
 ## hickory-dns daemon (longrun service). Reads the generated command line (/etc/hickory-dns.args; written by
 ## cont-init config.sh via hickory-dns-genconfig, see hickory-dns/KNOWLEDGE.md). `exec` makes the daemon this
-## service's process: s6 signals it directly on stop, and its stdout lands in the app log. After binding port 53
-## the binary drops privileges to nobody:nobody unconditionally on 0.26.1 and by default (drop_privileges=true)
-## on 0.26.2+ (bin/src/lib.rs check_drop_privs - post-bind, see hickory-dns/KNOWLEDGE.md §"Port 53 binding and
-## privileges"); the AppArmor profile grants the setuid/setgid capabilities for it.
+## service's process: s6 signals it directly on stop, and its stdout lands in the app log.
+##
+## The daemon NEVER runs as root: this launcher drops to nobody:nobody (65534/65534) BEFORE the exec and hands
+## CAP_NET_BIND_SERVICE down as an ambient capability for the :53 bind. Ambient capabilities are runtime prctl
+## state (kernel >= 4.3), not exec-acquired, so they survive no_new_privs - which this launcher also sets, so the
+## daemon cannot gain privileges via execve at all. hickory-dns's own post-bind drop (bin/src/lib.rs
+## check_drop_privs) is a no-op when not running as root ("if uid == 0 || euid == 0", v0.26.1): the daemon's
+## credential set never includes a privilege-change capability - hickory-dns/KNOWLEDGE.md §"Port 53 binding and
+## privileges". /bin/setpriv is util-linux setpriv (the busybox applet has no --reuid; the apk replaces it).
+##
 ## Fail with a clear message (s6 restarts this service) instead of bash's raw redirect error if config.sh did
 ## not finish.
 if [ ! -r /etc/hickory-dns.args ]; then
@@ -15,5 +21,9 @@ if [ ! -r /etc/hickory-dns.args ]; then
   exit 1
 fi
 read -r -a HICKORY_ARGS </etc/hickory-dns.args
-bashio::log.info "Starting hickory-dns: /usr/bin/hickory-dns ${HICKORY_ARGS[*]}"
-exec /usr/bin/hickory-dns "${HICKORY_ARGS[@]}"
+bashio::log.info "Starting hickory-dns as nobody (65534) with ambient CAP_NET_BIND_SERVICE: /usr/bin/hickory-dns ${HICKORY_ARGS[*]}"
+exec /bin/setpriv \
+  --no-new-privs \
+  --reuid 65534 --regid 65534 --clear-groups \
+  --inh-caps=+net_bind_service --ambient-caps=+net_bind_service \
+  /usr/bin/hickory-dns "${HICKORY_ARGS[@]}"

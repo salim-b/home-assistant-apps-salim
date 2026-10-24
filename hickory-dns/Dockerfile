@@ -6,11 +6,14 @@ FROM ${BUILD_FROM}
 # guided by the CI drift check. Development pin 0.26.1-r0 (current on 3.24-stable; identical config plumbing) -
 # hickory-dns/TODO.md gates the first release on a 3.24-stable APKINDEX serving >= 0.26.3 (v0.26.2 fixed ~38 GHSA
 # advisories). ca-certificates-bundle: system trust store read by hickory-dns's rustls-platform-verifier when
-# connecting to DoT/DoH/DoQ upstreams (certificate data package, floating).
+# connecting to DoT/DoH/DoQ upstreams (certificate data package, floating). setpriv (util-linux): the s6
+# launcher drops to nobody before the daemon exec - the busybox setpriv applet has no --reuid and is replaced
+# by the package (generic tool, floats).
 RUN apk add --no-cache \
     hickory-dns=0.26.1-r0 \
     hickory-dns-utils=0.26.1-r0 \
-    ca-certificates-bundle
+    ca-certificates-bundle \
+    setpriv
 
 COPY --link rootfs /
 

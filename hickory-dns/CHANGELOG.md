@@ -16,8 +16,9 @@
   public namespace.
 - Boot-time configuration generation with fail-fast validation (`hickory-dns --validate` parses the generated config and
   loads every zone file before the daemon starts).
-- Custom AppArmor profile (port-53 bind + privilege-drop capabilities, network mediation, enumerated file surface);
-  daemon drops privileges to `nobody` right after binding port 53.
+- Custom AppArmor profile (launcher capabilities, network mediation, enumerated file surface); the daemon never runs as
+  root: an s6 launcher drops to `nobody` before the exec and hands down exactly the ambient `CAP_NET_BIND_SERVICE` the
+  port-53 bind needs, with `no_new_privs` set - the daemon never holds a privilege-change capability.
 - hickory-dns apk packages pinned (0.26.1-r0): Alpine-side package updates become explicit app releases, guided by the
   CI drift check (see the repository-root `KNOWLEDGE.md` apk package version policy). The first release is gated on a
   3.24-stable APKINDEX serving >= 0.26.3 (hickory-dns/TODO.md).

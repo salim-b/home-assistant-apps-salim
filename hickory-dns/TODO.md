@@ -19,10 +19,10 @@ Open work items only (resolved items live in git history). Underlying technical 
      `KNOWLEDGE.md` apk package version policy).
 
 - **Device verification** (only on explicit user request; the lab has NO AppArmor enforcement, so capability denials are
-  device-only findings): verify `capability net_bind_service` (the :53 bind) and `capability setgid`/`setuid` (the
-  post-bind privilege drop) on a real device; re-check after the apk bump (0.26.3 introduces the `drop_privileges`
-  config key - we do not emit it, but re-verify the default-drop behavior is what `KNOWLEDGE.md` §"Port 53 binding and
-  privileges" records).
+  device-only findings): verify the never-root launcher under AppArmor enforcement - the daemon runs as nobody (65534)
+  with exactly the ambient CAP_NET_BIND_SERVICE (the lab asserts those credentials), the launcher's
+  setgid/setuid/setpcap use (setpriv) is not denied, and no error/denial lines appear in the app log. Re-check after the
+  apk bump (hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges").
 
 - **Blocklist support (deferred)**: upstream has a `blocklist` store (compiled into the apk: the `_cargo_opts_bin`
   feature list includes `blocklist`). Design: download list URLs in cont-init into `/data` (curl), chain a

@@ -34,6 +34,13 @@ install/update). A store-listed app has no profile on the host yet → `SECURITY
 store shows one less than the installed rating. Hosts without AppArmor support don't show different ratings; they reject
 installing such apps outright (`UnsupportedReason.APPARMOR`).
 
+- App containers run **without seccomp** (`DockerInterface.security_opt`: "Disable Seccomp / We don't support it
+  official and it causes problems on some types of host systems", supervisor `docker/interface.py` 2026.10.2) - so no
+  `no_new_privs` from a seccomp policy. The Docker default capability set is only trimmed by opt-in feature flags:
+  `APP_DROP_NET_RAW` (NET_RAW) and `APP_REDUCED_CAPABILITIES` (`REDUCED_CAPABILITIES_DROP` = AUDIT_WRITE, MKNOD, SETFCAP -
+  `docker/const.py`). Capabilities outside those lists (`setuid`/`setgid`/`setpcap`/`net_bind_service` among them)
+  survive every flag - apps relying on them need no `privileged:` entries.
+
 ## Supervisor: option schema quirks
 
 - `match(...)` regexes in `config.yaml` schema fields use voluptuous `Match` (*search* semantics, not fullmatch) —
@@ -173,6 +180,14 @@ Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7. Authoring
   capability, no `/lib/modules` access and no `kernel_modules: true` (verified on HAOS 18.3 / kernel 6.18.52-haos by
   rebooting with the module unloaded; the `kernel_modules` option only maps `/lib/modules` read-only and grants
   `SYS_MODULE` — both inert under a denying profile).
+- **Never-root low-port daemons: ambient capabilities, not file capabilities.** File capabilities on a binary are
+  exec-acquired and inert under `no_new_privs` (which Docker sets whenever its seccomp policy applies - not on HAOS, but
+  don't rely on that). The robust pattern is util-linux `setpriv` in the s6 launcher (the busybox `setpriv` applet has
+  no uid options; the apk replaces it at `/bin/setpriv`):
+  `setpriv --no-new-privs --reuid 65534 --regid 65534 --clear-groups --inh-caps=+net_bind_service --ambient-caps=+net_bind_service <daemon>` -
+  ambient capabilities are runtime prctl state (kernel >= 4.3), survive exec even under `no_new_privs`, and leave the
+  daemon holding exactly the one capability (verified: `CapEff`/`CapPrm`/`CapAmb` = `0000000000000400`). The profile
+  then grants `setuid`/`setgid`/`setpcap` for the launcher's syscalls and `net_bind_service` for the bind.
 
 ## apk package version policy
 
