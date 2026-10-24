@@ -16,13 +16,12 @@ far are toolchain rebuilds with an unchanged CLI).
 
 ## bashio option parsing (list-of-object options)
 
-`bashio::config '<list-option>'` returns one compact JSON object per line for list-of-object options; hd-idle-genargs
-reads the `disks` option line by line (`bashio::jq "${entry}" '.field'`) and relies on that shape (v3.24 base image; a
-shape change would break every entry — a lab boot with configured drives catches it). `'<field> // empty'` is valid only
-for STRING-typed fields: jq treats `false` as empty, so an optional BOOLEAN field cannot distinguish "absent" from
-"false" (absent → "null", false → "false"). With an untouched optional checkbox rendered as unchecked, the per-drive
-`disable_drive_pm` override is therefore a `list(yes|no)?` dropdown, not a `bool?`: empty visibly means "follow the
-global setting".
+The bashio option-consumption mechanics (array-option line shapes, the no-trailing-newline last-element hazard, the
+`// empty` string-only rule) are repository-wide facts: repository-root `KNOWLEDGE.md` §"bashio option consumption".
+hd-idle's reliance: hd-idle-genargs reads the `disks` option line by line (`bashio::jq "${entry}" '.field'`) — a shape
+change would break every entry (a lab boot with configured drives catches it), and the per-drive `disable_drive_pm`
+override is a `list(yes|no)?` dropdown, not a `bool?`, so "empty" visibly means "follow the global setting"
+(`config.yaml`).
 
 ## hd-idle CLI semantics relied upon by config.sh
 

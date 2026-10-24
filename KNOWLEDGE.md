@@ -293,6 +293,27 @@ bashio stubbing): skill `ha-app-base-image`.
   exactly (the cache stores the raw response). Requires the `S6_KEEP_ENV=1` gotcha above, since `CACHE_DIR` is an
   inherited variable.
 
+## bashio option consumption
+
+How scripts consume options through bashio — read from `/usr/lib/bashio/{config,jq}.sh` inside the built image
+(ghcr.io/home-assistant/base:3.24, 2026-10). Stubbing `bashio::config` for script tests: §"HA base image: shell
+gotchas".
+
+- **Array options come out one element per line**: `bashio::config '<array option>'` iterates `.key[]` through
+  `jq -r -c -M` (bashio `lib/config.sh`) — string-array options as one RAW (unquoted) element per line, object-array
+  options as one compact JSON object per line (fields are then read with `bashio::jq "${entry}" '.field'`).
+- **The output has NO trailing newline** (`printf '%s'` of the `$()`-stripped jq stream): a `while read` fed directly
+  from `bashio::config` silently drops the last element — capture the value into a variable and feed the loop via
+  `< <(echo "${RAW}")` (`echo` re-terminates the final line).
+- **Raw string lines must NOT go through `bashio::jq`**: jq parses the line as JSON, so an unquoted value like
+  `127.0.0.0/8` fails with `jq: parse error: Invalid numeric literal` (exit 5) — only object lines (valid JSON) do.
+- **`'<field> // empty'` is valid only for STRING-typed fields**: jq treats `false` as empty, so an optional BOOLEAN
+  field cannot distinguish "absent" from "false" (absent → "null", false → "false") — optional per-item checkboxes are
+  therefore modeled as `list(yes|no)?` dropdowns, not `bool?` (schema mechanics: §"Supervisor: option schema quirks").
+
+App-specific uses and consequences: `hd-idle/KNOWLEDGE.md` §"bashio option parsing (list-of-object options)",
+`hickory-dns/KNOWLEDGE.md` §"Option consumption (bashio)".
+
 ## s6-overlay: user bundles live OUTSIDE s6-rc.d
 
 Adding a service to a bundle (e.g. the default `user` bundle) is done via

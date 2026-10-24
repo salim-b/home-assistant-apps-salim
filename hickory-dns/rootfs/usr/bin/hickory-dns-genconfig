@@ -5,7 +5,7 @@ set -euo pipefail
 ## Generate the hickory-dns configuration from the app options (outputs and the --validate gate:
 ## hickory-dns/KNOWLEDGE.md §"Config-file and data layout"; config shape: §"Generated named.toml").
 ## Options are user data: every value is re-validated here regardless of the option schema (defense in depth,
-## hd-idle/KNOWLEDGE.md §"bashio option parsing (list-of-object options)").
+## hickory-dns/KNOWLEDGE.md §"Option consumption (bashio)").
 
 CONFIG=/data/named.toml
 CONFIG_NEW=/data/named.toml.new
@@ -154,7 +154,7 @@ directory = \"${ZONES_DIR}\"
 NETS=""
 V4_LOOPBACK=0
 V6_LOOPBACK=0
-## bashio option-consumption idioms (raw lines, no trailing newline): hickory-dns/KNOWLEDGE.md §"Option
+## bashio option-consumption idioms (raw lines, no trailing newline): repository-root KNOWLEDGE.md §"bashio option
 ## consumption".
 NETS_RAW=$(bashio::config 'allow_networks')
 while IFS= read -r cidr; do
@@ -199,7 +199,8 @@ done <<<"$DEFAULT_ZONE_FILES"
 ## hickory-dns/KNOWLEDGE.md §"Static entries (no hosts-file store upstream)".
 declare -A SEEN_ZONES=()
 N_STATIC=0
-## Object-array options differ: each line is a compact JSON object, so per-line jq IS correct here.
+## Object-array options differ: each line is a compact JSON object, so per-line jq IS correct here
+## (repository-root KNOWLEDGE.md §"bashio option consumption").
 ENTRIES_RAW=$(bashio::config 'static_entries')
 while IFS= read -r entry; do
   [ "$entry" != "" ] || continue

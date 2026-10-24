@@ -80,8 +80,3 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
 - Align the per-app `image:` comment in hd-idle's and nfs-server's `config.yaml` with hickory-dns's one-line pointer
   style (the CI image-name contract now lives in the repository README §"CI"). `config.yaml` is device-visible, so each
   alignment needs a version bump + changelog entry — fold into the apps' next natural bumps.
-
-- The bashio option-consumption facts live in app KNOWLEDGE files (`hd-idle/KNOWLEDGE.md` §"bashio option parsing
-  (list-of-object options)", `hickory-dns/KNOWLEDGE.md` §"Option consumption (bashio)") though they are app-independent
-  bashio/base-image mechanics — consider promoting them to the repository-root `KNOWLEDGE.md` (its §"HA base image:
-  shell gotchas" already carries the stubbing procedure) and leaving cross-references in the apps.

@@ -49,8 +49,8 @@ facts: `hickory-dns/KNOWLEDGE.md` §"Generator regression sandbox"). Recreate pe
 2. **Stub the binaries on PATH**: replace `/usr/bin/resolve` (canned ANSWER sections for known names, exit 1 otherwise)
    and `/usr/bin/hickory-dns` (accepts `--validate`; reject deliberately-broken configs) with stubs.
 3. **Stub bashio semantics exactly**: string-array options as one RAW element per line, object-array options as one
-   compact JSON object per line, both WITHOUT a trailing newline (`hickory-dns/KNOWLEDGE.md` §"Option consumption") — a
-   stub that appends `\n` hides the last-element-drop class of bugs.
+   compact JSON object per line, both WITHOUT a trailing newline (repository-root `KNOWLEDGE.md` §"bashio option
+   consumption") — a stub that appends `\n` hides the last-element-drop class of bugs.
 4. **Run the scenario matrix**: validation rejections (protocol, host, IP, port, CIDR, path charset), ACL handling
    (loopback append, empty list), resolution paths (fresh lookup, cache fallback, corrupted cache line, lookup timeout),
    and the default options' full output — diff named.toml, the args file and the zone files byte-for-byte against a

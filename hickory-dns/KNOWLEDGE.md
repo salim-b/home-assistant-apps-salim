@@ -2,9 +2,7 @@
 
 App-specific facts for the hickory-dns app, gathered from upstream source and Alpine packaging work. Facts that span
 apps live in the repository-root `KNOWLEDGE.md`; procedures live in `.agents/skills/` (this app's runtime procedures:
-skill `hickory-dns-runtime`). Bashio option parsing idioms (list-of-object options, `// empty` string-only rule):
-hd-idle/KNOWLEDGE.md §"bashio option parsing (list-of-object options)" - this app uses the same mechanics (including the
-one-JSON-object-per-line handling and the defense-in-depth re-validation of every option value).
+skill `hickory-dns-runtime`).
 
 ## Generated named.toml
 
@@ -79,22 +77,18 @@ address instead of failing.
 
 ## Option consumption (bashio)
 
-`bashio::config '<array option>'` (bashio `lib/config.sh`: the array branch iterates `.key[]` through `jq -r -c -M`)
-emits string-array options as one RAW (unquoted) element per line, object-array options as one compact JSON object per
-line. The output has NO trailing newline (`printf '%s'` of the `$()`-stripped jq stream), so a `while read` fed directly
-from `bashio::config` silently drops the last element - capture the value into a variable and feed the loop via
-`< <(echo "${RAW}")` (`echo` re-terminates the final line; the hd-idle-genargs idiom). A raw string line must NOT go
-through `bashio::jq` (jq parses it as JSON: `127.0.0.0/8` fails with `Invalid numeric literal` and exit 5) - only object
-lines do. Read from `/usr/lib/bashio/{config,jq}.sh` inside the built image (ghcr.io/home-assistant/base:3.24, 2026-10);
-the lab surfaced the failure as `jq: parse error: Invalid numeric literal at line 2, column 0` with the generator
-exiting 5.
+The mechanics (array-option line shapes, the no-trailing-newline last-element hazard, the `// empty` string-only rule,
+the `bashio::jq` ban on raw string lines) are repository-wide facts: repository-root `KNOWLEDGE.md` §"bashio option
+consumption". This app's application: the generator consumes both shapes (`allow_networks` as raw string lines,
+`static_entries`/`upstreams` as JSON-object lines) and re-validates every value regardless of the option schema (defense
+in depth).
 
 ## Generator regression sandbox
 
 The generator is regression-tested offline in a disposable sandbox (`/tmp/hickory-test/`, recreated per session - the
 lab covers the real-image path instead). The procedure (copy adaptation, bashio/resolve stubs, scenario matrix) is a
 skill: `hickory-dns-runtime` §"Offline regression sandbox"; the stubs replicate the option-consumption mechanics
-(§"Option consumption").
+(repository-root `KNOWLEDGE.md` §"bashio option consumption").
 
 ## Static entries (no hosts-file store upstream)
 
