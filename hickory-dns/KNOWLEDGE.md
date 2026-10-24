@@ -55,7 +55,8 @@ truth (verified against v0.26.3 AND v0.26.1 source - the dev pin must parse the 
   rejected a snake_case value that hand-written prose had slipped in).
 - ACL semantics (`crates/server/src/access.rs`, verified): allow-only configuration denies every other client; **empty
   allow AND deny lists = allow all** - the generator emits `allow_networks = []` when the option is cleared (with a
-  warning). The ACL is server-wide (no per-zone recursion control).
+  warning). The ACL is server-wide (no per-zone recursion control). Loopback (127.0.0.0/8, ::1/128) is always served:
+  the generator appends missing entries to a configured ACL (the healthcheck probes from 127.0.0.1).
 
 ## Upstream option model
 
@@ -136,9 +137,8 @@ is validated by the `--validate` boot gate (zone loading happens in `DnsServer::
 client CLI) - socket + catalog + response, authoritative (no upstream dependency: a dead upstream must not mark a
 healthy local DNS server unhealthy). HEALTHCHECK timeout 10s (client query timeout is smaller). The daemon has no HTTP
 endpoint (the apk compiles without metrics features), so there is no watchdog URL - HEALTHCHECK is the only
-container-level wedge signal (repository-root KNOWLEDGE.md §"Supervisor: health events / watchdog"). If the ACL is
-configured without a loopback network, the probe is REFUSED and the app shows unhealthy while serving LAN clients - the
-generator warns at boot when the option lacks a loopback entry.
+container-level wedge signal (repository-root KNOWLEDGE.md §"Supervisor: health events / watchdog"). A configured ACL
+without loopback entries gets them appended by the generator (with a warning) - loopback clients are always served.
 
 ## apk package pins and CA trust
 

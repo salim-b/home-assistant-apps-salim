@@ -41,8 +41,10 @@ configuration:
     description: >-
       Client access list: only queries from these networks (CIDR notation, e.g.
       `192.168.0.0/16`) are answered, everything else is refused. The defaults
-      cover loopback and the private LAN ranges. Clearing the list entirely
-      allows every client - not recommended on a network-exposed host.
+      cover loopback and the private LAN ranges; loopback is always served so
+      the app's own health probe works - missing entries are appended at
+      startup. Clearing the list entirely allows every client - not recommended
+      on a network-exposed host.
   dnssec:
     name: DNSSEC validation
     description: >-

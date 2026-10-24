@@ -30,8 +30,9 @@ recursive resolvers you configure.
 - **IPv6 networks**: routers advertise DNS servers both via DHCP (IPv4) and via Router Advertisement (RDNSS, IPv6). Make
   sure the IPv6 advertisement points at the HAOS device too (or disable it), otherwise IPv6-capable devices may bypass
   the app with an IPv6 DNS server learned from the router.
-- The app's own health probe queries the server from localhost. If you remove all loopback networks from the **Allowed
-  networks** list, the probe is refused and the app shows unhealthy even though LAN clients are served.
+- The app's own health probe queries the server from localhost. Loopback networks (127.0.0.0/8, ::1/128) are therefore
+  always served: if the **Allowed networks** list does not cover them, the generator appends the missing entries at
+  startup (with a warning).
 
 ## Configuration
 

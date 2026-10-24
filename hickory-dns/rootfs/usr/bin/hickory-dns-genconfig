@@ -157,10 +157,12 @@ listen_port = 53
 directory = \"${ZONES_DIR}\"
 "
 
-## Client ACL. Empty list = allow every client (verified upstream semantics); without a loopback entry the
-## app's own healthcheck probe (UDP from 127.0.0.1) is refused and the app shows unhealthy while serving.
+## Client ACL. Empty list = allow every client (verified upstream semantics). Loopback is always served: the app's
+## own healthcheck probe (UDP from 127.0.0.1) is a client like any other, so a configured ACL that does not cover
+## it would mark the app unhealthy while it serves - missing loopback entries are appended (with a warning).
 NETS=""
-LOOPBACK=0
+V4_LOOPBACK=0
+V6_LOOPBACK=0
 ## bashio::config emits string-array options as one RAW (unquoted) element per line with NO trailing newline -
 ## feed the captured value through `echo` so `read` sees the last element, and never jq the raw line
 ## (hickory-dns/KNOWLEDGE.md §"Option consumption").
@@ -172,15 +174,19 @@ while IFS= read -r cidr; do
   [ "$NETS" != "" ] && NETS+=", "
   NETS+="$(toml_str "$cidr")"
   case "$cidr" in
-    127.0.0.0/8 | 127.0.0.1/32 | ::1/128 | ::1) LOOPBACK=1 ;;
+    127.0.0.0/8 | 127.0.0.1/32 | 0.0.0.0/0) V4_LOOPBACK=1 ;;
+    ::1/128 | ::1 | ::/0) V6_LOOPBACK=1 ;;
   esac
 done < <(echo "$NETS_RAW")
 
 if [ "$NETS" != "" ]; then
+  if [ "$V4_LOOPBACK" = 0 ] || [ "$V6_LOOPBACK" = 0 ]; then
+    bashio::log.warning "Allowed networks does not cover loopback - missing entries appended (the app's own healthcheck probes from 127.0.0.1; loopback clients are always served)."
+    [ "$V4_LOOPBACK" = 1 ] || NETS+=", $(toml_str "127.0.0.0/8")"
+    [ "$V6_LOOPBACK" = 1 ] || NETS+=", $(toml_str "::1/128")"
+  fi
   CONFIG_BODY+="allow_networks = [${NETS}]
 "
-  [ "$LOOPBACK" = 1 ] \
-    || bashio::log.warning "No loopback network in the allowed networks - the app's own healthcheck probe (from 127.0.0.1) will be refused and the app shows unhealthy; include e.g. 127.0.0.0/8."
 else
   bashio::log.warning "Allowed networks is empty - every client is served."
   CONFIG_BODY+="allow_networks = []

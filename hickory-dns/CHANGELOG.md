@@ -11,7 +11,8 @@
   entries (protocol tls/https/quic, host, IP, port, path), queried in configured order; hostname upstreams are resolved
   once at startup with a last-known-good cache in `/data`.
 - DNSSEC validation on by default (root KSKs embedded in the hickory-dns binary; no anchor file).
-- Client ACL (allowed networks, private ranges + loopback by default; empty list = serve everyone).
+- Client ACL (allowed networks, private ranges + loopback by default; empty list = serve everyone; loopback is always
+  served so the app's own health probe works).
 - Static entries: hosts.txt-style hostname-to-IP pairs served as authoritative leaf zones, winning over the forwarded
   public namespace.
 - Boot-time configuration generation with fail-fast validation (`hickory-dns --validate` parses the generated config and

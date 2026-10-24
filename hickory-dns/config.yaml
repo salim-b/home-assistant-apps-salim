@@ -33,8 +33,9 @@ options:
     - protocol: tls
       host: dns.quad9.net
       ip: 149.112.112.112
-  # Client ACL: CIDRs whose queries are served (everything else is refused). Clearing the list allows all
-  # clients (hickory-dns/KNOWLEDGE.md §"Generated named.toml").
+  # Client ACL: CIDRs whose queries are served (everything else is refused); loopback (127.0.0.0/8, ::1/128) is
+  # always served so the app's own healthcheck works - missing entries are appended at startup. Clearing the
+  # list allows all clients (hickory-dns/KNOWLEDGE.md §"Generated named.toml").
   allow_networks:
     - "127.0.0.0/8"
     - "10.0.0.0/8"
