@@ -24,7 +24,7 @@ Turn your Home Assistant instance into a secure DNS server that resolves via enc
 
 - **One port-53 binder per host**: The app joins the host network namespace and binds port 53 – it cannot run alongside
   another DNS app (e.g. [AdGuard Home](https://github.com/hassio-addons/app-adguard-home) or
-  [Dnsmasq](/config/app/core_dnsmasq/info)) on the same device.
+  [Dnsmasq](https://github.com/home-assistant/apps/tree/master/dnsmasq)) on the same device.
 - **DoH3 (HTTP/3) upstreams are not available yet**: the packaged binary's h3 feature is not in any tagged upstream
   release, so the app rejects DoH3 upstreams for now.
 - **No ad/blocklist support yet**: planned for a later release.
