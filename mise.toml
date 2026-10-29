@@ -46,7 +46,7 @@ jactionlint = "2.3.0"
 zizmor = "1.31.1"
 # hk's binary pin and the hk@X.Y.Z package imported by hk.pkl must move together (the package provides the builtin
 # step definitions the binary executes).
-hk = { version = "2.9.0", workflow = "release.yml" }
+hk = { version = "2.10.0", workflow = "release.yml" }
 jq = "1.8.2"
 "aqua:jolars/panache" = "3.17.1"
 python = "3.15.2"
