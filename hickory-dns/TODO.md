@@ -5,20 +5,17 @@ procedures in the skill `hickory-dns-runtime`.
 
 ## Tasks
 
-- **Alpine aports bump MRs (blocking the first release)**: `community/hickory-dns` is at 0.26.1-r0 on 3.24-stable and
-  master (identical) - facts: `KNOWLEDGE.md` §"apk package pins and CA trust". Submit both:
-  1. master: fork gitlab.alpinelinux.org/alpine/aports, branch, bump `pkgver=0.26.3` with `pkgrel=0` (pkgrel resets on
-     pkgver bumps; NO DCO sign-off needed), update sha512sums, run `apkbuild-lint` + `abuild -r` (the build needs
-     `cargo cargo-auditable clang-dev cmake samurai`; consider a docker-based abuild), commit
-     `community/hickory-dns: upgrade to 0.26.3`, open the MR.
-  2. `[3.24]-stable`: cherry-pick as `[3.24] community/hickory-dns: upgrade to 0.26.3` (the established backport
-     naming), frame the MR with the GHSA list. No bump bot exists for aports (aports-qa-bot only labels/comments) and
-     the maintainer (msrd0) has been inactive since 2026-06; an "Upgrade Request" issue on the aports tracker is the
-     nudge if the MRs stall. **Gate the first app release on a 3.24-stable APKINDEX serving >= 0.26.3** (the Dockerfile
-     pin must be bumped in the same app release: pin + config.yaml version + changelog, per the repository-root
-     `KNOWLEDGE.md` apk package version policy). When the bumped daemon lands on the device, re-run the device
-     verification: `mise run test:live hickory-dns <host> --replace --test-options` (never-root launcher path,
-     device-verified for 0.26.1 on 2026-10-24 - `KNOWLEDGE.md` §"Port 53 binding and privileges").
+- **Alpine aports bump MRs (blocking the first release)**: `community/hickory-dns` is currently still at 0.26.1-r0 on
+  3.24-stable and master (identical) - facts: `KNOWLEDGE.md` §"apk package pins and CA trust".
+
+  Submitted two MRs upstream to bump to v0.26.3:
+  - <https://gitlab.alpinelinux.org/alpine/aports/-/merge_requests/110680> (`master`)
+  - <https://gitlab.alpinelinux.org/alpine/aports/-/merge_requests/110681> (`3.24-stable` backport)
+
+  Once merged and the bumped apk reaches the index, our CI should pick up the update automatically.
+
+- Once hickory-dns 0.26.4+ is released shipping <https://github.com/hickory-dns/hickory-dns/pull/4128>, query an `A`
+  instead of `SOA` record in `hickory-dns-healthcheck`.
 
 - **Blocklist support (deferred)**: upstream ground truth and the design sketch: `KNOWLEDGE.md` §"Deferred feature
   ground truth (upstream gaps)". Pursue after the first release.
