@@ -14,8 +14,8 @@ Turn your Home Assistant instance into a secure DNS server that resolves via enc
   are rejected.
 - **Configurable upstream resolvers**: Quad9 by default (anycast, pure IPs with pinned TLS names); Cloudflare, AdGuard,
   Google etc. via structured per-resolver entries (protocol, host, IP, port).
-- **Static entries**: `hosts.txt`-style hostname-to-IP answers served locally as authoritative zones – reach self-hosted
-  services by name from every LAN device without touching public DNS.
+- **Static entries**: [`hosts.txt`](https://en.wikipedia.org/wiki/Hosts_(file))-style hostname-to-IP answers served
+  locally as authoritative zones – reach self-hosted services by name from every LAN device without touching public DNS.
 - **Client ACL**: Only queries from the configured networks are served (private ranges + loopback by default).
 - **Hardened runtime**: Ships a custom [AppArmor](https://apparmor.net/) profile, and the daemon never runs as root: it
   starts as `nobody` holding only the capability the port-53 bind requires.
