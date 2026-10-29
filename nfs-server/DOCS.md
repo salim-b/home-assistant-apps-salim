@@ -87,6 +87,8 @@ exports an empty directory for it until the path reappears.
 ## Requirements
 
 The NFS server runs in the host's kernel: it requires the host kernel to provide the `nfsd` kernel module
-(`CONFIG_NFSD`). [Home Assistant OS](https://github.com/home-assistant/operating-system) ships this module on
-Rockchip-based boards (e.g. ODROID-M1/M1S, Home Assistant Green); on other boards the app fails to start with an
-explanatory error message.
+(`CONFIG_NFSD`). [Home Assistant OS](https://github.com/home-assistant/operating-system) ships this module on the
+ODROID-M1/M1S, Home Assistant Green, Raspberry Pi 3/4/5 and Home Assistant Yellow boards; it is missing on the
+generic-aarch64/generic-x86-64 and OVA (virtual machine) images and on the ODROID-C2/C4/N2 and Khadas VIM3 boards. On
+boards without the module, the app fails to start with an explanatory error message. Enabling the module on all boards
+is proposed upstream ([discussion #5334](https://github.com/orgs/home-assistant/discussions/5334)).

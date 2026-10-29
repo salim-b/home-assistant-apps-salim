@@ -24,11 +24,6 @@ Open work items only (resolved items live in git history). Underlying technical 
     explicit HAOS choice. Boards actually missing the module: generic-aarch64, generic-x86_64, ova, odroid-c2/c4/n2,
     khadas-vim3.
 
-- Verify the app's per-board support matrix in `DOCS.md` (the Requirements section claims Rockchip-only support):
-  Raspberry Pi 3/4/5 and Yellow likely already run the app on current HAOS — whether shipped releases' pinned kernels
-  already include the module needs an on-device check (skill `ha-app-device-testing`). Correct the matrix regardless of
-  the upstream `CONFIG_NFSD` outcome.
-
 - Upstream: host-side nfsd mount + supervisor bind-mount *(exploratory)*
 
   Goal: eliminate `SYS_ADMIN` entirely (the app-side module loading is already gone — the kernel's mount-time autoload

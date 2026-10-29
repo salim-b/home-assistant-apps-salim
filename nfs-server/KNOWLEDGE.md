@@ -28,6 +28,24 @@ instance, mismatching the container's nfsd. The road is supervisor support for b
 apps on demand plus `host_network: true`; the rating math cancels out (−1 host_network replaces −1 privileged) — the win
 is zero capabilities, the cost is weaker network isolation.
 
+## Host kernel nfsd availability per HAOS board
+
+Verified against `home-assistant/operating-system` `dev` on 2026-10-29 (kernel 6.18.59): the board kernels ship
+`nfsd.ko` on odroid-m1, odroid-m1s and green (explicit `CONFIG_NFSD=m` in
+`buildroot-external/kernel/v6.18.y/kernel-arm64-rockchip.config`) and on rpi3-64, rpi4-64, yellow and rpi5-64 — the
+pinned upstream Raspberry Pi defconfigs set it ([bcm2711_defconfig @
+60ea684a](https://github.com/raspberrypi/linux/blob/60ea684a8ace97bb0db1a16e20753bdd6ab371ff/arch/arm64/configs/bcm2711_defconfig),
+`CONFIG_NFSD=m`; no HAOS kernel fragment disables it, so RPi availability is incidental to upstream defconfig contents
+and can change with kernel bumps). Missing on generic-aarch64 and generic-x86-64/ova (upstream arm64 `defconfig` and
+[`x86_64_defconfig` @
+v6.18.59](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/plain/arch/x86/configs/x86_64_defconfig?h=v6.18.59):
+`CONFIG_NFS_FS=y`, no `CONFIG_NFSD`) and on odroid-c2/c4/n2
+(`buildroot-external/board/hardkernel/kernel-amlogic.config`) and khadas-vim3
+(`buildroot-external/board/khadas/kernel-vim.config`) — full custom kernel configs without `CONFIG_NFSD`. Upstream
+proposal to make it uniform via the shared `haos.config` fragment: [home-assistant discussion
+#5334](https://github.com/orgs/home-assistant/discussions/5334). Raspberry Pi/Yellow support is assumed from this
+analysis — not verified on a device; the user-facing docs state plain support.
+
 ## Export-cache and fsid semantics
 
 Runtime semantics of the generated `/etc/exports` content (schema-side constraints are repository-wide: root

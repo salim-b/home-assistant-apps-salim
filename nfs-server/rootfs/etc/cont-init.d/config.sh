@@ -24,8 +24,10 @@ if [ ! -e /proc/fs/nfsd/versions ]; then
     log_captured_stderr "$ERRFILE"
     rm -f "$ERRFILE"
     bashio::log.fatal "The host's kernel probably lacks NFS server support."
-    bashio::log.fatal "Note: Home Assistant OS only ships the nfsd kernel module on some boards"
-    bashio::log.fatal "(currently the Rockchip-based ones, e.g. ODROID-M1/M1S and Home Assistant Green)."
+    ## Board-support facts: nfs-server/KNOWLEDGE.md §"Host kernel nfsd availability per HAOS board"
+    bashio::log.fatal "Note: Home Assistant OS ships the nfsd kernel module on the ODROID-M1/M1S, Home Assistant Green,"
+    bashio::log.fatal "Raspberry Pi 3/4/5 and Home Assistant Yellow boards; it is missing on the generic/OVA images and"
+    bashio::log.fatal "on ODROID-C2/C4/N2 and Khadas VIM3."
     bashio::exit.nok
   fi
   rm -f "$ERRFILE"

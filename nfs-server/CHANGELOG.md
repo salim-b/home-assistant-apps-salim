@@ -2,6 +2,15 @@
 
 # Changelog
 
+## 0.7.4
+
+- Fix: board support information corrected. The `nfsd` kernel module the app requires is also present on Raspberry Pi
+  3/4/5 and Home Assistant Yellow (the upstream kernel defconfigs of those boards enable it), not only on the
+  Rockchip-based boards (ODROID-M1/M1S, Home Assistant Green). `DOCS.md`, `README.md` and the startup error message now
+  state which Home Assistant OS boards ship the module (missing: generic-aarch64/generic-x86-64, OVA, ODROID-C2/C4/N2,
+  Khadas VIM3) and link the upstream proposal to enable it everywhere. Raspberry Pi/Yellow support is derived from
+  kernel configuration analysis, not verified on a device — please report if it does not hold.
+
 ## 0.7.3
 
 - Maintainability: no behavior change - removed the stale `# hadolint ignore=DL3059` pragma from the Dockerfile (droast

@@ -23,8 +23,10 @@ server.
 ## Limitations
 
 - **Requires kernel support**: The host kernel must provide the `nfsd` kernel module (`CONFIG_NFSD`). [Home Assistant
-  OS](https://github.com/home-assistant/operating-system) ships it on Rockchip-based boards (e.g. ODROID-M1/M1S, Home
-  Assistant Green); on other boards the app fails to start with an explanatory error message.
+  OS](https://github.com/home-assistant/operating-system) ships it on the ODROID-M1/M1S, Home Assistant Green, Raspberry
+  Pi 3/4/5 and Home Assistant Yellow boards — not yet on the generic/OVA images and ODROID-C2/C4/N2 and Khadas VIM3
+  ([upstream proposal](https://github.com/orgs/home-assistant/discussions/5334)); on boards without the module the app
+  fails to start with an explanatory error message.
 - **NFSv4+ only**: The app serves the [NFSv4+](https://en.wikipedia.org/wiki/Network_File_System#NFSv4) protocol; NFSv2
   and NFSv3 clients cannot connect. Mount with `-t nfs4`.
 - **Network-level access control only**: No cryptographic authentication (`sec=sys`) – a client's claimed user ID is
