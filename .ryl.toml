@@ -1,6 +1,5 @@
-# ryl (https://ryl-docs.pages.dev/) - the YAML linter run by the hk `ryl` step (replaced yamllint).
-# TOML has no `extends`, so the tables below inline the `default` preset (ryl enables no rules by
-# default) with this repo's overrides applied.
+# https://ryl-docs.pages.dev/config-presets/
+# TOML config has no `extends`, so the tables below inline the `default` preset (ryl enables no rules by default) with this repo's overrides applied.
 
 exclude = [
   # Machine-generated mise lock artifacts (aube-lock.yaml): minified JSON blobs with unwrappable
@@ -54,6 +53,5 @@ level = "warning"
 
 [lint.rules.truthy]
 level = "warning"
-# GitHub Actions workflow files key their triggers on `on:` - a bare truthy key must not be flagged (inherited from
-# the pre-ryl .yamllint config).
+# GitHub Actions workflow files key their triggers on `on:` - a bare truthy key must not be flagged
 check-keys = false

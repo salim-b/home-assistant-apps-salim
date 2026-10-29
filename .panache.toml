@@ -1,7 +1,7 @@
 #:schema https://panache.bz/panache.schema.json
 
 # Panache configuration - Markdown formatter + semantic linter
-# (https://panache.bz, docs v3.16.0)
+# (https://panache.bz/reference/configuration.html)
 #
 # Panache owns ALL Markdown autoformatting: it is the single source for
 # prose wrapping (run `panache format .`, wired up as `mise run fmt`).
