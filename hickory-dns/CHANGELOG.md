@@ -22,4 +22,4 @@
 - Custom AppArmor profile; the daemon never runs as root - it starts as `nobody` holding only the capability the port-53
   bind requires.
 - hickory-dns apk packages pinned (0.26.1-r0): Alpine-side package updates become explicit app releases guided by the CI
-  drift check. The first release is gated on a 3.24-stable APKINDEX serving >= 0.26.3.
+  drift check.

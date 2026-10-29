@@ -191,14 +191,14 @@ always served.
 ## apk package pins and CA trust
 
 `hickory-dns` + `hickory-dns-utils` are pinned with full `pkgver-pkgrel` (the generated config encodes the binary's
-interface - named.toml schema + CLI; repository-root KNOWLEDGE.md §"apk package version policy"). Development pin
-0.26.1-r0; first release gated on a 3.24-stable APKINDEX serving >= 0.26.3 (v0.26.2 fixed ~38 GHSA advisories - shipping
-0.26.1 would undercut the app's security promise). The aports APKBUILD compiles with
-`tls-aws-lc-rs,https-aws-lc-rs,quic-aws-lc-rs,dnssec-aws-lc-rs,rustls-platform-verifier` (+ blocklist, recursor,
-resolver for the bin) - DoH3 is absent (§"Deferred feature ground truth (upstream gaps)"). `rustls-platform-verifier`
-reads the system trust store: `ca-certificates-bundle` is installed explicitly (floating; certificate data package).
-`hickory-dns-utils` ships `/usr/bin/dns`, `/usr/bin/recurse`, `/usr/bin/resolve` (used by the healthcheck and the
-hostname resolution); the main package ships `/usr/bin/hickory-dns` (renamed from `named` at 0.24.0, no alias).
+interface - named.toml schema + CLI; repository-root KNOWLEDGE.md §"apk package version policy"). Pin 0.26.1-r0; the
+aports MRs bumping to v0.26.3 (v0.26.2 fixed ~38 GHSA advisories) are tracked in `hickory-dns/TODO.md`. The aports
+APKBUILD compiles with `tls-aws-lc-rs,https-aws-lc-rs,quic-aws-lc-rs,dnssec-aws-lc-rs,rustls-platform-verifier` (+
+blocklist, recursor, resolver for the bin) - DoH3 is absent (§"Deferred feature ground truth (upstream gaps)").
+`rustls-platform-verifier` reads the system trust store: `ca-certificates-bundle` is installed explicitly (floating;
+certificate data package). `hickory-dns-utils` ships `/usr/bin/dns`, `/usr/bin/recurse`, `/usr/bin/resolve` (used by the
+healthcheck and the hostname resolution); the main package ships `/usr/bin/hickory-dns` (renamed from `named` at 0.24.0,
+no alias).
 
 ## Config-file and data layout
 

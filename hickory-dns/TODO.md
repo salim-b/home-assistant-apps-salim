@@ -5,8 +5,8 @@ procedures in the skill `hickory-dns-runtime`.
 
 ## Tasks
 
-- **Alpine aports bump MRs (blocking the first release)**: `community/hickory-dns` is currently still at 0.26.1-r0 on
-  3.24-stable and master (identical) - facts: `KNOWLEDGE.md` §"apk package pins and CA trust".
+- **Alpine aports bump MRs**: `community/hickory-dns` is currently still at 0.26.1-r0 on 3.24-stable and master
+  (identical) - facts: `KNOWLEDGE.md` §"apk package pins and CA trust".
 
   Submitted two MRs upstream to bump to v0.26.3:
   - <https://gitlab.alpinelinux.org/alpine/aports/-/merge_requests/110680> (`master`)

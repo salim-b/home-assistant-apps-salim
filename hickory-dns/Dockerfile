@@ -2,8 +2,8 @@ ARG BUILD_FROM=ghcr.io/home-assistant/base:3.24
 FROM ${BUILD_FROM}
 
 # apk pins: repository-root KNOWLEDGE.md §"apk package version policy" (updates become deliberate app releases);
-# the first-release gate on >= 0.26.3: hickory-dns/TODO.md (facts: hickory-dns/KNOWLEDGE.md §"apk package pins
-# and CA trust"). ca-certificates-bundle: the rustls-platform-verifier trust store (floating). setpriv
+# facts: hickory-dns/KNOWLEDGE.md §"apk package pins and CA trust". ca-certificates-bundle: the rustls-platform-verifier
+# trust store (floating). setpriv
 # (util-linux, floats): the never-root launcher needs its uid options - the busybox applet has none; see
 # hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges".
 RUN apk add --no-cache \
