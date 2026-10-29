@@ -38,9 +38,6 @@ Open work items only (resolved items live in git history). Underlying technical 
   file the mount-unit PR on operating-system and a supervisor discussion/PR with the netns analysis; implement the
   app-side switch only if welcomed.
 
-- Investigate mise task-arg-forwarding feature gap (the `test:live` task forwards its depends-args via a run script —
-  see `.mise/tasks/test/live/`) and fix it upstream if indicated.
-
 - Upstream: render app configuration labels as Markdown blocks instead of plain text (frontend)
 
   Submitted [`home-assistant/frontend#54839`](https://github.com/home-assistant/frontend/pull/54839), rejected. Seems we
