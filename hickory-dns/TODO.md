@@ -20,16 +20,6 @@ procedures in the skill `hickory-dns-runtime`.
      verification: `mise run test:live hickory-dns <host> --replace --test-options` (never-root launcher path,
      device-verified for 0.26.1 on 2026-10-24 - `KNOWLEDGE.md` §"Port 53 binding and privileges").
 
-- **Upstream issue for the `unexpected lookup skip` WARN** (small, not release-blocking): every positive answer from an
-  unsigned authoritative zone (localhost, the static leaf zones) makes the 0.26.x daemon log
-  `WARN hickory_server::zone_handler::catalog: unexpected lookup skip for request` - the catalog's positive-answer
-  branch warns its no-NSEC-proof arm although that skip is the normal path (RFC 4035 §3.1.3 requires NSEC proofs only in
-  the four negative cases). Verified upstream 2026-10-24: introduced in the 0.26.0 cycle (e7fed0e), present in
-  0.26.0/0.26.1/0.26.3 and main (c6b2e6d); no duplicate on the tracker; standalone repro confirmed with the packaged
-  binary + upstream's own localhost example zone (A warns, SOA/MX silent). File against hickory-dns/hickory-dns per
-  their `bug_report.md` template (suggested fix: drop that warn to debug); mechanism + matrix: `KNOWLEDGE.md`
-  §"Healthcheck" (the app healthcheck probes the zone SOA until this is fixed upstream).
-
 - **Blocklist support (deferred)**: upstream ground truth and the design sketch: `KNOWLEDGE.md` §"Deferred feature
   ground truth (upstream gaps)". Pursue after the first release.
 

@@ -5,22 +5,22 @@ Open work items only (resolved items live in git history). Underlying technical 
 
 ## Tasks
 
-- Drive-PM treatment blind spot (see `KNOWLEDGE.md` §`Drive-PM treatment`): a drive that reconnects under the SAME
-  kernel name (its bridge power-cycled it) is invisible to hd-idle-pmfix's `--since` diff and stays untreated until the
-  next app restart. Find a detection mechanism that respects the redundant-treatment risk (device-verified motor starts,
-  see `KNOWLEDGE.md`).
-
-- Upstream: hd-idle's `-s 1` re-resolves only *unresolved* device entries and never re-verifies already-resolved ones
-  (`resolveSymlinks()` skips entries with a populated `Name`). A small upstream change (re-verify resolved symlinks each
-  cycle, update entries whose resolution changed) would let us remove the app's `hd-idle-watch` service (see
-  `KNOWLEDGE.md`).
-
 - Monitor hd-idle upstream: v1.22 has no GitHub release (Alpine tracks the tag); Alpine-side package updates are caught
   automatically by the apk drift check (validate.py, daily CI cron) and released per the repository-root KNOWLEDGE.md
   §`apk package version policy` (release discipline: skill `ha-app-workflow`). Upstream *behavior* changes (new flags
   etc.) are read and adapted when such a release is made; a future version adding per-device `-I` or a config file would
   also relax the option schema. Worth filing upstream: per-device `-I` would make the global-only limitation moot for
   mixed setups.
+
+- Currently, hd-idle's `-s 1` re-resolves only *unresolved* device entries and never re-verifies already-resolved ones
+  (`resolveSymlinks()` skips entries with a populated `Name`). A [PR](https://github.com/adelolmo/hd-idle/pull/141) has
+  been submitted upstream to re-verify resolved symlinks each cycle and update entries whose resolution changed. Once
+  this is merged and released, we can remove the app's `hd-idle-watch` service (see `KNOWLEDGE.md`).
+
+- Drive-PM treatment blind spot (see `KNOWLEDGE.md` §`Drive-PM treatment`): a drive that reconnects under the SAME
+  kernel name (its bridge power-cycled it) is invisible to hd-idle-pmfix's `--since` diff and stays untreated until the
+  next app restart. Find a detection mechanism that respects the redundant-treatment risk (device-verified motor starts,
+  see `KNOWLEDGE.md`).
 
 - Upstream feature request to file (home-assistant/supervisor): the `device(subsystem=block)` dropdown leaks partitions
   (by-id `...-partN` links) into the app config UI and users pick them, which our startup validation rejects with an
