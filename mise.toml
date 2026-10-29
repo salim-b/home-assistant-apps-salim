@@ -46,17 +46,17 @@ jactionlint = "2.3.0"
 zizmor = "1.31.1"
 # hk's binary pin and the hk@X.Y.Z package imported by hk.pkl must move together (the package provides the builtin
 # step definitions the binary executes).
-hk = { version = "2.7.1", workflow = "release.yml" }
+hk = { version = "2.9.0", workflow = "release.yml" }
 jq = "1.8.2"
-"aqua:jolars/panache" = "3.17.0"
-python = "3.15.0"
+"aqua:jolars/panache" = "3.17.1"
+python = "3.15.2"
 ripgrep = "15.2.0"
-rumdl = "0.3.0"
-"aqua:owenlamont/ryl" = "0.26.0"
+rumdl = "0.3.1"
+"aqua:owenlamont/ryl" = "0.26.1"
 shellcheck = "0.11.0"
 shellharden = "4.3.2"
 shfmt = "3.14.1"
-uv = "0.13.1"
+uv = "0.13.6"
 yq = "4.54.1"
 # Node runtime + renovate package for the renovate-config-validator hk step (.github/renovate.json gate).
 # trust_policy_excludes: @yarnpkg/libzip@3.2.2 (a renovate dependency) lost npm provenance vs 3.2.1
@@ -65,8 +65,8 @@ yq = "4.54.1"
 # allow_builds: re2 (renovate's optional regex accelerator) ships a prebuilt native binary that its
 # install script downloads; aube's default-deny lifecycle policy would skip it, leaving the module
 # absent and renovate logging a verbose RegExp-fallback stack trace on every gate run.
-"npm:renovate" = { version = "44.176.2", trust_policy_excludes = ["@yarnpkg/libzip@3.2.2"], allow_builds = ["re2"] }
-node = "26.12.1"
+"npm:renovate" = { version = "44.190.0", trust_policy_excludes = ["@yarnpkg/libzip@3.2.2"], allow_builds = ["re2"] }
+node = "26.13.0"
 
 [vars]
 # Single source of the supervisor-ref pin the validate task fetches schemas from. Renovate bumps it
