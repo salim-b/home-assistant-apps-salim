@@ -16,7 +16,6 @@
 #USAGE }
 
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT"
 
 app="${usage_app?}"
 host="${usage_host?}"

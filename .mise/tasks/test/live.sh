@@ -11,7 +11,6 @@
 #USAGE flag "--test-options" help="Apply the app's test options (`.mise/tasks/test/live/<app>.yaml`) to the device app for the run (backup kept, restored on exit)"
 
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT"
 
 app="${usage_app?}"
 host="${usage_host?}"

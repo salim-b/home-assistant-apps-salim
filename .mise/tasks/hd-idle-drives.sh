@@ -3,7 +3,6 @@
 #USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to `root`), e.g. `root@192.168.1.11` or just `192.168.1.11`"
 
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT"
 
 host="${usage_host?}"
 # Bare host (no user@) defaults to root: HAOS device access is root-based

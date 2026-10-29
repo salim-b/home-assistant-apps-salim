@@ -5,7 +5,6 @@
 #USAGE }
 
 set -euo pipefail
-cd "$MISE_PROJECT_ROOT"
 
 # shellcheck disable=SC2124
 apps=("${usage_app:-$(git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1 | sort -u)}")
