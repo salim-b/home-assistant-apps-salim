@@ -44,5 +44,8 @@ via `mise run <task> --help` — not duplicated here. Device access over SSH onl
   analogous to the lab hooks (skill `ha-app-lab-testing`). Apps without a hook get deploy plus state-wait only.
 - Hooks may define their own env knobs; example: hd-idle's `LIVE_HDIDLE_LABEL_GLOB` selects the drives to exercise by
   filesystem label and generates the test options on the fly.
-- Known limitation: native mise depends-arg forwarding is not implemented in any released mise (docs describe it;
-  verified up to 2026.10.6) — the task forwards via its run script instead.
+- The deploy runs as a mise `depends` edge with native arg forwarding (`{{ usage.* }}` templates; `--replace`
+  conditionally via a Tera `{% if %}`). `mise tasks deps` hides the edge while the templates are unresolved (mise skips
+  usage-templated deps until args are known); `mise run --dry-run` shows the rendered deploy command. Verified against
+  released mise 2026.10.6, 2026.10.21 and 2026.10.23 (feature added upstream 2026.4, jdx/mise#8893; its historical
+  silent-drop bug for omitted optional values, jdx/mise#13569, was fixed before 2026.10.6).

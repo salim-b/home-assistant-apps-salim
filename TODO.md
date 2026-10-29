@@ -5,9 +5,6 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
 
 ## Tasks
 
-- Investigate mise task-arg-forwarding feature gap (the `test:live` task forwards its depends-args via a run script —
-  see `.mise/tasks/test/live/`) and fix it upstream if indicated.
-
 - Upstream: file an hk issue/PR against [jdx/hk](https://github.com/jdx/hk) — its shebang-based file typing (v2.7.0,
   `src/file_type.rs`) does not recognize `#!/usr/bin/with-contenv bashio` (the Home Assistant base image's interpreter
   for s6-overlay scripts): wrapper interpreter plus unknown `bashio` argument resolve to plain text, so hk's

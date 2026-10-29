@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2029  # remote/docker commands intentionally embed client-side values
 #MISE description="Deploy an app to a HAOS device and run live checks against it (app hook provides the checks)"
-# NOTE: mise's documented depends arg-forwarding is implemented in NO released mise (all forms
-# silently drop the args, checked up to 2026.10.6) - forward from the run script; revisit when mise ships it.
+#MISE depends="deploy {{ usage.app }} {{ usage.host }}{% if usage.replace %} --replace{% endif %}"
 #USAGE arg "<app>" help="App to test (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
@@ -17,11 +16,6 @@ host="${usage_host?}"
 # Bare host (no user@) defaults to root: HAOS device access is root-based
 case "$host" in *@*) ;; *) host="root@$host" ;; esac
 SSH_OPTS=(-o ConnectTimeout=10)
-
-# Forward the shared flags to deploy (native depends forwarding unimplemented - see header note)
-forward=()
-[ "${usage_replace:-false}" = "true" ] && forward+=(--replace)
-mise run deploy "$app" "$host" "${forward[@]}"
 
 # --------------------------------------------------------------------------
 # Generic live-test harness; per-app checks live in .mise/tasks/test/live/<app>.sh - hook contract
