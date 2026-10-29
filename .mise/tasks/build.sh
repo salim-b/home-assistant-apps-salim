@@ -6,8 +6,11 @@
 
 set -euo pipefail
 
-# shellcheck disable=SC2124
-apps=("${usage_app:-$(git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1 | sort -u)}")
+if [ "${usage_app:-}" != "" ]; then
+  apps=("$usage_app")
+else
+  mapfile -t apps < <(git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1 | sort -u)
+fi
 
 native_platform="linux/$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
 other_platform="linux/$([ "$native_platform" = "linux/amd64" ] && echo arm64 || echo amd64)"

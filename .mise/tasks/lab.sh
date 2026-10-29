@@ -11,8 +11,11 @@
 
 set -euo pipefail
 
-# shellcheck disable=SC2124
-apps=("${usage_app:-$(git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1 | sort -u)}")
+if [ "${usage_app:-}" != "" ]; then
+  apps=("$usage_app")
+else
+  mapfile -t apps < <(git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1 | sort -u)
+fi
 
 # Consumed by the app hook and the fixture adapter (both read LAB_SPINDOWN_DRIVES;
 # read-only standby commands + state queries only).
