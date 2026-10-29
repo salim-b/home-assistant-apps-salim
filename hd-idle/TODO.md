@@ -22,9 +22,14 @@ Open work items only (resolved items live in git history). Underlying technical 
   also relax the option schema. Worth filing upstream: per-device `-I` would make the global-only limitation moot for
   mixed setups.
 
-- The supervisor's `device(subsystem=block)` dropdown lists partitions and loop devices alongside disks (filter is by
-  udev subsystem only); users can pick a `-partN` entry, which our startup validation rejects with an explanatory
-  message. Consider an upstream suggestion for a finer filter (e.g. `type=disk`) if the UX annoys real users.
+- Upstream feature request to file (home-assistant/supervisor): the `device(subsystem=block)` dropdown leaks partitions
+  (by-id `...-partN` links) into the app config UI and users pick them, which our startup validation rejects with an
+  explanatory message. The UX annoys real users (us), so suggest a finer filter (e.g. `type=disk`). Root cause and
+  upstream state: repository-root `KNOWLEDGE.md` §"Supervisor: device access" (partitions only — loop devices are
+  already hidden upstream by `_RE_HIDE_SYSFS`). Investigated 2026-10: no existing upstream issue/PR/roadmap item
+  (supervisor, frontend, OpenHomeFoundation/roadmap, epics) and no community WTH thread; precedent for hard-filtering
+  the device list: supervisor PR #2489 (2021, virtual vc devices); another affected add-on: Draggon/hassio-hdd-tools.
+  The 2026.5 serial-port selector shows refined hardware pickers are welcome.
 
 - Upstream: file a feature request for per-drive (and/or global) disabling of the drives' own power management - the ATA
   SET FEATURES APM level and standby timer equivalents (`hdparm -B off` / `smartctl -d sat -s apm,off` and

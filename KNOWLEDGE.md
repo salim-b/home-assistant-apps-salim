@@ -72,8 +72,11 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
 - **Device-typed option fields** (`device` schema type, optionally `device(subsystem=<udev-subsystem>` — values from
   `hardware/const.py` `UdevSubsystem`, e.g. `block`, `usb`, `tty`) grant the cgroup rules (`c`/`b <major>:<minor> rwm`).
   `AppOptions._collect_device_paths` **recurses into list-of-objects schemas**, so `disks[].device` fields of a list
-  option grant access per entry. The UI renders them as a dropdown of `(device.by_id or device.path)` values; the
-  subsystem filter is by udev subsystem only (for `block` this still includes partitions and loops).
+  option grant access per entry. The UI renders them as a dropdown of `(device.by_id or device.path)` values; the option
+  schema's filter regex accepts `subsystem=<subsystem>` only (`apps/options.py`), so filtering is by udev subsystem only
+  — for `block` partitions leak into the dropdown (by-id `...-partN` links), while loop devices are already hidden by
+  `_RE_HIDE_SYSFS` (`hardware/helper.py`: `/sys/devices/virtual/block/*`; supervisor main @ b8d32f2, 2026-10-28; the
+  frontend renders the supervisor-provided options verbatim).
 - **Hotplug**: `docker/app.py::_hardware_events` listens for HARDWARE_NEW_DEVICE and re-grants the cgroup rule when a
   new device matches one of the configured paths against `device.path`, `device.sysfs` or **`device.links`** (the udev
   symlinks — hence by-id paths match after re-plugging even when the kernel letter changed). No app restart needed.
