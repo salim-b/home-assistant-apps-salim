@@ -22,14 +22,10 @@ Open work items only (resolved items live in git history). Underlying technical 
   next app restart. Find a detection mechanism that respects the redundant-treatment risk (device-verified motor starts,
   see `KNOWLEDGE.md`).
 
-- Upstream feature request to file (home-assistant/supervisor): the `device(subsystem=block)` dropdown leaks partitions
-  (by-id `...-partN` links) into the app config UI and users pick them, which our startup validation rejects with an
-  explanatory message. The UX annoys real users (us), so suggest a finer filter (e.g. `type=disk`). Root cause and
-  upstream state: repository-root `KNOWLEDGE.md` §"Supervisor: device access" (partitions only — loop devices are
-  already hidden upstream by `_RE_HIDE_SYSFS`). Investigated 2026-10: no existing upstream issue/PR/roadmap item
-  (supervisor, frontend, OpenHomeFoundation/roadmap, epics) and no community WTH thread; precedent for hard-filtering
-  the device list: supervisor PR #2489 (2021, virtual vc devices); another affected add-on: Draggon/hassio-hdd-tools.
-  The 2026.5 serial-port selector shows refined hardware pickers are welcome.
+- The `device(subsystem=block)` dropdown leaks partitions (by-id `...-partN` links) into the app config UI and users
+  pick them, which our startup validation rejects with an explanatory message. The UX annoys real users (us), so we
+  [suggested](https://github.com/orgs/home-assistant/discussions/5323) a finer filter upstream. Once approved, we could
+  offer to submit a PR implementing our proposal.
 
 - Upstream: file a feature request for per-drive (and/or global) disabling of the drives' own power management - the ATA
   SET FEATURES APM level and standby timer equivalents (`hdparm -B off` / `smartctl -d sat -s apm,off` and
