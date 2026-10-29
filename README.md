@@ -21,7 +21,7 @@ server.
 
 Spins down idle USB and SATA hard disk drives automatically.
 
-### [hickory-dns](./hickory-dns)
+### [Hickory DNS](./hickory-dns)
 
 ![Supports aarch64 Architecture][aarch64-shield] ![Supports amd64 Architecture][amd64-shield]
 

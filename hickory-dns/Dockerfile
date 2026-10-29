@@ -15,7 +15,7 @@ RUN apk add --no-cache \
 COPY --link rootfs /
 
 LABEL \
-    org.opencontainers.image.title="Home Assistant app: hickory-dns" \
+    org.opencontainers.image.title="Home Assistant app: Hickory DNS" \
     org.opencontainers.image.description="DNS server resolving via encrypted upstream DNS (DoT/DoH/DoQ) with DNSSEC validation." \
     org.opencontainers.image.source="https://github.com/salim-b/home-assistant-apps-salim" \
     org.opencontainers.image.licenses="Apache License 2.0"

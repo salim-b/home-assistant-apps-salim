@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.1.1
+
+- Renamed the app to "Hickory DNS" (display name only - the `hickory-dns` slug, install URL and image names stay the
+  same).
+
 ## 0.1.0
 
 - Initial release.

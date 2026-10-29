@@ -1,4 +1,4 @@
-# hickory-dns
+# Hickory DNS
 
 ## What it does
 
@@ -7,9 +7,9 @@ upstream over **encrypted DNS** (DNS-over-TLS, DNS-over-HTTPS or DNS-over-QUIC),
 answers. The point: point your router at the Home Assistant device once, and every device on the network resolves its
 DNS through encrypted upstream connections – no per-device configuration, no plaintext UDP:53 queries leaving your home.
 
-Under the hood it wraps the [hickory-dns](https://github.com/hickory-dns/hickory-dns) server binary (from the Alpine
-`hickory-dns` package) in forwarding-resolver mode: everything not answered locally is forwarded to the upstream
-recursive resolvers you configure.
+Under the hood it wraps the [`hickory-dns`](https://github.com/hickory-dns/hickory-dns) server binary in
+forwarding-resolver mode: everything not answered locally is forwarded to the upstream recursive resolvers you
+configure.
 
 ## Setup
 

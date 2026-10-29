@@ -1,4 +1,4 @@
-# Home Assistant app: hickory-dns
+# Home Assistant app: Hickory DNS
 
 Turn your Home Assistant instance into a secure DNS server that resolves via encrypted upstream DNS
 (DNS-over-TLS/HTTPS/QUIC) with DNSSEC validation. Built on memory-safe [Hickory DNS](https://hickory-dns.org/#server).
