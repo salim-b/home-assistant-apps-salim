@@ -4,3 +4,6 @@ mise.*.local.toml
 
 # Local-only notes (per-machine drive inventory; never committed)
 hd-idle/.drives.md
+
+# Build freshness stamps (mise run build; per-app mtime reference, see .mise/tasks/build.sh)
+.mise/build-stamps/

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Full-fidelity boot lab: fake supervisor API, boot, app-provided runtime check, graceful stop"
+#MISE depends="build {{ usage.app }}"
 #USAGE arg "[app]" help="App to lab-test (default: all apps)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
@@ -22,8 +23,8 @@ fi
 spindown_drives="${usage_spindown_drives:-}"
 export LAB_SPINDOWN_DRIVES="$spindown_drives"
 
-## The lab boots the repo-built image (local/<app>:<version>) and never builds it itself - fail fast
-## with the remedy instead of docker's raw "no such image" error mid-run.
+## The `build` dependency (declared in the #MISE header) rebuilds stale/missing images first; this
+## preflight only guards `mise run lab --skip-deps` runs against docker's raw "no such image" error mid-run.
 missing=()
 for app in "${apps[@]}"; do
   version=$(yq -r '.version' "$app/config.yaml")

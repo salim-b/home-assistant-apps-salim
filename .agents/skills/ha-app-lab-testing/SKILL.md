@@ -10,8 +10,11 @@ description: How to run the full-fidelity boot lab and write per-app lab hooks (
 ## When and how
 
 Run for every runtime-affecting change. Invocation: `mise run lab [app] [--keep]`; usage via `mise run lab --help` (not
-duplicated here). What it does: a fake Supervisor API serves the app's default options (adapted to the lab network), the
-app container boots with its complete s6-rc tree, an app-provided runtime check runs, then a graceful stop. `--keep`
+duplicated here). The lab declares `build` as a mise `depends` edge with arg forwarding: a stale or missing image is
+rebuilt first (`build` skips apps whose image is newer than every input file — stamp-based freshness, `--rebuild`
+forces; a no-arg lab runs the freshness pass over all apps). `--skip-deps` skips the build; a then-missing image fails
+the lab's preflight. What it does: a fake Supervisor API serves the app's default options (adapted to the lab network),
+the app container boots with its complete s6-rc tree, an app-provided runtime check runs, then a graceful stop. `--keep`
 keeps containers/directories for debugging.
 
 ## Boot-only default
