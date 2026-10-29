@@ -19,6 +19,23 @@ apps=("${usage_app:-$(git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1
 spindown_drives="${usage_spindown_drives:-}"
 export LAB_SPINDOWN_DRIVES="$spindown_drives"
 
+## The lab boots the repo-built image (local/<app>:<version>) and never builds it itself - fail fast
+## with the remedy instead of docker's raw "no such image" error mid-run.
+missing=()
+for app in "${apps[@]}"; do
+  version=$(yq -r '.version' "$app/config.yaml")
+  docker image inspect "local/$app:$version" >/dev/null 2>&1 || missing+=("$app")
+done
+if [ "${#missing[@]}" -gt 0 ]; then
+  echo "ERROR: no repo-built image for: ${missing[*]}" >&2
+  if [ "${#missing[@]}" -eq 1 ]; then
+    echo "       build it first: mise run build ${missing[0]}" >&2
+  else
+    echo "       build them first: mise run build" >&2
+  fi
+  exit 1
+fi
+
 net="nfslab-$$"
 ts() { echo "[t+${1}s] $2"; }
 tmpdir=$(mktemp -d /tmp/nfslab-XXXXXX)
