@@ -5,25 +5,6 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
 
 ## Tasks
 
-- Upstream: file a formatter bug against [panache](https://github.com/jolars/panache) — its reflow is non-idempotent on
-  a multi-line ~~strikethrough~~ inside a list item: the continuation line's indent grows by 2 spaces on every
-  `panache format` run, so `format --check` never settles afterward — violating the formatter's documented idempotency
-  golden rule ([formatting guide](https://panache.bz/guide/formatting.html)).
-
-  Reproducer (panache 3.16.0, verified 2026-10; default settings suffice, the wrap just lands elsewhere at other
-  line-widths):
-
-  ```markdown
-  - ~~Create upstream PR in HA to render app configuration labels in the UI as Markdown blocks instead of the current
-    single-line plain text.~~
-  ```
-
-  Findings to include in the issue: every run re-indents the continuation +2 (4 → 6 → 8 …); top-level multi-line
-  strikethroughs are stable, as are bold/strong and code spans wrapping inside list items — only strikethrough in a list
-  item is affected; `-o extensions.strikethrough=false` does not help (the CST still yields a `STRIKEOUT` node with
-  `NEWLINE` + `LINE_PREFIX` inside). Until fixed, this repo keeps struck spans on a single line (skill
-  `ha-app-markdown`).
-
 - Upstream: file an hk issue/PR against [jdx/hk](https://github.com/jdx/hk) — its shebang-based file typing (v2.7.0,
   `src/file_type.rs`) does not recognize `#!/usr/bin/with-contenv bashio` (the Home Assistant base image's interpreter
   for s6-overlay scripts): wrapper interpreter plus unknown `bashio` argument resolve to plain text, so hk's
@@ -56,8 +37,7 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   the custom step the same way the rumdl/ryl builtins do. Design point to settle in the PR: hk passes explicit file
   paths, and panache bypasses its own config excludes for explicit paths (observed here — hence the `mdExcludes` for
   `AI_POLICY.md` and `**/LICENSE.md` in `hk.pkl`); decide whether the builtin filters such files itself, documents the
-  interaction, or waits for panache to honor excludes on explicit paths (cf. the panache strikethrough idempotency entry
-  above for the other known panache quirk).
+  interaction, or waits for panache to honor excludes on explicit paths.
 
 - Upstream: investigate whether [shellharden](https://github.com/anordal/shellharden) mangles `for` loops and file an
   issue if none exists (check for existing ones first). Verified with v4.3.2 (2026-10): `--transform`/`--replace` quotes

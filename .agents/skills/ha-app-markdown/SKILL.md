@@ -17,15 +17,14 @@ description: Markdown formatting conventions for this repository — panache own
 
 - Second linter (`.rumdl.toml`, markdownlint-rules-rich); its own reflow is disabled (its fill state disagrees with
   panache's), so MD013 is a pure width check: code blocks exempt, lines whose only overrun is an unbreakable code span
-  forgiven.
+  forgiven. panache's reflow breaks around struck spans, never inside them (it leaves a too-long span overwide on its
+  own line), and MD013 does not exempt struck spans the way it exempts code spans: keep struck spans within the
+  120-column width.
 - rumdl never rewrites files: its fix allow-list is pinned to an inert `all` sentinel (behavioral canary in
   validate.py). Formatting fixes go through panache (`mise run fmt`); non-format rumdl findings are fixed by hand.
 
 ## Constructs that break the toolchain — write around them
 
-- Multi-line ~~strikethrough~~ inside a list item: panache's reflow is non-idempotent on it (the continuation line's
-  indent grows every run). Keep struck spans on a single line — shorten the wording; MD013 caps the width at 120.
-  (Upstream bug: root `TODO.md`.)
 - Do not let prose wrap so that a line starts with an ordered-list marker (`4)`, `2026.` — a parenthetical ending in
   digits does this at wrap boundaries): CommonMark renders such a line as prose, panache formats it as a nested list,
   and the two disagree.
