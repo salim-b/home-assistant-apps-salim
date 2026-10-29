@@ -5,27 +5,29 @@ Open work items only (resolved items live in git history). Underlying technical 
 
 ## Tasks
 
-- Upstream: `CONFIG_NFSD=m` in all HAOS board kernels *(do first)*
+- Upstream: `CONFIG_NFSD=m` in all HAOS board kernels *(awaiting upstream decision)*
 
-  Today only Rockchip-based boards (odroid-m1/m1s, Home Assistant Green) ship the nfsd kernel module — every other HAOS
-  board cannot run the app. Facts for the request (from HAOS sources and a reference kernel):
+  Filed 2026-10-29 as [`home-assistant discussion #5334`](https://github.com/orgs/home-assistant/discussions/5334) (HAOS
+  routes feature requests to org discussions — blank issues are disabled in the `home-assistant/operating-system` issue
+  tracker). The full fact set, per-board matrix, cost/containment arguments, and the proposed change live in the
+  discussion; this item only tracks state and next steps:
 
-  - The NFS *client* (`CONFIG_NFS_FS=y`) is already built into all board kernels (upstream PRs #4762/#4773), so the
-    `sunrpc`/`lockd`/`grace` infrastructure exists; nfsd mainly adds `nfsd.ko` itself.
-  - HAOS already ships `rpcbind` and `nfs-utils` (client tools) on every board; `rpcbind` even runs unconditionally.
-  - Module cost, measured on a comparable x86_64 kernel: `nfsd.ko.xz` ≈ 417 KB compressed; loaded only when the nfsd
-    filesystem is mounted, so zero runtime cost otherwise.
-  - Containment: the kernel nfsd of the app runs in the app's network namespace and resolves export paths in the app's
-    mount namespace, so it only ever serves files the app could read anyway.
-  - Boards missing the module: Raspberry Pi 3/4/5, generic-aarch64, generic-x86_64, odroid c2/c4/n2, khadas-vim3, ova.
-    Where: `buildroot-external/kernel/v6.18.y/` — shared `haos.config` fragment (preferred, avoids per-board
-    maintenance) or the per-SoC configs (`kernel-arm64-rockchip.config` already has it).
-  - Expected counterarguments & responses: *image/RAUC slot size grows* → ~0.4 MB compressed per board image vs multi-GB
-    images; *kernel attack surface* → the module stays unloaded until used, and the app-side exposure is confined
-    (AppArmor + namespaces); *"HAOS is not a NAS"* → official apps already include file/infra servers (Samba share app),
-    and HAOS ships USBIP and rpcbind support; an NFS server completes the existing NFS *client* support.
-  - Action: open an issue in home-assistant/operating-system with these facts, then a PR. If rejected: keep the
-    per-board support matrix in `DOCS.md`.
+  - Prepared: branch `agent-nfsd-all-boards` in the local `home-assistant/operating-system` clone — moves the seven
+    `CONFIG_NFSD*` lines from `kernel-arm64-rockchip.config` into the shared `haos.config` fragment of
+    `buildroot-external/kernel/v6.18.y/` — plus untracked drafts `agent-draft-proposal.md` / `agent-draft-pr.md` in that
+    clone's root.
+  - Submit it (fork → push branch → PR against `dev`, referencing the discussion) once maintainers signal approval
+    there, or if there is no reaction within 30 days (by 2026-11-28). Per the upstream AI policy (`AI_POLICY.md`), a
+    human must review and own everything posted — no autonomous submission.
+  - Raspberry Pi 3/4/5 and Yellow already ship `nfsd.ko`: the upstream `bcm2711`/`bcm2712` defconfigs pinned by HAOS set
+    `CONFIG_NFSD=m` and no HAOS fragment disables it — support there rests on upstream defconfig contents, not on an
+    explicit HAOS choice. Boards actually missing the module: generic-aarch64, generic-x86_64, ova, odroid-c2/c4/n2,
+    khadas-vim3.
+
+- Verify the app's per-board support matrix in `DOCS.md` (the Requirements section claims Rockchip-only support):
+  Raspberry Pi 3/4/5 and Yellow likely already run the app on current HAOS — whether shipped releases' pinned kernels
+  already include the module needs an on-device check (skill `ha-app-device-testing`). Correct the matrix regardless of
+  the upstream `CONFIG_NFSD` outcome.
 
 - Upstream: host-side nfsd mount + supervisor bind-mount *(exploratory)*
 
