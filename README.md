@@ -39,32 +39,37 @@ AppArmor, base-image gotchas, testing) and in each app's own `KNOWLEDGE.md` (e.g
 [`hickory-dns/KNOWLEDGE.md`](./hickory-dns/KNOWLEDGE.md)); step-by-step procedures live in the skills under
 [`.agents/skills/`](./.agents/skills) (index in [`AGENTS.md`](./AGENTS.md)).
 
-To test an app on your Home Assistant server (device), use the deploy mise tasks — `mise run <task> --help` has the
-full, current usage (options, flags and what happens to the app's stored options); the examples below cover the common
-flows:
+We use [mise](https://mise.jdx.dev/) as tool and environment manager and task runner. `mise run <task> --help` provides
+the full, current usage instructions for any task. Common tasks:
 
 ```sh
-# app name (repo subfolder) + SSH target of the device
+# check and validate files
+mise run check
+
+# test app in a containerized lab
+mise run lab nfs-server 
+
+# deploy app to HAOS device (installed as a local app)
 mise run deploy nfs-server root@homeassistant.local
 
-# switch a device from the locally installed app to the published registry
-# version (after merging); --config decides the previous options' fate
+# switch a device from the locally installed app to the published registry version,
+# migrating app options
 mise run deploy-registry hd-idle root@homeassistant.local --config migrate
 
-# get app logs (`--follow` continuously prints new log entries until you abort;
-# app slug is `local_<config.yaml slug>`)
+# get app logs from HAOS device (`--follow` continuously prints new log entries until
+# you abort; app slug is `local_<config.yaml slug>`)
 ssh root@homeassistant.local 'ha apps logs --follow local_nfs-server'
 ```
 
-Note that the deploy tasks comment out the top-level `image:` key in the *device-side* copy of `config.yaml`: with an
-`image` key set, the Supervisor would pull that image from GHCR instead of building locally from your working tree — see
-the [dev docs](https://contributors.home-assistant.io/apps/guides/testing/#remote-development). An app already installed
-**from an app repository** (not as a local app — such installs have a hashed store slug like `f8b2d53d_nfs-server`)
-would conflict on the app's published port, so the tasks refuse; uninstall that copy first (the error message shows the
-exact command) or pass `--replace` to have the task uninstall it automatically.
+Note that the deploy tasks comment out the top-level `image:` key in the *device-side* copy of the app's `config.yaml`:
+with an `image` key set, the Supervisor would pull that image from GHCR instead of building locally from your working
+tree — see the [dev docs](https://contributors.home-assistant.io/apps/guides/testing/#remote-development). An app
+already installed **from an app repository** (not as a local app — such installs have a hashed store slug like
+`f8b2d53d_nfs-server`) would conflict on the app's published port, so the tasks refuse; uninstall that copy first (the
+error message shows the exact command) or pass `--replace` to have the task uninstall it automatically.
 
-For a full end-to-end test, run `test:live` (for the `nfs-server` app, this includes an NFS client roundtrip against the
-running app). It deploys the app, forwarding `--replace`/`--test-options`:
+For a full end-to-end test on a HAOS device, run `test:live` (for the `nfs-server` app, this includes an NFS client
+roundtrip against the running app). It deploys the app, forwarding `--replace`/`--test-options`:
 
 ```sh
 # plain: tests the device app's currently configured shares
