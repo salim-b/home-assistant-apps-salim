@@ -9,10 +9,15 @@ HK_MISE = "1"
 HK_STASH_UNTRACKED = "0"
 
 # Task docs: https://mise.jdx.dev/tasks/ – file tasks live in `.mise/tasks/`
-[tasks.lint]
-description = "Lint all tracked files via hk (same checks as the pre-commit hook)"
-run = "hk check --all --no-fail-fast"
-output = "interleave"
+[tasks.check]
+description = "Run all pre-commit checks (lint + validate)"
+depends = ["lint", "validate"]
+output = "keep-order"
+
+# Panache owns ALL Markdown autoformatting (.panache.toml, .agents/skills/ha-app-markdown); rumdl stays check-only.
+[tasks.fmt]
+description = "Auto-format the repository's Markdown via Panache"
+run = "panache format ."
 
 [tasks.install-git-hooks]
 description = "Install hk git hooks user-wide via `~/.gitconfig` (needs Git 2.54+)"
@@ -26,18 +31,23 @@ fi
 exec hk install --global --mise
 """
 skip_if = """
-f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"; [[ -f "$f" ]] || f="$HOME/.gitconfig"; [[ -f "$f" ]] && rg -q '^\\s*\\[\\s*hook\\s+"hk-[\\w-]+"\\s*\\]' "$f"
+f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
+[[ -f "$f" ]] || f="$HOME/.gitconfig"
+[[ -f "$f" ]] && rg -q '^\\s*\\[\\s*hook\\s+"hk-[\\w-]+"\\s*\\]' "$f"
 """
 
-[tasks.check]
-description = "Run all pre-commit checks (lint + validate)"
-depends = ["lint", "validate"]
-output = "keep-order"
+[tasks.lint]
+description = "Lint all tracked files via hk (same checks as the pre-commit hook)"
+run = "hk check --all --no-fail-fast"
+output = "interleave"
 
-# Panache owns ALL Markdown autoformatting (.panache.toml, .agents/skills/ha-app-markdown); rumdl stays check-only.
-[tasks.fmt]
-description = "Auto-format the repository's Markdown via Panache"
-run = "panache format ."
+[tasks.optimize-png]
+description = "Optimize a PNG image file losslessly using oxipng"
+dir = "{{ cwd }}"
+usage = '''
+arg "<file>" help="Path to the PNG image file to optimize."
+'''
+run = 'oxipng --opt=max --strip=safe --alpha --interlace=off --zopfli --zi=100 "${usage_file:?}"'
 
 [tools]
 "github:immanuwell/dockerfile-roast" = "1.7.0"
