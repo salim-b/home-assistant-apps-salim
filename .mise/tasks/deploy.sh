@@ -59,6 +59,35 @@ if [ "$repo_installs" != "" ] && [ "$repo_installs" != "[]" ]; then
   echo "$repo_installs" | jq -r '.[] | "  - \(.slug) (installed version \(.version))"'
   if [ "${usage_replace:-false}" = "true" ]; then
     echo "-- --replace given: uninstalling the repository-installed copy first"
+    # --- hickory-dns: uninstalling the store copy can cut the DEVICE's own DNS ---------------------------------
+    # (the store reload and the local image build below need DNS - device_resolves_through_self)
+    if [ "$app" = "hickory-dns" ]; then
+      rc=0
+      device_resolves_through_self || rc=$?
+      case "$rc" in
+        0)
+          echo "   WARNING: the device itself resolves through the hickory-dns app being uninstalled below (its"
+          echo "            configured DNS servers include the device's own IP). Without it the device has no DNS"
+          echo "            left: the store reload and the local install's on-device image build will fail, and the"
+          echo "            device - plus any LAN client using it as a resolver - ends up with broken DNS. Re-point"
+          echo "            the device's DNS servers first (router DHCP or the HA network settings)."
+          printf '   Are you sure you want to continue? (yes/no) '
+          if ! read -r reply </dev/tty; then
+            echo >&2
+            echo "ERROR: aborted (no answer read) - nothing was changed on the device." >&2
+            exit 1
+          fi
+          case "${reply,,}" in
+            yes | y) ;;
+            *)
+              echo "-- aborted - nothing was changed on the device."
+              exit 1
+              ;;
+          esac
+          ;;
+        2) echo "-- (could not determine the device's DNS servers - skipping the DNS-outage check)" ;;
+      esac
+    fi
     for repo_slug in "${repo_slugs[@]}"; do
       # Options die with the uninstall - back them up first (--config migrate additionally carries them over).
       repo_opts=$(ha_app_options "$repo_slug")
