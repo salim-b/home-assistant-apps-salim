@@ -16,9 +16,9 @@ procedures in the skill `hickory-dns-runtime`.
 
 - **Upstream DNSSEC validator false-Bogus on real-world response shapes**: with `dnssec` enabled the daemon SERVFAILs
   names that resolve fine everywhere else - two live repros, both reproduced with the pinned 0.26.1 apk against
-  Cloudflare and Quad9 DoT upstreams: `public-dns.info` (unsigned apex-CNAME zone - the zone-cut search's NS query comes
-  back answered with a CNAME, the walk lands in the signed parent zone and the unsigned CNAME is judged Bogus;
-  [#4027](https://github.com/hickory-dns/hickory-dns/issues/4027),
+  Cloudflare and Quad9 DoT upstreams and verified identical on a v0.26.3 source build: `public-dns.info` (unsigned
+  apex-CNAME zone - the zone-cut search's NS query comes back answered with a CNAME, the walk lands in the signed parent
+  zone and the unsigned CNAME is judged Bogus; [#4027](https://github.com/hickory-dns/hickory-dns/issues/4027),
   [#4063](https://github.com/hickory-dns/hickory-dns/issues/4063)) and `wiki.mint-system.ch` (wildcard-expanded CNAME in
   a signed NSEC zone - the recursor attaches only the wildcard's NSEC and the whole answer is rejected, CD=1 does not
   help; [#4047](https://github.com/hickory-dns/hickory-dns/issues/4047),
