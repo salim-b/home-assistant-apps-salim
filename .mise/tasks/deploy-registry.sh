@@ -156,7 +156,7 @@ else
   [ "$local_installed" != "" ] && [ "$local_installed" != "null" ] \
     && local_version=$(echo "$local_installed" | jq -r '.version') || local_version=""
   if [ "$local_version" != "" ] && [ "$local_version" != "$store_version" ] \
-    && [ "$(printf '%s\n' "$local_version" "$store_version" | sort -V | head -1)" != "$store_version" ]; then
+    && [ "$(printf '%s\n' "$local_version" "$store_version" | sort -V | head -1)" = "$store_version" ]; then
     echo "   WARNING: the registry version ($store_version) is OLDER than the locally installed $local_version - proceeding as requested."
   fi
 
