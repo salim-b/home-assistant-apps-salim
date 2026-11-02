@@ -60,35 +60,6 @@ fi
   exit 1
 }
 
-sup_get() { # sup_get <api-path>: supervisor REST GET (read-only), raw JSON
-  ssh "${SSH_OPTS[@]}" "$host" \
-    "curl -s -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" http://supervisor/$1"
-}
-
-# The device resolves through the CoreDNS forward chain: manual servers, then the host's DHCP-learned DNS
-# servers ("locals"), then the DoT fallback (root KNOWLEDGE.md §"Supervisor: DNS resolution chain (CoreDNS)").
-# When the device's own IP is among them, whatever app serves :53 on the device (e.g. the locally installed
-# hickory-dns uninstalled below) sits in the device's own resolution path: uninstalling it cuts the
-# supervisor's DNS off and the registry install below fails (no DNS left to download with).
-device_resolves_through_self() { # 0 = the device's DNS servers include its own IP, 1 = no, 2 = undetermined
-  local dns_info net_info own_ips resolvers
-  dns_info=$(sup_get dns/info) || return 2
-  net_info=$(sup_get network/info) || return 2
-  # The device's own IPs: v1 nests the CIDR lists under .ipv4/.ipv6, v2 under .state/.config (both shapes
-  # exist - root KNOWLEDGE.md §"Supervisor: DNS resolution chain (CoreDNS)").
-  own_ips=$(jq -r '(.data.interfaces // [])[]
-      | (.ipv4.address // []) + (.ipv6.address // [])
-        + (.state.ipv4.addresses // []) + (.state.ipv6.addresses // [])
-        + (.config.ipv4.addresses // []) + (.config.ipv6.addresses // [])
-      | .[] | sub("/[0-9]+$"; "")' <<<"$net_info" 2>/dev/null) || return 2
-  resolvers=$(jq -r '((.data.servers // []) + (.data.locals // []))[]
-      | sub("^dns://"; "") | sub(":[0-9]+$"; "")' <<<"$dns_info" 2>/dev/null | sort -u) || return 2
-  [ "$own_ips" != "" ] && [ "$resolvers" != "" ] || return 2
-  local overlap
-  overlap=$(comm -12 <(printf '%s\n' "$own_ips" | sort -u) <(printf '%s\n' "$resolvers"))
-  [ "$overlap" != "" ]
-}
-
 # --- check the repository is added on the device -----------------------------
 repos=$(sup_get store/repositories)
 if ! echo "$repos" | jq -e '.result == "ok"' >/dev/null 2>&1; then
@@ -185,6 +156,7 @@ else
   fi
 
   # --- hickory-dns: uninstalling the local copy can cut the DEVICE's own DNS -----------------------------------
+  # (the registry install below cannot download without DNS - device_resolves_through_self)
   if [ "$app" = "hickory-dns" ] && [ "$local_version" != "" ]; then
     rc=0
     device_resolves_through_self || rc=$?
