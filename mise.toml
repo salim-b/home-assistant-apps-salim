@@ -41,14 +41,6 @@ description = "Lint all tracked files via hk (same checks as the pre-commit hook
 run = "hk check --all --no-fail-fast"
 output = "interleave"
 
-[tasks.optimize-png]
-description = "Optimize a PNG image file losslessly using oxipng"
-dir = "{{ cwd }}"
-usage = '''
-arg "<file>" help="Path to the PNG image file to optimize."
-'''
-run = 'oxipng --opt=max --strip=safe --alpha --interlace=off --zopfli --zi=100 "${usage_file:?}"'
-
 [tools]
 "github:immanuwell/dockerfile-roast" = "1.7.0"
 editorconfig-checker = "4.0.2"
