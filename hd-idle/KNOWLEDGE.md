@@ -183,6 +183,12 @@ gate could not express per-drive overrides); `--since <old-file>` treats only li
 flipped pm-flag counts as changed, so a newly overridden drive is treated exactly once and an unchanged override stays
 skipped.
 
+The treatment runs concurrently: hd-idle-pmfix dispatches one background job per treated drive (each drive's two SET
+FEATURES calls stay sequential) and logs the results in drives-file order after they all finish. Concurrent SG_IO to
+different disks is safe, and the wall time is bounded by the two per-call `timeout 60` caps instead of summing the
+per-drive spin-up times (a standby drive is woken by its first SET FEATURES command, so the former sequential loop
+scaled the boot with the drive count).
+
 Treatment-success detection (`smart()` in hd-idle-pmfix) requires smartctl exit 0 AND output free of
 `failed|unknown|unavailable`: the exit code alone does not certify that ATA SET FEATURES took effect —
 feature-page-filtered bridges answer "APM feature is: Unavailable" with exit 0 (the silent-no-op class of §"USB-bridge

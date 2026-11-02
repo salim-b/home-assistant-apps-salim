@@ -12,6 +12,9 @@ set -euo pipefail
 ## format: hd-idle/KNOWLEDGE.md §"Drive-PM treatment"). Only pm-flag 1 drives are treated (the idle time plays no
 ## role: an idle-0 drive is a treatment target all the same). With --since, only lines NEW or CHANGED relative to
 ## the old file are treated - redundant treatment of asleep drives risks bridge-mediated motor starts.
+## Treated drives run CONCURRENTLY (one background job per drive; each drive's two smartctl calls stay sequential):
+## a standby drive is woken by its first SET FEATURES command, so the former sequential loop scaled the boot with
+## the drive count; concurrent SG_IO to different disks is safe.
 
 DRIVES_FILE="${1:-/etc/hd-idle.drives}"
 SINCE_FILE=""
@@ -48,7 +51,12 @@ is_treated_before() {
 }
 
 ## Only resolved sd* disks with pm-flag 1 are treatment targets; a missing pm-flag (a pre-0.1.6 3-column file -
-## cannot occur in practice) means treat, the former global-default-on behavior.
+## cannot occur in practice) means treat, the former global-default-on behavior. Treated drives dispatch to
+## background jobs; each job writes its log line to a numbered temp file (drives-file order), logged after `wait`
+## - the log stays deterministic despite the concurrent smartctl calls.
+RESULT_DIR=$(mktemp -d)
+trap 'rm -rf "${RESULT_DIR}"' EXIT
+TREATED=0
 while read -r name idle ctype pmflag; do
   pmflag="${pmflag:-1}"
   [ -n "${name:-}" ] || continue
@@ -65,7 +73,19 @@ while read -r name idle ctype pmflag; do
     bashio::log.info "Drive ${name}: drive-PM treatment disabled for this drive - its own power management stays as is."
     continue
   fi
-  apm=$(smart "${name}" "apm" "off")
-  stby=$(smart "${name}" "standby" "off")
-  bashio::log.info "Drive ${name}: APM disable ${apm}; standby timer disable ${stby}."
+  TREATED=$((TREATED + 1))
+  (
+    apm=$(smart "${name}" "apm" "off")
+    stby=$(smart "${name}" "standby" "off")
+    printf 'Drive %s: APM disable %s; standby timer disable %s.\n' "${name}" "${apm}" "${stby}" \
+      >"${RESULT_DIR}/${TREATED}"
+  ) &
 done <"${DRIVES_FILE}"
+wait
+for ((i = 1; i <= TREATED; i++)); do
+  if [ -s "${RESULT_DIR}/${i}" ]; then
+    bashio::log.info "$(cat "${RESULT_DIR}/${i}")"
+  else
+    bashio::log.warning "Treatment result ${i} missing - its concurrent job failed to record it."
+  fi
+done

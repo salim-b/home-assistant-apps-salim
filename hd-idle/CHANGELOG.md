@@ -2,6 +2,13 @@
 
 # Changelog
 
+## 0.1.11
+
+- Internals: the drive-PM treatment now runs concurrently across drives instead of sequentially, so app starts (and
+  watcher reconfigurations) no longer scale with the drive count: standby drives are woken in parallel and the
+  treatment's wall time is bounded by the two per-call smartctl timeouts (~2 minutes worst case) instead of the
+  per-drive spin-up times summing up. No configuration change.
+
 ## 0.1.10
 
 - Maintainability: no behavior change (the comment-stripped scripts are unchanged; AppArmor confinement unchanged - the
