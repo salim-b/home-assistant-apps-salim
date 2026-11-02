@@ -156,7 +156,7 @@ case "$state" in
   started | startup) ;;
   *)
     echo "-- ensuring app is started (install never auto-starts; update/rebuild only restart when it was running)"
-    ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps start $local_slug"
+    ha_app_start "$local_slug"
     ;;
 esac
 state=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \

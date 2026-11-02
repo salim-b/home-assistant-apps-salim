@@ -140,6 +140,29 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
 - In-app links (`README.md`/`DOCS.md` `/config/app/<hash>_<slug>/...`) must use the hashed form to work for the
   repository install (the normal user case); they are dead links for local test installs — expected, those are dev-only.
 
+## Supervisor: ha CLI HTTP client timeouts
+
+Every `ha` CLI API call is capped by a hard-coded per-command HTTP client timeout — no flag or env var overrides it
+(home-assistant/cli `client/helper.go`, ref `bf6d59f`, checked 2026-11-02): commands using plain `GetJSONRequest()` get
+**30 s** (`DefaultTimeout` — among them `ha apps start`), container operations (`apps restart/stop/uninstall/ rebuild`,
+`core start/stop/check`…) get **10 min** (`ContainerOperationTimeout`), and downloads (`apps install/ update`, plugin/OS
+updates) get **1 h** (`ContainerDownloadTimeout`). The 30 s cap is far below hd-idle's app-start spin-up of many drives,
+so the device tasks must not use `ha apps start` for slow-starting apps: `ha_app_start` in `.mise/tasks/lib/ssh-ha.sh`
+POSTs the supervisor REST API (`POST /addons/<slug>/start`, whose response the supervisor holds until the app reaches
+the started state) with `curl --max-time $APP_START_TIMEOUT` (300 s) instead. Version-sensitive: re-verify against
+home-assistant/cli before relying.
+
+## Supervisor: DNS resolution chain (CoreDNS)
+
+The HAOS host and containers resolve through the CoreDNS plugin, whose forward priority is: manual `servers` (the DNS
+options), then `locals` (the host's NetworkManager/DHCP-learned DNS servers, exposed as `dns://<ip>` entries), then
+CloudFlare DoT when `fallback` is true (`supervisor/plugins/dns.py::_write_config`, ref `6556811`, checked 2026-11-02).
+`GET /dns/info` returns `data.servers`, `data.locals` and `data.fallback`; the device's own LAN IPs come from
+`GET /network/info` (`data.interfaces[].ipv4.address` / `.ipv6.address`, CIDR-suffixed strings, v1 shape; the v2 shape
+nests them under `state`/`config` instead). If the device's DNS servers include the device's own IP, the device resolves
+through whatever app serves :53 on it — uninstalling that app (e.g. a locally installed hickory-dns) cuts the
+supervisor's own DNS off mid-task, so subsequent registry downloads fail.
+
 ## AppArmor: mediation and profile mechanics
 
 Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7. Authoring and denial-forensics procedures: skill

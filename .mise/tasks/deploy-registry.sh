@@ -234,7 +234,7 @@ case "$state" in
   started | startup) ;;
   *)
     echo "-- app is not running (state: $state) - starting it"
-    ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps start $store_slug"
+    ha_app_start "$store_slug"
     sleep 10
     state=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" | jq -r '.data.state // empty')
     case "$state" in

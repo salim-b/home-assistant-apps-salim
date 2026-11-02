@@ -27,9 +27,10 @@ host_addr="${host##*@}" # strip a user@ prefix
 
 echo "== live test: $app on $host ($local_slug) =="
 
-wait_started() { # wait until the app reaches a running state
+wait_started() { # wait until the app reaches a running state (60 x ~3 s budget for slow-starting apps -
+  # hd-idle's concurrent drive spin-up; root KNOWLEDGE.md §"Supervisor: ha CLI HTTP client timeouts")
   local state=""
-  for _ in {1..15}; do
+  for _ in {1..60}; do
     state=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null \
       | jq -r '.data.state // empty') || true
     [ "$state" = "started" ] && return 0

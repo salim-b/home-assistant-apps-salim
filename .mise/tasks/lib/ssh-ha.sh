@@ -54,6 +54,28 @@ ha_retry() { # ha_retry <timeout-s> <cmd...>: retry commands failing with known 
   done
 }
 
+# 'ha apps start' cannot start slow apps: the CLI caps every API call with a hard-coded HTTP client timeout
+# (home-assistant/cli client/helper.go DefaultTimeout = 30 s; cmd/apps_start.go uses it, while restart/stop/
+# uninstall get 10 min and install/update 1 h) and offers no flag or env override - far below hd-idle's
+# multi-minute drive spin-up at boot. The supervisor holds the POST's response until the app reaches the started
+# state, so POST it directly with a curl timeout we control (same pattern as ha_post_options below).
+APP_START_TIMEOUT=300
+ha_app_start() { # ha_app_start <slug>: start the app, tolerating slow startups (hd-idle's drive spin-up)
+  local result rc
+  result=$(ssh "${SSH_OPTS[@]}" "$host" \
+    "curl -s --max-time ${APP_START_TIMEOUT} -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" \
+      -X POST http://supervisor/addons/$1/start") && rc=0 || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "ERROR: starting $1 failed or timed out after ${APP_START_TIMEOUT}s (curl rc=$rc) - the app may" >&2
+    echo "       still be starting; check: ssh $host 'ha apps logs $1'" >&2
+    return 1
+  fi
+  if ! echo "$result" | jq -e '.result == "ok"' >/dev/null 2>&1; then
+    printf 'ERROR: the supervisor rejected starting %s: %s\n' "$1" "$result" >&2
+    return 1
+  fi
+}
+
 # --- app options helpers (read-only probes skip ha_retry: readiness established, 'not installed' expected) ---
 
 ha_app_options() { # ha_app_options <slug>: the install's current options as compact JSON ('' when none/unreadable)
