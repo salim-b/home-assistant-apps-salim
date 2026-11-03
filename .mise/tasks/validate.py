@@ -106,8 +106,12 @@ def supervisor_constants() -> dict[str, str]:
 
 
 def find_apps() -> list[str]:
-    if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
-        return [sys.argv[1]]
+    """Selected app: `usage_app` env var (mise) or first argv token (direct
+    runs); empty/unset means all apps, like the optional arg's shell `:-`
+    expansion (empty ≡ unset)."""
+    for src in (os.environ.get("usage_app", ""), sys.argv[1] if len(sys.argv) > 1 else ""):
+        if src and not src.startswith("-"):
+            return [src]
     return sorted(
         p.name
         for p in ROOT.iterdir()

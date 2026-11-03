@@ -16,7 +16,7 @@
 
 set -euo pipefail
 
-app="${usage_app?}"
+app="${usage_app:?}"
 
 CONFIG_MODE="${usage_config:-}"
 case "$CONFIG_MODE" in
@@ -29,7 +29,7 @@ esac
 
 # shellcheck source=.mise/tasks/lib/ssh-ha.sh
 source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
-ha_connect "${usage_host?}"
+ha_connect "${usage_host:?}"
 slug=$(ha_app_slug "$app")
 local_slug="local_${slug}"
 wait_supervisor

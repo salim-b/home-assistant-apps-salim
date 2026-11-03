@@ -17,8 +17,8 @@
 
 set -euo pipefail
 
-app="${usage_app?}"
-file="${usage_file?}"
+app="${usage_app:?}"
+file="${usage_file:?}"
 
 # --- read and validate the options file --------------------------------------------------------
 # Relative paths resolve from the mise invocation directory (tasks run in the project root;
@@ -44,7 +44,7 @@ esac
 
 # shellcheck source=.mise/tasks/lib/ssh-ha.sh
 source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
-ha_connect "${usage_host?}"
+ha_connect "${usage_host:?}"
 slug=$(ha_app_slug "$app")
 local_slug="local_${slug}"
 wait_supervisor

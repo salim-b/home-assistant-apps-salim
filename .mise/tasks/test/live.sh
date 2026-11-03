@@ -11,11 +11,11 @@
 
 set -euo pipefail
 
-app="${usage_app?}"
+app="${usage_app:?}"
 
 # shellcheck source=.mise/tasks/lib/ssh-ha.sh
 source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
-ha_connect "${usage_host?}"
+ha_connect "${usage_host:?}"
 
 # --------------------------------------------------------------------------
 # Generic live-test harness; per-app checks live in .mise/tasks/test/live/<app>.sh - hook contract

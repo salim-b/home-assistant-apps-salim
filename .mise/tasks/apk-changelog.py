@@ -41,10 +41,14 @@ def _argv_value(name: str) -> str:
 
 
 def _val(name: str) -> str:
-    """Read a mise #USAGE option value (exposed to the task as env vars).
-    No manual check here: the usage spec declares the flag required=true, so
-    mise fails the invocation before the script ever runs."""
-    return os.environ.get(f"usage_{name.replace('-', '_')}", "") or _argv_value(name)
+    """Read a mise #USAGE option value (env var; argv fallback for direct runs).
+    The spec declares the flag required=true, so mise fails a missing flag
+    before the script runs - but empty values pass mise's check and are
+    rejected here (the Python equivalent of the shell's `${usage_name:?}`)."""
+    value = os.environ.get(f"usage_{name.replace('-', '_')}", "") or _argv_value(name)
+    if not value:
+        sys.exit(f"apk-changelog: --{name} must not be empty")
+    return value
 
 
 def _flag(name: str) -> bool:

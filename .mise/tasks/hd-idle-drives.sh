@@ -6,7 +6,7 @@ set -euo pipefail
 
 # shellcheck source=.mise/tasks/lib/ssh-ha.sh
 source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
-ha_connect "${usage_host?}"
+ha_connect "${usage_host:?}"
 OUT_FILE="hd-idle/.drives.md"
 
 ## The sheet carries stable by-id IDs (per-machine inventory) - must stay gitignored; refuse to
