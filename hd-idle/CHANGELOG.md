@@ -9,6 +9,14 @@
   "soon" that marks it as the transient drive-spin-up window; the cap is now 80 chars, which still keeps the log line
   short but fits the longest smartctl error messages. No configuration change.
 
+- Internals: the drive-PM treatment now retries the transient spin-up race. A drive that is asleep when the treatment
+  runs is woken by its first command, and the bridge may answer it with SCSI NOT READY ("device will be ready soon")
+  instead of holding the command through the spin-up — a spurious `rc=2` failure that self-heals once the spin-up
+  finishes (also observed on the sequential code path, so it is unrelated to the parallel treatment). Failed calls whose
+  output matches the NOT READY message family are re-issued up to 4 times with 10 s backoff and a late success is logged
+  as "ok (attempt N)"; timed-out and persistent failures (e.g. the APM-filtered bridges) are never retried. No
+  configuration change.
+
 ## 0.1.12
 
 - Internals: hd-idle-pmfix no longer treats a drives-file line without a pm-flag column as a treatment target. The

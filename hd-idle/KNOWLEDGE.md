@@ -137,8 +137,8 @@ it is useful for manual debugging.
 
 ## USB-bridge behaviors
 
-Empirical findings from WD USB bridges (My Book 1110/1230/25EE, Elements 107C, Ext HDD 1021) on test hardware; matrix
-entries are per-bridge firmware behavior.
+Empirical findings from WD USB bridges (My Book 1110/1230/25EE, Elements 107C/25A3, Ext HDD 1021) on test hardware — the
+25A3 findings from the production device; matrix entries are per-bridge firmware behavior.
 
 - **`hdparm -C` is not a safe probe** for these drives: it races the spin-down window (NOT READY sense data, ASC/ASCQ 04 01)
   and then **wakes the drive** — CHECK POWER MODE is forwarded to the drive: truthful, but spin-up inducing. Use
@@ -153,11 +153,13 @@ entries are per-bridge firmware behavior.
   latency of a *real* read (an asleep drive takes the motor ramp; bypass the page cache, read far offsets) — intrusive,
   it wakes an asleep drive. Prevention beats detection: the drives' own power management off plus a spindown command
   class the bridge actually honors (§"Drive-PM treatment", `TODO.md`).
-- **Drive-PM matrix**: `standby,off` is honored by ALL five bridges (the universally deliverable part); `apm,off` only
-  by the My Book 25EE bridge ("APM disabled", reads back as Disabled) — the other four fail with "scsi error aborted
-  command" (107C, 1230) resp. "SAT command failed" (1110, 1021), their APM feature page filtered entirely (smartctl:
-  "APM feature is: Unavailable"); non-fatal by design, logged once. Treatment settings are volatile (reset on drive
-  power cycle): re-applied at boot and on (re)appearance.
+- **Drive-PM matrix**: `standby,off` is honored by ALL six known bridges (the universally deliverable part); `apm,off`
+  by the My Book 25EE bridge ("APM disabled", reads back as Disabled) and the Elements 25A3 — the others fail with "scsi
+  error aborted command" (107C, 1230) resp. "SAT command failed" (1110, 1021), their APM feature page filtered entirely
+  (smartctl: "APM feature is: Unavailable"); non-fatal by design, logged once. The 25A3 additionally answers the first
+  command for an asleep drive with NOT READY 04/01 instead of holding it through the spin-up — a race (§"Drive-PM
+  treatment"), not a deterministic behavior. Treatment settings are volatile (reset on drive power cycle): re-applied at
+  boot and on (re)appearance.
 - **Redundant STOP commands are not harmless**: a STOP to an already-asleep drive half-started the motor (My Book 1230,
   audibly). Consequences: hd-idle's `-I` re-asserts spindowns to EVERY still-asleep drive once per idle interval
   (source-verified `updateState()`) — on such bridges a wear generator, not production-safe; and each app restart fires
@@ -193,8 +195,18 @@ Treatment-success detection (`smart()` in hd-idle-pmfix) requires smartctl exit 
 feature-page-filtered bridges answer "APM feature is: Unavailable" with exit 0 (the silent-no-op class of §"USB-bridge
 behaviors"). The failure-detail grep uses a different word list (`failed|unavailable|aborted|invalid`) — it only picks a
 log line for the message. Every treatment call pins `-d sat` (SAT passthrough for every sd\* device — no reliance on
-smartctl's per-device type auto-detection) and is capped at `timeout 60` (a wedged bridge or slow motor ramp-up must
-neither stall the s6 boot nor wedge a watcher tick).
+smartctl's per-device type auto-detection) and is capped at `timeout 60` (a wedged bridge must neither stall the s6 boot
+nor wedge a watcher tick — timed-out calls are never retried).
+
+A drive that is asleep when the treatment runs races its own spin-up: the first command is itself the wake-up, and the
+bridge may answer it with NOT READY sense (ASC 04/ASCQ 01) instead of holding it through the spin-up — smartctl then
+reports "Read Device Identity failed: scsi error device will be ready soon" and exits rc=2 (the same transient can
+surface at the SET FEATURES step as "APM disable failed: scsi error device will be ready soon" with exit rc=4). smartctl
+never retries NOT READY, so the call fails spuriously and self-heals once the spin-up finishes — observed on the
+Elements 25A3 bridge. smart() retries this recovery family: when the call failed and its output matches "will be ready
+soon" or "device not ready", it re-issues up to 4 attempts with 10 s backoff and logs a late success as "ok (attempt
+N)". The message filter is essential: rc=4 (FAILSMART) also covers the APM-filtered bridges' persistent rejection
+(§"USB-bridge behaviors"), which a bare rc-keyed retry would re-attempt pointlessly at every boot.
 
 ## hd-idle-watch design
 
