@@ -31,7 +31,9 @@ esac
 
 # Success requires rc=0 AND no failed|unknown|unavailable output: smartctl's exit code alone does not certify that
 # ATA SET FEATURES took effect (feature-page-filtered bridges answer "APM feature is: Unavailable" with rc=0 - a
-# silent no-op). The detail grep's different word list only picks a log line for the failure message. -d sat pins
+# silent no-op). The detail grep's different word list only picks a log line for the failure message, truncated to
+# 80 chars: wide enough for full sense messages ("scsi error device will be ready soon"), still one short log line.
+# -d sat pins
 # SAT passthrough for every sd* device; timeout 60 keeps a wedged bridge from stalling the s6 boot or a watcher tick.
 # Rationale: hd-idle/KNOWLEDGE.md §"Drive-PM treatment".
 smart() {
@@ -40,7 +42,7 @@ smart() {
   if [ "$rc" = 0 ] && ! grep -qiE 'failed|unknown|unavailable' <<<"$out"; then
     printf 'ok'
   else
-    printf 'rc=%s (%s)' "$rc" "$(grep -aiE 'failed|unavailable|aborted|invalid' <<<"$out" | head -1 | sed 's/^smartctl [^|]*//;s/^ *//' | cut -c1-60)"
+    printf 'rc=%s (%s)' "$rc" "$(grep -aiE 'failed|unavailable|aborted|invalid' <<<"$out" | head -1 | sed 's/^smartctl [^|]*//;s/^ *//' | cut -c1-80)"
   fi
 }
 

@@ -2,6 +2,13 @@
 
 # Changelog
 
+## 0.1.13
+
+- Internals: the drive-PM treatment no longer truncates the captured smartctl failure detail mid-message. The 60-char
+  cap had cut the SCSI NOT READY (04/01) sense message to "scsi error device will be ready", dropping the trailing
+  "soon" that marks it as the transient drive-spin-up window; the cap is now 80 chars, which still keeps the log line
+  short but fits the longest smartctl error messages. No configuration change.
+
 ## 0.1.12
 
 - Internals: hd-idle-pmfix no longer treats a drives-file line without a pm-flag column as a treatment target. The
