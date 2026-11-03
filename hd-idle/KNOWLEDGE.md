@@ -177,11 +177,10 @@ The drives file (`/etc/hd-idle.drives`, written by hd-idle-genargs next to the a
 interface and the single source of truth for the effective per-drive decision: one
 `<kernel-name> <idle> <command-type> <pm-flag>` line per drive with effective values (exclusions: idle 0, pm-flag 0).
 pmfix treats only pm-flag 1 entries; the idle time plays no role — an idle-0 drive is a treatment target all the same
-(its firmware timer must not fight the user's "never spin down" config). A missing pm-flag column (a pre-0.1.6 3-column
-file — cannot occur in practice) means treat. config.sh and the watcher run pmfix unconditionally (a global-only bashio
-gate could not express per-drive overrides); `--since <old-file>` treats only lines NEW or CHANGED relative to it — a
-flipped pm-flag counts as changed, so a newly overridden drive is treated exactly once and an unchanged override stays
-skipped.
+(its firmware timer must not fight the user's "never spin down" config). config.sh and the watcher run pmfix
+unconditionally (a global-only bashio gate could not express per-drive overrides); `--since <old-file>` treats only
+lines NEW or CHANGED relative to it — a flipped pm-flag counts as changed, so a newly overridden drive is treated
+exactly once and an unchanged override stays skipped.
 
 The treatment runs concurrently: hd-idle-pmfix dispatches one background job per treated drive (each drive's two SET
 FEATURES calls stay sequential) and logs the results in drives-file order after they all finish. Concurrent SG_IO to

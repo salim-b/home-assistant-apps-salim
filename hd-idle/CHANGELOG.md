@@ -2,6 +2,13 @@
 
 # Changelog
 
+## 0.1.12
+
+- Internals: hd-idle-pmfix no longer treats a drives-file line without a pm-flag column as a treatment target. The
+  fallback was unreachable dead code: the drives file is regenerated at every app start by the same image's
+  hd-idle-genargs (four-column format since 0.1.6), and the watcher's baseline replay replaces any drifted file before
+  the next treatment run. No behavior change.
+
 ## 0.1.11
 
 - Internals: the drive-PM treatment now runs concurrently across drives instead of sequentially, so app starts (and

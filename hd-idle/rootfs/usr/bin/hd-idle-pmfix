@@ -49,15 +49,14 @@ is_treated_before() {
     grep -qxF "$1" "${SINCE_FILE}"
 }
 
-## Only resolved sd* disks with pm-flag 1 are treatment targets; a missing pm-flag (a pre-0.1.6 3-column file -
-## cannot occur in practice) means treat, the former global-default-on behavior. Treated drives dispatch to
-## background jobs; each job writes its log line to a numbered temp file (drives-file order), logged after `wait`
-## - the log stays deterministic despite the concurrent smartctl calls.
+## Treatment targets: pm-flag-1 lines with a resolved sd* kernel name (a drive detached at boot appears under its
+## by-id path and is skipped; the watcher's next cycle treats it under its resolved name). Treated drives dispatch
+## to background jobs; each job writes its log line to a temp file numbered by drives-file order, logged after
+## `wait` - the log stays deterministic despite the concurrent smartctl calls.
 RESULT_DIR=$(mktemp -d)
 trap 'rm -rf "${RESULT_DIR}"' EXIT
 TREATED=0
 while read -r name idle ctype pmflag; do
-  pmflag="${pmflag:-1}"
   [ -n "${name:-}" ] || continue
   [[ "${name}" =~ ^sd[a-z]+$ ]] || continue
   if is_treated_before "${name} ${idle} ${ctype} ${pmflag}"; then
