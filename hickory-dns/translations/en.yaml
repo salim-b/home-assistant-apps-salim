@@ -58,9 +58,10 @@ configuration:
       Local hostname-to-IP answers (hosts.txt-style) served directly by this
       app, never forwarded to an upstream resolver. Each entry becomes its own
       authoritative zone, so it wins over any public record - useful for
-      reaching self-hosted services by name from every LAN device. Only A/AAAA
-      (address) lookups of the exact hostname are answered; other record types
-      get an authoritative empty answer.
+      reaching self-hosted services by name from every LAN device. A/AAAA
+      (address) lookups of the exact hostname are answered, and each entry
+      automatically also serves the matching PTR record from its own reverse
+      zone; other record types get an authoritative empty answer.
     fields:
       hostname:
         name: Hostname

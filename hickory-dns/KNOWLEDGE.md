@@ -22,10 +22,13 @@ truth (verified against v0.26.3 AND v0.26.1 source - the dev pin must parse the 
   name_servers blocks, options table.
 - Zone structure: Primary zones use a flat `file = "<relative path>"` key, which the deserializer turns into a file
   store (`bin/src/config/mod.rs` `ZoneConfigWithFile`; paths are relative to `directory`). Default zones: `localhost`,
-  `0.0.127.in-addr.arpa`, the 31-label `0.0.0...ip6.arpa` reverse zone, `255.in-addr.arpa`, `0.in-addr.arpa` (shipped
-  under `rootfs/etc/hickory-dns/zones/default/`, copied verbatim from the upstream test-data `default/*.zone` files -
-  the apk installs them to `/usr/share/doc/hickory-dns/examples/default/`, a doc-dir layout the image does not couple
-  to).
+  `0.0.127.in-addr.arpa`, the 31-label `0.0.0...ip6.arpa` reverse zone, `255.in-addr.arpa`, `0.in-addr.arpa`, and the
+  RFC 6303 private-use set - `10.in-addr.arpa`, `16.172.in-addr.arpa` through `31.172.in-addr.arpa`,
+  `168.192.in-addr.arpa`, `d.f.ip6.arpa`, `8.e.f.ip6.arpa` (empty SOA+NS files in the same template; reverse queries for
+  private address space never reach the upstream path, where public resolvers answer with synthesized, proof-less
+  NXDOMAINs the DNSSEC validator must reject) (shipped under `rootfs/etc/hickory-dns/zones/default/`, copied verbatim
+  from the upstream test-data `default/*.zone` files - the apk installs them to
+  `/usr/share/doc/hickory-dns/examples/default/`, a doc-dir layout the image does not couple to).
 - Forward store (`crates/server/src/store/forwarder.rs` `ForwardConfig`, deny_unknown_fields): `name_servers` (required
   Vec) + `options` (optional table). One `[[zones.stores.name_servers]]` block per configured upstream
   (`crates/resolver/src/config.rs`); per-connection field semantics (which field means what, defaults, the h3 gap) live
@@ -100,13 +103,16 @@ The server binary has NO hosts-file store (store types: file/in_memory/sqlite/fo
 `crates/server/src/store/mod.rs`; the resolver-library hosts support is not exposed by the binary, and the blocklist's
 hosts-format support is 0.0.0.0-sinkhole-only). Each static entry therefore becomes its own authoritative **Primary leaf
 zone** (SOA + NS + A/AAAA at the apex, `$ORIGIN <name>.`, TTL 300) written to
-`/etc/hickory-dns/zones/static/NN_<slug>.zone` at every boot and referenced from named.toml. The catalog answers the
-most specific zone first, so leaf zones win over the `.` forward zone - including public names. Generator-side
-validation: lowercase + trailing-dot normalization, LDH hostname check, IP check, duplicate (case-insensitive) and
-default-zone-shadow rejection, single-label warning. Caveats: unconfigured query types get authoritative
-NODATA/NXDOMAIN, and local answers carry no AD bit (they are authoritative, not validated). The zone-file content itself
-is validated by the `--validate` boot gate (zone loading happens in `DnsServer::run` BEFORE the validate return,
-`bin/src/lib.rs`).
+`/etc/hickory-dns/zones/static/NN_<slug>.zone` at every boot and referenced from named.toml, plus a matching reverse
+leaf zone (`NN_<slug>.ptr.zone`, SOA + NS + PTR to the hostname at the apex) named after the address - reversed octets
+for IPv4, the full 32-nibble name for IPv6 (IPv4-embedded tail groups supported). Entries sharing one address share one
+reverse zone with one PTR per name, and a reverse zone name colliding with another static zone is a boot-time rejection.
+The catalog answers the most specific zone first, so leaf zones win over the `.` forward zone - including public names -
+and a reverse leaf zone wins over its RFC 6303 parent empty zone. Generator-side validation: lowercase + trailing-dot
+normalization, LDH hostname check, IP check, duplicate (case-insensitive) and default-zone-shadow rejection,
+single-label warning. Caveats: unconfigured query types get authoritative NODATA/NXDOMAIN, and local answers carry no AD
+bit (they are authoritative, not validated). The zone-file content itself is validated by the `--validate` boot gate
+(zone loading happens in `DnsServer::run` BEFORE the validate return, `bin/src/lib.rs`).
 
 ## Deferred feature ground truth (upstream gaps)
 

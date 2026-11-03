@@ -54,6 +54,23 @@ upstreams:
     ip: 8.8.8.8
 ```
 
+## Local answers
+
+Some names never leave the device – the daemon answers them from its own authoritative zones:
+
+- **Static entries**: each configured hostname-to-IP pair is served as its own zone (winning over public records), and
+  the matching reverse (PTR) lookup is served too – `dig -x 192.168.1.10` returns the configured hostname.
+- **Private-use reverse space (RFC 6303)**: reverse lookups for RFC 1918, unique-local and link-local addresses
+  (`10.in-addr.arpa`, `16.172.in-addr.arpa` – `31.172.in-addr.arpa`, `168.192.in-addr.arpa`, `d.f.ip6.arpa`,
+  `8.e.f.ip6.arpa`) are answered locally with authoritative negative answers. Public resolvers respond to these
+  private-namespace queries with synthesized negative responses that carry no DNSSEC proof of non-existence – a strict
+  validator must reject those, so answering them locally both makes reverse lookups for unlisted LAN addresses fast and
+  deterministic and keeps DNSSEC validation out of a path it cannot verify.
+- **Shipped special-use zones**: `localhost` plus the loopback, unspecified-address and broadcast reverse zones – the
+  long-standing defaults every recursive resolver ships.
+
+Everything else is forwarded to the configured upstream resolvers.
+
 ## Security notes
 
 - The daemon runs confined in a custom AppArmor profile and never runs as root: an s6 launcher drops to an unprivileged

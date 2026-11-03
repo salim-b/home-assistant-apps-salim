@@ -1,6 +1,6 @@
 # https://contributors.home-assistant.io/apps/reference/configuration/
 name: Hickory DNS
-version: "0.2.0"
+version: "0.3.0"
 slug: hickory-dns
 description: DNS server resolving via encrypted upstream DNS (DoT/DoH/DoQ) with DNSSEC validation
 # Generic multi-arch manifest name; per-arch image names are derived by CI - repository README §"CI".
@@ -39,7 +39,8 @@ options:
     - "fd00::/8"
   # Root KSKs are embedded in the binary (no anchor file) - hickory-dns/KNOWLEDGE.md §"Generated named.toml".
   dnssec: true
-  # Static hostname -> IP answers served locally (hosts.txt-style), never forwarded upstream.
+  # Static hostname -> IP answers served locally (hosts.txt-style), never forwarded upstream; each entry
+  # also serves the matching PTR record from its own reverse leaf zone.
   static_entries: []
   debug: false
 schema:

@@ -21,6 +21,26 @@ DEFAULT_ZONES=(
   0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa
   255.in-addr.arpa
   0.in-addr.arpa
+  10.in-addr.arpa
+  16.172.in-addr.arpa
+  17.172.in-addr.arpa
+  18.172.in-addr.arpa
+  19.172.in-addr.arpa
+  20.172.in-addr.arpa
+  21.172.in-addr.arpa
+  22.172.in-addr.arpa
+  23.172.in-addr.arpa
+  24.172.in-addr.arpa
+  25.172.in-addr.arpa
+  26.172.in-addr.arpa
+  27.172.in-addr.arpa
+  28.172.in-addr.arpa
+  29.172.in-addr.arpa
+  30.172.in-addr.arpa
+  31.172.in-addr.arpa
+  168.192.in-addr.arpa
+  d.f.ip6.arpa
+  8.e.f.ip6.arpa
 )
 
 ## Zone files of the shipped default zones, relative to ${ZONES_DIR} (directory key).
@@ -28,7 +48,27 @@ DEFAULT_ZONE_FILES="localhost=default/localhost.zone
 0.0.127.in-addr.arpa=default/127.0.0.1.zone
 0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa=default/ipv6_1.zone
 255.in-addr.arpa=default/255.zone
-0.in-addr.arpa=default/0.zone"
+0.in-addr.arpa=default/0.zone
+10.in-addr.arpa=default/10.zone
+16.172.in-addr.arpa=default/16.172.zone
+17.172.in-addr.arpa=default/17.172.zone
+18.172.in-addr.arpa=default/18.172.zone
+19.172.in-addr.arpa=default/19.172.zone
+20.172.in-addr.arpa=default/20.172.zone
+21.172.in-addr.arpa=default/21.172.zone
+22.172.in-addr.arpa=default/22.172.zone
+23.172.in-addr.arpa=default/23.172.zone
+24.172.in-addr.arpa=default/24.172.zone
+25.172.in-addr.arpa=default/25.172.zone
+26.172.in-addr.arpa=default/26.172.zone
+27.172.in-addr.arpa=default/27.172.zone
+28.172.in-addr.arpa=default/28.172.zone
+29.172.in-addr.arpa=default/29.172.zone
+30.172.in-addr.arpa=default/30.172.zone
+31.172.in-addr.arpa=default/31.172.zone
+168.192.in-addr.arpa=default/168.192.zone
+d.f.ip6.arpa=default/ipv6_ula.zone
+8.e.f.ip6.arpa=default/ipv6_linklocal.zone"
 
 ## Fixed forward-store options - per-option rationale: hickory-dns/KNOWLEDGE.md §"Generated named.toml".
 OPTIONS_BLOCK='timeout = 5
@@ -83,6 +123,85 @@ is_cidr() {
   else
     return 1
   fi
+}
+
+## Expand an embedded dotted-quad IPv4 group (e.g. the tail of ::ffff:192.168.1.1) into its two 16-bit
+## hex groups, printed space-separated. Returns 1 on malformed octets.
+ipv4_embedded_groups() {
+  local o1 o2 o3 o4 o
+  IFS=. read -r o1 o2 o3 o4 <<<"$1" || return 1
+  for o in "$o1" "$o2" "$o3" "$o4"; do
+    [[ "$o" =~ ^[0-9]{1,3}$ ]] || return 1
+    (( 10#$o <= 255 )) || return 1
+  done
+  printf '%s %s' "$(printf '%04x' "$(( (10#$o1 << 8) | 10#$o2 ))")" "$(printf '%04x' "$(( (10#$o3 << 8) | 10#$o4 ))")"
+}
+
+## Full reverse zone name for an IPv6 address: 32 nibble labels, least significant nibble first
+## (e.g. fd12:3456:789a::1 -> 1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.a.9.8.7.6.5.4.3.2.1.d.f.ip6.arpa).
+## Prints the name; returns 1 on malformed input (the caller turns that into a boot-time option error).
+ipv6_reverse_name() {
+  local addr="${1}" head="" tail="" part group
+  [[ "$addr" != *::*::* ]] || return 1  # more than one "::"
+  if [[ "$addr" == *"::"* ]]; then
+    head="${addr%%::*}"
+    tail="${addr##*::}"
+  else
+    head="$addr"
+  fi
+  local -a head_groups=() tail_groups=()
+  local g
+  if [ "$head" != "" ]; then
+    while IFS= read -r g; do
+      if [[ "$g" == *.* ]]; then
+        local expanded
+        expanded="$(ipv4_embedded_groups "$g")" || return 1
+        local -a pair=()
+        read -ra pair <<<"$expanded"
+        head_groups+=("${pair[@]}")
+      else
+        head_groups+=("$g")
+      fi
+    done < <(tr ':' '\n' <<<"$head")
+  fi
+  if [ "$tail" != "" ]; then
+    while IFS= read -r g; do
+      if [[ "$g" == *.* ]]; then
+        local expanded
+        expanded="$(ipv4_embedded_groups "$g")" || return 1
+        local -a pair=()
+        read -ra pair <<<"$expanded"
+        tail_groups+=("${pair[@]}")
+      else
+        tail_groups+=("$g")
+      fi
+    done < <(tr ':' '\n' <<<"$tail")
+  fi
+  (( ${#head_groups[@]} + ${#tail_groups[@]} <= 8 )) || return 1
+  ## "::" expansion: the elided groups are all zero and sit between the head and the tail.
+  local -a groups=()
+  local fill=$(( 8 - ${#head_groups[@]} - ${#tail_groups[@]} ))
+  local idx
+  for group in "${head_groups[@]}"; do
+    groups+=("$group")
+  done
+  for (( idx = 0; idx < fill; idx++ )); do
+    groups+=("0")
+  done
+  for group in "${tail_groups[@]}"; do
+    groups+=("$group")
+  done
+  local hex=""
+  for group in "${groups[@]}"; do
+    [[ "$group" =~ ^[0-9a-fA-F]{1,4}$ ]] || return 1
+    hex+="$(printf '%04x' "0x$group")"
+  done
+  (( ${#hex} == 32 )) || return 1
+  local out="" i
+  for (( i = ${#hex} - 1; i >= 0; i-- )); do
+    out+="${hex:i:1}."
+  done
+  printf '%sip6.arpa' "$out"
 }
 
 ## ---------------------------------------------------------------------------
@@ -195,9 +314,11 @@ file = $(toml_str "$file")
 "
 done <<<"$DEFAULT_ZONE_FILES"
 
-## Static entries -> one authoritative leaf zone each; semantics and why (no hosts-file store upstream):
+## Static entries -> one authoritative forward leaf zone plus the matching reverse (PTR) leaf zone each;
+## semantics and why (no hosts-file store upstream):
 ## hickory-dns/KNOWLEDGE.md §"Static entries (no hosts-file store upstream)".
 declare -A SEEN_ZONES=()
+declare -A SEEN_REVERSE=()  ## reverse zone name -> the static zone file already holding its PTR records
 N_STATIC=0
 ## Object-array options differ: each line is a compact JSON object, so per-line jq IS correct here
 ## (repository-root KNOWLEDGE.md §"bashio option consumption").
@@ -244,10 +365,49 @@ zone = $(toml_str "$host")
 zone_type = \"Primary\"
 file = $(toml_str "static/${file}")
 "
+
+  ## Reverse leaf zone: the matching PTR record, answered locally like the forward record. Entries
+  ## sharing one address share one reverse zone holding one PTR per name.
+  case "$ip" in
+    *:*)
+      rev_zone="$(ipv6_reverse_name "$ip")" \
+        || bashio::exit.nok "Static entry '${host}': '${ip}' is not a valid IPv6 address."
+      ;;
+    *)
+      IFS=. read -r r_o1 r_o2 r_o3 r_o4 <<<"$ip"
+      rev_zone="${r_o4}.${r_o3}.${r_o2}.${r_o1}.in-addr.arpa"
+      ;;
+  esac
+  ## A reverse zone name may repeat only when entries share one address (grouped below); any other
+  ## collision - e.g. with another entry's forward hostname - is a hard duplicate-zone error.
+  if [[ -z "${SEEN_REVERSE[${rev_zone}]+x}" ]]; then
+    [[ -z "${SEEN_ZONES[${rev_zone}]+x}" ]] \
+      || bashio::exit.nok "Static entry '${host}': its reverse zone '${rev_zone}' collides with another static entry's zone."
+    SEEN_ZONES["${rev_zone}"]=1
+  fi
+  rev_file="$(printf '%02d' "$N_STATIC")_${slug:0:64}.ptr.zone"
+  if [[ -z "${SEEN_REVERSE[${rev_zone}]+x}" ]]; then
+    SEEN_REVERSE["${rev_zone}"]="$rev_file"
+    {
+      # shellcheck disable=SC2016  # '$ORIGIN'/'$TTL' are zone-file directives, not shell expansions
+      printf '$ORIGIN %s.\n$TTL 300\n' "$rev_zone"
+      printf '@   IN  SOA   %s. hostmaster.hickory-dns.invalid. (\n                1 3600 900 86400 300 )\n' "$rev_zone"
+      printf '@   IN  NS    %s.\n' "$rev_zone"
+      printf '@   IN  PTR   %s.\n' "$host"
+    } >"${STATIC_DIR}/${rev_file}"
+    CONFIG_BODY+="
+[[zones]]
+zone = $(toml_str "$rev_zone")
+zone_type = \"Primary\"
+file = $(toml_str "static/${rev_file}")
+"
+  else
+    printf '@   IN  PTR   %s.\n' "$host" >>"${STATIC_DIR}/${SEEN_REVERSE[${rev_zone}]}"
+  fi
 done < <(echo "$ENTRIES_RAW")
 
 if [ "$N_STATIC" -gt 0 ]; then
-  bashio::log.info "Serving ${N_STATIC} static entries as local authoritative zones"
+  bashio::log.info "Serving ${N_STATIC} static entries as local authoritative zones (forward + matching PTR records)"
 fi
 
 ## Upstream resolvers -> one name_servers block each, in option order (the order is the failover priority);

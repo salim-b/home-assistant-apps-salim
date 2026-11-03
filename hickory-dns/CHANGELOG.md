@@ -2,6 +2,17 @@
 
 # Changelog
 
+## 0.3.0
+
+- Private-use reverse zones (RFC 6303) are now answered locally: PTR lookups for RFC 1918/ULA/link-local addresses
+  (`10.in-addr.arpa`, `16.172.in-addr.arpa` through `31.172.in-addr.arpa`, `168.192.in-addr.arpa`, `d.f.ip6.arpa`,
+  `8.e.f.ip6.arpa`) never leave the device. Public resolvers answer private-namespace queries with synthesized,
+  proof-less NXDOMAINs, which DNSSEC validation must reject as Bogus - the source of the "response does not contain NSEC
+  or NSEC3 records" warnings and the SERVFAILs for LAN reverse lookups.
+- Static entries now also answer the matching PTR lookup: an entry for `nas.lan` -> `192.168.1.10` serves reverse
+  lookups of `192.168.1.10` with `nas.lan` from its own reverse zone. Entries sharing one address share one reverse zone
+  with one PTR per name.
+
 ## 0.2.0
 
 - The default upstream resolvers now talk DNS-over-QUIC (DoQ, UDP port 853) instead of DoT: QUIC multiplexes queries
