@@ -12,7 +12,7 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   s6-overlay's `with-contenv` (and similar env-style wrappers) to the real interpreter and type `bashio` as shell — the
   file content is plain bash. Until then, `hk.pkl` re-declares each shell builtin's `match_any` with added glob
   selectors for the s6 script paths (see the `s6Globs` comment there); the glob additions can be dropped once this
-  lands.
+  lands. All three shell steps also cover the apps' `/usr/bin` scripts via the `appBinGlobs` selector.
 
 - Upstream: file an hk issue against [jdx/hk](https://github.com/jdx/hk) (likely co-filed with
   [owenlamont/ryl](https://github.com/owenlamont/ryl)) — the `ryl` builtin's fix-mode wiring silently passes files with
@@ -46,8 +46,12 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   substitution in a for iterable is the idiomatic splitting form and not flagged by shellcheck. Minimal repro is a
   4-line script; the workaround rule (brace expansion, `read -r -a`, `mapfile`) and the 9 repo sites rewritten
   accordingly are documented in skill `ha-app-tooling`. The same run also confirmed the cosmetic nit of `[ -n "$x" ]`
-  being rewritten to `[ "$x" != "" ]`. If upstream is unresponsive, reconsider whether shellharden should stay a fix
-  step here (vs check-only or dropped).
+  being rewritten to `[ "$x" != "" ]`. A second, worse defect (same version): the parser loses sync on nested
+  parentheses inside arithmetic expansion — `printf '%04x' "$(( (a << 8) | b ))"` reports "the parser got lost" on a
+  syntactically complete file, and everything after it is mangled (spurious `""` prefixes; quotes inserted into
+  single-quoted strings, which corrupts generated output). Flat arithmetic (`$(( 10#$a ))`) is unaffected; the one repo
+  site was rewritten arithmetic-free (`printf '%02x%02x'`; workaround rule in skill `ha-app-tooling`). If upstream is
+  unresponsive, reconsider whether shellharden should stay a fix step here (vs check-only or dropped).
 
 - apk-pin checker: deduplicate the triplicated pin parser — the `pkg=version` regex plus the backslash-continuation
   state machine over `apk add` blocks exists three times (`.mise/tasks/validate.py`, and the changelog + nudge jobs of

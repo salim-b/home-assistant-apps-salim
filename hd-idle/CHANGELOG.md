@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.1.14
+
+- Internals: the `/usr/bin` helper scripts (`hd-idle-genargs`, `hd-idle-pmfix`) now sit under the repository's full
+  shell gate (shfmt, shellharden, shellcheck) and were reformatted and quoting-hardened accordingly - no functional
+  changes.
+
 ## 0.1.13
 
 - Internals: the drive-PM treatment no longer truncates the captured smartctl failure detail mid-message. The 60-char

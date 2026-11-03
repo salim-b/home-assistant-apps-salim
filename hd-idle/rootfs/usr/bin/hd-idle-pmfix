@@ -20,14 +20,23 @@ SINCE_FILE=""
 
 case "${2:-}" in
   --since)
-    [ -n "${3:-}" ] || { bashio::log.error "hd-idle-pmfix: --since needs a file argument"; exit 1; }
+    [ "${3:-}" != "" ] || {
+      bashio::log.error "hd-idle-pmfix: --since needs a file argument"
+      exit 1
+    }
     SINCE_FILE="$3"
     ;;
   "") ;;
-  *) bashio::log.error "hd-idle-pmfix: unknown argument '${2}'"; exit 1 ;;
+  *)
+    bashio::log.error "hd-idle-pmfix: unknown argument '${2}'"
+    exit 1
+    ;;
 esac
 
-[ -r "${DRIVES_FILE}" ] || { bashio::log.warning "hd-idle-pmfix: no drives file (${DRIVES_FILE}) - nothing to treat"; exit 0; }
+[ -r "$DRIVES_FILE" ] || {
+  bashio::log.warning "hd-idle-pmfix: no drives file (${DRIVES_FILE}) - nothing to treat"
+  exit 0
+}
 
 # Success requires rc=0 AND no failed|unknown|unavailable output: smartctl's exit code alone does not certify that
 # ATA SET FEATURES took effect (feature-page-filtered bridges answer "APM feature is: Unavailable" with rc=0 - a
@@ -39,10 +48,10 @@ esac
 smart() {
   local dev="$1" flag="$2" value="$3" out rc attempt
   for attempt in 1 2 3 4; do
-    if [ "${attempt}" -gt 1 ]; then sleep 10; fi
+    if [ "$attempt" -gt 1 ]; then sleep 10; fi
     out=$(timeout 60 smartctl -d sat -s "${flag},${value}" "/dev/${dev}" 2>&1) && rc=0 || rc=$?
     if [ "$rc" = 0 ] && ! grep -qiE 'failed|unknown|unavailable' <<<"$out"; then
-      if [ "${attempt}" -gt 1 ]; then printf 'ok (attempt %s)' "${attempt}"; else printf 'ok'; fi
+      if [ "$attempt" -gt 1 ]; then printf 'ok (attempt %s)' "$attempt"; else printf 'ok'; fi
       return 0
     fi
     # Retry ONLY the transient spin-up race: an asleep drive is woken by the call itself and its bridge can answer
@@ -59,8 +68,8 @@ smart() {
 }
 
 is_treated_before() {
-  [ -n "${SINCE_FILE}" ] && [ -r "${SINCE_FILE}" ] &&
-    grep -qxF "$1" "${SINCE_FILE}"
+  [ "$SINCE_FILE" != "" ] && [ -r "$SINCE_FILE" ] \
+    && grep -qxF "$1" "$SINCE_FILE"
 }
 
 ## Treatment targets: pm-flag-1 lines with a resolved sd* kernel name (a drive detached at boot appears under its
@@ -71,28 +80,28 @@ RESULT_DIR=$(mktemp -d)
 trap 'rm -rf "${RESULT_DIR}"' EXIT
 TREATED=0
 while read -r name idle ctype pmflag; do
-  [ -n "${name:-}" ] || continue
-  [[ "${name}" =~ ^sd[a-z]+$ ]] || continue
+  [ "${name:-}" != "" ] || continue
+  [[ "$name" =~ ^sd[a-z]+$ ]] || continue
   if is_treated_before "${name} ${idle} ${ctype} ${pmflag}"; then
-    if [ "${pmflag}" = "1" ]; then
+    if [ "$pmflag" = "1" ]; then
       bashio::log.info "Drive ${name}: power management already disabled (unchanged configuration) - skipping."
     else
       bashio::log.info "Drive ${name}: drive-PM treatment disabled for this drive (configuration unchanged) - skipping."
     fi
     continue
   fi
-  if [ "${pmflag}" != "1" ]; then
+  if [ "$pmflag" != "1" ]; then
     bashio::log.info "Drive ${name}: drive-PM treatment disabled for this drive - its own power management stays as is."
     continue
   fi
   TREATED=$((TREATED + 1))
   (
-    apm=$(smart "${name}" "apm" "off")
-    stby=$(smart "${name}" "standby" "off")
-    printf 'Drive %s: APM disable %s; standby timer disable %s.\n' "${name}" "${apm}" "${stby}" \
+    apm=$(smart "$name" "apm" "off")
+    stby=$(smart "$name" "standby" "off")
+    printf 'Drive %s: APM disable %s; standby timer disable %s.\n' "$name" "$apm" "$stby" \
       >"${RESULT_DIR}/${TREATED}"
   ) &
-done <"${DRIVES_FILE}"
+done <"$DRIVES_FILE"
 wait
 for ((i = 1; i <= TREATED; i++)); do
   if [ -s "${RESULT_DIR}/${i}" ]; then

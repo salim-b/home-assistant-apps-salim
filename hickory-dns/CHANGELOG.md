@@ -12,6 +12,8 @@
 - Static entries now also answer the matching PTR lookup: an entry for `nas.lan` -> `192.168.1.10` serves reverse
   lookups of `192.168.1.10` with `nas.lan` from its own reverse zone. Entries sharing one address share one reverse zone
   with one PTR per name.
+- Internals: the app's scripts were reformatted and quoting-hardened by the repository's full shell gate - no functional
+  changes.
 
 ## 0.2.0
 

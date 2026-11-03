@@ -75,7 +75,10 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   as brace expansion (`for _ in {1..N}`) or arrays (`read -r -a` / `mapfile`) instead. It also quotes command-string
   executions (`if "$NFSD_CMD"`) where quoting changes what is *executed*: the whole string becomes one literal command
   name (`command not found` — this broke nfs-server 0.6.1 on-device). Build such commands as arrays
-  (`NFSD_CMD=(...); "${NFSD_CMD[@]}"`) so quoting is stable either way. (Upstream items: root `TODO.md`.)
+  (`NFSD_CMD=(...); "${NFSD_CMD[@]}"`) so quoting is stable either way. Its parser also loses sync on nested parentheses
+  inside arithmetic expansion (`"$(( (a << 8) | b ))"` reports "the parser got lost" on a syntactically complete file
+  and mangles everything after it — spurious `""` prefixes, quotes inserted into single-quoted strings); keep arithmetic
+  flat, flat `$(( 10#$a ))` is fine. (Upstream items: root `TODO.md`.)
 
 ## Workflow, Dockerfile and Renovate config linting
 
@@ -118,4 +121,4 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 
 Scripts with the `#!/usr/bin/with-contenv bashio` shebang are plain bash, but hk's shebang-based file typing does not
 recognize the wrapper (root `TODO.md`), so `hk.pkl` re-declares each shell builtin's `match_any` with added glob
-selectors for the s6 script paths — keep those globs when adding app scripts.
+selectors for the s6 script paths and the apps' `/usr/bin` scripts — keep those globs when adding app scripts.

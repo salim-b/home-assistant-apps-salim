@@ -3,15 +3,19 @@
 amends "package://github.com/jdx/hk/releases/download/v2.10.0/hk@2.10.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v2.10.0/hk@2.10.0#/Builtins.pkl"
 
-// hk's shebang-based file typing misses the extensionless s6 scripts (upstream item: root TODO.md).
-// `match_any` REPLACES a step's default selection (frozen by the pinned package version), so each
-// shell step below repeats the builtin's own selectors plus s6Globs.
-local s6Globs = List(
-  "**/cont-init.d/*",
-  "**/s6-overlay/scripts/*",
-  "**/s6-rc.d/*/run",
-  "**/s6-rc.d/*/finish",
-)
+  // hk's shebang-based file typing misses the extensionless s6 scripts and the apps' /usr/bin scripts
+  // (upstream item: root TODO.md). `match_any` REPLACES a step's default selection (frozen by the
+  // pinned package version), so each shell step below repeats the builtin's own selectors plus the
+  // added globs.
+  local s6Globs = List(
+    "**/cont-init.d/*",
+    "**/s6-overlay/scripts/*",
+    "**/s6-rc.d/*/run",
+    "**/s6-rc.d/*/finish",
+  )
+  // The apps' extension-less /usr/bin scripts (bashio shebangs - the same typing gap as the s6
+  // scripts). All three shell steps cover them, so these scripts must stay conforming.
+  local appBinGlobs = List("**/rootfs/usr/bin/*")
 local mdGlobs = List("**/*.md", "**/*.markdown")
 // Explicit paths bypass panache's config excludes; AI_POLICY.md is upstream-verbatim, **/LICENSE.md mirrors the default Markdown exclude.
 local mdExcludes = List("AI_POLICY.md", "**/LICENSE.md")
@@ -38,6 +42,7 @@ local linters = new Mapping<String, Step> {
       new FileSelector { glob = List("**/*.sh", "**/*.bash") },
       new FileSelector { types = List("sh", "bash") },
       new FileSelector { glob = s6Globs },
+      new FileSelector { glob = appBinGlobs },
     )
   }
   ["shfmt"] = (Builtins.shfmt) {
@@ -47,6 +52,7 @@ local linters = new Mapping<String, Step> {
       },
       new FileSelector { types = List("sh", "bash") },
       new FileSelector { glob = s6Globs },
+      new FileSelector { glob = appBinGlobs },
     )
   }
   ["shellharden"] = (Builtins.shellharden) {
@@ -55,6 +61,7 @@ local linters = new Mapping<String, Step> {
     match_any = List(
       new FileSelector { types = List("bash", "sh") },
       new FileSelector { glob = s6Globs },
+      new FileSelector { glob = appBinGlobs },
     )
   }
   // jactionlint (maintained actionlint fork, hk builtin): workflows, composite actions and
