@@ -30,25 +30,15 @@ fi
   echo "ERROR: options file '$file' not found (absolute path, or relative to the mise invocation directory)" >&2
   exit 1
 }
+# .yaml/.yml are converted via yq like the test options; .json is parsed by jq exactly (no YAML 1.1 coercions)
+check='if length == 1 and (.[0] | type == "object" and length > 0) then .[0] else empty end'
 case "$file" in
-  *.yaml | *.yml) options=$(yq -o json '.' "$file" 2>/dev/null | jq -c '.') || options="" ;;
-  *) options=$(jq -c '.' "$file" 2>/dev/null) || options="" ;;
+  *.yaml | *.yml) options=$(yq -o json '.' "$file" 2>/dev/null | jq -cse "$check" 2>/dev/null) || options="" ;;
+  *) options=$(jq -cse "$check" "$file" 2>/dev/null) || options="" ;;
 esac
 [ "$options" != "" ] || {
-  echo "ERROR: '$file' could not be parsed - expected JSON with the options (YAML for .yaml/.yml files)" >&2
-  exit 1
-}
-docs=$(jq -s 'length' <<<"$options")
-[ "$docs" = "1" ] || {
-  echo "ERROR: '$file' must contain exactly one JSON document (found $docs)" >&2
-  exit 1
-}
-[ "$(jq -r 'type' <<<"$options")" = "object" ] || {
-  echo "ERROR: '$file' must contain a JSON object with the app's top-level option keys (found: $(jq -r 'type' <<<"$options"))" >&2
-  exit 1
-}
-[ "$options" != "{}" ] || {
-  echo "ERROR: '$file' contains an empty options object - nothing to apply" >&2
+  echo "ERROR: '$file' must contain exactly one non-empty JSON object with the app's top-level option keys" >&2
+  echo "       (not valid JSON, wrong type, empty, or several documents; YAML for .yaml/.yml files)" >&2
   exit 1
 }
 
