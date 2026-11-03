@@ -13,8 +13,8 @@ configure.
 
 ## Setup
 
-1. Install the app. The defaults work out of the box: Quad9 (9.9.9.9 and 149.112.112.112) over DoT with DNSSEC
-   validation on.
+1. Install the app. The defaults work out of the box: Quad9 (9.9.9.9 and 149.112.112.112) over DoQ (DNS-over-QUIC) with
+   DNSSEC validation on.
 2. In your **router's DHCP settings**, set the DNS server handed out to LAN devices to your Home Assistant device's IP
    address. Every (re)connecting device then picks up the new DNS server automatically.
 3. Verify from any LAN device: `nslookup example.com <HAOS-IP>` (or `dig @<HAOS-IP> example.com`).

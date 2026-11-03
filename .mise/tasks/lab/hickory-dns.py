@@ -7,14 +7,14 @@ none).
 
 The lab harness forwards a generic LAB_FIXTURE_ENV string to the fake-API
 container; the `upstreams=<variant>` item selects an upstream-pool variant for
-the boot: `upstreams=https` / `upstreams=quic` replace the default pool with a
-single hostname-only upstream of that protocol, so the forwarded probe proves
-exactly that encrypted transport end-to-end through the real daemon (DoT is
-covered by the default pool; the resolve CLI cannot dial DoH/DoQ directly).
-Hostname-only upstreams additionally exercise the boot-time name resolution
-path (fresh lookup + last-known-good cache) that the default IP-based pool
-skips. Run all three after transport-affecting changes:
-`LAB_FIXTURE_ENV=upstreams=https mise run lab hickory-dns` (and quic)."""
+the boot: `upstreams=tls` / `upstreams=https` / `upstreams=quic` replace the default
+pool with a single hostname-only upstream of that protocol, so the forwarded probe
+proves exactly that encrypted transport end-to-end through the real daemon (the
+default pool is Quad9's anycast IPs over DoQ; the resolve CLI cannot dial
+DoH/DoQ directly). Hostname-only upstreams additionally exercise the boot-time
+name resolution path (fresh lookup + last-known-good cache) that the default
+IP-based pool skips. Run all four after transport-affecting changes:
+`LAB_FIXTURE_ENV=upstreams=tls mise run lab hickory-dns` (and https, quic)."""
 
 import os
 
@@ -29,6 +29,8 @@ def lab_adapt_fixture(options):
         options["upstreams"] = [{"protocol": "https", "host": "cloudflare-dns.com"}]
     elif variant == "quic":
         options["upstreams"] = [{"protocol": "quic", "host": "dns.adguard-dns.com"}]
-    elif variant not in ("", "tls"):
+    elif variant == "tls":
+        options["upstreams"] = [{"protocol": "tls", "host": "dns.quad9.net"}]
+    elif variant != "":
         raise ValueError(f"unknown upstreams lab variant: {variant}")
     return options

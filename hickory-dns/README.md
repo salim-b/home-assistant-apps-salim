@@ -12,8 +12,8 @@ Turn your Home Assistant instance into a secure DNS server that resolves via enc
   port-53 queries leaving the home.
 - **DNSSEC validated by default**: Upstream answers are validated against the DNSSEC root trust anchors; bogus answers
   are rejected.
-- **Configurable upstream resolvers**: Quad9 by default (anycast, pure IPs with pinned TLS names); Cloudflare, AdGuard,
-  Google etc. via structured per-resolver entries (protocol, host, IP, port).
+- **Configurable upstream resolvers**: Quad9 by default (anycast, pure IPs with pinned TLS names, forwarded over DoQ);
+  Cloudflare, AdGuard, Google etc. via structured per-resolver entries (protocol, host, IP, port).
 - **Static entries**: [`hosts.txt`](https://en.wikipedia.org/wiki/Hosts_(file))-style hostname-to-IP answers served
   locally as authoritative zones – reach self-hosted services by name from every LAN device without touching public DNS.
 - **Client ACL**: Only queries from the configured networks are served (private ranges + loopback by default).

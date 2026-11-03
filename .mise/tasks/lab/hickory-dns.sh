@@ -7,10 +7,12 @@
 
 ## Fixture adaptation: .mise/tasks/lab/hickory-dns.py adds one static entry so the runtime check can
 ## probe an authoritative leaf-zone answer (the default options serve none). LAB_FIXTURE_ENV (forwarded by
-## the harness to the fake API) selects the upstream-pool variant: `upstreams=https` / `upstreams=quic`
-## replace the default pool with a single hostname-only upstream, so the forwarded probe proves exactly
-## that transport end-to-end through the real daemon (DoT is covered by the default pool; the resolve CLI
-## cannot dial DoH/DoQ directly). Run all three after transport-affecting changes:
+## the harness to the fake API) selects the upstream-pool variant: `upstreams=tls` / `upstreams=https` /
+## `upstreams=quic` replace the default pool with a single hostname-only upstream, so the forwarded probe
+## proves exactly that transport end-to-end through the real daemon (the default pool is Quad9's anycast
+## IPs over DoQ; the resolve CLI cannot dial DoH/DoQ directly). Run all four after transport-affecting
+## changes:
+##   LAB_FIXTURE_ENV=upstreams=tls mise run lab hickory-dns     # Quad9 DoT
 ##   LAB_FIXTURE_ENV=upstreams=https mise run lab hickory-dns   # Cloudflare DoH
 ##   LAB_FIXTURE_ENV=upstreams=quic mise run lab hickory-dns    # AdGuard DoQ
 ## Hostname-only upstreams additionally exercise the boot-time name resolution path (fresh lookup +
@@ -20,6 +22,13 @@ lab_runtime_check() {
   ## The fixture variant must have taken effect: a lost docker-cp race would otherwise serve the default
   ## options and silently test the default pool instead of the selected transport.
   case "${LAB_FIXTURE_ENV:-}" in
+    *upstreams=tls*)
+      grep -q 'type = "tls"' "$LAB_TMPDIR/data/named.toml" \
+        || {
+          echo "tls variant not in effect (no tls upstream in the generated pool)"
+          return 1
+        }
+      ;;
     *upstreams=https*)
       grep -q 'type = "https"' "$LAB_TMPDIR/data/named.toml" \
         || {
@@ -96,7 +105,7 @@ lab_runtime_check() {
     return 1
   }
 
-  ## Forwarded query: the real path - resolver pool, encrypted upstream (DoT to Quad9), DNSSEC
+  ## Forwarded query: the real path - resolver pool, encrypted upstream (DoQ to Quad9), DNSSEC
   ## validation of the signed example.com. Needs outbound internet from the lab network.
   out=$(docker exec "$LAB_NET_NAME-app" /usr/bin/dns -n 127.0.0.1:53 query example.com A) \
     || {

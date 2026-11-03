@@ -1,6 +1,6 @@
 # https://contributors.home-assistant.io/apps/reference/configuration/
 name: Hickory DNS
-version: "0.1.1"
+version: "0.2.0"
 slug: hickory-dns
 description: DNS server resolving via encrypted upstream DNS (DoT/DoH/DoQ) with DNSSEC validation
 # Generic multi-arch manifest name; per-arch image names are derived by CI - repository README §"CI".
@@ -18,12 +18,13 @@ init: false
 host_network: true
 options:
   # Structured upstream resolvers, queried in the given order - field semantics, defaults and resolution:
-  # hickory-dns/KNOWLEDGE.md §"Upstream option model". Defaults are Quad9 anycast IPs with a pinned TLS name.
+  # hickory-dns/KNOWLEDGE.md §"Upstream option model". Defaults are Quad9 anycast IPs forwarded over DoQ
+  # with the pinned TLS name dns.quad9.net.
   upstreams:
-    - protocol: tls
+    - protocol: quic
       host: dns.quad9.net
       ip: 9.9.9.9
-    - protocol: tls
+    - protocol: quic
       host: dns.quad9.net
       ip: 149.112.112.112
   # Client ACL: CIDRs whose queries are served, everything else refused - semantics incl. the loopback handling:

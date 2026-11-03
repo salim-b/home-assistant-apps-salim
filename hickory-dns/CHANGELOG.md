@@ -2,6 +2,13 @@
 
 # Changelog
 
+## 0.2.0
+
+- The default upstream resolvers now talk DNS-over-QUIC (DoQ, UDP port 853) instead of DoT: QUIC multiplexes queries
+  without TCP head-of-line blocking and opens the encrypted connection in a single round trip, and Quad9 serves DoQ on
+  all of its variants. Existing installs keep their saved configuration - switch the upstreams' protocol to `quic` in
+  the app options to adopt the new default.
+
 ## 0.1.1
 
 - Renamed the app to "Hickory DNS" (display name only - the `hickory-dns` slug, install URL and image names stay the
