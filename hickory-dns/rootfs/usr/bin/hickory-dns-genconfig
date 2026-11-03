@@ -14,62 +14,43 @@ ZONES_DIR=/etc/hickory-dns/zones
 STATIC_DIR=/etc/hickory-dns/zones/static
 CACHE=/data/hickory-dns.upstreams.cache
 
-## Zone names shipped under ${ZONES_DIR}/default (static entries must not shadow them).
-DEFAULT_ZONES=(
-  localhost
-  0.0.127.in-addr.arpa
-  0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa
-  255.in-addr.arpa
-  0.in-addr.arpa
-  10.in-addr.arpa
-  16.172.in-addr.arpa
-  17.172.in-addr.arpa
-  18.172.in-addr.arpa
-  19.172.in-addr.arpa
-  20.172.in-addr.arpa
-  21.172.in-addr.arpa
-  22.172.in-addr.arpa
-  23.172.in-addr.arpa
-  24.172.in-addr.arpa
-  25.172.in-addr.arpa
-  26.172.in-addr.arpa
-  27.172.in-addr.arpa
-  28.172.in-addr.arpa
-  29.172.in-addr.arpa
-  30.172.in-addr.arpa
-  31.172.in-addr.arpa
-  168.192.in-addr.arpa
-  d.f.ip6.arpa
-  8.e.f.ip6.arpa
+## Zone files of the shipped default zones, relative to ${ZONES_DIR} (directory key), as "zone=file"
+## entries - the single source of truth for the default-zone set. The empty zones all share one
+## origin-relative template file (empty.zone); zone identity comes from the named.toml `zone` key.
+DEFAULT_ZONE_FILES=(
+  "localhost=default/localhost.zone"
+  "0.0.127.in-addr.arpa=default/127.0.0.1.zone"
+  "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa=default/ipv6_1.zone"
+  "255.in-addr.arpa=default/empty.zone"
+  "0.in-addr.arpa=default/empty.zone"
+  "10.in-addr.arpa=default/empty.zone"
+  "16.172.in-addr.arpa=default/empty.zone"
+  "17.172.in-addr.arpa=default/empty.zone"
+  "18.172.in-addr.arpa=default/empty.zone"
+  "19.172.in-addr.arpa=default/empty.zone"
+  "20.172.in-addr.arpa=default/empty.zone"
+  "21.172.in-addr.arpa=default/empty.zone"
+  "22.172.in-addr.arpa=default/empty.zone"
+  "23.172.in-addr.arpa=default/empty.zone"
+  "24.172.in-addr.arpa=default/empty.zone"
+  "25.172.in-addr.arpa=default/empty.zone"
+  "26.172.in-addr.arpa=default/empty.zone"
+  "27.172.in-addr.arpa=default/empty.zone"
+  "28.172.in-addr.arpa=default/empty.zone"
+  "29.172.in-addr.arpa=default/empty.zone"
+  "30.172.in-addr.arpa=default/empty.zone"
+  "31.172.in-addr.arpa=default/empty.zone"
+  "168.192.in-addr.arpa=default/empty.zone"
+  "d.f.ip6.arpa=default/empty.zone"
+  "8.e.f.ip6.arpa=default/empty.zone"
 )
 
-## Zone files of the shipped default zones, relative to ${ZONES_DIR} (directory key). The empty zones all
-## share one origin-relative template file (empty.zone) - zone identity comes from the named.toml `zone` key.
-DEFAULT_ZONE_FILES="localhost=default/localhost.zone
-0.0.127.in-addr.arpa=default/127.0.0.1.zone
-0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa=default/ipv6_1.zone
-255.in-addr.arpa=default/empty.zone
-0.in-addr.arpa=default/empty.zone
-10.in-addr.arpa=default/empty.zone
-16.172.in-addr.arpa=default/empty.zone
-17.172.in-addr.arpa=default/empty.zone
-18.172.in-addr.arpa=default/empty.zone
-19.172.in-addr.arpa=default/empty.zone
-20.172.in-addr.arpa=default/empty.zone
-21.172.in-addr.arpa=default/empty.zone
-22.172.in-addr.arpa=default/empty.zone
-23.172.in-addr.arpa=default/empty.zone
-24.172.in-addr.arpa=default/empty.zone
-25.172.in-addr.arpa=default/empty.zone
-26.172.in-addr.arpa=default/empty.zone
-27.172.in-addr.arpa=default/empty.zone
-28.172.in-addr.arpa=default/empty.zone
-29.172.in-addr.arpa=default/empty.zone
-30.172.in-addr.arpa=default/empty.zone
-31.172.in-addr.arpa=default/empty.zone
-168.192.in-addr.arpa=default/empty.zone
-d.f.ip6.arpa=default/empty.zone
-8.e.f.ip6.arpa=default/empty.zone"
+## Zone names of the shipped default zones (static entries must not shadow them), derived from
+## DEFAULT_ZONE_FILES.
+DEFAULT_ZONES=()
+for mapping in "${DEFAULT_ZONE_FILES[@]}"; do
+  DEFAULT_ZONES+=("${mapping%%=*}")
+done
 
 ## Fixed forward-store options - per-option rationale: hickory-dns/KNOWLEDGE.md §"Generated named.toml".
 OPTIONS_BLOCK='timeout = 5
@@ -325,7 +306,7 @@ else
 fi
 
 ## Shipped default zones (localhost and the built-in reverse zones).
-while IFS= read -r mapping; do
+for mapping in "${DEFAULT_ZONE_FILES[@]}"; do
   zone="${mapping%%=*}"
   file="${mapping#*=}"
   CONFIG_BODY+="
@@ -334,7 +315,7 @@ zone = $(toml_str "$zone")
 zone_type = \"Primary\"
 file = $(toml_str "$file")
 "
-done <<<"$DEFAULT_ZONE_FILES"
+done
 
 ## Static entries -> one authoritative forward leaf zone plus the matching reverse (PTR) leaf zone each;
 ## semantics and why (no hosts-file store upstream):
