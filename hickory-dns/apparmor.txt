@@ -48,9 +48,13 @@ profile hickory-dns flags=(attach_disconnected,mediate_deleted) {
   # AppArmor status reporting (s6 sets this up; harmless otherwise)
   /sys/kernel/security/apparmor/** r,
 
-  # App config surface (generated named.toml + zones + service args; hickory-dns/KNOWLEDGE.md §"Config-file and
-  # data layout"). Blanket-covered; documents what the scripts read and write.
+  # App config surface (generated named.toml + zones; hickory-dns/KNOWLEDGE.md §"Config-file and data layout").
+  # Blanket-covered; documents what the scripts read and write.
   /etc/hickory-dns/{,**} rw,
+
+  # The s6 service command line the run script reads (hickory-dns/KNOWLEDGE.md §"Config-file and data layout").
+  # Blanket-covered; documents what is read.
+  /etc/hickory-dns.args r,
 
   # Hostname-upstream resolution (resolve --system) and the identity lookups (hickory-dns/KNOWLEDGE.md §"Port 53
   # binding and privileges"). Blanket-covered; enumerated as documentation.

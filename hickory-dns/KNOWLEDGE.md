@@ -223,8 +223,9 @@ manual debugging (`docker exec`).
 Custom profile (repository-root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics"): `file,` + `signal,`
 blankets, `capability net_bind_service` + `setgid` + `setuid` + `setpcap`, network inet/inet6 stream/dgram (listeners,
 upstream connections, bashio supervisor API, healthcheck probe), the s6/bashio/`/data` boilerplate from the hd-idle
-profile, and documented (blanket-covered) rules for the app's config surface (`/etc/hickory-dns/{,**}`), the
-privilege-drop lookups (`/etc/passwd`, `/etc/group`), `/etc/resolv.conf` (hostname upstreams), and
-`/etc/ssl/certs/{,**}` (rustls-platform-verifier trust store). No sub-profile: the daemon needs network in the same
-profile. The lab has no AppArmor enforcement - the capability rules (`net_bind_service` for the bind,
-`setgid`/`setuid`/`setpcap` for the drop) are device-verified (2026-10-24 - §"Port 53 binding and privileges").
+profile, and documented (blanket-covered) rules for the app's config surface (`/etc/hickory-dns/{,**}`), the s6 service
+command line (`/etc/hickory-dns.args`), the privilege-drop lookups (`/etc/passwd`, `/etc/group`), `/etc/resolv.conf`
+(hostname upstreams), and `/etc/ssl/certs/{,**}` (rustls-platform-verifier trust store). No sub-profile: the daemon
+needs network in the same profile. The lab has no AppArmor enforcement - the capability rules (`net_bind_service` for
+the bind, `setgid`/`setuid`/`setpcap` for the drop) are device-verified (2026-10-24 - §"Port 53 binding and
+privileges").
