@@ -93,11 +93,20 @@ toml_str() {
   printf '"%s"' "$s"
 }
 
+## A decimal 0-255 octet/prefix without leading zeros: bash arithmetic reads leading zeros as octal,
+## and the daemon's address/CIDR parsers reject them - reject here so the option error, not a raw
+## --validate parse error, reports the problem.
+is_dec_octet() {
+  [[ "${1}" =~ ^[0-9]{1,3}$ ]] || return 1
+  [[ "${1}" == "0" || "${1}" != 0* ]] || return 1
+  ((10#${1} <= 255))
+}
+
 is_ipv4() {
   local ip="${1}" octet
   [[ "$ip" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 1
   for octet in "${BASH_REMATCH[@]:1}"; do
-    ((octet <= 255)) || return 1
+    is_dec_octet "$octet" || return 1
   done
 }
 
@@ -116,11 +125,11 @@ is_cidr() {
   [[ "$cidr" == */* ]] || return 1
   addr="${cidr%/*}"
   prefix="${cidr##*/}"
-  [[ "$prefix" =~ ^[0-9]{1,3}$ ]] || return 1
+  is_dec_octet "$prefix" || return 1
   if is_ipv4 "$addr"; then
-    ((prefix <= 32)) || return 1
+    ((10#$prefix <= 32)) || return 1
   elif is_ipv6 "$addr"; then
-    ((prefix <= 128)) || return 1
+    ((10#$prefix <= 128)) || return 1
   else
     return 1
   fi
@@ -132,8 +141,7 @@ ipv4_embedded_groups() {
   local o1 o2 o3 o4 o
   IFS=. read -r o1 o2 o3 o4 <<<"$1" || return 1
   for o in "$o1" "$o2" "$o3" "$o4"; do
-    [[ "$o" =~ ^[0-9]{1,3}$ ]] || return 1
-    (( 10#$o <= 255 )) || return 1
+    is_dec_octet "$o" || return 1
   done
   printf '%s %s' "$(printf '%04x' "$(( (10#$o1 << 8) | 10#$o2 ))")" "$(printf '%04x' "$(( (10#$o3 << 8) | 10#$o4 ))")"
 }
@@ -142,47 +150,59 @@ ipv4_embedded_groups() {
 ## (e.g. fd12:3456:789a::1 -> 1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.a.9.8.7.6.5.4.3.2.1.d.f.ip6.arpa).
 ## Prints the name; returns 1 on malformed input (the caller turns that into a boot-time option error).
 ipv6_reverse_name() {
-  local addr="${1}" head="" tail="" part group
+  local addr="${1}" head="" tail="" group
   [[ "$addr" != *::*::* ]] || return 1  # more than one "::"
+  [[ "$addr" != *:::* ]] || return 1    # ":::" - overlapping colons are not a "::" elision
+  case "$addr" in
+    :[!:]* | *[!:]: | :) return 1 ;;  # a lone ":" at either edge - "::" edges are the elision
+  esac
   if [[ "$addr" == *"::"* ]]; then
     head="${addr%%::*}"
     tail="${addr##*::}"
   else
     head="$addr"
   fi
+  local -a head_raw=() tail_raw=()
+  [ "$head" = "" ] || mapfile -t head_raw < <(tr ':' '\n' <<<"$head")
+  [ "$tail" = "" ] || mapfile -t tail_raw < <(tr ':' '\n' <<<"$tail")
+  ## An embedded IPv4 dotted quad is valid only as the address's FINAL group (::ffff:1.2.3.4) - it
+  ## replaces the last two 16-bit groups; anywhere else ("1.2.3.4:5", "1.2.3.4::5") the input is not
+  ## a valid IPv6 address.
   local -a head_groups=() tail_groups=()
-  local g
-  if [ "$head" != "" ]; then
-    while IFS= read -r g; do
-      if [[ "$g" == *.* ]]; then
-        local expanded
-        expanded="$(ipv4_embedded_groups "$g")" || return 1
-        local -a pair=()
-        read -ra pair <<<"$expanded"
-        head_groups+=("${pair[@]}")
-      else
-        head_groups+=("$g")
-      fi
-    done < <(tr ':' '\n' <<<"$head")
-  fi
-  if [ "$tail" != "" ]; then
-    while IFS= read -r g; do
-      if [[ "$g" == *.* ]]; then
-        local expanded
-        expanded="$(ipv4_embedded_groups "$g")" || return 1
-        local -a pair=()
-        read -ra pair <<<"$expanded"
-        tail_groups+=("${pair[@]}")
-      else
-        tail_groups+=("$g")
-      fi
-    done < <(tr ':' '\n' <<<"$tail")
-  fi
+  local n idx expanded
+  local -a pair=()
+  n=${#head_raw[@]}
+  for (( idx = 0; idx < n; idx++ )); do
+    group="${head_raw[idx]}"
+    if [[ "$group" == *.* ]]; then
+      (( idx == n - 1 && ${#tail_raw[@]} == 0 )) || return 1
+      expanded="$(ipv4_embedded_groups "$group")" || return 1
+      read -ra pair <<<"$expanded"
+      head_groups+=("${pair[@]}")
+    else
+      head_groups+=("$group")
+    fi
+  done
+  n=${#tail_raw[@]}
+  for (( idx = 0; idx < n; idx++ )); do
+    group="${tail_raw[idx]}"
+    if [[ "$group" == *.* ]]; then
+      (( idx == n - 1 )) || return 1
+      expanded="$(ipv4_embedded_groups "$group")" || return 1
+      read -ra pair <<<"$expanded"
+      tail_groups+=("${pair[@]}")
+    else
+      tail_groups+=("$group")
+    fi
+  done
   (( ${#head_groups[@]} + ${#tail_groups[@]} <= 8 )) || return 1
-  ## "::" expansion: the elided groups are all zero and sit between the head and the tail.
-  local -a groups=()
+  ## "::" expansion: the elided groups are all zero and sit between the head and the tail; a "::"
+  ## that elides nothing ("1:2:3:4:5:6:7:8::") is not a valid address.
   local fill=$(( 8 - ${#head_groups[@]} - ${#tail_groups[@]} ))
-  local idx
+  if [[ "$addr" == *"::"* ]]; then
+    (( fill >= 1 )) || return 1
+  fi
+  local -a groups=()
   for group in "${head_groups[@]}"; do
     groups+=("$group")
   done
@@ -217,8 +237,9 @@ resolve_host() {
     ## Bounded lookup: the CLI has no timeout of its own - a wedged system resolver must not stall the boot.
     if out=$(/usr/bin/timeout 10 /usr/bin/resolve --system -t "$type" "$name" 2>/dev/null); then
       ## Answer lines are "\t<name> <ttl> <class> <type> <rdata>"; pick the first record of the wanted type
-      ## (skips CNAME chains) and print its rdata (last field).
-      ip=$(printf '%s\n' "$out" | awk -v T="$type" '/ANSWER SECTION/{f=1; next} f && NF>=5 && $(NF-1)==T {print $NF; exit}')
+      ## (skips CNAME chains) and print its rdata (last field). The f flag is reset on every other section
+      ## header so AUTHORITY/ADDITIONAL records (e.g. glue addresses) are never mistaken for answers.
+      ip=$(printf '%s\n' "$out" | awk -v T="$type" '/ANSWER SECTION/{f=1; next} /SECTION/{f=0} f && NF>=5 && $(NF-1)==T {print $NF; exit}')
       ## Only a structurally valid address is accepted: anything else falls through to the cache instead of
       ## reaching the generated TOML.
       if [ "$ip" != "" ] && { is_ipv4 "$ip" || is_ipv6 "$ip"; }; then
@@ -285,9 +306,9 @@ while IFS= read -r cidr; do
   NETS+="$(toml_str "$cidr")"
   case "$cidr" in
     127.0.0.0/8 | 127.0.0.1/32 | 0.0.0.0/0) V4_LOOPBACK=1 ;;
-    ::1/128 | ::1 | ::/0) V6_LOOPBACK=1 ;;
+    ::1/128 | ::/0) V6_LOOPBACK=1 ;;
   esac
-done < <(echo "$NETS_RAW")
+done < <(printf '%s\n' "$NETS_RAW")
 
 if [ "$NETS" != "" ]; then
   if [ "$V4_LOOPBACK" = 0 ] || [ "$V6_LOOPBACK" = 0 ]; then
@@ -331,11 +352,22 @@ while IFS= read -r entry; do
   [ "$host" != "" ] && [ "$ip" != "" ] \
     || bashio::exit.nok "Static entry '${entry}': hostname and ip are both required."
   host="${host,,}"
-  host="${host%.}"
+  while [[ "$host" == *. ]]; do
+    host="${host%.}"
+  done
   is_hostname "$host" \
     || bashio::exit.nok "Invalid static entry hostname '${host}': not a DNS name."
-  if ! is_ipv4 "$ip" && ! is_ipv6 "$ip"; then
-    bashio::exit.nok "Static entry '${host}': '${ip}' is not an IPv4 or IPv6 address."
+  ## Validate the address and derive the reverse zone up front: for IPv6 the reverse-name helper IS
+  ## the validator (a malformed address cannot produce a zone name), so both the record type and the
+  ## reverse zone come from this branch.
+  if is_ipv4 "$ip"; then
+    rectype="A"
+    IFS=. read -r r_o1 r_o2 r_o3 r_o4 <<<"$ip"
+    rev_zone="${r_o4}.${r_o3}.${r_o2}.${r_o1}.in-addr.arpa"
+  else
+    rev_zone="$(ipv6_reverse_name "$ip")" \
+      || bashio::exit.nok "Static entry '${host}': '${ip}' is not a valid IPv6 address."
+    rectype="AAAA"
   fi
   for zone in "${DEFAULT_ZONES[@]}"; do
     [ "$host" != "$zone" ] \
@@ -350,8 +382,6 @@ while IFS= read -r entry; do
   N_STATIC=$((N_STATIC + 1))
   slug=$(printf '%s' "$host" | tr -c 'a-zA-Z0-9' '_')
   file="$(printf '%02d' "$N_STATIC")_${slug:0:64}.zone"
-  rectype="A"
-  is_ipv6 "$ip" && rectype="AAAA"
   {
     # shellcheck disable=SC2016  # '$ORIGIN'/'$TTL' are zone-file directives, not shell expansions
     printf '$ORIGIN %s.\n$TTL 300\n' "$host"
@@ -369,16 +399,6 @@ file = $(toml_str "static/${file}")
 
   ## Reverse leaf zone: the matching PTR record, answered locally like the forward record. Entries
   ## sharing one address share one reverse zone holding one PTR per name.
-  case "$ip" in
-    *:*)
-      rev_zone="$(ipv6_reverse_name "$ip")" \
-        || bashio::exit.nok "Static entry '${host}': '${ip}' is not a valid IPv6 address."
-      ;;
-    *)
-      IFS=. read -r r_o1 r_o2 r_o3 r_o4 <<<"$ip"
-      rev_zone="${r_o4}.${r_o3}.${r_o2}.${r_o1}.in-addr.arpa"
-      ;;
-  esac
   ## A reverse zone name may repeat only when entries share one address (grouped below); any other
   ## collision - e.g. with another entry's forward hostname - is a hard duplicate-zone error.
   if [[ -z "${SEEN_REVERSE[${rev_zone}]+x}" ]]; then
@@ -405,7 +425,7 @@ file = $(toml_str "static/${rev_file}")
   else
     printf '@   IN  PTR   %s.\n' "$host" >>"${STATIC_DIR}/${SEEN_REVERSE[${rev_zone}]}"
   fi
-done < <(echo "$ENTRIES_RAW")
+done < <(printf '%s\n' "$ENTRIES_RAW")
 
 if [ "$N_STATIC" -gt 0 ]; then
   bashio::log.info "Serving ${N_STATIC} static entries as local authoritative zones (forward + matching PTR records)"
@@ -428,7 +448,7 @@ while IFS= read -r entry; do
   [ "$proto" != "" ] \
     || bashio::exit.nok "Upstream '${entry}': protocol is required (tls, quic or https)."
   if [ "$proto" = "h3" ]; then
-    bashio::exit.nok "Upstream protocol 'h3': DoH3 is not supported by the packaged hickory-dns yet (the bin h3 features are not in any tagged release; hickory-dns/TODO.md) - use https (HTTP/2) for now."
+    bashio::exit.nok "Upstream protocol 'h3': DoH3 is not supported by the packaged hickory-dns yet (the bin h3 features are not in any tagged release) - use https (HTTP/2) for now."
   fi
   case "$proto" in
     tls | quic | https) ;;
@@ -466,7 +486,9 @@ while IFS= read -r entry; do
   [ "$host" != "" ] \
     || bashio::exit.nok "Upstream '${entry}': needs a host (the TLS server name the upstream certificate is validated against, e.g. dns.quad9.net)."
   host="${host,,}"
-  host="${host%.}"
+  while [[ "$host" == *. ]]; do
+    host="${host%.}"
+  done
   is_hostname "$host" \
     || bashio::exit.nok "Invalid upstream host '${host}': not a DNS name."
 
@@ -500,7 +522,7 @@ ${conn},
 ]
 "
   N_UPSTREAMS=$((N_UPSTREAMS + 1))
-done < <(echo "$UPSTREAMS_RAW")
+done < <(printf '%s\n' "$UPSTREAMS_RAW")
 
 ((N_UPSTREAMS >= 1)) \
   || bashio::exit.nok "At least one upstream resolver is required in the 'upstreams' option."
