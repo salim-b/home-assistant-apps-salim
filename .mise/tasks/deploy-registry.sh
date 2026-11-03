@@ -17,10 +17,6 @@
 set -euo pipefail
 
 app="${usage_app?}"
-host="${usage_host?}"
-# Bare host (no user@) defaults to root: HAOS device access is root-based
-case "$host" in *@*) ;; *) host="root@$host" ;; esac
-SSH_OPTS=(-o ConnectTimeout=10)
 
 CONFIG_MODE="${usage_config:-}"
 case "$CONFIG_MODE" in
@@ -33,14 +29,10 @@ esac
 
 # shellcheck source=.mise/tasks/lib/ssh-ha.sh
 source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
-wait_supervisor
-
-[ -d "$app" ] || {
-  echo "ERROR: no app directory '$app' in the repo" >&2
-  exit 1
-}
-slug=$(yq -r '.slug' "$app/config.yaml")
+ha_connect "${usage_host?}"
+slug=$(ha_app_slug "$app")
 local_slug="local_${slug}"
+wait_supervisor
 
 echo "== switching $app to the registry version on $host =="
 
@@ -61,11 +53,7 @@ fi
 }
 
 # --- check the repository is added on the device -----------------------------
-repos=$(sup_get store/repositories)
-if ! echo "$repos" | jq -e '.result == "ok"' >/dev/null 2>&1; then
-  echo "ERROR: could not read the store repositories on $host: $repos" >&2
-  exit 1
-fi
+repos=$(sup_expect_ok store/repositories "the store repositories")
 repo_entry=$(echo "$repos" | jq -c --arg url "$repo_url" \
   '[.data[] | select(((.url // "") | sub("/$";"") | ascii_downcase) == ($url | ascii_downcase))] | .[0] // empty')
 if [ "$repo_entry" = "" ] || [ "$repo_entry" = "null" ]; then
@@ -81,11 +69,7 @@ echo "-- repository on device: $repo_slug ($repo_url)"
 # --- discover the store entry + installed copies (one listing) ---------------
 # Store installs get the exact hashed slug '<repo-hash>_<app-slug>', the local one 'local_<app-slug>' -
 # exact matches, no suffix guessing (fact: root KNOWLEDGE.md §"Supervisor: store slugs (in-app documentation links)").
-store=$(sup_get store/addons)
-if ! echo "$store" | jq -e '.result == "ok"' >/dev/null 2>&1; then
-  echo "ERROR: could not read the store listing on $host: $store" >&2
-  exit 1
-fi
+store=$(sup_expect_ok store/addons "the store listing")
 store_slug="${repo_slug}_${slug}"
 
 store_entry=$(echo "$store" | jq -c --arg s "$store_slug" \
@@ -226,8 +210,7 @@ else
   if [ "$CONFIG_MODE" = "migrate" ] && [ "$old_options" != "" ]; then
     echo "-- migrating the previous options (filtered to the target schema)"
     filtered=$(ha_filter_options "$old_options" "$store_slug")
-    dropped=$(jq -r --argjson keys "$(ha_schema_keys "$store_slug")" \
-      'to_entries | map(select(.key as $k | $keys | index($k) | not) | .key) | join(", ")' <<<"$old_options")
+    dropped=$(ha_dropped_keys "$old_options" "$store_slug")
     [ "$dropped" != "" ] && echo "   (dropped, unknown to the target's schema: $dropped)"
     if [ "$filtered" = "{}" ]; then
       echo "-- (no options left after filtering - nothing to migrate)"
@@ -251,26 +234,6 @@ else
 fi
 
 # --- ensure running ----------------------------------------------------------
-# 'ha apps install' never auto-starts (updates/rebuilds only restart when it was running):
-# start it when the state check finds it not running, then verify again.
-sleep 3
-state=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" | jq -r '.data.state // empty')
-case "$state" in
-  started | startup) ;;
-  *)
-    echo "-- app is not running (state: $state) - starting it"
-    ha_app_start "$store_slug"
-    sleep 10
-    state=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" | jq -r '.data.state // empty')
-    case "$state" in
-      started | startup) ;;
-      *)
-        echo "WARNING: the app state is '$state' even after a start attempt - check the app log:" >&2
-        echo "         ssh $host 'ha apps logs $store_slug'" >&2
-        exit 1
-        ;;
-    esac
-    ;;
-esac
+state=$(ha_ensure_running "$store_slug")
 final_version=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $store_slug --raw-json" | jq -r '.data.version')
 echo "== $app now runs the registry version $final_version (state: $state) =="

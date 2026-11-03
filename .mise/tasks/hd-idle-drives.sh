@@ -4,10 +4,9 @@
 
 set -euo pipefail
 
-host="${usage_host?}"
-# Bare host (no user@) defaults to root: HAOS device access is root-based
-case "$host" in *@*) ;; *) host="root@$host" ;; esac
-SSH_OPTS=(-o ConnectTimeout=10)
+# shellcheck source=.mise/tasks/lib/ssh-ha.sh
+source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
+ha_connect "${usage_host?}"
 OUT_FILE="hd-idle/.drives.md"
 
 ## The sheet carries stable by-id IDs (per-machine inventory) - must stay gitignored; refuse to

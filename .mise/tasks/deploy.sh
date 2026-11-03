@@ -18,10 +18,6 @@
 set -euo pipefail
 
 app="${usage_app?}"
-host="${usage_host?}"
-# Bare host (no user@) defaults to root: HAOS device access is root-based
-case "$host" in *@*) ;; *) host="root@$host" ;; esac
-SSH_OPTS=(-o ConnectTimeout=10)
 
 CONFIG_MODE="${usage_config:-}"
 case "$CONFIG_MODE" in
@@ -34,15 +30,11 @@ esac
 
 # shellcheck source=.mise/tasks/lib/ssh-ha.sh
 source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
-wait_supervisor
-
-[ -d "$app" ] || {
-  echo "ERROR: no app directory '$app' in the repo" >&2
-  exit 1
-}
+ha_connect "${usage_host?}"
+slug=$(ha_app_slug "$app")
 version=$(yq -r '.version' "$app/config.yaml")
-slug=$(yq -r '.slug' "$app/config.yaml")
 local_slug="local_${slug}"
+wait_supervisor
 
 echo "== deploying $app v$version to $host (store slug: $local_slug) =="
 
@@ -163,8 +155,7 @@ fi
 if [ "$CONFIG_MODE" = "migrate" ] && [ "${MIGRATE_OPTIONS:-}" != "" ]; then
   echo "-- --config migrate: applying the replaced copy's options (filtered to the app's schema)"
   filtered=$(ha_filter_options "$MIGRATE_OPTIONS" "$local_slug")
-  dropped=$(jq -r --argjson keys "$(ha_schema_keys "$local_slug")" \
-    'to_entries | map(select(.key as $k | $keys | index($k) | not) | .key) | join(", ")' <<<"$MIGRATE_OPTIONS")
+  dropped=$(ha_dropped_keys "$MIGRATE_OPTIONS" "$local_slug")
   [ "$dropped" != "" ] && echo "   (dropped, unknown to the app's schema: $dropped)"
   if [ "$filtered" != "{}" ]; then
     ha_post_options "$local_slug" "$filtered" \

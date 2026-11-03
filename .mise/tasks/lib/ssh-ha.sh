@@ -2,10 +2,25 @@
 # shellcheck shell=bash
 #MISE hide=true
 #MISE description="⚠️ internal helper (sourced by device tasks, not runnable on its own)"
-# Sourced by the device tasks (see .agents/skills/ha-app-device-testing): the caller's
-# SSH_OPTS array and `host` variable are the sourcing task's contract (set before sourcing).
-# shellcheck disable=SC2154  # SSH_OPTS + host are the sourcing task's contract variables
+# Sourced by the device tasks (see .agents/skills/ha-app-device-testing): call `ha_connect <host-arg>` right after
+# sourcing - it sets the contract variables `host` + SSH_OPTS that the other helpers read.
+# shellcheck disable=SC2154  # host + SSH_OPTS are set by ha_connect
 # shellcheck disable=SC2029  # the remote commands intentionally embed client-side values (function args)
+
+ha_connect() { # ha_connect <host>: set the contract variables - normalize the SSH target (bare host -> root@: HAOS device
+  # access is root-based) and SSH_OPTS
+  host="$1"
+  case "$host" in *@*) ;; *) host="root@$host" ;; esac
+  SSH_OPTS=(-o ConnectTimeout=10)
+}
+
+ha_app_slug() { # ha_app_slug <app>: the app's slug from its repo config.yaml (fails when the repo has no such app directory)
+  [ -d "$1" ] || {
+    echo "ERROR: no app directory '$1' in the repo" >&2
+    return 1
+  }
+  yq -r '.slug' "$1/config.yaml"
+}
 
 # The supervisor may still be settling after a device reboot (transient "not ready" /
 # "is shutdown" messages from the ha CLI): wait up front, retry the mutators below on those.
@@ -76,11 +91,49 @@ ha_app_start() { # ha_app_start <slug>: start the app, tolerating slow startups 
   fi
 }
 
+ha_ensure_running() { # ha_ensure_running <slug>: ensure the app runs after an install/update/restart ('ha apps install'
+  # never auto-starts; updates/rebuilds only restart when it was running): start it when the state check finds it not
+  # running, then verify again. Progress on stderr, final state on stdout (capture-safe); fails with a log hint when
+  # the app still won't run.
+  local state
+  sleep 3
+  state=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $1 --raw-json" | jq -r '.data.state // empty')
+  case "$state" in
+    started | startup) ;;
+    *)
+      echo "-- app is not running (state: $state) - starting it" >&2
+      ha_app_start "$1"
+      sleep 10
+      state=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $1 --raw-json" | jq -r '.data.state // empty')
+      case "$state" in
+        started | startup) ;;
+        *)
+          echo "WARNING: the app state is '$state' even after a start attempt - check the app log:" >&2
+          echo "         ssh $host 'ha apps logs $1'" >&2
+          return 1
+          ;;
+      esac
+      ;;
+  esac
+  printf '%s\n' "$state"
+}
+
 # --- supervisor REST probes -------------------------------------------------------------------
 
 sup_get() { # sup_get <api-path>: supervisor REST GET (read-only), raw JSON
   ssh "${SSH_OPTS[@]}" "$host" \
     "curl -s -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" http://supervisor/$1"
+}
+
+sup_expect_ok() { # sup_expect_ok <api-path> <what>: sup_get + require result=="ok" - prints the raw JSON on success,
+  # fails (with the response echoed) otherwise; readiness is established (wait_supervisor), so no retries
+  local out
+  out=$(sup_get "$1") || out=""
+  if ! echo "$out" | jq -e '.result == "ok"' >/dev/null 2>&1; then
+    echo "ERROR: could not read $2 on $host: ${out:-<no output>}" >&2
+    return 1
+  fi
+  printf '%s\n' "$out"
 }
 
 # The device resolves through the CoreDNS forward chain: manual servers, then the host's DHCP-learned DNS
@@ -138,6 +191,12 @@ ha_filter_options() { # ha_filter_options <options-json> <target-slug>: the opti
   local keys
   keys=$(ha_schema_keys "$2")
   jq -c --argjson keys "$keys" 'with_entries(select(.key as $k | $keys | index($k)))' <<<"$1"
+}
+
+ha_dropped_keys() { # ha_dropped_keys <options-json> <target-slug>: the options' keys unknown to the target's schema,
+  # comma-joined ('' when none) - the counterpart of ha_filter_options, reporting the drops instead of filtering
+  jq -r --argjson keys "$(ha_schema_keys "$2")" \
+    'to_entries | map(select(.key as $k | $keys | index($k) | not) | .key) | join(", ")' <<<"$1"
 }
 
 ha_backup_options() { # ha_backup_options <app-name> <options-json>: back the options up to a local file (they die

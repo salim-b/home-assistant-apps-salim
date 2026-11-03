@@ -12,16 +12,16 @@
 set -euo pipefail
 
 app="${usage_app?}"
-host="${usage_host?}"
-# Bare host (no user@) defaults to root: HAOS device access is root-based
-case "$host" in *@*) ;; *) host="root@$host" ;; esac
-SSH_OPTS=(-o ConnectTimeout=10)
+
+# shellcheck source=.mise/tasks/lib/ssh-ha.sh
+source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
+ha_connect "${usage_host?}"
 
 # --------------------------------------------------------------------------
 # Generic live-test harness; per-app checks live in .mise/tasks/test/live/<app>.sh - hook contract
 # (live_prepare/live_runtime_check, LIVE_* contract vars): .agents/skills/ha-app-device-testing.
 # --------------------------------------------------------------------------
-slug=$(yq -r '.slug' "$app/config.yaml")
+slug=$(ha_app_slug "$app")
 local_slug="local_${slug}"
 host_addr="${host##*@}" # strip a user@ prefix
 
