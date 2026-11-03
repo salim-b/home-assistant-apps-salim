@@ -24,11 +24,14 @@ truth (verified against v0.26.3 AND v0.26.1 source - the dev pin must parse the 
   store (`bin/src/config/mod.rs` `ZoneConfigWithFile`; paths are relative to `directory`). Default zones: `localhost`,
   `0.0.127.in-addr.arpa`, the 31-label `0.0.0...ip6.arpa` reverse zone, `255.in-addr.arpa`, `0.in-addr.arpa`, and the
   RFC 6303 private-use set - `10.in-addr.arpa`, `16.172.in-addr.arpa` through `31.172.in-addr.arpa`,
-  `168.192.in-addr.arpa`, `d.f.ip6.arpa`, `8.e.f.ip6.arpa` (empty SOA+NS files in the same template; reverse queries for
-  private address space never reach the upstream path, where public resolvers answer with synthesized, proof-less
-  NXDOMAINs the DNSSEC validator must reject) (shipped under `rootfs/etc/hickory-dns/zones/default/`, copied verbatim
-  from the upstream test-data `default/*.zone` files - the apk installs them to
-  `/usr/share/doc/hickory-dns/examples/default/`, a doc-dir layout the image does not couple to).
+  `168.192.in-addr.arpa`, `d.f.ip6.arpa`, `8.e.f.ip6.arpa` (reverse queries for private address space never reach the
+  upstream path, where public resolvers answer with synthesized, proof-less NXDOMAINs the DNSSEC validator must reject).
+  Shipped under `rootfs/etc/hickory-dns/zones/default/`: `localhost.zone`, `127.0.0.1.zone` and `ipv6_1.zone` carry
+  their zones' records and stay verbatim copies of the upstream test-data `default/*.zone` files (the apk installs those
+  to `/usr/share/doc/hickory-dns/examples/default/`, a doc-dir layout the image does not couple to); every other default
+  zone is empty (SOA + NS only) and shares ONE origin-relative template file, `empty.zone` - zone identity comes from
+  the named.toml `zone` key, so a single file serves all 22 empty zones (one shared file verified against the pinned
+  0.26.1 `--validate`).
 - Forward store (`crates/server/src/store/forwarder.rs` `ForwardConfig`, deny_unknown_fields): `name_servers` (required
   Vec) + `options` (optional table). One `[[zones.stores.name_servers]]` block per configured upstream
   (`crates/resolver/src/config.rs`); per-connection field semantics (which field means what, defaults, the h3 gap) live

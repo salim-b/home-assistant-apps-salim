@@ -43,32 +43,33 @@ DEFAULT_ZONES=(
   8.e.f.ip6.arpa
 )
 
-## Zone files of the shipped default zones, relative to ${ZONES_DIR} (directory key).
+## Zone files of the shipped default zones, relative to ${ZONES_DIR} (directory key). The empty zones all
+## share one origin-relative template file (empty.zone) - zone identity comes from the named.toml `zone` key.
 DEFAULT_ZONE_FILES="localhost=default/localhost.zone
 0.0.127.in-addr.arpa=default/127.0.0.1.zone
 0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa=default/ipv6_1.zone
-255.in-addr.arpa=default/255.zone
-0.in-addr.arpa=default/0.zone
-10.in-addr.arpa=default/10.zone
-16.172.in-addr.arpa=default/16.172.zone
-17.172.in-addr.arpa=default/17.172.zone
-18.172.in-addr.arpa=default/18.172.zone
-19.172.in-addr.arpa=default/19.172.zone
-20.172.in-addr.arpa=default/20.172.zone
-21.172.in-addr.arpa=default/21.172.zone
-22.172.in-addr.arpa=default/22.172.zone
-23.172.in-addr.arpa=default/23.172.zone
-24.172.in-addr.arpa=default/24.172.zone
-25.172.in-addr.arpa=default/25.172.zone
-26.172.in-addr.arpa=default/26.172.zone
-27.172.in-addr.arpa=default/27.172.zone
-28.172.in-addr.arpa=default/28.172.zone
-29.172.in-addr.arpa=default/29.172.zone
-30.172.in-addr.arpa=default/30.172.zone
-31.172.in-addr.arpa=default/31.172.zone
-168.192.in-addr.arpa=default/168.192.zone
-d.f.ip6.arpa=default/ipv6_ula.zone
-8.e.f.ip6.arpa=default/ipv6_linklocal.zone"
+255.in-addr.arpa=default/empty.zone
+0.in-addr.arpa=default/empty.zone
+10.in-addr.arpa=default/empty.zone
+16.172.in-addr.arpa=default/empty.zone
+17.172.in-addr.arpa=default/empty.zone
+18.172.in-addr.arpa=default/empty.zone
+19.172.in-addr.arpa=default/empty.zone
+20.172.in-addr.arpa=default/empty.zone
+21.172.in-addr.arpa=default/empty.zone
+22.172.in-addr.arpa=default/empty.zone
+23.172.in-addr.arpa=default/empty.zone
+24.172.in-addr.arpa=default/empty.zone
+25.172.in-addr.arpa=default/empty.zone
+26.172.in-addr.arpa=default/empty.zone
+27.172.in-addr.arpa=default/empty.zone
+28.172.in-addr.arpa=default/empty.zone
+29.172.in-addr.arpa=default/empty.zone
+30.172.in-addr.arpa=default/empty.zone
+31.172.in-addr.arpa=default/empty.zone
+168.192.in-addr.arpa=default/empty.zone
+d.f.ip6.arpa=default/empty.zone
+8.e.f.ip6.arpa=default/empty.zone"
 
 ## Fixed forward-store options - per-option rationale: hickory-dns/KNOWLEDGE.md §"Generated named.toml".
 OPTIONS_BLOCK='timeout = 5
