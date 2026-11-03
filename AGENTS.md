@@ -54,19 +54,19 @@ Applies to comments and documentation alike:
 
 Load a skill's full text before doing the kind of work it covers:
 
-  | Skill                   | Consult it before/when                                                              |
-  | ----------------------- | ----------------------------------------------------------------------------------- |
-  | `ha-app-workflow`       | making any change, commit, or release (branching, commit format, version bumps, CI) |
-  | `ha-app-tooling`        | touching `hk.pkl`, mise tasks, or lint config; interpreting lint failures           |
-  | `ha-app-markdown`       | writing or editing any Markdown file                                                |
-  | `ha-app-apparmor`       | creating or changing an `apparmor.txt`; diagnosing on-device permission denials     |
-  | `ha-app-base-image`     | writing or debugging app shell scripts (procfs writes, s6 wiring, bashio)           |
-  | `ha-app-lab-testing`    | deploying any runtime-affecting change; adding or changing lab hooks                |
-  | `ha-app-device-testing` | verifying on a real HAOS device (deploy / deploy-registry / test:live)              |
-  | `ha-app-scaffolding`    | adding or bootstrapping a new app subdirectory                                      |
-  | `nfs-server-runtime`    | touching nfs-server runtime code or s6 services; debugging it on a device           |
-  | `hd-idle-runtime`       | touching hd-idle runtime code or s6 services; debugging it on a device              |
-  | `hickory-dns-runtime`   | touching hickory-dns runtime code or s6 services; debugging it on a device          |
+  | Skill                   | Consult it before/when                                                                 |
+  | ----------------------- | -------------------------------------------------------------------------------------- |
+  | `ha-app-workflow`       | making any change, commit, or release (branching, commit format, version bumps, CI)    |
+  | `ha-app-tooling`        | touching `hk.pkl`, mise tasks, or lint config; interpreting lint failures              |
+  | `ha-app-markdown`       | writing or editing any Markdown file                                                   |
+  | `ha-app-apparmor`       | creating or changing an `apparmor.txt`; diagnosing on-device permission denials        |
+  | `ha-app-base-image`     | writing or debugging app shell scripts (procfs writes, s6 wiring, bashio)              |
+  | `ha-app-lab-testing`    | deploying any runtime-affecting change; adding or changing lab hooks                   |
+  | `ha-app-device-testing` | verifying on a real HAOS device (deploy / deploy-registry / apply-options / test:live) |
+  | `ha-app-scaffolding`    | adding or bootstrapping a new app subdirectory                                         |
+  | `nfs-server-runtime`    | touching nfs-server runtime code or s6 services; debugging it on a device              |
+  | `hd-idle-runtime`       | touching hd-idle runtime code or s6 services; debugging it on a device                 |
+  | `hickory-dns-runtime`   | touching hickory-dns runtime code or s6 services; debugging it on a device             |
 
 ## Environment setup
 
@@ -89,6 +89,7 @@ testing use the devcontainer (`.devcontainer.json`), not the lab.
 - `mise run lab` — full-fidelity boot lab; **run for every runtime-affecting change**.
 - `mise run deploy <app> <host>` and `mise run deploy-registry <app> <host>` — put an app on a real device.
 - `mise run test:live <app> <host>` — deploy plus per-app live checks.
+- `mise run apply-options <app> <host> <file>` — apply a JSON options file to the app's installed copy on a device.
 - `mise run hd-idle-drives <host>` — regenerate the local drive cheat sheet (`hd-idle/.drives.md`, gitignored).
 - `mise run install-git-hooks` — enable hk pre-commit/commit-msg hooks (once per machine).
 

@@ -56,6 +56,10 @@ mise run deploy nfs-server root@homeassistant.local
 # migrating app options
 mise run deploy-registry hd-idle root@homeassistant.local --config migrate
 
+# apply a JSON options file to the installed app on the device
+# (schema-filtered, previous options backed up; see `mise run apply-options --help`)
+mise run apply-options hd-idle root@homeassistant.local options.json
+
 # get app logs from HAOS device (`--follow` continuously prints new log entries until
 # you abort; app slug is `local_<config.yaml slug>`)
 ssh root@homeassistant.local 'ha apps logs --follow local_nfs-server'

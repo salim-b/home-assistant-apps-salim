@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2029  # remote commands intentionally embed client-side values
+#MISE description="Apply a JSON (or YAML) options file to an installed HA app on a device - schema-filtered, previous options backed up"
+#USAGE arg "<app>" help="App to apply the options to (repo subfolder name)" {
+#USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
+#USAGE }
+#USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to `root`), e.g. `root@homeassistant.local` or just `homeassistant.local`"
+#USAGE arg "<file>" help="""
+#USAGE   JSON file with the options to apply (top-level option keys, e.g. `options.json`; `.yaml`/`.yml` files are converted
+#USAGE   via yq; relative paths resolve from the mise invocation directory). The schema-filtered keys become the install's
+#USAGE   complete options - a fresh options POST replaces the stored set (unknown keys are dropped, reported), and the
+#USAGE   previous options are backed up locally first (path printed).
+#USAGE """
+#USAGE flag "--slug <slug>" help="Apply to this exact install slug on the device instead of auto-detecting the app's installed copy (e.g. `local_nfs-server` or `f8b2d53d_nfs-server`)"
+#USAGE flag "--no-restart" help="Do not restart/start the app after posting - the options apply at its next start"
+#USAGE flag "--dry-run" help="Show the schema-filtered options and dropped keys; change nothing on the device"
+
+set -euo pipefail
+
+app="${usage_app?}"
+host="${usage_host?}"
+file="${usage_file?}"
+# Bare host (no user@) defaults to root: HAOS device access is root-based
+case "$host" in *@*) ;; *) host="root@$host" ;; esac
+SSH_OPTS=(-o ConnectTimeout=10)
+
+[ -d "$app" ] || {
+  echo "ERROR: no app directory '$app' in the repo" >&2
+  exit 1
+}
+slug=$(yq -r '.slug' "$app/config.yaml")
+local_slug="local_${slug}"
+
+# --- read and validate the options file --------------------------------------------------------
+# Relative paths resolve from the mise invocation directory (tasks run in the project root;
+# MISE_ORIGINAL_CWD holds the caller's cwd - the same directory for repo-root invocations).
+if [ "${file#/}" = "$file" ] && [ -f "${MISE_ORIGINAL_CWD:-.}/$file" ]; then
+  file="${MISE_ORIGINAL_CWD:-.}/$file"
+fi
+[ -f "$file" ] || {
+  echo "ERROR: options file '$file' not found (absolute path, or relative to the mise invocation directory)" >&2
+  exit 1
+}
+case "$file" in
+  *.yaml | *.yml) options=$(yq -o json '.' "$file" 2>/dev/null | jq -c '.') || options="" ;;
+  *) options=$(jq -c '.' "$file" 2>/dev/null) || options="" ;;
+esac
+[ "$options" != "" ] || {
+  echo "ERROR: '$file' could not be parsed - expected JSON with the options (YAML for .yaml/.yml files)" >&2
+  exit 1
+}
+docs=$(jq -s 'length' <<<"$options")
+[ "$docs" = "1" ] || {
+  echo "ERROR: '$file' must contain exactly one JSON document (found $docs)" >&2
+  exit 1
+}
+[ "$(jq -r 'type' <<<"$options")" = "object" ] || {
+  echo "ERROR: '$file' must contain a JSON object with the app's top-level option keys (found: $(jq -r 'type' <<<"$options"))" >&2
+  exit 1
+}
+[ "$options" != "{}" ] || {
+  echo "ERROR: '$file' contains an empty options object - nothing to apply" >&2
+  exit 1
+}
+
+# shellcheck source=.mise/tasks/lib/ssh-ha.sh
+source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
+wait_supervisor
+
+echo "== applying options from $file to $app on $host =="
+
+# --- discover the install to apply to ------------------------------------------------------------
+# Stored options are per-install: the local copy uses the slug 'local_<slug>', a repository install the hashed
+# store slug '<repo-hash>_<slug>' (fact: root KNOWLEDGE.md §"Supervisor: store slugs (in-app documentation links)").
+store_apps=$(ssh "${SSH_OPTS[@]}" "$host" 'ha store apps --raw-json' 2>/dev/null || true)
+if ! echo "$store_apps" | jq -e '.result == "ok"' >/dev/null 2>&1; then
+  echo "ERROR: could not read the app store listing on $host: ${store_apps:-<no output>}" >&2
+  exit 1
+fi
+if [ "${usage_slug:-}" != "" ]; then
+  installed=$(echo "$store_apps" | jq -c --arg s "$usage_slug" \
+    '[.data.addons[] | select(.slug == $s and .installed == true)]')
+else
+  installed=$(echo "$store_apps" | jq -c --arg local "$local_slug" --arg suffix "$slug" \
+    '[.data.addons[] | select(.installed == true and (.slug == $local or ((.slug | split("_")) | last) == $suffix))]')
+fi
+case "$(jq 'length' <<<"$installed")" in
+  1)
+    target=$(jq -r '.[0].slug' <<<"$installed")
+    version=$(jq -r '.[0].version' <<<"$installed")
+    echo "-- target install: $target (version $version)"
+    ;;
+  0)
+    if [ "${usage_slug:-}" != "" ]; then
+      echo "ERROR: no installed app '${usage_slug}' on $host (is the slug right? it must name an installed copy)" >&2
+    else
+      echo "ERROR: '$app' is not installed on $host (neither '$local_slug' nor a repository install)." >&2
+      echo "       Deploy it first, e.g.: mise run deploy $app $host" >&2
+    fi
+    exit 1
+    ;;
+  *)
+    echo "ERROR: several installed copies of '$slug' found on $host (they would conflict on the app's published port):" >&2
+    jq -r '.[] | "       - \(.slug) (version \(.version))"' <<<"$installed" >&2
+    echo "       Uninstall all but one first, or pick one explicitly with --slug <slug>." >&2
+    exit 1
+    ;;
+esac
+
+# --- schema safety (the same filter as the deploy/deploy-registry --config migrate flows) --------
+# A fresh options POST replaces the whole stored set and silently drops keys unknown to the schema
+# (fact: root KNOWLEDGE.md §"Supervisor: option schema quirks") - the filter makes the drops explicit.
+filtered=$(ha_filter_options "$options" "$target")
+dropped=$(jq -r --argjson keys "$(ha_schema_keys "$target")" \
+  'to_entries | map(select(.key as $k | $keys | index($k) | not) | .key) | join(", ")' <<<"$options")
+[ "$dropped" != "" ] && echo "-- (dropped, unknown to the app's schema: $dropped)"
+if [ "$filtered" = "{}" ]; then
+  echo "ERROR: no option key of '$file' matches the schema of $target:" >&2
+  echo "       file keys:   $(jq -r 'keys | join(", ")' <<<"$options")" >&2
+  echo "       schema keys: $(ha_schema_keys "$target" | jq -r 'join(", ")')" >&2
+  echo "       Is the file meant for another app or version?" >&2
+  exit 1
+fi
+
+if [ "${usage_dry_run:-false}" = "true" ]; then
+  echo "-- would POST these options to $target:"
+  jq . <<<"$filtered"
+  echo "-- dry run: nothing was changed on the device"
+  exit 0
+fi
+
+# --- apply (the POST replaces the stored set; the current options are user data - back them up first) ---
+old=$(ha_app_options "$target")
+if [ "$old" != "" ] && [ "$old" != "{}" ]; then
+  echo "-- current options backed up locally: $(ha_backup_options "$app" "$old")"
+fi
+ha_post_options "$target" "$filtered" \
+  || {
+    echo "ERROR: applying the options failed (the current options are backed up above)" >&2
+    exit 1
+  }
+echo "-- options applied"
+
+if [ "${usage_no_restart:-false}" = "true" ]; then
+  echo "-- --no-restart: the options apply at the app's next start"
+  exit 0
+fi
+
+# --- make the options take effect (options reach a running app only at its next (re)start) -------
+state=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $target --raw-json" | jq -r '.data.state // empty')
+case "$state" in
+  stopped)
+    echo "-- app is stopped - starting it (the options apply at start)"
+    ha_app_start "$target"
+    ;;
+  *)
+    echo "-- restarting $target so the options take effect"
+    ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps restart $target"
+    ;;
+esac
+
+# --- ensure running (the same verification as the deploy tasks) -----------------------------------
+sleep 3
+state=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $target --raw-json" | jq -r '.data.state // empty')
+case "$state" in
+  started | startup) ;;
+  *)
+    echo "-- app is not running (state: $state) - starting it"
+    ha_app_start "$target"
+    sleep 10
+    state=$(ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps info $target --raw-json" | jq -r '.data.state // empty')
+    case "$state" in
+      started | startup) ;;
+      *)
+        echo "WARNING: the app state is '$state' even after a start attempt - check the app log:" >&2
+        echo "         ssh $host 'ha apps logs $target'" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+esac
+echo "== options applied to $target v$version (state: $state) =="
