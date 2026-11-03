@@ -35,8 +35,8 @@ Never duplicate information across files. Place it where it belongs and referenc
 - `<app>/CHANGELOG.md` — user-visible changes per version.
 - `TODO.md` (repo root) and `<app>/TODO.md` — open work items only (cross-app vs. app-specific). Resolved items are
   deleted, not archived: Git history is the record.
-- Code and config comments — purpose plus pointer (`# See <app>/KNOWLEDGE.md §…`, `# see .agents/skills/<skill>…`);
-  parsimony rules below.
+- Code and config comments — reduce to a minimum; purpose plus pointer (`# See <app>/KNOWLEDGE.md §…`,
+  `# see .agents/skills/<skill>…`); parsimony rules below.
 - `AGENTS.md` (this file) — agent process, placement rule, and the skill index. No facts, no procedures, no task usage.
 
 ### Prose parsimony
