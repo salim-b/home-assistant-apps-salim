@@ -29,9 +29,12 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 - File tasks live in `.mise/tasks/` with proper suffixes (`.sh`, `.py`, … — mise resolves the short names, e.g.
   `mise run lint`) and `#MISE`/`#USAGE` header comments.
 - Document and type task arguments via usage specs — never bare `$1` handling unless `raw_args = true`.
-- Required args: declare `arg "<name>"` — mise errors before the task starts when missing (no manual checks). Read with
-  `${usage_name?}`; optional ones with `${usage_name:-…}` defaults; boolean flags with `${usage_name:-false}` (mise
-  docs, "Read argument values"). In Python tasks the values are exported as `usage_<underscored_name>` env vars.
+- Required args: declare `arg "<name>"` — mise errors before the task starts when missing (no manual checks). Read
+  required string args with `${usage_name:?}` — it also rejects empty values, which pass mise's presence check (mise
+  docs, "Read argument values": `?` errors only when unset, `:?` also when empty). Optional args read with
+  `${usage_name:-…}` (empty ≡ unset); boolean flags with `${usage_name:-false}`, compared against `"true"`. In Python
+  tasks the values are exported as `usage_<underscored_name>` env vars — reject empty required values explicitly there
+  (the `:?` guard is shell-only).
 
 ## validate.py (`.mise/tasks/validate.py`, part of `mise run check`)
 
