@@ -12,9 +12,8 @@ set -euo pipefail
 ## format: hd-idle/KNOWLEDGE.md §"Drive-PM treatment"). Only pm-flag 1 drives are treated (the idle time plays no
 ## role: an idle-0 drive is a treatment target all the same). With --since, only lines NEW or CHANGED relative to
 ## the old file are treated - redundant treatment of asleep drives risks bridge-mediated motor starts.
-## Treated drives run CONCURRENTLY (one background job per drive; each drive's two smartctl calls stay sequential):
-## a standby drive is woken by its first SET FEATURES command, so the former sequential loop scaled the boot with
-## the drive count; concurrent SG_IO to different disks is safe.
+## Treated drives run CONCURRENTLY (one background job per drive; each drive's two smartctl calls stay sequential;
+## concurrent SG_IO to different disks is safe): a standby drive is woken by its first SET FEATURES command.
 
 DRIVES_FILE="${1:-/etc/hd-idle.drives}"
 SINCE_FILE=""
