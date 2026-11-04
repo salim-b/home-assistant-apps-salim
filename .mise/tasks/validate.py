@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --with voluptuous --with pyyaml --with jsonschema python3
+#!/usr/bin/env -S uv run --with voluptuous --with pyyaml python3
 #MISE description="Validate app configs and translations against HA Supervisor schemas"
 #USAGE arg "[app]" help="App directory to validate (default: all apps)"
 #USAGE flag "--schemas-only" help="Only refetch the pinned Supervisor schemas"
@@ -10,11 +10,11 @@ Parses all app YAML files (catching parse errors early); validates translations 
 supervisor's voluptuous schemas (AST-extracted from the pinned ref - no drifting copies) and the
 AppArmor profile against the supervisor's profile-name regex (exactly one top-level profile);
 cross-checks translation 'configuration' keys vs schema keys (incl. nested 'fields') and
-'network' keys (lowercase!) vs config.yaml 'ports'; schema-validates .rumdl.toml and
-.panache.toml against their published schemas (.github/renovate.json is instead gated by the
-official renovate-config-validator in the hk lint stack); canary-checks that rumdl's
+'network' keys (lowercase!) vs config.yaml 'ports'; canary-checks that rumdl's
 autofix stays disabled (panache owns formatting; see .rumdl.toml `fixable`); verifies apk pins
 against the Alpine binary indexes (policy: root KNOWLEDGE.md §apk package version policy).
+TOML config schemas (.rumdl.toml, .panache.toml, mise.toml) are validated by the hk `tombi`
+step instead, via the files' `#:schema` directives (.agents/skills/ha-app-tooling).
 """
 from __future__ import annotations
 
@@ -30,7 +30,6 @@ import sys
 import tarfile
 import tempfile
 import time
-import tomllib
 import urllib.request
 
 import voluptuous
@@ -134,40 +133,6 @@ def _flag(name: str) -> bool:
     return False
 
 
-def validate_rumdl_config() -> None:
-    """Schema-validate .rumdl.toml against rumdl's published config schema, fetched at the
-    installed rumdl version's tag (pin: mise.toml [tools] + mise.lock). Requires rumdl on
-    PATH (`mise run validate`)."""
-    import jsonschema
-
-    config_file = ROOT / ".rumdl.toml"
-    if not config_file.is_file():
-        return
-    config = tomllib.loads(config_file.read_text())
-
-    try:
-        out = subprocess.run(
-            ["rumdl", "--version"], capture_output=True, text=True, check=True
-        ).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        sys.exit("rumdl not on PATH: run this task via `mise run validate`")
-    version = out.split()[-1]
-
-    schema_url = f"https://raw.githubusercontent.com/rvben/rumdl/v{version}/rumdl.schema.json"
-    schema_file = CACHE.parent / f"rumdl-schema-v{version}.json"
-    if not schema_file.is_file():
-        schema_file.parent.mkdir(parents=True, exist_ok=True)
-        print(f"fetching {schema_url}")
-        schema_file.write_text(urllib.request.urlopen(schema_url).read().decode())
-    try:
-        jsonschema.validate(config, json.loads(schema_file.read_text()))
-    except jsonschema.ValidationError as err:
-        loc = "/".join(str(p) for p in err.absolute_path) or "<root>"
-        fail(".rumdl.toml", f"schema mismatch at {loc}: {err.message[:200]}")
-    except jsonschema.SchemaError as err:
-        fail(".rumdl.toml", f"fetched schema unusable: {err.message[:200]}")
-
-
 def validate_rumdl_no_autofix() -> None:
     """Behavioral canary: rumdl must not rewrite ANY file (panache owns all markdown
     formatting). Runs `rumdl fmt` on a scratch violation file with the repo config and fails if
@@ -197,43 +162,6 @@ def validate_rumdl_no_autofix() -> None:
                 " in .rumdl.toml) - re-verify the installed rumdl version's"
                 " fixable/unfixable semantics",
             )
-
-
-def validate_panache_config() -> None:
-    """Schema-validate .panache.toml against panache's published config schema, fetched at the
-    installed panache version's tag (pin: mise.toml [tools] + mise.lock) - same pattern as rumdl.
-    Requires panache on PATH (`mise run validate`)."""
-    import jsonschema
-
-    config_file = ROOT / ".panache.toml"
-    if not config_file.is_file():
-        return
-    config = tomllib.loads(config_file.read_text())
-
-    try:
-        version = (
-            subprocess.run(
-                ["panache", "--version"], capture_output=True, text=True, check=True
-            )
-            .stdout.strip()
-            .split()[-1]
-        )
-    except (OSError, subprocess.CalledProcessError):
-        sys.exit("panache not on PATH: run this task via `mise run validate`")
-
-    schema_url = f"https://raw.githubusercontent.com/jolars/panache/v{version}/panache.schema.json"
-    schema_file = CACHE.parent / f"panache-schema-v{version}.json"
-    if not schema_file.is_file():
-        schema_file.parent.mkdir(parents=True, exist_ok=True)
-        print(f"fetching {schema_url}")
-        schema_file.write_text(urllib.request.urlopen(schema_url).read().decode())
-    try:
-        jsonschema.validate(config, json.loads(schema_file.read_text()))
-    except jsonschema.ValidationError as err:
-        loc = "/".join(str(p) for p in err.absolute_path) or "<root>"
-        fail(".panache.toml", f"schema mismatch at {loc}: {err.message[:200]}")
-    except jsonschema.SchemaError as err:
-        fail(".panache.toml", f"fetched schema unusable: {err.message[:200]}")
 
 
 APKINDEX_TTL = 24 * 3600  # the daily CI cron should see Alpine-side repoints
@@ -340,9 +268,7 @@ def main() -> int:
 
     if _flag("schemas-only"):
         return 0  # cache warmed by the fetches above
-    validate_rumdl_config()
     validate_rumdl_no_autofix()
-    validate_panache_config()
     validate_apk_pins()
 
     for app in find_apps():

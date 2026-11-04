@@ -1,7 +1,7 @@
 ---
 name: ha-app-tooling
 description: How this repository's dev tooling works — the hk lint gate and git hooks, mise task authoring with usage
-  specs, what validate.py checks, and the YAML/shell linting conventions. Use when touching hk.pkl, mise tasks, or lint
+  specs, what validate.py checks, and the YAML/shell/TOML linting conventions. Use when touching hk.pkl, mise tasks, or lint
   configuration, or when interpreting lint failures.
 ---
 
@@ -20,9 +20,9 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 - To check an explicit file set, pipe NUL-separated paths to hk:
   `git diff --name-only -z HEAD | hk check --files0-from=-`.
 - Git hooks (enable once per machine: `mise run install-git-hooks`, after `mise install --locked`; needs Git 2.54+,
-  installs user-wide, silently no-ops in repos without `hk.pkl`): pre-commit auto-fixes (panache format, final newlines,
-  shfmt, shellcheck autofixes) and gates the commit; commit-msg enforces Conventional Commits. Escape hatch:
-  `HK=0 git commit`.
+  installs user-wide, silently no-ops in repos without `hk.pkl`): pre-commit auto-fixes (panache format, tombi format,
+  final newlines, shfmt, shellcheck autofixes) and gates the commit; commit-msg enforces Conventional Commits. Escape
+  hatch: `HK=0 git commit`.
 
 ## mise task authoring
 
@@ -43,10 +43,10 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   merge strategy, `.github/renovate.json`) — green means the new schemas validate our app configs. Renovate does not
   track schema-*behavior* changes: re-verify version-sensitive supervisor facts against the new ref before relying on
   them (skill `ha-app-workflow`).
-- Schema-validates `.rumdl.toml` against rumdl's and `.panache.toml` against panache's published config schemas, and
-  compares pinned apk package versions in app Dockerfiles against the Alpine binary indexes (drift = guided release —
-  root `KNOWLEDGE.md` §"apk package version policy"). `.github/renovate.json` is gated by the official
-  `renovate-config-validator` hk step instead (see the linting section below).
+- Compares pinned apk package versions in app Dockerfiles against the Alpine binary indexes (drift = guided release —
+  root `KNOWLEDGE.md` §"apk package version policy"). TOML config schemas are validated by the hk `tombi-lint` step
+  instead (section below); `.github/renovate.json` is gated by the official renovate-config-validator hk step (see the
+  linting section below).
 
 ## YAML linting: ryl
 
@@ -66,6 +66,26 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 - `line-length` ignores comments by default (yamllint parity): the 140 limit bites YAML scalars only.
 - Config is TOML with `[lint.rules]` (`[rules]` is deprecated as of ryl 0.26). A rule with an option table must not also
   appear as a `"<name>" = "enable"` string in the same table — TOML duplicate key, ryl exits `2` loudly.
+
+## TOML linting: tombi
+
+- TOML is linted and formatted by tombi (hk builtins `tombi`/`tombi_format`, pinned as `tombi` in mise.toml);
+  `mise run fmt` formats via `tombi format .`. The lint step adds `--error-on-warnings`: tombi exits 0 when only its
+  warn-severity rules fire, and the gate must fail on them (its three built-ins — key-empty, dotted-keys-out-of-order,
+  tables-out-of-order — are all warn-severity).
+- Schemas bind per-file via a `#:schema <url>` top directive (Taplo-compatible; must be the document's first comment,
+  followed by a blank line). Renovate auto-bumps our tools, so "latest" is usually the right schema ref. There is no
+  repo-level `.tombi.toml` config file (yet): defaults plus the directives cover everything.
+- tombi validates in **strict mode** (default): objects without `additionalProperties` are treated as closed, so unknown
+  keys are errors even when the schema doesn't mark them so — stricter than the stock-JSON-Schema validation validate.py
+  used to do. Adding a config key the upstream schema doesn't know yet fails the gate until the schema learns it: the
+  schema is the contract. Schema deprecations are warn-severity, hence gate-failing too.
+- Schemas are fetched remotely and cached (`~/.cache/tombi`, 24 h TTL; `tombi cache clean`). Offline runs reuse cached
+  copies and silently skip un-cached schemas, while CI always runs online — schema checks therefore track upstream
+  main/latest, not the installed tool version, and an upstream schema change can fail the gate with no local change
+  (signal, like zizmor's online audits).
+- Formatter defaults match .editorconfig (2-space, LF, double quotes) and nothing is key-sorted by default; an
+  unformatted file is an Error (exit 1) in the format check.
 
 ## Shell linting
 

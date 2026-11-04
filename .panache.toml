@@ -7,9 +7,8 @@
 # prose wrapping (run `panache format .`, wired up as `mise run fmt`).
 # rumdl (see .rumdl.toml) stays as the markdownlint-rules-rich second
 # linter - with its own reflow disabled so the two never fight over
-# wrapping. The config is schema-validated (see .mise/tasks/validate.py);
-# the schema directive above also gives editors completion + validation.
-# Unknown keys are errors (upstream design).
+# wrapping. The schema directive above validates this config via the hk
+# `tombi` step (and editors alike) - unknown keys are errors (upstream design).
 
 # Plain GitHub-Flavored Markdown repository.
 flavor = "gfm"
