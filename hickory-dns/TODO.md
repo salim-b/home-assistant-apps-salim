@@ -30,7 +30,7 @@ procedures in the skill `hickory-dns-runtime`.
   instead of `SOA` record in `hickory-dns-healthcheck`.
 
 - **Blocklist support (deferred)**: upstream ground truth and the design sketch: `KNOWLEDGE.md` §"Deferred feature
-  ground truth (upstream gaps)". Pursue after the first release.
+  ground truth (upstream gaps)".
 
 - **DoH3 upstreams (deferred)**: blocked on a tagged upstream release plus the apk carrying the bin h3 features
   (`KNOWLEDGE.md` §"Deferred feature ground truth (upstream gaps)"). The generator already rejects `protocol = h3` with
@@ -47,3 +47,10 @@ procedures in the skill `hickory-dns-runtime`.
   generator `OPTIONS_BLOCK` interpolation + value validation, config option/schema/translations, recording the
   per-option why in §"Generated named.toml" (currently only git history has it), regression-sandbox snapshot update,
   lab, version bump + CHANGELOG.
+
+- **Per-entry TTL for static entries**: static leaf zones are hardcoded to `$TTL 300` (§"Static entries (no hosts-file
+  store upstream)"); expose an optional `ttl` field per `static_entries` entry (default 300), emitted into the leaf
+  zone's `$TTL` directive and validated (0 is legal per RFC 1035 - clients then don't cache). Settle in design: whether
+  the SOA minimum (the leaf zones' negative TTL, currently 300) follows the entry TTL, and which entry's TTL the shared
+  reverse zone gets when several entries share one address. Covers: config option/schema/translations, generator
+  emission + validation, §"Static entries" facts, regression-sandbox snapshot update, lab, version bump + CHANGELOG.
