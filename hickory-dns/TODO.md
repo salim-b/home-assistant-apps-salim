@@ -55,6 +55,33 @@ procedures in the skill `hickory-dns-runtime`.
   Covers: generator `OPTIONS_BLOCK` interpolation + validation, config option/schema/translations, recording the
   per-option why in §"Generated named.toml", regression-sandbox snapshot update, lab, version bump + CHANGELOG.
 
+- **Expose `server_ordering_strategy` as an app option (with a derived `num_concurrent_reqs`)**: the generator pins
+  `server_ordering_strategy = "UserProvidedOrder"` and `num_concurrent_reqs = 1` (`ResolverOpts` - §"Generated
+  named.toml"); expose the strategy as a select (`UserProvidedOrder` default, `QueryStatistics`, `RoundRobin` - the
+  generated TOML carries the Rust variant names verbatim, snake_case is rejected by the daemon) and derive
+  `num_concurrent_reqs` from the strategy automatically: `1` for the default `UserProvidedOrder` (serial failover - the
+  upstream option order stays the priority), `2` or more for `QueryStatistics` and `RoundRobin` (parallel fan-out; exact
+  value TBD, e.g. the number of configured upstreams). Covers: generator emission + derivation + validation, config
+  option/schema/translations, recording the per-option why in §"Generated named.toml", regression-sandbox snapshot
+  update, lab, version bump + CHANGELOG.
+
+- **Expose `max_active_requests` as an optional app option**: the cap on in-flight queries per multiplexed upstream
+  connection (`ResolverOpts`, upstream default 32) currently applies as the silent upstream default; replace the silence
+  with an optional configurable option defaulting to 32 (optional options stay hidden in the UI until the user toggles
+  "Show unused optional configuration options", so the default path is unchanged). The value bounds concurrent queries
+  per DoT/DoQ/DoH connection - validation: integer with sane lower/upper bounds. Covers: generator `OPTIONS_BLOCK`
+  interpolation + validation, config option/schema/translations, recording the per-option why in §"Generated
+  named.toml", regression-sandbox snapshot update, lab, version bump + CHANGELOG.
+
+- **Rebind protection via `deny_answers` (opt-out, enabled by default)**: strip upstream answers whose addresses fall
+  into private/reserved networks (DNS-rebinding defense) - the filter applies to forwarded answers only; local zones
+  (`static_entries`, shipped default zones) bypass it, so the two compose cleanly. Exact shape TBD, two avenues: either
+  a CIDR list reusing the `allow_networks` machinery (validation, loopback-append precedent) or a simpler bool that
+  emits `deny_answers = [RFC1918, ULA, loopback, link-local]`. Enabled by default is a behavior change for existing
+  installs - document it prominently and pick the version-bump level accordingly. Covers: generator emission +
+  validation, config option/schema/translations, §"Generated named.toml" why, regression-sandbox snapshot update, lab
+  (including a private-address upstream answer repro), version bump + CHANGELOG.
+
 - **Per-entry TTL for static entries**: static leaf zones are hardcoded to `$TTL 300` (§"Static entries (no hosts-file
   store upstream)"); expose an optional `ttl` field per `static_entries` entry (default 300), emitted into the leaf
   zone's `$TTL` directive and validated (0 is legal per RFC 1035 - clients then don't cache). Settle in design: whether
