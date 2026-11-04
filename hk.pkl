@@ -116,6 +116,18 @@ local linters = new Mapping<String, Step> {
       }
     }
   }
+  // tombi (TOML linter/formatter): schemas bind per-file via `#:schema` top directives
+  // (strict mode - unknown keys are errors).
+  ["tombi-format"] = Builtins.tombi_format
+  // tombi exits 0 on its warn-severity rules by default, so --error-on-warnings makes them gate-fail
+  // Conventions: .agents/skills/ha-app-tooling
+  ["tombi-lint"] = (Builtins.tombi) {
+    check {
+      command {
+        argv = List("tombi", "lint", "--quiet", "--error-on-warnings", "{{files}}")
+      }
+    }
+  }
   // Panache owns ALL Markdown formatting (.agents/skills/ha-app-markdown, .panache.toml); explicit
   // paths bypass panache's config excludes, hence mdExcludes.
   ["panache-format"] {

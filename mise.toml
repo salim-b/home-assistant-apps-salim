@@ -14,10 +14,11 @@ description = "Run all pre-commit checks (lint + validate)"
 depends = ["lint", "validate"]
 output = "keep-order"
 
-# Panache owns ALL Markdown autoformatting (.panache.toml, .agents/skills/ha-app-markdown); rumdl stays check-only.
+# Panache owns ALL Markdown autoformatting (.panache.toml, .agents/skills/ha-app-markdown); rumdl stays check-only
+# tombi owns TOML autoformatting (.tombi.toml)
 [tasks.fmt]
-description = "Auto-format the repository's Markdown via Panache"
-run = "panache format ."
+description = "Auto-format the repository's Markdown (Panache) and TOML (tombi)"
+run = ["panache format .", "tombi format ."]
 
 [tasks.install-git-hooks]
 description = "Install hk git hooks user-wide via `~/.gitconfig` (needs Git 2.54+)"
@@ -58,6 +59,7 @@ rumdl = "0.3.1"
 shellcheck = "0.11.0"
 shellharden = "4.3.2"
 shfmt = "3.14.1"
+tombi = "1.10.0"
 uv = "0.13.6"
 yq = "4.54.1"
 # Node runtime + renovate package for the renovate-config-validator hk step (.github/renovate.json gate).

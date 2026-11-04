@@ -9,8 +9,8 @@ exclude = [
 
 [files]
 yaml = [
-    "*.yaml",
-    "*.yml",
+  "*.yaml",
+  "*.yml",
 ]
 
 [lint.rules]
