@@ -1,32 +1,32 @@
-#:schema https://raw.githubusercontent.com/rvben/rumdl/refs/heads/main/rumdl.schema.json
+#:schema https://raw.githubusercontent.com/rvben/rumdl/main/rumdl.schema.json
 
 [global]
-# https://rumdl.dev/global-settings/
-editorconfig = true
-# AI_POLICY.md is kept verbatim for upstream syncs (Open Home Foundation's policy text)
-exclude = ["AI_POLICY.md"]
-# rumdl must never rewrite files - panache owns ALL markdown formatting. `fixable` is rumdl's fix
-# allow-list with no "fix nothing" wildcard, so an *inert* entry is pinned: `all` is preserved by
-# rule-list canonicalization and never matched against a rule name (verified through 0.3.1). The
-# behavioral canary in validate.py fails loudly if a rumdl upgrade ever flips this.
-fixable = ["all"]
+  # https://rumdl.dev/global-settings/
+  editorconfig = true
+  # AI_POLICY.md is kept verbatim for upstream syncs (Open Home Foundation's policy text)
+  exclude = [ "AI_POLICY.md" ]
+  # rumdl must never rewrite files - panache owns ALL markdown formatting. `fixable` is rumdl's fix
+  # allow-list with no "fix nothing" wildcard, so an *inert* entry is pinned: `all` is preserved by
+  # rule-list canonicalization and never matched against a rule name (verified through 0.3.1). The
+  # behavioral canary in validate.py fails loudly if a rumdl upgrade ever flips this.
+  fixable = [ "all" ]
 
 [per-file-ignores]
-# https://rumdl.dev/global-settings/#per-file-ignores
+  # https://rumdl.dev/global-settings/#per-file-ignores
 
 [MD013]
-# https://rumdl.dev/md013/
-# Code is not prose: fenced/indented code blocks keep their natural length.
-code-block-line-length = 0
-# A line whose only overflow is an unbreakable inline code span must not fail the check.
-code-spans = false
-# Panache owns prose wrapping (.panache.toml, .agents/skills/ha-app-markdown), so rumdl's own
-# reflow stays off (documented default): MD013 remains a pure width check - flag over the limit,
-# never rewrite (rumdl's normalized fill state disagrees with panache's packing).
-line-length = 120
+  # https://rumdl.dev/md013/
+  # Code is not prose: fenced/indented code blocks keep their natural length.
+  code-block-line-length = 0
+  # A line whose only overflow is an unbreakable inline code span must not fail the check.
+  code-spans = false
+  # Panache owns prose wrapping (.panache.toml, .agents/skills/ha-app-markdown), so rumdl's own
+  # reflow stays off (documented default): MD013 remains a pure width check - flag over the limit,
+  # never rewrite (rumdl's normalized fill state disagrees with panache's packing).
+  line-length = 120
 
 [MD033]
-# https://rumdl.dev/md033/
-allowed_elements = ["details", "kbd", "summary"]
-# `table_allowed_elements` replaces the in-table allow-list (no union with `allowed_elements`, verified 0.3.1)
-table_allowed_elements = ["br", "details", "kbd", "summary"]
+  # https://rumdl.dev/md033/
+  allowed_elements = [ "details", "kbd", "summary" ]
+  # `table_allowed_elements` replaces the in-table allow-list (no union with `allowed_elements`, verified 0.3.1)
+  table_allowed_elements = [ "br", "details", "kbd", "summary" ]

@@ -1,3 +1,5 @@
+#:schema https://raw.githubusercontent.com/owenlamont/ryl/main/ryl.toml.schema.json
+
 # https://ryl-docs.pages.dev/config-presets/
 # TOML config has no `extends`, so the tables below inline the `default` preset (ryl enables no rules by default) with this repo's overrides applied.
 
@@ -8,50 +10,50 @@ exclude = [
 ]
 
 [files]
-yaml = [
-  "*.yaml",
-  "*.yml",
-]
+  yaml = [
+    "*.yaml",
+    "*.yml",
+  ]
 
 [lint.rules]
-anchors = "enable"
-braces = "enable"
-brackets = "enable"
-colons = "enable"
-commas = "enable"
-document-end = "disable"
-empty-lines = "enable"
-empty-values = "disable"
-float-values = "disable"
-hyphens = "enable"
-indentation = "enable"
-key-duplicates = "enable"
-key-ordering = "disable"
-new-line-at-end-of-file = "enable"
-new-lines = "enable"
-octal-values = "disable"
-quoted-strings = "disable"
-trailing-spaces = "enable"
+  anchors = "enable"
+  braces = "enable"
+  brackets = "enable"
+  colons = "enable"
+  commas = "enable"
+  document-end = "disable"
+  empty-lines = "enable"
+  empty-values = "disable"
+  float-values = "disable"
+  hyphens = "enable"
+  indentation = "enable"
+  key-duplicates = "enable"
+  key-ordering = "disable"
+  new-line-at-end-of-file = "enable"
+  new-lines = "enable"
+  octal-values = "disable"
+  quoted-strings = "disable"
+  trailing-spaces = "enable"
 
-# App config descriptions/translations use long lines intentionally, and Renovate pins action refs
-# to full commit SHAs with a version comment - single-line by YAML grammar, impossible to wrap.
-[lint.rules.line-length]
-level = "warning"
-max = 140
+  # App config descriptions/translations use long lines intentionally, and Renovate pins action refs
+  # to full commit SHAs with a version comment - single-line by YAML grammar, impossible to wrap.
+  [lint.rules.line-length]
+    level = "warning"
+    max = 140
 
-# HA app files don't use a leading '---'
-[lint.rules.document-start]
-level = "warning"
-present = false
+  # HA app files don't use a leading '---'
+  [lint.rules.document-start]
+    level = "warning"
+    present = false
 
-[lint.rules.comments]
-level = "warning"
-min-spaces-from-content = 1
+  [lint.rules.comments]
+    level = "warning"
+    min-spaces-from-content = 1
 
-[lint.rules.comments-indentation]
-level = "warning"
+  [lint.rules.comments-indentation]
+    level = "warning"
 
-[lint.rules.truthy]
-level = "warning"
-# GitHub Actions workflow files key their triggers on `on:` - a bare truthy key must not be flagged
-check-keys = false
+  [lint.rules.truthy]
+    level = "warning"
+    # GitHub Actions workflow files key their triggers on `on:` - a bare truthy key must not be flagged
+    check-keys = false

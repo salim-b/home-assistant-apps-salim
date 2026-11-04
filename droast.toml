@@ -1,3 +1,5 @@
+#:schema https://raw.githubusercontent.com/immanuwell/dockerfile-roast/main/schemas/droast.schema.json
+
 # droast (https://github.com/immanuwell/dockerfile-roast) configuration - read by the hk `droast`
 # step (pre-commit + `mise run lint`); failure threshold stays at the default `error`, so
 # info-level findings report but do not fail the gate.
