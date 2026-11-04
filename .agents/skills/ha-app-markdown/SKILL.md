@@ -20,6 +20,9 @@ description: Markdown formatting conventions for this repository — panache own
   forgiven. panache's reflow breaks around struck spans, never inside them (it leaves a too-long span overwide on its
   own line), and MD013 does not exempt struck spans the way it exempts code spans: keep struck spans within the
   120-column width.
+- Inline HTML is allow-listed per element, not per file (MD033), see `.rumdl.toml` for the currently allowed HTML tags;
+  every other tag fails the lint, READMEs included. Reach for Markdown constructs (links, images, emphasis, code spans)
+  before raw HTML.
 - rumdl never rewrites files: its fix allow-list is pinned to an inert `all` sentinel (behavioral canary in
   validate.py). Formatting fixes go through panache (`mise run fmt`); non-format rumdl findings are fixed by hand.
 
