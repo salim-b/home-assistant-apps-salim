@@ -39,3 +39,11 @@ procedures in the skill `hickory-dns-runtime`.
 - **SPKI pinning for configured upstreams (deferred)**: no upstream config surface exists (`KNOWLEDGE.md` §"Deferred
   feature ground truth (upstream gaps)"). File the upstream feature request; revisit when a tagged release grows a
   pinning knob, then expose an app option.
+
+- **Expose the response-cache TTL clamps as app options**: the generator pins `positive_max_ttl` and `negative_max_ttl`
+  (`ResolverOpts` - §"Generated named.toml") to 3600; replace them with two configurable options defaulting to
+  `positive_max_ttl = 86400` (honor record authors' TTLs - equals the resolver's `MAX_TTL`, re-verify per apk bump) and
+  `negative_max_ttl = 60` (bounded negative caching - a name that just starts resolving works within a minute). Covers:
+  generator `OPTIONS_BLOCK` interpolation + value validation, config option/schema/translations, recording the
+  per-option why in §"Generated named.toml" (currently only git history has it), regression-sandbox snapshot update,
+  lab, version bump + CHANGELOG.
