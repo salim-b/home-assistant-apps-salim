@@ -126,7 +126,7 @@ bytes; upstream default 8192) with TTL expiry. No disk persistence exists in the
 (`crates/resolver/src/cache.rs`, `moka::sync::Cache<Query, Entry>`), so per-entry size follows the stored wire content.
 Empirical memory measurements (0.26.1 apk, dev-host containers, RSS delta at steady state after filling):
 
-- Synthetic single-A mix (90% single-A + 10% 5-CNAME/5-A CDN-chain responses), 20000 entries, cache 65536: +28.7 MB RSS =
+- Synthetic single-A mix (90% single-A + 10% 5-CNAME/5-A CDN-chain responses), 20000 entries, cache 65536: +28.7 MB =
   **1.43 kB/entry**.
 - Real-world top-20k domains over DoT (`validate = false`), ~19962 successful responses, cache 65536: +43.1 MB = **2.16
   kB/entry** - real-world entries are ~50% larger than the synthetic mix (CNAME chains, multi-A answers).
