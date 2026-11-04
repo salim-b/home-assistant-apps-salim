@@ -16,12 +16,12 @@ flavor = "gfm"
 # AI_POLICY.md is the Open Home Foundation's policy text, kept verbatim for
 # upstream syncs - not this repo's prose to style: excluded from formatting
 # and linting entirely (mirrors rumdl's exclude).
-extend-exclude = ["AI_POLICY.md"]
+extend-exclude = [ "AI_POLICY.md" ]
 
 [format]
-# Match rumdl's enforced MD013 limit so the formatter and the second
-# linter agree on what "fits" means: paragraph prose is reflowed to fill
-# this width (default wrap mode is reflow, spelled out for clarity).
-# Columns, not bytes; code blocks are never rewrapped.
-line-width = 120
-wrap = "reflow"
+  # Match rumdl's enforced MD013 limit so the formatter and the second
+  # linter agree on what "fits" means: paragraph prose is reflowed to fill
+  # this width (default wrap mode is reflow, spelled out for clarity).
+  # Columns, not bytes; code blocks are never rewrapped.
+  line-width = 120
+  wrap = "reflow"

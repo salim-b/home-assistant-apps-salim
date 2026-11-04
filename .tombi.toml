@@ -1,0 +1,12 @@
+#:schema https://www.schemastore.org/tombi.json
+
+# https://tombi-toml.github.io/tombi/docs/configuration
+
+toml-version = "v1.1.0"
+
+[format.rules]
+  array-bracket-space-width = 1
+  indent-sub-tables = true
+  indent-table-key-value-pairs = true
+  line-width = 120
+  trailing-comment-alignment = true

@@ -3,28 +3,28 @@
 # https://mise.jdx.dev/configuration.html
 
 [env]
-DOCKER_BUILDKIT = "1"
-# hk: resolve mise environments in hooks (HK_MISE). HK_STASH_UNTRACKED=0 keeps untracked worktree files out of the
-# pre-commit stash/restore cycle and skips their discovery (hk docs; `hk check`/`hk check --all` select tracked
-# files only in hk 2.7.1 regardless of it - verified with a bait untracked file).
-HK_MISE = "1"
-HK_STASH_UNTRACKED = "0"
+  DOCKER_BUILDKIT = "1"
+  # hk: resolve mise environments in hooks (HK_MISE). HK_STASH_UNTRACKED=0 keeps untracked worktree files out of the
+  # pre-commit stash/restore cycle and skips their discovery (hk docs; `hk check`/`hk check --all` select tracked
+  # files only in hk 2.7.1 regardless of it - verified with a bait untracked file).
+  HK_MISE = "1"
+  HK_STASH_UNTRACKED = "0"
 
 # Task docs: https://mise.jdx.dev/tasks/ – file tasks live in `.mise/tasks/`
 [tasks.check]
-description = "Run all pre-commit checks (lint + validate)"
-depends = ["lint", "validate"]
-output = "keep-order"
+  description = "Run all pre-commit checks (lint + validate)"
+  depends = [ "lint", "validate" ]
+  output = "keep-order"
 
 # Panache owns ALL Markdown autoformatting (.panache.toml, .agents/skills/ha-app-markdown); rumdl stays check-only
 # tombi owns TOML autoformatting (.tombi.toml)
 [tasks.fmt]
-description = "Auto-format the repository's Markdown (Panache) and TOML (tombi)"
-run = ["panache format .", "tombi format ."]
+  description = "Auto-format the repository's Markdown (Panache) and TOML (tombi)"
+  run = [ "panache format .", "tombi format ." ]
 
 [tasks.install-git-hooks]
-description = "Install hk git hooks user-wide via `~/.gitconfig` (needs Git 2.54+)"
-run = """
+  description = "Install hk git hooks user-wide via `~/.gitconfig` (needs Git 2.54+)"
+  run = """
 need=2.54
 have=$(git --version | sed 's/^git version //;s/ .*$//')
 if [ "$(printf '%s\\n%s\\n' "$need" "$have" | sort -V | head -n1)" != "$need" ]; then
@@ -33,48 +33,52 @@ if [ "$(printf '%s\\n%s\\n' "$need" "$have" | sort -V | head -n1)" != "$need" ];
 fi
 exec hk install --global --mise
 """
-skip_if = """
+  skip_if = """
 f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
 [[ -f "$f" ]] || f="$HOME/.gitconfig"
 [[ -f "$f" ]] && rg -q '^\\s*\\[\\s*hook\\s+"hk-[\\w-]+"\\s*\\]' "$f"
 """
 
 [tasks.lint]
-description = "Lint all tracked files via hk (same checks as the pre-commit hook)"
-run = "hk check --all --no-fail-fast"
-output = "interleave"
+  description = "Lint all tracked files via hk (same checks as the pre-commit hook)"
+  run = "hk check --all --no-fail-fast"
+  output = "interleave"
 
 [tools]
-"github:immanuwell/dockerfile-roast" = "1.7.0"
-editorconfig-checker = "4.0.2"
-jactionlint = "2.3.0"
-zizmor = "1.31.1"
-# hk's binary pin and the hk@X.Y.Z package imported by hk.pkl must move together (the package provides the builtin
-# step definitions the binary executes).
-hk = { version = "2.10.0", workflow = "release.yml" }
-jq = "1.8.2"
-"aqua:jolars/panache" = "3.17.1"
-python = "3.15.2"
-ripgrep = "15.2.0"
-rumdl = "0.3.1"
-"aqua:owenlamont/ryl" = "0.26.1"
-shellcheck = "0.11.0"
-shellharden = "4.3.2"
-shfmt = "3.14.1"
-tombi = "1.10.0"
-uv = "0.13.6"
-yq = "4.54.1"
-# Node runtime + renovate package for the renovate-config-validator hk step (.github/renovate.json gate).
-# trust_policy_excludes: @yarnpkg/libzip@3.2.2 (a renovate dependency) lost npm provenance vs 3.2.1
-# because the release branch lacked `npmPublishProvenance: true` (yarnpkg/berry#7182); aube
-# otherwise blocks the tool tree.
-# allow_builds: re2 (renovate's optional regex accelerator) ships a prebuilt native binary that its
-# install script downloads; aube's default-deny lifecycle policy would skip it, leaving the module
-# absent and renovate logging a verbose RegExp-fallback stack trace on every gate run.
-"npm:renovate" = { version = "44.190.0", trust_policy_excludes = ["@yarnpkg/libzip@3.2.2"], allow_builds = ["re2"] }
-node = "26.13.0"
+  "github:immanuwell/dockerfile-roast" = "1.7.0"
+  editorconfig-checker = "4.0.2"
+  jactionlint = "2.3.0"
+  zizmor = "1.31.1"
+  # hk's binary pin and the hk@X.Y.Z package imported by hk.pkl must move together (the package provides the builtin
+  # step definitions the binary executes).
+  hk = { version = "2.10.0", workflow = "release.yml" }
+  jq = "1.8.2"
+  "aqua:jolars/panache" = "3.17.1"
+  python = "3.15.2"
+  ripgrep = "15.2.0"
+  rumdl = "0.3.1"
+  "aqua:owenlamont/ryl" = "0.26.1"
+  shellcheck = "0.11.0"
+  shellharden = "4.3.2"
+  shfmt = "3.14.1"
+  tombi = "1.10.0"
+  uv = "0.13.6"
+  yq = "4.54.1"
+  # Node runtime + renovate package for the renovate-config-validator hk step (.github/renovate.json gate).
+  # trust_policy_excludes: @yarnpkg/libzip@3.2.2 (a renovate dependency) lost npm provenance vs 3.2.1
+  # because the release branch lacked `npmPublishProvenance: true` (yarnpkg/berry#7182); aube
+  # otherwise blocks the tool tree.
+  # allow_builds: re2 (renovate's optional regex accelerator) ships a prebuilt native binary that its
+  # install script downloads; aube's default-deny lifecycle policy would skip it, leaving the module
+  # absent and renovate logging a verbose RegExp-fallback stack trace on every gate run.
+  "npm:renovate" = {
+    version = "44.190.0",
+    trust_policy_excludes = [ "@yarnpkg/libzip@3.2.2" ],
+    allow_builds = [ "re2" ]
+  }
+  node = "26.13.0"
 
 [vars]
-# Single source of the supervisor-ref pin the validate task fetches schemas from. Renovate bumps it
-# to the newest supervisor release and automerges once CI check is green (.github/renovate.json).
-supervisor_ref = "2026.10.2"
+  # Single source of the supervisor-ref pin the validate task fetches schemas from. Renovate bumps it
+  # to the newest supervisor release and automerges once CI check is green (.github/renovate.json).
+  supervisor_ref = "2026.10.2"

@@ -74,8 +74,9 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   warn-severity rules fire, and the gate must fail on them (its three built-ins — key-empty, dotted-keys-out-of-order,
   tables-out-of-order — are all warn-severity).
 - Schemas bind per-file via a `#:schema <url>` top directive (Taplo-compatible; must be the document's first comment,
-  followed by a blank line). Renovate auto-bumps our tools, so "latest" is usually the right schema ref. There is no
-  repo-level `.tombi.toml` config file (yet): defaults plus the directives cover everything.
+  followed by a blank line). Renovate auto-bumps our tools, so "latest" is usually the right schema ref. The repo-level
+  `.tombi.toml` config file defines the TOML formatting rules (only deviations from tombi's defaults,
+  <https://tombi-toml.github.io/tombi/docs/configuration>).
 - tombi validates in **strict mode** (default): objects without `additionalProperties` are treated as closed, so unknown
   keys are errors even when the schema doesn't mark them so — stricter than the stock-JSON-Schema validation validate.py
   used to do. Adding a config key the upstream schema doesn't know yet fails the gate until the schema learns it: the
