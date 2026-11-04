@@ -117,6 +117,33 @@ single-label warning. Caveats: unconfigured query types get authoritative NODATA
 bit (they are authoritative, not validated). The zone-file content itself is validated by the `--validate` boot gate
 (zone loading happens in `DnsServer::run` BEFORE the validate return, `bin/src/lib.rs`).
 
+## Response cache behavior (memory)
+
+The resolver's response cache is a pure in-memory LRU (`moka`, capacity = `cache_size` entries - an entry count, NOT
+bytes; upstream default 8192) with TTL expiry. No disk persistence exists in the resolver path (verified: a filled
+0.26.1 container leaves no cache files on disk - only the generator's upstream host-address cache is persisted,
+§"Config-file and data layout"). The cache stores full deserialized DNS `Message` objects
+(`crates/resolver/src/cache.rs`, `moka::sync::Cache<Query, Entry>`), so per-entry size follows the stored wire content.
+Empirical memory measurements (0.26.1 apk, dev-host containers, RSS delta at steady state after filling):
+
+- Synthetic single-A mix (90% single-A + 10% 5-CNAME/5-A CDN-chain responses), 20000 entries, cache 65536: +28.7 MB RSS =
+  **1.43 kB/entry**.
+- Real-world top-20k domains over DoT (`validate = false`), ~19962 successful responses, cache 65536: +43.1 MB = **2.16
+  kB/entry** - real-world entries are ~50% larger than the synthetic mix (CNAME chains, multi-A answers).
+- Same 20k domains with `validate = true` (DNSSEC): +56.0 MB = **2.84 kB/entry** - the +0.7 kB/entry over the
+  non-validating arm is cached DNSKEY/DS chain-of-trust material, NOT answer RRSIGs (cache hits replay RRSIG-free: a
+  DO-flagged query of a cached name returned zero RRSIGs; validation artifacts live in separate cache entries).
+- **The LRU bound works**: 20000 queries against the 8192-entry default (2.4x capacity) plateau at +13.9 MB RSS = 1.69
+  kB/entry (synthetic mix) - the daemon evicts to capacity, so steady-state memory is bounded by
+  `cache_size × per-entry cost`, never by query volume.
+- TTL expiry is the second bound: entries live at most `positive_max_ttl`/`negative_max_ttl` (generator pin: 3600 s,
+  §"Generated named.toml").
+
+Consequence: at home scale the 8192-entry default costs ~14 MB (synthetic mix) to ~23 MB worst case (8192 × 2.84 kB,
+signed real-world) - negligible against 2 GB+ HAOS devices, and the TTL caps bound the useful depth anyway (a
+household's unique names asked within one hour stay well below 8192; an eviction's only cost is one extra upstream
+query). Larger capacities only pay off when >8192 distinct names are asked within a single TTL window.
+
 ## Deferred feature ground truth (upstream gaps)
 
 Verified against v0.26.3 source; revisit when a tagged release + the apk carry the features (hickory-dns/TODO.md).

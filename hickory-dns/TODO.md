@@ -48,6 +48,13 @@ procedures in the skill `hickory-dns-runtime`.
   per-option why in §"Generated named.toml" (currently only git history has it), regression-sandbox snapshot update,
   lab, version bump + CHANGELOG.
 
+- **Expose the response-cache size as an app option**: the generator pins `cache_size` (`ResolverOpts` - §"Generated
+  named.toml") to 8192 (the upstream default); replace the pin with an optional configurable option defaulting to 8192
+  (optional options stay hidden in the UI until the user toggles "Show unused optional configuration options", so the
+  default path is unchanged). The value is an entry count, NOT bytes - validation: integer with sane lower/upper bounds.
+  Covers: generator `OPTIONS_BLOCK` interpolation + validation, config option/schema/translations, recording the
+  per-option why in §"Generated named.toml", regression-sandbox snapshot update, lab, version bump + CHANGELOG.
+
 - **Per-entry TTL for static entries**: static leaf zones are hardcoded to `$TTL 300` (§"Static entries (no hosts-file
   store upstream)"); expose an optional `ttl` field per `static_entries` entry (default 300), emitted into the leaf
   zone's `$TTL` directive and validated (0 is legal per RFC 1035 - clients then don't cache). Settle in design: whether
