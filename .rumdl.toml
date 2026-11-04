@@ -28,4 +28,5 @@ line-length = 120
 [MD033]
 # https://rumdl.dev/md033/
 allowed_elements = ["details", "kbd", "summary"]
+# `table_allowed_elements` replaces the in-table allow-list (no union with `allowed_elements`, verified 0.3.1)
 table_allowed_elements = ["br", "details", "kbd", "summary"]
