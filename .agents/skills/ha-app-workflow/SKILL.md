@@ -52,6 +52,8 @@ Run `mise run check` — lint plus validate; it is the same gate CI runs. Lint-s
   directive (its frontend image comes from Docker Hub; buildx's builtin frontend suffices).
 - The lint workflow runs frenck's app linter natively (pinned source plus pypi requirements), not via its Docker action
   (whose Docker Hub image builds flaked with 504s and 429 runner-pool rate limits).
+- In `.github/workflows/`, match GitHub users and bots by immutable user id, never by `login` (root `KNOWLEDGE.md`
+  §"GitHub Actions: user identity matching").
 
 ## Device access
 

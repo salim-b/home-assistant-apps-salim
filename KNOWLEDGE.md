@@ -376,3 +376,12 @@ for any s6-overlay v3 container; the lab boot wait and the nfs-server live test 
 (s6-overlay v3 legacy compat; source: [just-containers/s6-overlay v3.2.3.2,
 `doc/init.txt`](https://github.com/just-containers/s6-overlay/blob/v3.2.3.2/doc/init.txt) — re-verify on
 base-image/s6-overlay bumps).
+
+## GitHub Actions: user identity matching
+
+When a workflow or its embedded scripts gate on or select a GitHub user or bot (Renovate, Dependabot,
+`github-actions[bot]`, a human), match by the immutable user id — `github.actor_id` /
+`github.event.pull_request.user.id` in workflow expressions, `user.id` in REST payloads — never by the corresponding
+`login`. Logins are mutable: ordinary usernames can be renamed and are reclaimable afterwards, and bot logins are merely
+`<app-slug>[bot]` — if an app is deleted, its slug can be re-registered and mints a different bot user behind the same
+login string. User ids are never reissued. Comment each hardcoded id with its login (e.g. `29139614 = renovate[bot]`).
