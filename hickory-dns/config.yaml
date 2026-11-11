@@ -1,6 +1,6 @@
 # https://contributors.home-assistant.io/apps/reference/configuration/
 name: Hickory DNS
-version: "0.3.1"
+version: "0.3.2"
 slug: hickory-dns
 description: DNS server resolving via encrypted upstream DNS (DoT/DoH/DoQ) with DNSSEC validation
 # Generic multi-arch manifest name; per-arch image names are derived by CI - repository README §"CI".
