@@ -7,7 +7,7 @@ FROM ${BUILD_FROM}
 # (util-linux, floats): the never-root launcher needs its uid options - the busybox applet has none; see
 # hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges".
 RUN apk add --no-cache \
-    hickory-dns=0.26.1-r0 \
+    hickory-dns=0.26.3-r0 \
     hickory-dns-utils=0.26.1-r0 \
     ca-certificates-bundle \
     setpriv
