@@ -37,12 +37,13 @@ permissions:
 jobs:
   changelog:
     name: Fill changelog for merged apk pin bump
+    # 29139614 = renovate[bot]
     if: >-
       github.repository == 'salim-b/home-assistant-apps-salim' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.merged == true &&
       github.event.pull_request.base.ref == 'main' &&
-      github.event.pull_request.user.login == 'renovate[bot]' &&
+      github.event.pull_request.user.id == 29139614 &&
       contains(github.event.pull_request.labels.*.name, 'apk_pin')
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -308,6 +309,8 @@ jobs:
           REPO = os.environ["GITHUB_REPOSITORY"]
           DRY_RUN = os.environ.get("DRY_RUN", "").lower() in ("1", "true")
           MAX_NUDGES_PER_PR = 3  # cap github-actions[bot] rebase comments per PR
+          RENOVATE_BOT_USER_ID = 29139614  # renovate[bot]
+          ACTIONS_BOT_USER_ID = 41898282  # github-actions[bot]
           HDRS = {
               "Authorization": f"Bearer {TOKEN}",
               "Accept": "application/vnd.github+json",
@@ -428,7 +431,7 @@ jobs:
           candidates = [
               pr
               for pr in api_list("pulls", {"state": "open"})
-              if pr["user"]["login"] == "renovate[bot]"
+              if pr["user"]["id"] == RENOVATE_BOT_USER_ID
               and any(label["name"] == "apk_pin" for label in pr["labels"])
           ]
           notes.append(f"Open apk_pin PRs authored by renovate[bot]: {len(candidates)}")
@@ -482,7 +485,7 @@ jobs:
               prior = sum(
                   1
                   for comment in api_list(f"issues/{number}/comments", {})
-                  if comment["user"]["login"] == "github-actions[bot]"
+                  if comment["user"]["id"] == ACTIONS_BOT_USER_ID
               )
               if prior >= MAX_NUDGES_PER_PR:
                   notes.append(
