@@ -4,7 +4,8 @@
 
 ## 0.3.1
 
-- Updated hickory-dns from 0.26.1-r0 to 0.26.3-r0.
+- Updated the bundled hickory-dns from 0.26.1-r0 to 0.26.3-r0 ([upstream release
+  notes](https://github.com/hickory-dns/hickory-dns/releases/tag/v0.26.3)).
 
 ## 0.3.0
 
