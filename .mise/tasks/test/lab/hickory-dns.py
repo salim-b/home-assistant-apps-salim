@@ -1,5 +1,7 @@
+# fmt: off
 #MISE hide=true
 #MISE description="⚠️ internal helper script (fixture adapter, sourced by the lab task)"
+# fmt: on
 
 """Fixture adapter for the hickory-dns lab: add one static entry so the runtime
 check can probe an authoritative leaf-zone answer (the default options serve

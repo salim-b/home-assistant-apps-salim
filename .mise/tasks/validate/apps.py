@@ -1,7 +1,9 @@
 #!/usr/bin/env -S uv run --with voluptuous --with pyyaml python3
+# fmt: off
 #MISE description="Validate app configs and translations against HA Supervisor schemas"
 #USAGE arg "[app]" help="App directory to validate (default: all apps)"
 #USAGE flag "--schemas-only" help="Only refetch the pinned Supervisor schemas"
+# fmt: on
 
 """Validation harness: supervisor-side semantics the CI app linter does not
 cover, at a pinned supervisor ref (what each check is for: .agents/skills/ha-app-tooling).
@@ -15,6 +17,7 @@ autofix stays disabled (panache owns formatting; see .rumdl.toml `fixable`).
 TOML config schemas (.rumdl.toml, .panache.toml, mise.toml) are validated by the hk `tombi`
 step instead, via the files' `#:schema` directives (.agents/skills/ha-app-tooling).
 """
+
 from __future__ import annotations
 
 import ast
@@ -49,9 +52,11 @@ def _supervisor_ref() -> str:
 
 REF = _supervisor_ref()
 RAW = "https://raw.githubusercontent.com/home-assistant/supervisor"
-CACHE = pathlib.Path(
-    os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache")
-) / "ha-apps-supervisor-schemas" / REF
+CACHE = (
+    pathlib.Path(os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache"))
+    / "ha-apps-supervisor-schemas"
+    / REF
+)
 
 # supervisor.const ATTR_* names the schemas reference; fetched from const.py at the pinned ref
 CONST_NAMES: set[str] = set()
@@ -103,7 +108,10 @@ def find_apps() -> list[str]:
     """Selected app: `usage_app` env var (mise) or first argv token (direct
     runs); empty/unset means all apps, like the optional arg's shell `:-`
     expansion (empty ≡ unset)."""
-    for src in (os.environ.get("usage_app", ""), sys.argv[1] if len(sys.argv) > 1 else ""):
+    for src in (
+        os.environ.get("usage_app", ""),
+        sys.argv[1] if len(sys.argv) > 1 else "",
+    ):
         if src and not src.startswith("-"):
             return [src]
     return sorted(
@@ -139,7 +147,13 @@ def validate_rumdl_no_autofix() -> None:
         canary_file.write_text(canary)
         try:
             subprocess.run(
-                ["rumdl", "fmt", "--config", str(ROOT / ".rumdl.toml"), str(canary_file)],
+                [
+                    "rumdl",
+                    "fmt",
+                    "--config",
+                    str(ROOT / ".rumdl.toml"),
+                    str(canary_file),
+                ],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -180,7 +194,11 @@ def main() -> int:
     for app in find_apps():
         app_dir = ROOT / app
         config_file = next(
-            (f for f in (app_dir / "config.yaml", app_dir / "config.yml") if f.is_file()),
+            (
+                f
+                for f in (app_dir / "config.yaml", app_dir / "config.yml")
+                if f.is_file()
+            ),
             None,
         )
         if not config_file:
@@ -239,16 +257,29 @@ def main() -> int:
                 entry = schema.get(opt)
                 # A list schema entry is list-of-objects only when its item spec is a mapping; a scalar item
                 # (`- "str"`) is a list-of-strings, which has no fields (official apps: Let's Encrypt `domains`).
-                is_list_of_objects = isinstance(entry, list) and bool(entry) and isinstance(entry[0], dict)
+                is_list_of_objects = (
+                    isinstance(entry, list)
+                    and bool(entry)
+                    and isinstance(entry[0], dict)
+                )
                 if fields and not is_list_of_objects:
-                    fail(app, f"translations[{lang}].configuration.{opt} has fields but schema entry is not a list-of-objects")
+                    fail(
+                        app,
+                        f"translations[{lang}].configuration.{opt} has fields but schema entry is not a list-of-objects",
+                    )
                 if not fields and is_list_of_objects:
-                    fail(app, f"translations[{lang}].configuration.{opt} misses fields for list-of-objects schema entry")
+                    fail(
+                        app,
+                        f"translations[{lang}].configuration.{opt} misses fields for list-of-objects schema entry",
+                    )
                 if fields and is_list_of_objects:
                     sub_keys = set((schema.get(opt) or [{}])[0].keys())
                     missing = set(fields.keys()) - sub_keys
                     if missing:
-                        fail(app, f"translations[{lang}].configuration.{opt}.fields keys not in schema: {sorted(missing)}")
+                        fail(
+                            app,
+                            f"translations[{lang}].configuration.{opt}.fields keys not in schema: {sorted(missing)}",
+                        )
 
         aa_file = app_dir / "apparmor.txt"
         # (the apparmor key's presence itself is checked by the CI app linter)
@@ -256,7 +287,8 @@ def main() -> int:
             ns: dict[str, object] = {"re": __import__("re")}
             regex = eval(aa_src["RE_PROFILE"], ns)  # noqa: S307
             profile_names = [
-                m.group(1) for line in aa_file.read_text().splitlines()
+                m.group(1)
+                for line in aa_file.read_text().splitlines()
                 if (m := regex.match(line))
             ]
             if len(profile_names) != 1:
@@ -269,7 +301,9 @@ def main() -> int:
             if slug and profile_names and profile_names[0] != slug:
                 # supervisor renames the profile to the installed slug anyway;
                 # matching the config slug keeps the file self-documenting
-                print(f"[{app}] note: profile name '{profile_names[0]}' != slug '{slug}' (supervisor adjusts it)")
+                print(
+                    f"[{app}] note: profile name '{profile_names[0]}' != slug '{slug}' (supervisor adjusts it)"
+                )
 
     if problems:
         print("\nVALIDATION FAILED:")

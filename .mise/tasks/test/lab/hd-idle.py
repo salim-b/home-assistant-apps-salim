@@ -1,11 +1,14 @@
+# fmt: off
 #MISE hide=true
 #MISE description="⚠️ internal helper script (fixture adapter, sourced by the lab task)"
+# fmt: on
 
 """Fixture adapter for the hd-idle lab: configures the smoke-test drives
 (kernel names from LAB_SPINDOWN_DRIVES, e.g. "sda,sdb") on a short idle so the daemon
 exercises its natural spindown path within the check window. Bare kernel names pass the app's
 device resolution unchanged (rootfs/etc/cont-init.d/config.sh); only these drives are listed,
 so no other disk of the lab host is ever touched."""
+
 
 def lab_adapt_fixture(options):
     import os

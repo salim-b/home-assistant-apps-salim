@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
+# fmt: off
 #MISE description="Check pinned apk package versions in app Dockerfiles against the Alpine binary indexes (drift alarm)"
 #USAGE arg "[app]" help="App directory to check (default: all apps)"
+# fmt: on
 
 """validate:apk-pins: compare pinned apk package versions in app Dockerfiles against the Alpine binary
 indexes of the pinned base-image branch. Drift = guided release (policy + why: root KNOWLEDGE.md
 §"apk package version policy"); CI runs this task only on main pushes and the daily cron, never
 in the PR gate.
 """
+
 from __future__ import annotations
 
 import io
@@ -20,11 +23,14 @@ import urllib.request
 
 ROOT = pathlib.Path(os.environ.get("MISE_PROJECT_ROOT", "."))
 
-CACHE = pathlib.Path(
-    os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache")
-) / "ha-apps-apk-pins"
+CACHE = (
+    pathlib.Path(os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache"))
+    / "ha-apps-apk-pins"
+)
 
-APKINDEX_TTL = 24 * 3600  # the daily CI cron should see Alpine-side repoints within a day
+APKINDEX_TTL = (
+    24 * 3600
+)  # the daily CI cron should see Alpine-side repoints within a day
 
 problems: list[str] = []
 
@@ -36,7 +42,10 @@ def fail(app: str, msg: str) -> None:
 def find_apps() -> list[str]:
     """Selected app: `usage_app` env var (mise) or first argv token (direct runs); empty/unset
     means all apps, like the optional arg's shell `:-` expansion (empty ≡ unset)."""
-    for src in (os.environ.get("usage_app", ""), sys.argv[1] if len(sys.argv) > 1 else ""):
+    for src in (
+        os.environ.get("usage_app", ""),
+        sys.argv[1] if len(sys.argv) > 1 else "",
+    ):
         if src and not src.startswith("-"):
             return [src]
     return sorted(
@@ -100,9 +109,7 @@ def main() -> int:
         pins: list[tuple[str, str]] = []
         in_apk = False
         for raw in text.splitlines():
-            found = re.findall(
-                r"([A-Za-z0-9][\w.+-]*)=(\d[\w.:]+(?:-r\d+)?)", raw
-            )
+            found = re.findall(r"([A-Za-z0-9][\w.+-]*)=(\d[\w.:]+(?:-r\d+)?)", raw)
             if in_apk:
                 pins.extend(found)
                 if not raw.rstrip().endswith("\\"):

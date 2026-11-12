@@ -91,6 +91,26 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 - Formatter defaults match .editorconfig (2-space, LF, double quotes) and nothing is key-sorted by default; an
   unformatted file is an Error (exit 1) in the format check.
 
+## Python linting: ruff
+
+- Python (the `.mise/tasks/` scripts) is linted and formatted by ruff via the hk builtins `ruff` (check/fix =
+  `ruff check`; the fix path preflights with the builtin's `check_diff`) and `ruff_format` (check via
+  `ruff format --diff`, fix via `ruff format`), pinned as `aqua:astral-sh/ruff` in mise.toml. The formatter step runs
+  before the linter step; `mise run fmt` runs `ruff format .`.
+- Config is `.ruff.toml` (TOML, `#:schema`-bound): rule selection is pinned explicitly
+  (`select = ["E4", "E7", "E9", "F", "I", "B"]`) because ruff 0.17.0 expanded the default rule set and keeps drifting
+  with releases (ruff CHANGELOG 0.17.0, astral-sh/ruff#28786) — don't swap `select` for `extend-select` unless the gate
+  should follow upstream defaults. `target-version` tracks the Python mise.toml pins (py315).
+- ruff does not read `.editorconfig`; its formatter defaults (4-space indent, double quotes, 88 columns) match this
+  repo's Python style. Both builtins pass `--force-exclude`, so config excludes apply even to hk's explicit file
+  arguments, and ruff resolves the config by walking up from each target file — the root `.ruff.toml` covers every task
+  script.
+- The `#MISE`/`#USAGE` task directives sit inside `# fmt: off`/`# fmt: on` markers in every task script: ruff format
+  normalizes `#MISE` comment spacing (no comment-prefix exclusion exists) and must not touch them. mise's parser
+  tolerates the spaced form (its prefix regexes match with `\s*` tolerance, unlike the usage crate's strict `#USAGE`
+  regex; mise `src/task/mod.rs`, verified 2026-11-12 against mise 2026.11.6), but the unspaced directives stay canonical
+  — keep the markers around the block, and never append anything to directive lines (the header parses as TOML).
+
 ## Shell linting
 
 - shfmt (formatting; follows .editorconfig) and shellharden (quoting hardening) are hk *fix* steps — let pre-commit fix

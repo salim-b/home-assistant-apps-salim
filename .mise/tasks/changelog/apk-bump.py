@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# fmt: off
 #MISE description="Insert the templated changelog section for an apk pin bump (shared by the `apk-bump` CI workflow and local runs)"
 #USAGE flag "--app <app>" required=#true help="App directory whose CHANGELOG.md is updated"
 #USAGE flag "--pkg <pkg>" required=#true help="Pinned apk package name, e.g. hd-idle"
@@ -6,6 +7,7 @@
 #USAGE flag "--new <new>" required=#true help="New pin (full pkgver-pkgrel), e.g. 1.22-r8"
 #USAGE flag "--version <version>" required=#true help="App version the section is titled with (the version bumpVersions wrote in the same Renovate PR)"
 #USAGE flag "--dry-run" help="Print the section that would be inserted instead of writing CHANGELOG.md"
+# fmt: on
 
 """changelog:apk-bump: insert the templated changelog section for an apk pin bump.
 
@@ -16,6 +18,7 @@ that heading is absent. The bullet is end-user phrased ("Updated the bundled <pk
 <new>") and greedy-wrapped at the repository's Markdown width (panache, 120 chars) so `mise run
 fmt` right after the insertion is a no-op and the dry-run output matches the committed form.
 """
+
 from __future__ import annotations
 
 import os
@@ -97,7 +100,9 @@ def main() -> int:
     dry_run = _flag("dry-run")
 
     if old == new:
-        sys.exit(f"changelog:apk-bump: --old and --new are identical ({old}) - nothing to record")
+        sys.exit(
+            f"changelog:apk-bump: --old and --new are identical ({old}) - nothing to record"
+        )
     changelog = ROOT / app / "CHANGELOG.md"
     if not changelog.is_file():
         sys.exit(f"changelog:apk-bump: {changelog} does not exist (app '{app}')")
@@ -110,7 +115,9 @@ def main() -> int:
     # Idempotency: any existing `## <version>` heading (with a trailing qualifier) counts as present.
     heading_re = re.compile(rf"^## {re.escape(version)}(?:\s|$)")
     if any(heading_re.match(line) for line in lines):
-        print(f"changelog:apk-bump: [{app}] a '## {version}' section already exists - nothing to do")
+        print(
+            f"changelog:apk-bump: [{app}] a '## {version}' section already exists - nothing to do"
+        )
         return 0
 
     anchor = next(
@@ -122,7 +129,7 @@ def main() -> int:
             f"structure, refusing to modify"
         )
 
-    rest = lines[anchor + 1:]
+    rest = lines[anchor + 1 :]
     while rest and not rest[0].strip():
         rest.pop(0)
     section = ["", heading, "", *bullet_lines, ""]
@@ -140,7 +147,9 @@ def main() -> int:
         return 0
 
     changelog.write_text(new_text)
-    print(f"changelog:apk-bump: [{app}] inserted '## {version}' section ({pkg} {old} -> {new})")
+    print(
+        f"changelog:apk-bump: [{app}] inserted '## {version}' section ({pkg} {old} -> {new})"
+    )
     return 0
 
 
