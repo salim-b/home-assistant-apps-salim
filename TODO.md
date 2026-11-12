@@ -60,15 +60,3 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   jobs of `.github/workflows/apk-bump.yaml`; the trigger is the literal substring `apk add` in a line) with no canary
   fixture locking their behavior together – and align the index/arch semantics between the task and the nudge job
   (facts: root `KNOWLEDGE.md` §"apk package version policy").
-
-- Comment hygiene in device-visible files – each alignment needs a version bump + changelog entry, so fold into the
-  apps' next natural bumps:
-  - hickory-dns: compress the `apparmor.txt` capability comment (restates the app's AppArmor knowledge sections);
-    re-wrap the §-citations in `apparmor.txt`, `rootfs/etc/s6-overlay/s6-rc.d/hickory-dns/run` and
-    `rootfs/usr/bin/hickory-dns-genconfig` so the citation names stay on one line (a wrap inserts `#`/`##` inside the
-    quoted section name, breaking greppability).
-  - nfs-server: compress the `config.yaml` shares-schema comment (restates §"Export-cache and fsid semantics"); fix the
-    mountd grant comment (contradicts the run script – tracked in `nfs-server/TODO.md`); resolve the dangling
-    "busybox-applet exec mediation" citation in `apparmor.txt` (no such content exists); state the "Official docs
-    template" comment once in the sub-profile header instead of four times; drop the episodic release-breakage
-    parenthetical in `rootfs/etc/s6-overlay/scripts/nfsd-start`.
