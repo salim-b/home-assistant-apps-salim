@@ -3,9 +3,9 @@
 #MISE hide=true
 #MISE description="⚠️ internal helper script"
 # App-specific live-test hook for hickory-dns, sourced by .mise/tasks/test/live.sh; hook contract:
-# .agents/skills/ha-app-device-testing. Focus: the device-only verification of the never-root
-# launcher under AppArmor enforcement (hickory-dns/TODO.md) - the lab asserts the daemon's
-# credentials but enforces no AppArmor (skill ha-app-lab-testing). Evidence model (root
+# .agents/skills/ha-app-device-testing. Focus: the device-only verification of the never-root launcher under
+# AppArmor enforcement (facts: hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges") - the lab asserts the
+# daemon's credentials but enforces no AppArmor (skill ha-app-lab-testing). Evidence model (root
 # KNOWLEDGE.md §"Device SSH: sessions run in the Terminal & SSH app"): the ssh session runs
 # inside the SSH app's container, so the daemon's process tree, /proc and the host's sockets are
 # unreachable - the assertions use the app's OWN log (the s6 run script logs the full setpriv

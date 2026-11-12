@@ -349,7 +349,7 @@ EOF
     }
     ## The restore precedes the restart by ~1 s (drives+state mv, pmfix, s6-svc -r, then the daemon logs
     ## 'Starting hd-idle' again) - a single grep right after the cmp success can land in that window and
-    ## count 1 (observed twice). Poll for the restarted daemon instead.
+    ## count 1. Poll for the restarted daemon instead.
     restarts=0
     for _ in {1..10}; do
       restarts=$(docker logs "$app" 2>&1 | grep -c "Starting hd-idle" || true)

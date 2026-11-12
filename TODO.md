@@ -58,11 +58,22 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
 - apk-pin checker: deduplicate the triplicated pin parser — the `pkg=version` regex plus the backslash-continuation
   state machine over `apk add` blocks exists three times (`.mise/tasks/validate/apk-pins.py`, and the changelog + nudge
   jobs of `.github/workflows/apk-bump.yaml`; the trigger is the literal substring `apk add` in a line) with no canary
-  fixture locking their behavior together — and align the index/arch semantics: the validate:apk-pins task consults ONE
-  repo index per arch (community preferred, main only as fetch fallback; hardcoded x86_64/aarch64, packages absent from
-  the index are silently skipped) while apk-bump.yaml merges main+community (main wins) and derives arches from each
-  app's `config.yaml` (facts: root `KNOWLEDGE.md` §"apk package version policy").
+  fixture locking their behavior together — and align the index/arch semantics between the task and the nudge job
+  (facts: root `KNOWLEDGE.md` §"apk package version policy").
 
-- Align the per-app `image:` comment in hd-idle's and nfs-server's `config.yaml` with hickory-dns's one-line pointer
-  style (the CI image-name contract now lives in the repository README §"CI"). `config.yaml` is device-visible, so each
-  alignment needs a version bump + changelog entry — fold into the apps' next natural bumps.
+- Comment hygiene in device-visible files — each alignment needs a version bump + changelog entry, so fold into the
+  apps' next natural bumps:
+  - hd-idle, nfs-server: align the `config.yaml` `image:` comment with hickory-dns's one-line pointer style (the CI
+    image-name contract lives in the repository README §"CI").
+  - hd-idle: compress `rootfs/usr/bin/hd-idle-pmfix`'s header and `smart()` comments (they restate
+    `hd-idle/KNOWLEDGE.md` §"Drive-PM treatment") to a pointer; state the fatal-path rationale once, not in both
+    `hd-idle-healthcheck` and the `Dockerfile`; drop the episodic grep narration in `hd-idle-genargs`.
+  - hickory-dns: compress the `apparmor.txt` capability comment (restates the app's AppArmor knowledge sections);
+    re-wrap the §-citations in `apparmor.txt`, `rootfs/etc/s6-overlay/s6-rc.d/hickory-dns/run` and
+    `rootfs/usr/bin/hickory-dns-genconfig` so the citation names stay on one line (a wrap inserts `#`/`##` inside the
+    quoted section name, breaking greppability).
+  - nfs-server: compress the `config.yaml` shares-schema comment (restates §"Export-cache and fsid semantics"); fix the
+    mountd grant comment (contradicts the run script — tracked in `nfs-server/TODO.md`); resolve the dangling
+    "busybox-applet exec mediation" citation in `apparmor.txt` (no such content exists); state the "Official docs
+    template" comment once in the sub-profile header instead of four times; drop the episodic release-breakage
+    parenthetical in `rootfs/etc/s6-overlay/scripts/nfsd-start`.

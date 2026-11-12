@@ -6,17 +6,8 @@
 # see .agents/skills/ha-app-lab-testing.
 
 ## Fixture adaptation: .mise/tasks/test/lab/hickory-dns.py adds one static entry so the runtime check can
-## probe an authoritative leaf-zone answer (the default options serve none). LAB_FIXTURE_ENV (forwarded by
-## the harness to the fake API) selects the upstream-pool variant: `upstreams=tls` / `upstreams=https` /
-## `upstreams=quic` replace the default pool with a single hostname-only upstream, so the forwarded probe
-## proves exactly that transport end-to-end through the real daemon (the default pool is Quad9's anycast
-## IPs over DoQ; the resolve CLI cannot dial DoH/DoQ directly). Run all four after transport-affecting
-## changes:
-##   LAB_FIXTURE_ENV=upstreams=tls mise run test:lab hickory-dns     # Quad9 DoT
-##   LAB_FIXTURE_ENV=upstreams=https mise run test:lab hickory-dns   # Cloudflare DoH
-##   LAB_FIXTURE_ENV=upstreams=quic mise run test:lab hickory-dns    # AdGuard DoQ
-## Hostname-only upstreams additionally exercise the boot-time name resolution path (fresh lookup +
-## last-known-good cache) that the default IP-based pool skips.
+## probe an authoritative leaf-zone answer (the default options serve none); LAB_FIXTURE_ENV=upstreams=tls|https|quic
+## selects the upstream-pool variant - usage matrix in that file's docstring.
 
 lab_runtime_check() {
   ## The fixture variant must have taken effect: a lost docker-cp race would otherwise serve the default

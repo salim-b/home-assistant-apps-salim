@@ -87,9 +87,8 @@ lab_runtime_check() {
   ## nfsd-watch mirror refresh: an in-container unplug/replug of a "drive" mounted at the /media share
   ## path (privileged: bind over the share path = replug, its umount = unplug) must be picked up within
   ## a poll interval without an app restart - the export switches to the new mount's content and, on
-  ## unplug, stops serving the detached superblock clone (the stale-serving hazard the pre-watcher code
-  ## had). The real trigger path (HAOS mounts under /media, propagated rslave) is supervisor-source-
-  ## verified: nfs-server/KNOWLEDGE.md.
+  ## unplug, stops serving the detached superblock clone. The real trigger path (HAOS mounts under /media,
+  ## propagated rslave) is supervisor-source-verified: nfs-server/KNOWLEDGE.md.
   if ! (
     set -e
 

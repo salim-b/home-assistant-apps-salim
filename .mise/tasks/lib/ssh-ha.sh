@@ -69,11 +69,10 @@ ha_retry() { # ha_retry <timeout-s> <cmd...>: retry commands failing with known 
   done
 }
 
-# 'ha apps start' cannot start slow apps: the CLI caps every API call with a hard-coded HTTP client timeout
-# (home-assistant/cli client/helper.go DefaultTimeout = 30 s; cmd/apps_start.go uses it, while restart/stop/
-# uninstall get 10 min and install/update 1 h) and offers no flag or env override - far below hd-idle's
-# multi-minute drive spin-up at boot. The supervisor holds the POST's response until the app reaches the started
-# state, so POST it directly with a curl timeout we control (same pattern as ha_post_options below).
+# 'ha apps start' cannot start slow apps: the CLI caps every API call with a hard-coded 30 s HTTP client timeout and
+# offers no override (full timeout catalog: root KNOWLEDGE.md §"Supervisor: ha CLI HTTP client timeouts"). The
+# supervisor holds the POST's response until the app reaches the started state, so POST it directly with a curl
+# timeout we control (same pattern as ha_post_options below).
 APP_START_TIMEOUT=300
 ha_app_start() { # ha_app_start <slug>: start the app, tolerating slow startups (hd-idle's drive spin-up)
   local result rc

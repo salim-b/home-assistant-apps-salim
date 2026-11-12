@@ -144,7 +144,7 @@ def validate_rumdl_no_autofix() -> None:
     """Behavioral canary: rumdl must not rewrite ANY file (panache owns all markdown formatting).
 
     Runs `rumdl fmt` on a scratch violation file with the repo config and fails if it changed - a
-    it changed - a rumdl upgrade that flips the inert-`all` fixable semantics (see the comment in
+    rumdl upgrade that flips the inert-`all` fixable semantics (see the comment in
     .rumdl.toml) is caught at `mise run check`. Requires rumdl on PATH (`mise run validate:apps`).
     """
     canary = "# canary\n\nSome  text with fixable issues.   \n\n- item one\n+ item two\nTab\there\n"

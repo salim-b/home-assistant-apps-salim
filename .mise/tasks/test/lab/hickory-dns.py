@@ -17,7 +17,7 @@ default pool is Quad9's anycast IPs over DoQ; the resolve CLI cannot dial
 DoH/DoQ directly). Hostname-only upstreams additionally exercise the boot-time
 name resolution path (fresh lookup + last-known-good cache) that the default
 IP-based pool skips. Run all four after transport-affecting changes:
-`LAB_FIXTURE_ENV=upstreams=tls mise run lab hickory-dns` (and https, quic).
+`LAB_FIXTURE_ENV=upstreams=tls mise run test:lab hickory-dns` (and https, quic).
 """
 
 import os
