@@ -51,6 +51,14 @@ Applies to comments and documentation alike:
   pointer in the comment. Inline comments (invariants whose loss would cause misbehavior) must not restate anything
   recorded elsewhere: every significant piece of information has exactly one home.
 
+### Prose typography
+
+In prose – Markdown text, comments, user-facing strings, commit messages – dash punctuation (Gedankenstrich) is the
+spaced en dash (` – `), never a bare hyphen; numeric ranges take an unspaced en dash (`3–5`). Compound modifiers
+(`drive-PM`, `opt-out`), code, keys, and flags keep the plain hyphen; the em dash is not part of this style. The one
+exception is a file that must remain ASCII-only (none so far – Markdown, YAML, and task/service scripts all tolerate
+UTF-8). Apply this to prose you write or rewrite; do not sweep untouched files unprompted.
+
 ## Skills index
 
 Load a skill's full text before doing the kind of work it covers:
