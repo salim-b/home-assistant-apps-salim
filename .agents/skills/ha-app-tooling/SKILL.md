@@ -163,8 +163,10 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   config, which a repo config is not. `--strict` also fails while the installed Renovate flags a pending config
   migration, so Renovate bumps that deprecate config keys surface immediately.
 - Renovate also manages the mise.toml `[tools]` pins (manager `mise`; weekly, Monday, like the other managers) and keeps
-  `mise.lock` in sync — except `hk`, whose binary pin and the `hk@X.Y.Z` package imported by `hk.pkl` must move together
-  in one manual change (excluded via packageRule in `.github/renovate.json`).
+  `mise.lock` in sync — including `hk`: a custom regex manager (`.github/renovate.json`) rewrites the `hk@X.Y.Z` package
+  imports in `hk.pkl` with the same depName/datasource/currentValue as the mise manager's hk dep, so both land in one
+  branch and one PR bumps all three files. Manual bumps use `mise run bump-hk <version>`; the CI check catches partial
+  desyncs (`mise install --locked` errors on a mise.toml/mise.lock disagreement).
 
 ## bashio shebang note
 

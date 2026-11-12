@@ -28,6 +28,21 @@
       "datasourceTemplate": "github-tags",
       "depNameTemplate": "home-assistant/supervisor",
       "versioningTemplate": "semver-coerced"
+    },
+    {
+      "customType": "regex",
+      "description": "The hk@X.Y.Z pkl package that hk.pkl imports (amends + Builtins lines) must move together with the hk pin in mise.toml [tools] and mise.lock - the package provides the builtin step definitions the binary executes. The mise manager owns mise.toml + mise.lock; this manager keeps hk.pkl in the SAME update: same depName, datasource and currentValue as the mise manager's hk dep, so Renovate folds both into one branch and one PR bumps all three files. Two matchStrings because each import line carries the version twice (path segment and hk@X# marker) and both occurrences must be rewritten - the same invariant bump-hk.sh enforces for manual bumps. The CI check catches partial desyncs regardless: mise install --locked errors when mise.toml and mise.lock disagree.",
+      "managerFilePatterns": [
+        "/^hk\\.pkl$/"
+      ],
+      "matchStrings": [
+        "download/v(?<currentValue>\\d+\\.\\d+\\.\\d+)/hk",
+        "hk@(?<currentValue>\\d+\\.\\d+\\.\\d+)#"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "hk",
+      "packageNameTemplate": "jdx/hk",
+      "extractVersionTemplate": "^v(?<version>\\S+)$"
     }
   ],
   "packageRules": [
@@ -131,15 +146,20 @@
       ]
     },
     {
-      "description": "hk stays out of the mise manager: its mise.toml binary pin and the hk@X.Y.Z package imported by hk.pkl must move together in one manual change (the package provides the builtin step definitions the binary executes - bumping only one leaves hk.pkl importing a version the binary or registry cannot resolve). matchPackageNames needs both names: the mise manager's dep matches by its resolved packageName jdx/hk (GitHub releases datasource), not the depName hk that PR titles show.",
+      "description": "hk pkl-package manager (custom.regex): same weekly Monday cadence and label as the mise [tools] rule so BOTH hk deps of the pair update together (mise manager owns mise.toml + mise.lock, this one hk.pkl) - a schedule mismatch would open one-sided desync PRs on off-Monday runs. Listed for both match spellings because the mise manager's dep matches packageRules by its resolved packageName jdx/hk, not the depName hk that PR titles show (verified against Renovate 44.235.0, 2026-11-12, local reproduction), and which side wins for custom-manager deps is not pinned down.",
       "matchManagers": [
-        "mise"
+        "custom.regex"
       ],
       "matchPackageNames": [
         "hk",
         "jdx/hk"
       ],
-      "enabled": false
+      "addLabels": [
+        "mise_tools"
+      ],
+      "schedule": [
+        "before 8am on monday"
+      ]
     },
     {
       "description": "Supervisor schema pin: weekly, same cadence as the actions manager; automerges once the CI check job (mise run validate:apps against the new ref) is green. The Renovate PR body lists the upstream changelog for an audit trail. automergeStrategy rebase: linear history without merge bubbles (GitHub rebase-merge; conflicts block the automerge until resolved — same as manual). Applies on both merge paths (Renovate's own merge today, platform-native automerge if branch protection ever arrives).",
