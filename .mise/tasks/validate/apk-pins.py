@@ -2,7 +2,7 @@
 #MISE description="Check pinned apk package versions in app Dockerfiles against the Alpine binary indexes (drift alarm)"
 #USAGE arg "[app]" help="App directory to check (default: all apps)"
 
-"""apk-pins: compare pinned apk package versions in app Dockerfiles against the Alpine binary
+"""validate:apk-pins: compare pinned apk package versions in app Dockerfiles against the Alpine binary
 indexes of the pinned base-image branch. Drift = guided release (policy + why: root KNOWLEDGE.md
 §"apk package version policy"); CI runs this task only on main pushes and the daily cron, never
 in the PR gate.
@@ -134,7 +134,7 @@ def main() -> int:
         for p in problems:
             print(f"  {p}")
         return 1
-    print("apk-pins OK")
+    print("validate:apk-pins OK")
     return 0
 
 

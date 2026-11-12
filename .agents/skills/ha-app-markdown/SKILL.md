@@ -24,7 +24,8 @@ description: Markdown formatting conventions for this repository — panache own
   every other tag fails the lint, READMEs included. Reach for Markdown constructs (links, images, emphasis, code spans)
   before raw HTML.
 - rumdl never rewrites files: its fix allow-list is pinned to an inert `all` sentinel (behavioral canary in
-  validate.py). Formatting fixes go through panache (`mise run fmt`); non-format rumdl findings are fixed by hand.
+  `validate/apps.py`). Formatting fixes go through panache (`mise run fmt`); non-format rumdl findings are fixed by
+  hand.
 
 ## Constructs that break the toolchain — write around them
 

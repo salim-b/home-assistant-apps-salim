@@ -8,7 +8,7 @@
   # rumdl must never rewrite files - panache owns ALL markdown formatting. `fixable` is rumdl's fix
   # allow-list with no "fix nothing" wildcard, so an *inert* entry is pinned: `all` is preserved by
   # rule-list canonicalization and never matched against a rule name (verified through 0.3.1). The
-  # behavioral canary in validate.py fails loudly if a rumdl upgrade ever flips this.
+  # behavioral canary in validate/apps.py fails loudly if a rumdl upgrade ever flips this.
   fixable = [ "all" ]
 
 [per-file-ignores]

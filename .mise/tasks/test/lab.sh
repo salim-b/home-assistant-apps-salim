@@ -7,8 +7,8 @@
 #USAGE flag "--keep" help="Keep lab containers/dirs for debugging"
 #USAGE flag "--spindown-drives <drives>" help="Comma-separated `sd*` kernel names an app hook may spin down for real (hd-idle smoke test; read-only: no data is written)"
 #
-# Per-app hooks: .mise/tasks/lab/<app>.sh (docker args + runtime check), optional fixture
-# adapter .mise/tasks/lab/<app>.py - see .agents/skills/ha-app-lab-testing. No hook: boot-only lab.
+# Per-app hooks: .mise/tasks/test/lab/<app>.sh (docker args + runtime check), optional fixture
+# adapter .mise/tasks/test/lab/<app>.py - see .agents/skills/ha-app-lab-testing. No hook: boot-only lab.
 
 set -euo pipefail
 
@@ -24,7 +24,7 @@ spindown_drives="${usage_spindown_drives:-}"
 export LAB_SPINDOWN_DRIVES="$spindown_drives"
 
 ## The `build` dependency (declared in the #MISE header) rebuilds stale/missing images first; this
-## preflight only guards `mise run lab --skip-deps` runs against docker's raw "no such image" error mid-run.
+## preflight only guards `mise run test:lab --skip-deps` runs against docker's raw "no such image" error mid-run.
 missing=()
 for app in "${apps[@]}"; do
   version=$(yq -r '.version' "$app/config.yaml")
@@ -81,7 +81,7 @@ subnet=$(docker network inspect "$net" --format '{{range .IPAM.Config}}{{.Subnet
 
 for app in "${apps[@]}"; do
   version=$(yq -r '.version' "$app/config.yaml")
-  hook=".mise/tasks/lab/$app.sh"
+  hook=".mise/tasks/test/lab/$app.sh"
   echo "== lab for $app $version $([ -f "$hook" ] && echo "(hook: $hook)" || echo "(boot-only, no hook)") =="
 
   ts "$SECONDS" "-- fake supervisor API (serving $app/config.yaml options)"
@@ -156,8 +156,8 @@ PYEOF' >/dev/null
     "${lab_docker_args[@]}" \
     -e SUPERVISOR_TOKEN=fake -e SUPERVISOR_API="http://$net-fakesup:8000" \
     "local/$app:$version" >/dev/null
-  # serve the app's fixture adapter to the fake API, if one exists (convention: .mise/tasks/lab/<app>.py)
-  fixture_py=".mise/tasks/lab/$app.py"
+  # serve the app's fixture adapter to the fake API, if one exists (convention: .mise/tasks/test/lab/<app>.py)
+  fixture_py=".mise/tasks/test/lab/$app.py"
   if [ -f "$fixture_py" ]; then
     docker cp "$PWD/$fixture_py" "$net-fakesup:/lab-hook.py" >/dev/null
   fi

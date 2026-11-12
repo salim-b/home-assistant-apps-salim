@@ -73,7 +73,7 @@ case "$(jq 'length' <<<"$installed")" in
       echo "ERROR: no installed app '${usage_slug}' on $host (is the slug right? it must name an installed copy)" >&2
     else
       echo "ERROR: '$app' is not installed on $host (neither '$local_slug' nor a repository install)." >&2
-      echo "       Deploy it first, e.g.: mise run deploy $app $host" >&2
+      echo "       Deploy it first, e.g.: mise run deploy:local $app $host" >&2
     fi
     exit 1
     ;;

@@ -77,7 +77,7 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
   uninstall+reinstall: the reinstall had the app's DEFAULT options, not the previously stored ones) — the
   `--remove-config` flag only additionally deletes the app's persistent `/data` config folder. Consequently: a reinstall
   ("fresh install") always runs the app's default options, update and rebuild preserve stored options, and a tool that
-  keeps options across an uninstall must read + re-POST them (the deploy-registry migration does; task semantics: skill
+  keeps options across an uninstall must read + re-POST them (the deploy:registry migration does; task semantics: skill
   `ha-app-device-testing`).
 
 ## Supervisor: device access
@@ -244,18 +244,19 @@ digest until the next versioned release.
 - **Float** when the package's interface is not encoded in the app's runtime logic (a generic tool the app runs but
   never inspects): chasing pkgrel rebuilds would add version-bump churn without user value.
 
-Enforcement: the `apk-pins` task (`.mise/tasks/apk-pins.py`) extracts the BUILD_FROM default branch and the apk pins
-from each app's Dockerfile and compares them against the Alpine **binary indexes** (dl-cdn APKINDEX, cached 24 h). It
-runs only on main pushes and the CI lint workflow's daily cron — never in the PR gate: the indexes reflect Alpine's
-current publishing state, not a PR's changes, so a repoint would redden every open PR including the bump PRs meant to
-resolve the drift; a PR's own pin correctness is enforced by its build instead, where `apk add pkg=pin` resolves or
-fails. A red main-push or cron run is the drift alarm. The comparison is per-arch against ONE index per arch — x86_64
-and aarch64 are hardcoded (not derived from the apps' `arch:` lists) and community is fetched with main only as a fetch
-fallback, so a package that lives only in main, or whose main version diverges from community's, is validated against
-community's version or silently skipped. The apk-bump workflow's nudge job merges main+community instead (main wins) and
-derives the arch list from each app's `config.yaml` — task and nudge can disagree in principle (alignment + parser
-dedupe: `TODO.md`). The index serves only the current pkgrel (old ones disappear), so the next build would break anyway
-— the alarm turns an Alpine-side repoint into a guided release instead of silent image drift.
+Enforcement: the `validate:apk-pins` task (`.mise/tasks/validate/apk-pins.py`) extracts the BUILD_FROM default branch
+and the apk pins from each app's Dockerfile and compares them against the Alpine **binary indexes** (dl-cdn APKINDEX,
+cached 24 h). It runs only on main pushes and the CI lint workflow's daily cron — never in the PR gate: the indexes
+reflect Alpine's current publishing state, not a PR's changes, so a repoint would redden every open PR including the
+bump PRs meant to resolve the drift; a PR's own pin correctness is enforced by its build instead, where
+`apk add pkg=pin` resolves or fails. A red main-push or cron run is the drift alarm. The comparison is per-arch against
+ONE index per arch — x86_64 and aarch64 are hardcoded (not derived from the apps' `arch:` lists) and community is
+fetched with main only as a fetch fallback, so a package that lives only in main, or whose main version diverges from
+community's, is validated against community's version or silently skipped. The apk-bump workflow's nudge job merges
+main+community instead (main wins) and derives the arch list from each app's `config.yaml` — task and nudge can disagree
+in principle (alignment + parser dedupe: `TODO.md`). The index serves only the current pkgrel (old ones disappear), so
+the next build would break anyway — the alarm turns an Alpine-side repoint into a guided release instead of silent image
+drift.
 
 **Renovate opens the update PRs, grouped by update type, including the `config.yaml` version bumps**: the Dockerfile
 manager extracts `apk add pkg=version` pins into the `apk` datasource, and the apk packageRule in
@@ -276,15 +277,15 @@ then rebases when behind base (rebaseWhen auto: behind-base-branch for automergi
 delay is bounded by the pkgver review. The version-guard workflow still passes on the Renovate PR as opened.
 `postUpgradeTasks` need `allowedPostUpgradeCommands` — a self-hosted-only option — so the changelog entry is filled
 post-merge by the CI changelog job instead. The rule's registryUrls branch value must be updated together with the
-Dockerfile's `BUILD_FROM` default on a base-image bump; the apk-pins task derives the branch dynamically and remains the
-config-independent net. Floating apk packages are skipped (`unspecified-version`), as intended.
+Dockerfile's `BUILD_FROM` default on a base-image bump; the validate:apk-pins task derives the branch dynamically and
+remains the config-independent net. Floating apk packages are skipped (`unspecified-version`), as intended.
 
 **Release automation (since 2026-10-18)**, chained apk rules in `.github/renovate.json`: pkgrel-only bumps (`1.22-r7` →
 `1.22-r8`, classified `patch`) **automerge once CI is green** (rebase strategy — linear history); pkgver bumps get the
 `needs-review` label and stay manual (CLI semantics may change). `platformAutomerge: false` keeps merges on Renovate's
 own path (branch protection and "Allow auto-merge" are off today; the explicit setting prevents a later repo-toggle
 enablement from merging before CI finishes). Post-merge, the apk-bump workflow's changelog job (a merged `renovate[bot]`
-PR labeled `apk_pin`) inserts the templated `## <version>` section via the shared `apk-changelog` mise task —
+PR labeled `apk_pin`) inserts the templated `## <version>` section via the shared `changelog:apk-bump` mise task —
 idempotent, a pre-written section is never touched. The same workflow's nudge job (daily 01:30 UTC,
 `workflow_dispatch`-able with a `dry_run` input) comments `@renovate rebase` (capped at 3 per PR) once ALL of the app's
 arch indexes serve the new pin: an early bump PR legitimately stays red until the lagging arch's index catches up, and

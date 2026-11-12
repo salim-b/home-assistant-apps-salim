@@ -82,7 +82,7 @@ jobs:
               "Accept": "application/vnd.github+json",
               "User-Agent": "apk-bump-changelog",
           }
-          # same pin shape as the apk-pins task (.mise/tasks/apk-pins.py)
+          # same pin shape as the validate:apk-pins task (.mise/tasks/validate/apk-pins.py)
           PIN_RE = re.compile(r"([A-Za-z0-9][\w.+-]*)=(\d[\w.:]+(?:-r\d+)?)")
 
           def api(path, params=None):
@@ -217,7 +217,7 @@ jobs:
               echo "::warning::PR #${PR_NUMBER}: no version bump and/or old pin found for app '${app}' - no changelog section for ${pkg}"
               continue
             fi
-            mise run apk-changelog --app "$app" --pkg "$pkg" --old "$old" --new "$new" --version "$version"
+            mise run changelog:apk-bump --app "$app" --pkg "$pkg" --old "$old" --new "$new" --version "$version"
           done
 
       - name: Format and lint
@@ -253,7 +253,7 @@ jobs:
             body=$(jq -r 'map("  - \(.pkg): \(.old) -> \(.new) (app version \(.version))") | join("\n")' <<<"$group")
             {
               printf '%s\n' "$subject"
-              printf 'Post-merge changelog entry for the apk pin bump merged in PR #%s (apk-changelog task template).\n' "$PR_NUMBER"
+              printf 'Post-merge changelog entry for the apk pin bump merged in PR #%s (changelog:apk-bump task template).\n' "$PR_NUMBER"
               printf '\n%s\n' "$body"
             } > "$RUNNER_TEMP/commitmsg"
             git commit -F "$RUNNER_TEMP/commitmsg"
@@ -316,7 +316,7 @@ jobs:
               "Accept": "application/vnd.github+json",
               "User-Agent": "apk-bump-nudge",
           }
-          # same pin shape as the apk-pins task (.mise/tasks/apk-pins.py)
+          # same pin shape as the validate:apk-pins task (.mise/tasks/validate/apk-pins.py)
           PIN_RE = re.compile(r"([A-Za-z0-9][\w.+-]*)=(\d[\w.:]+(?:-r\d+)?)")
           # HA arch names -> Alpine arch names (others map 1:1)
           ALPINE_ARCH = {"amd64": "x86_64", "i386": "x86"}

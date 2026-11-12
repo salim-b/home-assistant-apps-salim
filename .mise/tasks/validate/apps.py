@@ -132,7 +132,7 @@ def validate_rumdl_no_autofix() -> None:
     """Behavioral canary: rumdl must not rewrite ANY file (panache owns all markdown
     formatting). Runs `rumdl fmt` on a scratch violation file with the repo config and fails if
     it changed - a rumdl upgrade that flips the inert-`all` fixable semantics (see the comment in
-    .rumdl.toml) is caught at `mise run check`. Requires rumdl on PATH (`mise run validate`)."""
+    .rumdl.toml) is caught at `mise run check`. Requires rumdl on PATH (`mise run validate:apps`)."""
     canary = "# canary\n\nSome  text with fixable issues.   \n\n- item one\n+ item two\nTab\there\n"
     with tempfile.TemporaryDirectory() as td:
         canary_file = pathlib.Path(td) / "canary.md"
@@ -145,7 +145,7 @@ def validate_rumdl_no_autofix() -> None:
                 check=True,
             )
         except FileNotFoundError:
-            sys.exit("rumdl not on PATH: run this task via `mise run validate`")
+            sys.exit("rumdl not on PATH: run this task via `mise run validate:apps`")
         except subprocess.CalledProcessError as err:
             fail(".rumdl.toml", f"canary fmt invocation failed: {err.stderr[-200:]}")
             return
@@ -276,7 +276,7 @@ def main() -> int:
         for p in problems:
             print(f"  {p}")
         return 1
-    print("validate OK")
+    print("validate:apps OK")
     return 0
 
 

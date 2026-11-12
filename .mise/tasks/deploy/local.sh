@@ -184,4 +184,4 @@ state=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/de
 
 echo "-- $action $local_slug v$version (state: $state)"
 
-echo "deploy OK"
+echo "deploy:local OK"

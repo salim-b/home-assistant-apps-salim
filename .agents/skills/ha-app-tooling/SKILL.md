@@ -1,11 +1,11 @@
 ---
 name: ha-app-tooling
 description: How this repository's dev tooling works — the hk lint gate and git hooks, mise task authoring with usage
-  specs, what validate.py checks, and the YAML/shell/TOML linting conventions. Use when touching hk.pkl, mise tasks, or lint
+  specs, what the validate tasks check, and the YAML/shell/TOML linting conventions. Use when touching hk.pkl, mise tasks, or lint
   configuration, or when interpreting lint failures.
 ---
 
-# Dev tooling (hk, mise tasks, validate.py, linting)
+# Dev tooling (hk, mise tasks, validation, linting)
 
 **Task usage is not documented here**: `mise run <task> --help` is the authoritative, always-current usage for every
 task (args, flags, choices). This skill covers only the conventions and gotchas behind the tasks.
@@ -36,19 +36,19 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   tasks the values are exported as `usage_<underscored_name>` env vars — reject empty required values explicitly there
   (the `:?` guard is shell-only).
 
-## validate.py (`.mise/tasks/validate.py`, part of `mise run check`)
+## validate:apps (`.mise/tasks/validate/apps.py`, part of `mise run check`)
 
 - Fetches supervisor schemas from the ref pinned in `mise.toml` `[vars].supervisor_ref` (cached under `~/.cache/`).
 - Renovate bumps that pin to the newest supervisor release and automerges the bump once CI `check` is green (rebase
   merge strategy, `.github/renovate.json`) — green means the new schemas validate our app configs. Renovate does not
   track schema-*behavior* changes: re-verify version-sensitive supervisor facts against the new ref before relying on
   them (skill `ha-app-workflow`).
-- apk pin drift is a separate task: `mise run apk-pins` (`.mise/tasks/apk-pins.py`) compares pinned apk package versions
-  in app Dockerfiles against the Alpine binary indexes (drift = guided release — root `KNOWLEDGE.md` §"apk package
-  version policy"); CI runs it only on main pushes and the daily cron (lint workflow), never in the PR gate — the
-  indexes are Alpine's publishing state, not the PR's. TOML config schemas are validated by the hk `tombi-lint` step
-  instead (section below); `.github/renovate.json` is gated by the official renovate-config-validator hk step (see the
-  linting section below).
+- apk pin drift is a separate task: `mise run validate:apk-pins` (`.mise/tasks/validate/apk-pins.py`) compares pinned
+  apk package versions in app Dockerfiles against the Alpine binary indexes (drift = guided release — root
+  `KNOWLEDGE.md` §"apk package version policy"); CI runs it only on main pushes and the daily cron (lint workflow),
+  never in the PR gate — the indexes are Alpine's publishing state, not the PR's. TOML config schemas are validated by
+  the hk `tombi-lint` step instead (section below); `.github/renovate.json` is gated by the official
+  renovate-config-validator hk step (see the linting section below).
 
 ## YAML linting: ryl
 
@@ -80,9 +80,10 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   `.tombi.toml` config file defines the TOML formatting rules (only deviations from tombi's defaults,
   <https://tombi-toml.github.io/tombi/docs/configuration>).
 - tombi validates in **strict mode** (default): objects without `additionalProperties` are treated as closed, so unknown
-  keys are errors even when the schema doesn't mark them so — stricter than the stock-JSON-Schema validation validate.py
-  used to do. Adding a config key the upstream schema doesn't know yet fails the gate until the schema learns it: the
-  schema is the contract. Schema deprecations are warn-severity, hence gate-failing too.
+  keys are errors even when the schema doesn't mark them so — stricter than the stock-JSON-Schema validation
+  `validate:apps` performs on the supervisor schemas. Adding a config key the upstream schema doesn't know yet fails the
+  gate until the schema learns it: the schema is the contract. Schema deprecations are warn-severity, hence gate-failing
+  too.
 - Schemas are fetched remotely and cached (`~/.cache/tombi`, 24 h TTL; `tombi cache clean`). Offline runs reuse cached
   copies and silently skip un-cached schemas, while CI always runs online — schema checks therefore track upstream
   main/latest, not the installed tool version, and an upstream schema change can fail the gate with no local change

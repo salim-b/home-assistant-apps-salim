@@ -113,8 +113,8 @@ recovery (nfsdcld + per-netns rpc_pipefs)").
 - **Changing detection** (state-file format, `--check`): keep it a stateless replay over one mountinfo snapshot — the
   mount ID is the only signal that catches a re-mount at the same path (dev:ino cannot); clean ticks must stay
   log-silent. Facts: §"Automatic mirror refresh (nfsd-watch)".
-- **Any runtime-affecting change**: full-fidelity lab boot first (`mise run lab nfs-server`, hook
-  `.mise/tasks/lab/nfs-server.sh` — skill `ha-app-lab-testing`); device testing only on explicit user request (skill
-  `ha-app-device-testing`). AppArmor changes additionally need a `config.yaml` version bump (the profile reloads on app
-  update only — root `KNOWLEDGE.md` §"AppArmor: mediation and profile mechanics"). Releases: one version per branch plus
-  a changelog entry (skill `ha-app-workflow`).
+- **Any runtime-affecting change**: full-fidelity lab boot first (`mise run test:lab nfs-server`, hook
+  `.mise/tasks/test/lab/nfs-server.sh` — skill `ha-app-lab-testing`); device testing only on explicit user request
+  (skill `ha-app-device-testing`). AppArmor changes additionally need a `config.yaml` version bump (the profile reloads
+  on app update only — root `KNOWLEDGE.md` §"AppArmor: mediation and profile mechanics"). Releases: one version per
+  branch plus a changelog entry (skill `ha-app-workflow`).

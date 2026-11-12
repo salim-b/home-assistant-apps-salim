@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #MISE hide=true
 #MISE description="⚠️ internal helper script"
-# App hook for .mise/tasks/lab.sh (nfs-server specifics); general contract (lab_docker_args append
-# semantics, lab_runtime_check, fixture adapters in .mise/tasks/lab/<app>.py):
+# App hook for .mise/tasks/test/lab.sh (nfs-server specifics); general contract (lab_docker_args append
+# semantics, lab_runtime_check, fixture adapters in .mise/tasks/test/lab/<app>.py):
 # see .agents/skills/ha-app-lab-testing.
 #
 # shellcheck disable=SC2034  # contract variables are consumed by the harness
@@ -26,7 +26,7 @@ lab_docker_args+=(
 mkdir -p "$LAB_TMPDIR/drive-b"
 echo b-content >"$LAB_TMPDIR/drive-b/b.txt"
 
-## Fixture adaptation: .mise/tasks/lab/nfs-server.py (every share's client network must point at the lab subnet)
+## Fixture adaptation: .mise/tasks/test/lab/nfs-server.py (every share's client network must point at the lab subnet)
 
 lab_runtime_check() {
   ## `docker logs --since` keeps polls O(window) instead of O(full history) - the container's log

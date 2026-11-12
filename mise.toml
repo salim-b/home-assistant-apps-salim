@@ -13,7 +13,7 @@
 # Task docs: https://mise.jdx.dev/tasks/ – file tasks live in `.mise/tasks/`
 [tasks.check]
   description = "Run all pre-commit checks (lint + validate)"
-  depends = [ "lint", "validate" ]
+  depends = [ "lint", "validate:apps" ]
   output = "keep-order"
 
 # Panache owns ALL Markdown autoformatting (.panache.toml, .agents/skills/ha-app-markdown); rumdl stays check-only

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2029  # remote/docker commands intentionally embed client-side values
 #MISE description="Deploy an app to a HAOS device and run live checks against it (app hook provides the checks)"
-#MISE depends="deploy {{ usage.app }} {{ usage.host }}{% if usage.replace %} --replace{% endif %}"
+#MISE depends="deploy:local {{ usage.app }} {{ usage.host }}{% if usage.replace %} --replace{% endif %}"
 #USAGE arg "<app>" help="App to test (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }

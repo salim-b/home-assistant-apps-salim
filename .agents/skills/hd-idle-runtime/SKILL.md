@@ -28,7 +28,7 @@ The app generates that command line from the app options and keeps it in sync wi
 
 Drive IDs: the options reference stable by-id paths (the physical `ata-<MODEL>_<SERIAL>` link and the `usb-*` enclosure
 entry); hd-idle itself only ever sees kernel names. Regenerate the drive cheat sheet with
-`mise run hd-idle-drives <host>` (writes `hd-idle/.drives.md`).
+`mise run hd-idle:regen-drives.md <host>` (writes `hd-idle/.drives.md`).
 
 ## Boot sequence
 

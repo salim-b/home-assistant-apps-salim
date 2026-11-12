@@ -9,13 +9,13 @@ description: How to run the full-fidelity boot lab and write per-app lab hooks (
 
 ## When and how
 
-Run for every runtime-affecting change. Invocation: `mise run lab [app] [--keep]`; usage via `mise run lab --help` (not
-duplicated here). The lab declares `build` as a mise `depends` edge with arg forwarding: a stale or missing image is
-rebuilt first (`build` skips apps whose image is newer than every input file — stamp-based freshness, `--rebuild`
-forces; a no-arg lab runs the freshness pass over all apps). `--skip-deps` skips the build; a then-missing image fails
-the lab's preflight. What it does: a fake Supervisor API serves the app's default options (adapted to the lab network),
-the app container boots with its complete s6-rc tree, an app-provided runtime check runs, then a graceful stop. `--keep`
-keeps containers/directories for debugging.
+Run for every runtime-affecting change. Invocation: `mise run test:lab [app] [--keep]`; usage via
+`mise run test:lab --help` (not duplicated here). The lab declares `build` as a mise `depends` edge with arg forwarding:
+a stale or missing image is rebuilt first (`build` skips apps whose image is newer than every input file — stamp-based
+freshness, `--rebuild` forces; a no-arg lab runs the freshness pass over all apps). `--skip-deps` skips the build; a
+then-missing image fails the lab's preflight. What it does: a fake Supervisor API serves the app's default options
+(adapted to the lab network), the app container boots with its complete s6-rc tree, an app-provided runtime check runs,
+then a graceful stop. `--keep` keeps containers/directories for debugging.
 
 ## Boot-only default
 
@@ -24,20 +24,20 @@ apps (skill `ha-app-scaffolding`).
 
 ## Hook contract
 
-`.mise/tasks/lab/<app>.sh` is sourced by the harness (env: `LAB_NET_NAME`, `LAB_TMPDIR`, `LAB_APP_IP`, `LAB_SUBNET`,
-`LAB_SPINDOWN_DRIVES`):
+`.mise/tasks/test/lab/<app>.sh` is sourced by the harness (env: `LAB_NET_NAME`, `LAB_TMPDIR`, `LAB_APP_IP`,
+`LAB_SUBNET`, `LAB_SPINDOWN_DRIVES`):
 
 - append to `lab_docker_args` (`lab_docker_args+=(…)` — do NOT overwrite it; the harness pre-seeds the `/data` volume);
 - define `lab_runtime_check`.
 
-The optional fixture adapter is a separate file `.mise/tasks/lab/<app>.py` defining `lab_adapt_fixture(options)` with
-`LABNETWORK` as the subnet placeholder; the harness serves it to the fake API whenever the file exists. A generic
+The optional fixture adapter is a separate file `.mise/tasks/test/lab/<app>.py` defining `lab_adapt_fixture(options)`
+with `LABNETWORK` as the subnet placeholder; the harness serves it to the fake API whenever the file exists. A generic
 `LAB_FIXTURE_ENV` string from the invoking environment is forwarded to the fake-API container; adapters may parse it to
 select fixture variants (hickory-dns uses it for per-protocol upstream pools:
-`LAB_FIXTURE_ENV=upstreams=https mise run lab hickory-dns`). Convention over configuration — never place hook files
+`LAB_FIXTURE_ENV=upstreams=https mise run test:lab hickory-dns`). Convention over configuration — never place hook files
 inside the app dir (app-dir contents get copied to devices by `deploy`).
 
-Reference implementations: `.mise/tasks/lab/nfs-server.sh` and `nfs-server.py`.
+Reference implementations: `.mise/tasks/test/lab/nfs-server.sh` and `nfs-server.py`.
 
 ## Hardware-behavior checks
 

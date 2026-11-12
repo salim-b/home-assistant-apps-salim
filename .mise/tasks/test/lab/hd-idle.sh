@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #MISE hide=true
 #MISE description="⚠️ internal helper script"
-# App hook for .mise/tasks/lab.sh (hd-idle specifics); general contract:
+# App hook for .mise/tasks/test/lab.sh (hd-idle specifics); general contract:
 # .agents/skills/ha-app-lab-testing. May set lab_docker_args, may define lab_runtime_check.
 #
 # HAOS binds the host's /dev read-only into every app container, so /dev/disk/by-* udev
@@ -19,7 +19,7 @@ lab_docker_args+=(-e HD_IDLE_WATCH_INTERVAL=5)
 #
 # Optional spindown smoke test driven by LAB_SPINDOWN_DRIVES (`mise run lab hd-idle
 # --spindown-drives sda,sdb`): READ-ONLY standby commands + state queries only; the fixture
-# adapter (.mise/tasks/lab/hd-idle.py) configures a 30 s idle for the natural spindown path.
+# adapter (.mise/tasks/test/lab/hd-idle.py) configures a 30 s idle for the natural spindown path.
 #
 # Host-side spindown mechanisms (udisks2, hdparm.conf, TLP, smartd, ...) and desktop IO on mounted
 # drives can skew spindown tests (background: hd-idle/KNOWLEDGE.md; lab_preflight warns) - assertions

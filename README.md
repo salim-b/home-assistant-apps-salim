@@ -47,14 +47,14 @@ the full, current usage instructions for any task. Common tasks:
 mise run check
 
 # test app in a containerized lab
-mise run lab nfs-server 
+mise run test:lab nfs-server
 
 # deploy app to HAOS device (installed as a local app)
-mise run deploy nfs-server root@homeassistant.local
+mise run deploy:local nfs-server root@homeassistant.local
 
 # switch a device from the locally installed app to the published registry version,
 # migrating app options
-mise run deploy-registry hd-idle root@homeassistant.local --config migrate
+mise run deploy:registry hd-idle root@homeassistant.local --config migrate
 
 # apply a JSON options file to the installed app on the device
 # (schema-filtered, previous options backed up; see `mise run apply-options --help`)

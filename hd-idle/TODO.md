@@ -6,11 +6,11 @@ Open work items only (resolved items live in git history). Underlying technical 
 ## Tasks
 
 - Monitor hd-idle upstream: v1.22 has no GitHub release (Alpine tracks the tag); Alpine-side package updates are caught
-  automatically by the apk drift check (validate.py, daily CI cron) and released per the repository-root KNOWLEDGE.md
-  §`apk package version policy` (release discipline: skill `ha-app-workflow`). Upstream *behavior* changes (new flags
-  etc.) are read and adapted when such a release is made; a future version adding per-device `-I` or a config file would
-  also relax the option schema. Worth filing upstream: per-device `-I` would make the global-only limitation moot for
-  mixed setups.
+  automatically by the apk drift check (`validate:apk-pins`, daily CI cron) and released per the repository-root
+  KNOWLEDGE.md §`apk package version policy` (release discipline: skill `ha-app-workflow`). Upstream *behavior* changes
+  (new flags etc.) are read and adapted when such a release is made; a future version adding per-device `-I` or a config
+  file would also relax the option schema. Worth filing upstream: per-device `-I` would make the global-only limitation
+  moot for mixed setups.
 
 - Currently, hd-idle's `-s 1` re-resolves only *unresolved* device entries and never re-verifies already-resolved ones
   (`resolveSymlinks()` skips entries with a populated `Name`). A [PR](https://github.com/adelolmo/hd-idle/pull/141) has
@@ -94,10 +94,10 @@ Open work items only (resolved items live in git history). Underlying technical 
   skip/treat DECISION is not): unchanged drives-file line → skip, new/changed line → treat exactly once, missing `.prev`
   file → treat all (pmfix logs every decision). A regression (e.g. in the line match) would silently re-treat asleep
   drives on every change tick — the wear-generating failure mode (`KNOWLEDGE.md` §"USB-bridge behaviors"). Mirror the
-  genargs `--check` matrix in `.mise/tasks/lab/hd-idle.sh`.
+  genargs `--check` matrix in `.mise/tasks/test/lab/hd-idle.sh`.
 
 - Device-side verification with real drives attached (the lab can cover neither half: it cannot simulate kernel renames
-  — `.mise/tasks/lab/hd-idle.sh` — and has no drives): (a) extend `.mise/tasks/test/live/hd-idle.yaml` with
+  — `.mise/tasks/test/lab/hd-idle.sh` — and has no drives): (a) extend `.mise/tasks/test/live/hd-idle.yaml` with
   device-specific drives and run the live hook through a short idle soak; (b) verify the watcher's core promise
   end-to-end — a drive moved to another port (kernel rename) is re-granted (cgroup rules), re-resolved (by-id) and the
   daemon restarted under the new name (DOCS.md's "drives moved between ports are picked up automatically").

@@ -8,7 +8,7 @@ name: Publish reconcile
 # GHCR unreachable (after backoff retries) or a failed dispatch fails this run (red).
 #
 # Known limitation: reconciles TAG EXISTENCE only - stale tag content is version-guard's and
-# validate.py's domain (both fail loudly on source drift).
+# validate:apps' domain (both fail loudly on source drift).
 #
 # Cron offset: 03:15 UTC - away from the lint cron (00:00) and the apk-bump nudge (01:30). GHCR is
 # probed anonymously with the runner's preinstalled docker buildx CLI (public packages; only

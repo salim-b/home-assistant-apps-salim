@@ -7,7 +7,7 @@
 #USAGE flag "--version <version>" required=#true help="App version the section is titled with (the version bumpVersions wrote in the same Renovate PR)"
 #USAGE flag "--dry-run" help="Print the section that would be inserted instead of writing CHANGELOG.md"
 
-"""apk-changelog: insert the templated changelog section for an apk pin bump.
+"""changelog:apk-bump: insert the templated changelog section for an apk pin bump.
 
 The Renovate apk-pin PR is merged without a changelog entry - the apk-bump workflow's changelog
 job runs this task post-merge to fill it (policy: root KNOWLEDGE.md §apk package version policy);
@@ -47,7 +47,7 @@ def _val(name: str) -> str:
     rejected here (the Python equivalent of the shell's `${usage_name:?}`)."""
     value = os.environ.get(f"usage_{name.replace('-', '_')}", "") or _argv_value(name)
     if not value:
-        sys.exit(f"apk-changelog: --{name} must not be empty")
+        sys.exit(f"changelog:apk-bump: --{name} must not be empty")
     return value
 
 
@@ -88,10 +88,10 @@ def main() -> int:
     dry_run = _flag("dry-run")
 
     if old == new:
-        sys.exit(f"apk-changelog: --old and --new are identical ({old}) - nothing to record")
+        sys.exit(f"changelog:apk-bump: --old and --new are identical ({old}) - nothing to record")
     changelog = ROOT / app / "CHANGELOG.md"
     if not changelog.is_file():
-        sys.exit(f"apk-changelog: {changelog} does not exist (app '{app}')")
+        sys.exit(f"changelog:apk-bump: {changelog} does not exist (app '{app}')")
 
     heading = f"## {version}"
     bullet = (
@@ -106,7 +106,7 @@ def main() -> int:
     # Idempotency: any existing `## <version>` heading (with a trailing qualifier) counts as present.
     heading_re = re.compile(rf"^## {re.escape(version)}(?:\s|$)")
     if any(heading_re.match(line) for line in lines):
-        print(f"apk-changelog: [{app}] a '## {version}' section already exists - nothing to do")
+        print(f"changelog:apk-bump: [{app}] a '## {version}' section already exists - nothing to do")
         return 0
 
     anchor = next(
@@ -114,7 +114,7 @@ def main() -> int:
     )
     if anchor is None:
         sys.exit(
-            f"apk-changelog: {changelog} has no '# Changelog' heading - unexpected "
+            f"changelog:apk-bump: {changelog} has no '# Changelog' heading - unexpected "
             f"structure, refusing to modify"
         )
 
@@ -127,7 +127,7 @@ def main() -> int:
 
     if dry_run:
         print(
-            f"apk-changelog: [{app}] would insert after '# Changelog' "
+            f"changelog:apk-bump: [{app}] would insert after '# Changelog' "
             f"({pkg} {old} -> {new}):"
         )
         print()
@@ -136,7 +136,7 @@ def main() -> int:
         return 0
 
     changelog.write_text(new_text)
-    print(f"apk-changelog: [{app}] inserted '## {version}' section ({pkg} {old} -> {new})")
+    print(f"changelog:apk-bump: [{app}] inserted '## {version}' section ({pkg} {old} -> {new})")
     return 0
 
 
