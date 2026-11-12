@@ -43,8 +43,10 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   merge strategy, `.github/renovate.json`) — green means the new schemas validate our app configs. Renovate does not
   track schema-*behavior* changes: re-verify version-sensitive supervisor facts against the new ref before relying on
   them (skill `ha-app-workflow`).
-- Compares pinned apk package versions in app Dockerfiles against the Alpine binary indexes (drift = guided release —
-  root `KNOWLEDGE.md` §"apk package version policy"). TOML config schemas are validated by the hk `tombi-lint` step
+- apk pin drift is a separate task: `mise run apk-pins` (`.mise/tasks/apk-pins.py`) compares pinned apk package versions
+  in app Dockerfiles against the Alpine binary indexes (drift = guided release — root `KNOWLEDGE.md` §"apk package
+  version policy"); CI runs it only on main pushes and the daily cron (lint workflow), never in the PR gate — the
+  indexes are Alpine's publishing state, not the PR's. TOML config schemas are validated by the hk `tombi-lint` step
   instead (section below); `.github/renovate.json` is gated by the official renovate-config-validator hk step (see the
   linting section below).
 

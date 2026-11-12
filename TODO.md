@@ -56,10 +56,10 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   upstream is unresponsive, reconsider whether shellharden should stay a fix step here (vs check-only or dropped).
 
 - apk-pin checker: deduplicate the triplicated pin parser — the `pkg=version` regex plus the backslash-continuation
-  state machine over `apk add` blocks exists three times (`.mise/tasks/validate.py`, and the changelog + nudge jobs of
+  state machine over `apk add` blocks exists three times (`.mise/tasks/apk-pins.py`, and the changelog + nudge jobs of
   `.github/workflows/apk-bump.yaml`; the trigger is the literal substring `apk add` in a line) with no canary fixture
-  locking their behavior together — and align the index/arch semantics: validate.py consults ONE repo index per arch
-  (community preferred, main only as fetch fallback; hardcoded x86_64/aarch64, packages absent from the index are
+  locking their behavior together — and align the index/arch semantics: the apk-pins task consults ONE repo index per
+  arch (community preferred, main only as fetch fallback; hardcoded x86_64/aarch64, packages absent from the index are
   silently skipped) while apk-bump.yaml merges main+community (main wins) and derives arches from each app's
   `config.yaml` (facts: root `KNOWLEDGE.md` §"apk package version policy").
 

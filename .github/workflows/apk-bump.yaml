@@ -8,10 +8,10 @@ name: Apk pin bump
 # with the GITHUB_TOKEN - its workflow suppression is intended (no rebuild is needed).
 #
 # nudge: Alpine repushes land per-arch asynchronously, so an early bump PR legitimately stays red
-# until every arch index serves the new pin (validate_apk_pins fails). Rebases such PRs daily
-# (@renovate rebase - fresh check runs; re-running failed runs can still count as red) once ALL
-# arch indexes serve the pin; while an index lags it does nothing. workflow_dispatch accepts
-# dry_run for log-only verification runs.
+# until every arch index serves the new pin (the PR build's apk add fails on the lagging arch).
+# Rebases such PRs daily (@renovate rebase - fresh check runs; re-running failed runs can still
+# count as red) once ALL arch indexes serve the pin; while an index lags it does nothing.
+# workflow_dispatch accepts dry_run for log-only verification runs.
 #
 # Cron offset: 01:30 UTC - away from the lint cron (00:00) and publish-reconcile (03:15).
 
@@ -82,7 +82,7 @@ jobs:
               "Accept": "application/vnd.github+json",
               "User-Agent": "apk-bump-changelog",
           }
-          # same pin shape as validate_apk_pins in .mise/tasks/validate.py
+          # same pin shape as the apk-pins task (.mise/tasks/apk-pins.py)
           PIN_RE = re.compile(r"([A-Za-z0-9][\w.+-]*)=(\d[\w.:]+(?:-r\d+)?)")
 
           def api(path, params=None):
@@ -104,7 +104,7 @@ jobs:
 
           def parse_pins(text):
               """All pins from a full Dockerfile text: {pkg: pin} - same state
-              machine as validate_apk_pins (apk add block tracked across
+              machine as the apk-pins task (apk add block tracked across
               backslash continuations)."""
               pins: dict = {}
               in_apk = False
@@ -316,7 +316,7 @@ jobs:
               "Accept": "application/vnd.github+json",
               "User-Agent": "apk-bump-nudge",
           }
-          # same pin shape as validate_apk_pins in .mise/tasks/validate.py
+          # same pin shape as the apk-pins task (.mise/tasks/apk-pins.py)
           PIN_RE = re.compile(r"([A-Za-z0-9][\w.+-]*)=(\d[\w.:]+(?:-r\d+)?)")
           # HA arch names -> Alpine arch names (others map 1:1)
           ALPINE_ARCH = {"amd64": "x86_64", "i386": "x86"}
@@ -341,7 +341,7 @@ jobs:
 
           def parse_pins(text):
               """All pins from a full Dockerfile text: {pkg: pin} - same state
-              machine as validate_apk_pins (apk add block tracked across
+              machine as the apk-pins task (apk add block tracked across
               backslash continuations)."""
               pins: dict = {}
               in_apk = False
@@ -385,7 +385,7 @@ jobs:
 
           def build_branch(dockerfile_text):
               """Alpine branch from the Dockerfile's BUILD_FROM default (same
-              derivation as validate.py's validate_apk_pins)."""
+              derivation as the apk-pins task)."""
               match = re.search(r"(?m)^ARG BUILD_FROM=(\S+)", dockerfile_text)
               if not match:
                   return None
@@ -404,7 +404,7 @@ jobs:
           def index_map(branch, alpine_arch):
               """pkg -> version from the Alpine binary indexes (dl-cdn
               APKINDEX, main + community merged with main winning - NOT the same
-              index semantics as validate.py's _apkindex_versions, which consults
+              index semantics as the apk-pins task's _apkindex_versions, which consults
               one repo per arch (community preferred); alignment tracked in root
               TODO.md - the APKBUILD source branch can outrun the index either way)."""
               key = (branch, alpine_arch)

@@ -84,6 +84,8 @@ testing use the devcontainer (`.devcontainer.json`), not the lab.
 `mise tasks ls --local` lists the tasks (the `--local` flag excludes your global mise tasks). The essentials:
 
 - `mise run check` — lint + validate; **always run before finishing a change** (it is the CI gate).
+- `mise run apk-pins` — compare pinned apk package versions against the Alpine binary indexes (drift alarm; CI runs it
+  on main pushes and the daily cron only, never in the PR gate).
 - `mise run fmt` — reformat (Markdown reflow); run it instead of hand-wrapping prose.
 - `mise run build` — build app images (native arch + cross-check) and assert image metadata.
 - `mise run lab` — full-fidelity boot lab; **run for every runtime-affecting change**.

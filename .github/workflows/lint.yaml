@@ -96,3 +96,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mise run check
+
+      - name: 🧭 Check apk pin drift
+        # Alpine's binary indexes are world-state, not PR state: a repoint must not redden open
+        # PRs (the bump automation resolves drift). Main pushes and the daily cron carry the
+        # alarm; the PR gate's pin arbiter is the PR's own build (root KNOWLEDGE.md §"apk package
+        # version policy").
+        if: github.event_name != 'pull_request'
+        run: mise run apk-pins
