@@ -493,7 +493,7 @@ while IFS= read -r disk; do
   fi
 
   if [ "$IDLE" = "0" ]; then
-    qlog_info "Drive ${DEV}: idle time 0 - never spun down (excluded)."
+    qlog_info "Drive ${DEV}: idle time 0 – never spun down."
   fi
   ARGS+=(-a "$EMIT_NAME" -i "$IDLE" -c "$COMMAND_TYPE" -p "$POWER_CONDITION")
 
