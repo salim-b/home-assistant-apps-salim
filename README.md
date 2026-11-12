@@ -94,8 +94,9 @@ mise run test:live nfs-server root@homeassistant.local --test-options
 ```
 
 Deploy-task mechanics that are not visible in `--help` — why the device-side app config's `image:` key gets commented
-out, and what happens when the app is also installed from the app repository — are documented in
-[`KNOWLEDGE.md`](./KNOWLEDGE.md) §"Deploy tasks: local builds and store-copy conflicts".
+out, and what happens when the app is also installed from the app repository — are documented in [`KNOWLEDGE.md`
+§"Deploy tasks: local builds and store-copy
+conflicts"](KNOWLEDGE.md#deploy-tasks-local-builds-and-store-copy-conflicts).
 
 ## CI
 
