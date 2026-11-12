@@ -101,11 +101,54 @@ lab_runtime_check() {
     echo "a run script crashed during boot (raw './run: line N:' error in the app log)"
     return 1
   fi
-  docker logs "$app" 2>&1 | grep -qE "hd-idle command line: /usr/sbin/hd-idle -s 1 -c [a-z]+ -p [0-9]+ -i 0([^0-9]|$)" \
+  docker logs "$app" 2>&1 | grep -qE "hd-idle command line: /usr/sbin/hd-idle -s 1 -i 0([^0-9]|$)" \
     || {
       echo "the hd-idle command line does not pin the global idle to 0 (unlisted drives would be managed)"
       return 1
     }
+  ## Per-drive argv completeness: after each `-a <name>`, `-i` must follow; a non-zero idle must be followed by
+  ## `-c <scsi|ata> -p <0-15>` (exclusion entries - system disks - end after `-i 0`; there are no global
+  ## -c/-p defaults anymore). Every managed drive's argv is therefore fully explicit.
+  if ! docker exec -i "$app" sh -s <<'EOF'
+awk '
+  {
+    for (i = 1; i <= NF; i++) {
+      t = $i
+      if (t == "-a") {
+        mode = "want-name"
+        continue
+      }
+      if (mode == "") continue
+      if (mode == "want-name") {
+        mode = "want-i"
+      } else if (mode == "want-i") {
+        if (t != "-i") { bad = 1; exit }
+        mode = "idle"
+      } else if (mode == "idle") {
+        if (t !~ /^[0-9]+$/) { bad = 1; exit }
+        mode = (t == "0") ? "" : "want-c"
+      } else if (mode == "want-c") {
+        if (t != "-c") { bad = 1; exit }
+        mode = "ctype"
+      } else if (mode == "ctype") {
+        if (t != "scsi" && t != "ata") { bad = 1; exit }
+        mode = "want-p"
+      } else if (mode == "want-p") {
+        if (t != "-p") { bad = 1; exit }
+        mode = "pc"
+      } else if (mode == "pc") {
+        if (t !~ /^[0-9]+$/) { bad = 1; exit }
+        mode = ""
+      }
+    }
+  }
+  END { exit bad ? 1 : (mode == "" ? 0 : 1) }
+' /etc/hd-idle.args
+EOF
+  then
+    echo "   FAIL: the hd-idle argv is not fully explicit per drive (missing -i/-c/-p after an -a entry)"
+    return 1
+  fi
   echo "hd-idle up (process, /proc/diskstats, config dump, drive inventory OK)"
 
   lab_preflight
@@ -407,14 +450,27 @@ EOF
     return 0
   fi
 
-  ## Per-drive drive-PM override: the drives file carries the effective per-drive flag in a 4th column
-  ## (1 = treat, 0 = leave the drive's own power management alone); the fixture sets disable_drive_pm=no
-  ## on the FIRST drive so the override is exercised end to end (pm-flag 0, hd-idle-pmfix logs the skip).
+  ## Drives-file format: exclusion rows `<name> 0 - 0` (system disks; the command-type column is "-" because no
+  ## spin-down command is ever issued for them), drive rows `<name> <idle> <scsi|ata> <0|1>`. The 4-column check
+  ## below stays as the cheap structural probe; the shape check pins the per-row grammar.
   if ! docker exec "$app" sh -c "awk 'NF > 0 && NF != 4 { exit 1 }' /etc/hd-idle.drives"; then
     echo "   FAIL: /etc/hd-idle.drives lines are not 4 columns (pm-flag column missing)"
     return 1
   fi
+  if docker exec "$app" sh -c "grep -qvE '^[^ ]+ (0 - 0|[0-9]+ (scsi|ata) [01])\$' /etc/hd-idle.drives"; then
+    echo "   FAIL: unexpected drives-file row shape (exclusion rows '<name> 0 - 0', drive rows '<name> <idle> <scsi|ata> <0|1>')"
+    return 1
+  fi
+  ## Per-drive drive-PM toggle: the drives file carries the per-drive decision in a 4th column
+  ## (1 = treat, 0 = leave the drive's own power management alone); the fixture sets disable_drive_pm=false
+  ## on the FIRST drive so the off state is exercised end to end (pm-flag 0, hd-idle-pmfix logs the skip),
+  ## while the other drives carry no key at all (absent = enabled - pm-flag 1).
   pm_skip="${drives%%,*}"
+  pm_zero_count=$(docker exec "$app" sh -c "awk '\$3 != \"-\" && \$4 == 0' /etc/hd-idle.drives | wc -l")
+  if [ "$pm_zero_count" != "1" ]; then
+    echo "   FAIL: expected exactly one managed drive with pm-flag 0 (the override drive), got ${pm_zero_count}"
+    return 1
+  fi
   docker exec "$app" grep -qx "${pm_skip} .* 0" /etc/hd-idle.drives \
     || {
       echo "   FAIL: override drive ${pm_skip} has no pm-flag 0 in the drives file"

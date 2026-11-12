@@ -16,8 +16,8 @@
 #   system-used devices. Each included disk maps to its preferred /dev/disk/by-id path (usb-* > ata-*
 #   > wwn-*) and gets a 30 s idle (as in the lab fixture) so the daemon exercises its natural spindown
 #   path within the check window; the FIRST discovered drive additionally carries a per-drive drive-PM
-#   override (disable_drive_pm=no), exercised end to end (asserted in live_runtime_check). Without the
-#   variable, the repo's test options file (a safe no-op: no drives) is applied unchanged. A
+#   toggle in its off state (disable_drive_pm=false), exercised end to end (asserted in live_runtime_check).
+#   Without the variable, the repo's test options file (a safe no-op: no drives) is applied unchanged. A
 #   match-everything glob includes every labeled disk - choose it deliberately.
 # - LIVE_HDIDLE_DISKS_JSON (set by live_prepare): JSON object mapping the disks' kernel names to
 #   {label, device}; drives the per-drive assertions in live_runtime_check().
@@ -124,12 +124,12 @@ live_prepare() {
       '. + {($d): {label: $l, device: $dev}}' <<<"$disks_map")
   done
 
-  ## Per-drive drive-PM override: the FIRST discovered drive gets disable_drive_pm=no, exercised end
+  ## Per-drive drive-PM toggle: the FIRST discovered drive gets disable_drive_pm=false, exercised end
   ## to end on the device (hd-idle-pmfix must skip exactly that drive - asserted in
   ## live_runtime_check; the drives file is not reachable over SSH, HAOS ships no docker CLI).
   ## keys[0] == the first inserted (sorted) drive.
   pm_override_disk=$(jq -r 'keys[0]' <<<"$disks_map")
-  disks_json=$(jq -c '.[0].disable_drive_pm = "no"' <<<"$disks_json")
+  disks_json=$(jq -c '.[0].disable_drive_pm = false' <<<"$disks_json")
   disks_map=$(jq -c --arg d "$pm_override_disk" '.[$d].pm_override = true' <<<"$disks_map")
 
   tmpfile=$(mktemp "${TMPDIR:-/tmp}/hd-idle-live-options.XXXXXX")
@@ -235,7 +235,7 @@ live_runtime_check() {
               return 1
             fi
             if grep -qF "Drive ${pm_override_disk}: APM disable" <<<"$tail_log"; then
-              echo "   FAIL: the override drive ${pm_override_disk} received the drive-PM treatment despite disable_drive_pm=no" >&2
+              echo "   FAIL: the override drive ${pm_override_disk} received the drive-PM treatment despite disable_drive_pm=false" >&2
               return 1
             fi
             pm_skip_count=$(grep -cF "drive-PM treatment disabled for this drive" <<<"$tail_log" || true)

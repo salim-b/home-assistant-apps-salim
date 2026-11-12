@@ -276,31 +276,7 @@ fi
 ## Configuration (full generation only)
 ## ---------------------------------------------------------------------------
 
-DEFAULT_IDLE=$(bashio::config 'default_idle')
-DEFAULT_COMMAND=$(bashio::config 'default_command_type')
-DEFAULT_POWER=$(bashio::config 'default_power_condition')
 DISKS=$(bashio::config 'disks')
-
-## The global option is the DEFAULT for drives whose own disable_drive_pm field is empty (per-drive yes/no overrides
-## it); the EFFECTIVE flag is the drives file's pm-flag column, hd-idle-pmfix decides per drive from it
-## (hd-idle/KNOWLEDGE.md §"Drive-PM treatment").
-GLOBAL_PM=0
-if [ "$(bashio::config 'disable_drive_pm' true)" = "true" ]; then
-  GLOBAL_PM=1
-fi
-
-## Defense in depth: the supervisor schema already validates these; cheap re-checks keep a hand-edited options.json from producing a bogus argv.
-[[ "$DEFAULT_IDLE" =~ ^[0-9]+$ ]] \
-  || bashio::exit.nok "Invalid default idle time '${DEFAULT_IDLE}': must be a non-negative integer."
-case "$DEFAULT_COMMAND" in
-  scsi | ata) ;;
-  *)
-    bashio::exit.nok "Invalid default command type '${DEFAULT_COMMAND}': must be scsi or ata."
-    ;;
-esac
-if ! [[ "$DEFAULT_POWER" =~ ^[0-9]+$ ]] || [ "$DEFAULT_POWER" -gt 15 ]; then
-  bashio::exit.nok "Invalid default power condition '${DEFAULT_POWER}': must be 0-15."
-fi
 
 detect_system_disks
 
@@ -412,13 +388,15 @@ fi
 ## ---------------------------------------------------------------------------
 
 ## The global idle stays pinned to 0: unlisted drives (and runtime-appearing ones) are never touched - HAOS grants
-## device access per listed drive only. Every -a entry carries an explicit -i (per-drive idle, or default idle).
-ARGS=(-s 1 -c "$DEFAULT_COMMAND" -p "$DEFAULT_POWER" -i 0)
+## device access per listed drive only. Every drive entry carries explicit -i/-c/-p (its own settings; there are no
+## global defaults - the CLI's built-in defaults cover only what no entry reaches).
+ARGS=(-s 1 -i 0)
 
 DRIVES_LINES=()
-## System disks are exclusion entries (idle 0): never treatment targets, hence pm-flag 0.
+## System disks are exclusion entries (idle 0): never treatment targets, hence pm-flag 0; the command-type column is
+## "-" (no spin-down command is ever issued for them).
 for disk in "${SYSTEM_SD_DISKS[@]}"; do
-  DRIVES_LINES+=("${disk} 0 ${DEFAULT_COMMAND} 0")
+  DRIVES_LINES+=("${disk} 0 - 0")
 done
 
 for disk in "${SYSTEM_SD_DISKS[@]}"; do
@@ -449,13 +427,36 @@ while IFS= read -r disk; do
   require_space_free 'idle' "$IDLE"
   require_space_free 'command_type' "$COMMAND_TYPE"
   require_space_free 'power_condition' "$POWER_CONDITION"
-  ## Per-drive drive-PM override (yes/no), read with `// empty` like the other optional fields (string values); unknown values fall back to the global default.
-  PM_OVERRIDE=$(bashio::jq "$disk" '.disable_drive_pm // empty')
-  require_space_free 'disable_drive_pm' "$PM_OVERRIDE"
-  DRIVE_PM="$GLOBAL_PM"
-  case "$PM_OVERRIDE" in
-    yes) DRIVE_PM=1 ;;
-    no) DRIVE_PM=0 ;;
+  ## The supervisor schema marks idle/command_type/power_condition required, so an empty value here means a
+  ## hand-edited options.json. Defense in depth: cheap re-checks keep one from producing a bogus argv.
+  [ "$IDLE" != "" ] \
+    || bashio::exit.nok "Drive '${DEV}': missing idle time - every drive sets its own (0 = never spin down)."
+  [[ "$IDLE" =~ ^[0-9]+$ ]] \
+    || bashio::exit.nok "Drive '${DEV}': invalid idle time '${IDLE}': must be a non-negative integer."
+  [ "$COMMAND_TYPE" != "" ] \
+    || bashio::exit.nok "Drive '${DEV}': missing command type - every drive sets its own (scsi or ata)."
+  case "$COMMAND_TYPE" in
+    scsi | ata) ;;
+    *)
+      bashio::exit.nok "Drive '${DEV}': invalid command type '${COMMAND_TYPE}': must be scsi or ata."
+      ;;
+  esac
+  [ "$POWER_CONDITION" != "" ] \
+    || bashio::exit.nok "Drive '${DEV}': missing power condition - every drive sets its own (0-15)."
+  if ! [[ "$POWER_CONDITION" =~ ^[0-9]+$ ]] || [ "$POWER_CONDITION" -gt 15 ]; then
+    bashio::exit.nok "Drive '${DEV}': invalid power condition '${POWER_CONDITION}': must be 0-15."
+  fi
+  ## Per-drive drive-PM toggle (bool?), read WITHOUT `// empty`: jq folds an explicit false into "absent"
+  ## (root KNOWLEDGE.md §"bashio option consumption"). Absent (null) = the treatment default (enabled); the
+  ## supervisor coerces legacy yes/no dropdown strings to booleans before the app ever sees them.
+  PM=$(bashio::jq "$disk" '.disable_drive_pm')
+  require_space_free 'disable_drive_pm' "$PM"
+  case "$PM" in
+    true | null) DRIVE_PM=1 ;;
+    false) DRIVE_PM=0 ;;
+    *)
+      bashio::exit.nok "Drive '${DEV}': invalid disable_drive_pm value '${PM}': must be true, false, or unset."
+      ;;
   esac
   ## Partition selection grants cgroup access only for the partition node, while hd-idle opens the disk node.
   if [[ "$DEV" == *-part[0-9]* ]]; then
@@ -490,23 +491,14 @@ while IFS= read -r disk; do
     EMIT_NAME="$DEV"
   fi
 
-  ARGS+=(-a "$EMIT_NAME")
-  if [ "$IDLE" != "" ]; then
-    EFFECTIVE_IDLE="$IDLE"
-  else
-    EFFECTIVE_IDLE="$DEFAULT_IDLE"
+  if [ "$IDLE" = "0" ]; then
+    qlog_info "Drive ${DEV}: idle time 0 - never spun down (excluded)."
   fi
-  ARGS+=(-i "$EFFECTIVE_IDLE")
-  if [ "$COMMAND_TYPE" != "" ]; then
-    ARGS+=(-c "$COMMAND_TYPE")
-  fi
-  if [ "$POWER_CONDITION" != "" ]; then
-    ARGS+=(-p "$POWER_CONDITION")
-  fi
+  ARGS+=(-a "$EMIT_NAME" -i "$IDLE" -c "$COMMAND_TYPE" -p "$POWER_CONDITION")
 
-  ## Effective per-drive values for the drives-file line (format: hd-idle/KNOWLEDGE.md §"Drive-PM treatment");
-  ## the 4th column is the effective drive-PM treatment flag.
-  DRIVES_LINES+=("${EMIT_NAME} ${EFFECTIVE_IDLE} ${COMMAND_TYPE:-${DEFAULT_COMMAND}} ${DRIVE_PM}")
+  ## Per-drive values for the drives-file line (format: hd-idle/KNOWLEDGE.md §"Drive-PM treatment");
+  ## the 4th column is the drive-PM treatment flag.
+  DRIVES_LINES+=("${EMIT_NAME} ${IDLE} ${COMMAND_TYPE} ${DRIVE_PM}")
 done < <(echo "$DISKS")
 
 if [ "$N_DRIVES" -eq 0 ]; then

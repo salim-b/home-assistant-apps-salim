@@ -3,8 +3,8 @@
 set -euo pipefail
 
 ## Disable the drives' own power management (APM level + internal standby timer) - the app's drive-PM treatment
-## (global disable_drive_pm as the default, per-drive yes/no overrides; the drives file's pm-flag column carries the
-## effective per-drive decision). Why, per-bridge reality, volatility, the same-kernel-name gap:
+## (the per-drive disable_drive_pm toggle decides; entries saved without it behave as enabled; the drives file's
+## pm-flag column carries the per-drive decision). Why, per-bridge reality, volatility, the same-kernel-name gap:
 ## hd-idle/KNOWLEDGE.md §"Drive-PM treatment"; user-facing behavior: DOCS.md.
 ##
 ## Usage: hd-idle-pmfix <drives-file> [--since <old-drives-file>]

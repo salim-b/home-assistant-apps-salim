@@ -13,10 +13,10 @@ only these drives are listed, so no other disk of the lab host is ever touched.
 
 
 def lab_adapt_fixture(options: dict[str, object]) -> dict[str, object]:
-    """Adapt the lab options: list the smoke-test drives, first one with disable_drive_pm=no.
+    """Adapt the lab options: list the smoke-test drives, first one with disable_drive_pm=false.
 
     The drives come from LAB_SPINDOWN_DRIVES (comma-separated kernel names); the first drive
-    carries the per-drive override so the pm-flag skip path is exercised end to end.
+    carries the per-drive toggle in its off state so the pm-flag skip path is exercised end to end.
     """
     import os
 
@@ -30,10 +30,10 @@ def lab_adapt_fixture(options: dict[str, object]) -> dict[str, object]:
         {"device": d, "idle": 30, "command_type": "scsi", "power_condition": 0}
         for d in drives
     ]
-    ## The FIRST drive carries a per-drive override (disable_drive_pm=no) so the override is
-    ## exercised end to end: pm-flag 0 in the drives file, hd-idle-pmfix logs the skip (asserted
-    ## by the lab hook); all other drives inherit the global default (pm-flag 1).
+    ## The FIRST drive carries disable_drive_pm=false so the treatment-off state is exercised end to
+    ## end: pm-flag 0 in the drives file, hd-idle-pmfix logs the skip (asserted by the lab hook); all
+    ## other drives carry no key at all - absent = enabled (pm-flag 1, the default).
     if entries:
-        entries[0]["disable_drive_pm"] = "no"
+        entries[0]["disable_drive_pm"] = False
     adapted["disks"] = entries
     return adapted

@@ -19,65 +19,35 @@ configuration:
           Spin the drive down after this many seconds without I/O activity.
           `0` never spins the drive down (excludes the drive).
 
-          An empty value uses the default idle time.
-
           Tip: manufacturers recommend at least 3-5 minutes - short idle
           times wear drives out faster.
       command_type:
         name: Command type
         description: >-
-          How the spin-down command is sent. `scsi` (default) works for
-          drives behind a SCSI translation layer - typically all USB drives.
-          `ata` is the native ATA command, needed for SATA drives and some
-          USB bridges. If a USB drive refuses to spin down with `scsi`, try
-          `ata`. An empty value uses the default command type.
+          How the spin-down command is sent. `scsi` works for drives behind
+          a SCSI translation layer - typically all USB drives. `ata` is the
+          native ATA command, needed for SATA drives and some USB bridges.
+          If a USB drive refuses to spin down with `scsi`, try `ata`.
       power_condition:
         name: Power condition
         description: >-
           Value sent with the SCSI spin-down command (`0`-`15`). `0` is
           right for nearly all drives. Only real SCSI/SAS drives need other
-          values. An empty value uses the default power condition.
+          values.
       disable_drive_pm:
         name: Disable drive power management
         description: >-
-          Per-drive override of the global "Disable drive power management"
-          setting: `yes` disables this drive's own power management (the
-          Advanced Power Management (APM) level and the built-in standby
-          timer, see the global setting for why), `no` keeps the drive's
-          own power management. An empty value follows the global setting.
-          Note: switching this off (here or globally) does not re-enable
-          the drive's power management right away - settings applied
-          earlier are volatile but persist until the drive is power-cycled.
-  default_idle:
-    name: Default idle time (seconds)
-    description: >-
-      Idle time for drive entries whose own idle field is left empty. `0`
-      never spins such drives down. Applies to listed drives only - unlisted
-      drives are never spun down.
-  default_command_type:
-    name: Default command type
-    description: >-
-      Command type for drives without their own setting. See the per-drive
-      command type for details.
-  default_power_condition:
-    name: Default power condition
-    description: >-
-      Power condition for drives without their own setting. See the
-      per-drive power condition for details.
-  disable_drive_pm:
-    name: Disable drive power management
-    description: >-
-      Drives - and some USB bridges - run their own power management and
-      can spin themselves up again shortly after a spin-down, invisibly to
-      this app. When enabled, the app disables every managed drive's own
-      power management (the Advanced Power Management (APM) level and the
-      built-in standby timer), so only the configured idle time puts drives
-      to sleep. The settings are volatile: they are re-applied at app start
-      and whenever a drive (re)appears. A drive or bridge that does not
-      support one of the commands logs a one-time failure - harmless.
-      Individual drives can override this setting with their own Disable
-      drive power management field in the drive list; drives without their
-      own setting follow this one.
+          When enabled, the app disables this drive's own power management
+          (the Advanced Power Management (APM) level and the built-in
+          standby timer), so only the configured idle time puts the drive
+          to sleep - some drives and USB bridges otherwise wake themselves
+          up again shortly after a spin-down, invisibly to this app.
+          Enabled by default: a drive entry saved without touching this
+          switch behaves as enabled. Switch it off only for drives that
+          must keep their own power management. Note: switching this off
+          does not re-enable the drive's power management right away -
+          settings applied earlier are volatile but persist until the drive
+          is power-cycled.
   debug:
     name: Debug mode
     description: >-

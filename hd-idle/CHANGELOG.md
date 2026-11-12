@@ -2,6 +2,23 @@
 
 # Changelog
 
+## 0.2.0
+
+- Breaking: per-drive spin-down settings are now required and the global defaults are gone. Every drive entry must set
+  its own idle time, command type and power condition (the options UI marks all three as required); the Default idle
+  time, Default command type and Default power condition options are removed. Existing installations must re-save the
+  drive list with these values set: until then the app refuses to start (the supervisor names the missing options), and
+  with automatic updates enabled the update itself is held back until the configuration matches the new schema - open
+  the app's settings on the still-running old version, set the values per drive, save, and the next update proceeds.
+- Change: the global Disable drive power management option is removed; the per-drive switch (now a real boolean toggle
+  instead of the yes/no dropdown) decides per drive, and a drive entry saved without touching the switch behaves as
+  enabled - the former default. If you had the global setting switched off, switch it off for each drive that must keep
+  its own power management. Stored yes/no dropdown values convert automatically (yes → on, no → off).
+- Internals: the generated command line no longer sets global command-type/-power-condition defaults (every drive entry
+  carries its own), so the hd-idle -t single-shot path now uses hd-idle's built-in defaults (scsi, power condition 0 -
+  the same values the app used to set). System-disk exclusion rows in the internal drives file use `-` as their
+  command-type placeholder (no spin-down command is ever issued for them).
+
 ## 0.1.15
 
 - The startup drive inventory now also shows the label of each drive's first labeled partition (filesystem label
