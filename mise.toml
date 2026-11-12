@@ -76,7 +76,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
     trust_policy_excludes = [ "@yarnpkg/libzip@3.2.2" ],
     allow_builds = [ "re2" ]
   }
-  node = "26.13.0"
+  node = "26.13.1"
 
 [vars]
   # Single source of the supervisor-ref pin the validate task fetches schemas from. Renovate bumps it
