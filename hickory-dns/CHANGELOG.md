@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.3.2
+
+- Maintainability: no behavior change – the `apparmor.txt` capability comment points at its canonical knowledge sections
+  instead of restating them, and §-citations in `apparmor.txt`, the s6 run script and the generator are re-wrapped so
+  section names stay on one line (a wrap splits the quoted name and breaks greppability).
+
 ## 0.3.1
 
 - Updated the bundled hickory-dns from 0.26.1-r0 to 0.26.3-r0 ([upstream release

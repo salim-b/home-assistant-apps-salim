@@ -6,9 +6,10 @@ set -euo pipefail
 ## hickory-dns/KNOWLEDGE.md §"Config-file and data layout"). `exec` makes the daemon this service's process, so
 ## s6 signals it directly on stop and its stdout lands in the app log.
 ##
-## The daemon NEVER runs as root: the launcher drops to nobody (65534) before the exec, handing down exactly the
-## ambient CAP_NET_BIND_SERVICE the :53 bind needs - mechanics and why: hickory-dns/KNOWLEDGE.md §"Port 53
-## binding and privileges" (the busybox setpriv applet has no --reuid; /bin/setpriv is the util-linux package).
+## The daemon NEVER runs as root: the launcher drops to nobody (65534) before the exec, handing down exactly
+## the ambient CAP_NET_BIND_SERVICE the :53 bind needs - mechanics and why:
+## hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges"
+## (the busybox setpriv applet has no --reuid; /bin/setpriv is the util-linux package).
 ##
 ## Fail with a clear message (s6 restarts this service) instead of bash's raw redirect error if config.sh did
 ## not finish.

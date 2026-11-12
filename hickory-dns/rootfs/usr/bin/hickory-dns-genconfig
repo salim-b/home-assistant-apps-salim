@@ -278,8 +278,8 @@ directory = \"${ZONES_DIR}\"
 NETS=""
 V4_LOOPBACK=0
 V6_LOOPBACK=0
-## bashio option-consumption idioms (raw lines, no trailing newline): repository-root KNOWLEDGE.md §"bashio option
-## consumption".
+## bashio option-consumption idioms (raw lines, no trailing newline):
+## repository-root KNOWLEDGE.md §"bashio option consumption".
 NETS_RAW=$(bashio::config 'allow_networks')
 while IFS= read -r cidr; do
   [ "$cidr" != "" ] || continue
