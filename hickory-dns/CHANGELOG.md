@@ -4,8 +4,7 @@
 
 ## 0.3.1
 
-- Internals: bumped the pinned hickory-dns package from 0.26.1-r0 to 0.26.3-r0 (Alpine package update; see the
-  repository-root `KNOWLEDGE.md` apk package version policy).
+- Updated hickory-dns from 0.26.1-r0 to 0.26.3-r0.
 
 ## 0.3.0
 
