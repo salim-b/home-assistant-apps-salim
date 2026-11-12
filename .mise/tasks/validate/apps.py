@@ -265,7 +265,7 @@ def main() -> int:
                 if fields and not is_list_of_objects:
                     fail(
                         app,
-                        f"translations[{lang}].configuration.{opt} has fields but schema entry is not a list-of-objects",
+                        f"translations[{lang}].configuration.{opt} has fields but schema is not a list-of-objects",
                     )
                 if not fields and is_list_of_objects:
                     fail(

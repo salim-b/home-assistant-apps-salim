@@ -23,11 +23,13 @@
   # Security: S307 marks the deliberate eval() sites (the `# noqa: S307` comments in
   # validate/apps.py go live with it); S603/S607/S310 keep the subprocess and URL surfaces
   # audited (inline noqa with reasons where intentional). Exception messages: EM + TRY.
-  # pathlib idioms: PTH. noqa hygiene: RUF100 + PGH004.
+  # pathlib idioms: PTH. noqa hygiene: RUF100 + PGH004. E501 is the outer fence for what the
+  # formatter cannot split (long strings) and for prose - see [lint.pycodestyle] below.
   select = [
     "E4",
     "E7",
     "E9",
+    "E501",
     "F",
     "I",
     "B",
@@ -50,3 +52,9 @@
     "RUF100",
     "PGH004",
   ]
+
+  [lint.pycodestyle]
+    # align prose width with our Markdown docs (panache wraps Markdown at 120). The formatter
+    # still wraps code at the 88-column default, so E501 only bites what the formatter cannot
+    # split plus over-long prose.
+    max-line-length = 120

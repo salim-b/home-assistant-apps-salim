@@ -104,9 +104,10 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   drift (ruff's own default applies). Note that UP is target-sensitive in the other direction: once ruff's default
   target crosses py314, its safe autofix will drop the no-longer-needed `from __future__ import annotations` imports.
 - ruff does not read `.editorconfig`; its formatter defaults (4-space indent, double quotes, 88 columns) match this
-  repo's Python style. Both builtins pass `--force-exclude`, so config excludes apply even to hk's explicit file
-  arguments, and ruff resolves the config by walking up from each target file — the root `.ruff.toml` covers every task
-  script.
+  repo's Python style. E501 is the outer fence at 120 columns (`.ruff.toml` `[lint.pycodestyle]`, panache's prose width)
+  for what the formatter cannot split. Both builtins pass `--force-exclude`, so config excludes apply even to hk's
+  explicit file arguments, and ruff resolves the config by walking up from each target file — the root `.ruff.toml`
+  covers every task script.
 - The `#MISE`/`#USAGE` task directives sit inside `# fmt: off`/`# fmt: on` markers in every task script: ruff format
   normalizes `#MISE` comment spacing (no comment-prefix exclusion exists) and must not touch them. mise's parser
   tolerates the spaced form (its prefix regexes match with `\s*` tolerance, unlike the usage crate's strict `#USAGE`
