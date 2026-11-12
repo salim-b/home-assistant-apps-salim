@@ -1,0 +1,9 @@
+#:schema https://www.schemastore.org/ty.json
+
+# ty configuration - Python type checker for the .mise/tasks scripts, run by the hk ty builtin
+# (selects **/*.py + **/*.pyi, `ty check`). Conventions: .agents/skills/ha-app-tooling
+
+# No [environment] pin: the scripts' runtimes are the mise python (stdlib-only scripts) and uv's
+# ephemeral `--with` env (validate/apps.py) - neither is a repo-managed venv ty could resolve
+# against, so third-party imports are suppressed inline (`# ty: ignore[import-not-found]`) at
+# their import sites instead of being configured away globally.

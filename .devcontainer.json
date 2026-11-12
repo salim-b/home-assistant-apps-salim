@@ -18,7 +18,7 @@
   },
   "customizations": {
     "vscode": {
-      "extensions": ["charliermarsh.ruff", "esbenp.prettier-vscode", "mkhl.shfmt", "timonwong.shellcheck"],
+      "extensions": ["astral-sh.ty", "charliermarsh.ruff", "esbenp.prettier-vscode", "mkhl.shfmt", "timonwong.shellcheck"],
       "settings": {
         "terminal.integrated.profiles.linux": {
           "zsh": {

@@ -105,6 +105,12 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   `target-version` stays unpinned: nothing couples it to the `python` mise.toml pin, so a pin would drift (ruff's own
   default applies). Note that UP is target-sensitive in the other direction: once ruff's default target crosses py314,
   its safe autofix will drop the no-longer-needed `from __future__ import annotations` imports.
+- Type checking runs via the hk builtin `ty` (pinned as `ty` in mise.toml, config `ty.toml`, `#:schema`-bound) after
+  ruff: `ty check` over `**/*.py`/`**/*.pyi`. The scripts have no repo-managed Python environment - stdlib-only scripts
+  run on the mise python, `validate/apps.py` runs under `uv run --with voluptuous --with pyyaml` - so ty cannot resolve
+  third-party imports; suppress those inline (`# ty: ignore[import-not-found] - reason`), never by disabling the rule in
+  config (the comment form keeps other same-line diagnostics live, and a config-wide ignore would pass a typo'd import
+  anywhere).
 - Docstrings (D, google convention) and annotations (ANN) are committed regimes: a docstring's first line is the summary
   (ends with a period), then a blank line before the body, and parameter names must appear in the text (ruff's D417
   checks name presence, not section structure). Every function gets full annotations; dynamic dicts (lab-option

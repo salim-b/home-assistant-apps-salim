@@ -30,8 +30,8 @@ import sys
 import tempfile
 import urllib.request
 
-import voluptuous
-import yaml
+import voluptuous  # ty: ignore[import-not-found] - uv-run --with dep, no repo venv for ty
+import yaml  # ty: ignore[import-not-found] - uv-run --with dep, no repo venv for ty
 
 ROOT = pathlib.Path(os.environ.get("MISE_PROJECT_ROOT", "."))
 

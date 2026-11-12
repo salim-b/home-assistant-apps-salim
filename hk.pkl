@@ -131,6 +131,8 @@ local linters = new Mapping<String, Step> {
   // ruff (Python linter + formatter, hk builtins; config: .ruff.toml): formatter before linter.
   ["ruff-format"] = Builtins.ruff_format
   ["ruff"] = Builtins.ruff
+  // ty (Python type checker, hk builtin; config: ty.toml) - runs after ruff on the same files.
+  ["ty"] = Builtins.ty
   // Panache owns ALL Markdown formatting (.agents/skills/ha-app-markdown, .panache.toml); explicit
   // paths bypass panache's config excludes, hence mdExcludes.
   ["panache-format"] {
