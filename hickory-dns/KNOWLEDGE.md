@@ -7,15 +7,15 @@ skill `hickory-dns-runtime`).
 ## Generated named.toml
 
 The cont-init generator (`rootfs/usr/bin/hickory-dns-genconfig`) emits `/data/named.toml` from the app options. Ground
-truth (verified against v0.26.3 AND v0.26.1 source - the dev pin must parse the same config):
+truth (verified against v0.26.3 AND v0.26.1 source – the dev pin must parse the same config):
 
 - Top-level keys (`bin/src/config/mod.rs`): `listen_addrs_ipv4`/`listen_addrs_ipv6` (lists of IPs), `listen_port` (u16),
   `directory` (zone-file root, default `/var/named`), `allow_networks`/`deny_networks` (lists of CIDR strings), `zones`
-  (array of tables), `drop_privileges` (**added in 0.26.2** - NOT emitted by this app, see §"Port 53 binding and
-  privileges"). `deny_unknown_fields` everywhere: a typo is a hard startup error - which the generator turns into a boot
+  (array of tables), `drop_privileges` (**added in 0.26.2** – NOT emitted by this app, see §"Port 53 binding and
+  privileges"). `deny_unknown_fields` everywhere: a typo is a hard startup error – which the generator turns into a boot
   failure with a logged message (`--validate` gate).
 - **TOML ordering rule**: every top-level key must precede the first `[[zones]]` header (bare keys after one would land
-  inside it), and every `[[zones]]` header must precede the forward zone's stores sub-tables - dotted sub-table headers
+  inside it), and every `[[zones]]` header must precede the forward zone's stores sub-tables – dotted sub-table headers
   (`[[zones.stores.name_servers]]`) implicitly define their parent tables, so emitting one before `[[zones]]` makes
   `zones` a plain table that cannot be redefined as an array afterwards (TOML "table cannot be redefined" error). The
   generator therefore assembles in this order: top-level keys, default zones, static zones, forward-zone header,
@@ -23,20 +23,20 @@ truth (verified against v0.26.3 AND v0.26.1 source - the dev pin must parse the 
 - Zone structure: Primary zones use a flat `file = "<relative path>"` key, which the deserializer turns into a file
   store (`bin/src/config/mod.rs` `ZoneConfigWithFile`; paths are relative to `directory`). Default zones: `localhost`,
   `0.0.127.in-addr.arpa`, the 31-label `0.0.0...ip6.arpa` reverse zone, `255.in-addr.arpa`, `0.in-addr.arpa`, and the
-  RFC 6303 private-use set - `10.in-addr.arpa`, `16.172.in-addr.arpa` through `31.172.in-addr.arpa`,
+  RFC 6303 private-use set – `10.in-addr.arpa`, `16.172.in-addr.arpa` through `31.172.in-addr.arpa`,
   `168.192.in-addr.arpa`, `d.f.ip6.arpa`, `8.e.f.ip6.arpa` (reverse queries for private address space never reach the
   upstream path, where public resolvers answer with synthesized, proof-less NXDOMAINs the DNSSEC validator must reject).
   Shipped under `rootfs/etc/hickory-dns/zones/default/`: `localhost.zone`, `127.0.0.1.zone` and `ipv6_1.zone` carry
   their zones' records and stay verbatim copies of the upstream test-data `default/*.zone` files (the apk installs those
   to `/usr/share/doc/hickory-dns/examples/default/`, a doc-dir layout the image does not couple to); every other default
-  zone is empty (SOA + NS only) and shares ONE origin-relative template file, `empty.zone` - zone identity comes from
+  zone is empty (SOA + NS only) and shares ONE origin-relative template file, `empty.zone` – zone identity comes from
   the named.toml `zone` key, so a single file serves all 22 empty zones (one shared file verified against the pinned
   0.26.1 `--validate`).
 - Forward store (`crates/server/src/store/forwarder.rs` `ForwardConfig`, deny_unknown_fields): `name_servers` (required
   Vec) + `options` (optional table). One `[[zones.stores.name_servers]]` block per configured upstream
   (`crates/resolver/src/config.rs`); per-connection field semantics (which field means what, defaults, the h3 gap) live
   in §"Upstream option model". TOML-shape facts:
-  - `trust_negative_responses` (optional bool, default **true**) - the generator emits **false**: with two potentially
+  - `trust_negative_responses` (optional bool, default **true**) – the generator emits **false**: with two potentially
     different upstream providers, an NXDOMAIN from the first is retried against the second instead of being trusted
     (resilience over latency).
   - `connections`: list of `{ port = <u16>, protocol = { ... } }` tables. `port` is a SIBLING key emitted only when
@@ -49,38 +49,38 @@ truth (verified against v0.26.3 AND v0.26.1 source - the dev pin must parse the 
   `timeout = 5`, `attempts = 2`, `num_concurrent_reqs = 1`, `server_ordering_strategy = "UserProvidedOrder"` (makes the
   upstreams option order the failover priority; the default `QueryStatistics` adaptive ordering would silently reorder),
   `positive_max_ttl = 3600`, `negative_max_ttl = 3600`, `edns_payload_len = 1232` (avoids UDP fragmentation on tunneled
-  paths), `cache_size = 8192`, and `validate = <dnssec option>` (DNSSEC validation; the root KSKs - KSK-2017 tag 20326,
-  KSK-2024 tag 38696 - are embedded via `TrustAnchors::default()`, no anchor file needed). Enum VALUES in the generated
+  paths), `cache_size = 8192`, and `validate = <dnssec option>` (DNSSEC validation; the root KSKs – KSK-2017 tag 20326,
+  KSK-2024 tag 38696 – are embedded via `TrustAnchors::default()`, no anchor file needed). Enum VALUES in the generated
   TOML are the Rust variant names verbatim (`ServerOrderingStrategy` has no `rename_all`; the lab's real `--validate`
   rejected a snake_case value that hand-written prose had slipped in).
 - Device-verified DNSSEC behavior (2026-10-24, 0.26.1, AppArmor-enforcing device): fresh DO-flagged queries come back
-  validated - positives with AD + RRSIG, negatives with AD + NSEC/NSEC3 + RRSIG, bogus data (dnssec-failed.org)
-  SERVFAILs. Unsigned zones correctly carry NO AD (e.g. wikipedia.org has no DNSKEY - the live hook's AD check uses
+  validated – positives with AD + RRSIG, negatives with AD + NSEC/NSEC3 + RRSIG, bogus data (dnssec-failed.org)
+  SERVFAILs. Unsigned zones correctly carry NO AD (e.g. wikipedia.org has no DNSKEY – the live hook's AD check uses
   `www.ietf.org`).
 - ACL semantics (`crates/server/src/access.rs`, verified): allow-only configuration denies every other client; **empty
-  allow AND deny lists = allow all** - the generator emits `allow_networks = []` when the option is cleared (with a
+  allow AND deny lists = allow all** – the generator emits `allow_networks = []` when the option is cleared (with a
   warning). The ACL is server-wide (no per-zone recursion control). Loopback (127.0.0.0/8, ::1/128) is always served:
   the generator appends missing entries to a configured ACL (the healthcheck probes from 127.0.0.1).
 
 ## Upstream option model
 
-Each `upstreams` entry is a structured object: `protocol` (`tls`/`quic`/`https` - the serde ProtocolConfig type values
+Each `upstreams` entry is a structured object: `protocol` (`tls`/`quic`/`https` – the serde ProtocolConfig type values
 verbatim; a single-value `list(...)` select in the option schema, repository-root KNOWLEDGE.md §"Supervisor: option
 schema quirks"; plaintext upstreams are NOT offered), `host`, `ip`, `port`, `path`. Generator-enforced field rules:
-`host` is the TLS server name (mandatory for every protocol - nothing to derive it from a bare IP) and doubles as the
+`host` is the TLS server name (mandatory for every protocol – nothing to derive it from a bare IP) and doubles as the
 resolution source when `ip` is empty; `ip` is the connect target (validated literal, never resolved by the daemon);
 `port` defaults 853 (tls/quic) / 443 (https) and is emitted only when set (the serde protocol-default applies
 otherwise); `path` is https-only (default `/dns-query`, no serde default, leading slash normalized) and rejected on the
-other protocols - silent ignoring would misconfigure. `protocol = h3` (the serde H3 type) is rejected with a pointed
+other protocols – silent ignoring would misconfigure. `protocol = h3` (the serde H3 type) is rejected with a pointed
 error until the packaged binary grows the h3 feature (§"Deferred feature ground truth (upstream gaps)"). The shipped
-defaults are Quad9's anycast IPs with the pinned TLS name `dns.quad9.net` - pure-IP connect targets need no boot-time
+defaults are Quad9's anycast IPs with the pinned TLS name `dns.quad9.net` – pure-IP connect targets need no boot-time
 name resolution (no chicken-and-egg).
 
 Hostname upstreams are resolved once at generation time via the shipped `resolve` CLI from hickory-dns-utils
 (`resolve --system -t A|AAAA <name>` against `/etc/resolv.conf` = the supervisor's DNS forwarder). The CLI has no
-timeout of its own - each lookup is bounded by `timeout 10` so a wedged system resolver cannot stall the boot (and with
+timeout of its own – each lookup is bounded by `timeout 10` so a wedged system resolver cannot stall the boot (and with
 it cont-init). Answer lines are `\t<name> <ttl> <class> <type> <rdata>`; the generator picks the first record of the
-wanted type (CNAME chains skipped) and accepts only a structurally valid address - fresh or from the last-known-good
+wanted type (CNAME chains skipped) and accepts only a structurally valid address – fresh or from the last-known-good
 cache `/data/hickory-dns.upstreams.cache` (`name ip` lines, corrupt address fields skipped). Fresh-first, then the
 cache: upstream address changes are picked up automatically and a resolution outage at boot degrades to the cached
 address instead of failing.
@@ -95,7 +95,7 @@ in depth).
 
 ## Generator regression sandbox
 
-The generator is regression-tested offline in a disposable sandbox (`/tmp/hickory-test/`, recreated per session - the
+The generator is regression-tested offline in a disposable sandbox (`/tmp/hickory-test/`, recreated per session – the
 lab covers the real-image path instead). The procedure (copy adaptation, bashio/resolve stubs, scenario matrix) is a
 skill: `hickory-dns-runtime` §"Offline regression sandbox"; the stubs replicate the option-consumption mechanics
 (repository-root `KNOWLEDGE.md` §"bashio option consumption").
@@ -107,10 +107,10 @@ The server binary has NO hosts-file store (store types: file/in_memory/sqlite/fo
 hosts-format support is 0.0.0.0-sinkhole-only). Each static entry therefore becomes its own authoritative **Primary leaf
 zone** (SOA + NS + A/AAAA at the apex, `$ORIGIN <name>.`, TTL 300) written to
 `/etc/hickory-dns/zones/static/NN_<slug>.zone` at every boot and referenced from named.toml, plus a matching reverse
-leaf zone (`NN_<slug>.ptr.zone`, SOA + NS + PTR to the hostname at the apex) named after the address - reversed octets
+leaf zone (`NN_<slug>.ptr.zone`, SOA + NS + PTR to the hostname at the apex) named after the address – reversed octets
 for IPv4, the full 32-nibble name for IPv6 (IPv4-embedded tail groups supported). Entries sharing one address share one
 reverse zone with one PTR per name, and a reverse zone name colliding with another static zone is a boot-time rejection.
-The catalog answers the most specific zone first, so leaf zones win over the `.` forward zone - including public names -
+The catalog answers the most specific zone first, so leaf zones win over the `.` forward zone – including public names -
 and a reverse leaf zone wins over its RFC 6303 parent empty zone. Generator-side validation: lowercase + trailing-dot
 normalization, LDH hostname check, IP check, duplicate (case-insensitive) and default-zone-shadow rejection,
 single-label warning. Caveats: unconfigured query types get authoritative NODATA/NXDOMAIN, and local answers carry no AD
@@ -119,9 +119,9 @@ bit (they are authoritative, not validated). The zone-file content itself is val
 
 ## Response cache behavior (memory)
 
-The resolver's response cache is a pure in-memory LRU (`moka`, capacity = `cache_size` entries - an entry count, NOT
+The resolver's response cache is a pure in-memory LRU (`moka`, capacity = `cache_size` entries – an entry count, NOT
 bytes; upstream default 8192) with TTL expiry. No disk persistence exists in the resolver path (verified: a filled
-0.26.1 container leaves no cache files on disk - only the generator's upstream host-address cache is persisted,
+0.26.1 container leaves no cache files on disk – only the generator's upstream host-address cache is persisted,
 §"Config-file and data layout"). The cache stores full deserialized DNS `Message` objects
 (`crates/resolver/src/cache.rs`, `moka::sync::Cache<Query, Entry>`), so per-entry size follows the stored wire content.
 Empirical memory measurements (0.26.1 apk, dev-host containers, RSS delta at steady state after filling):
@@ -129,18 +129,18 @@ Empirical memory measurements (0.26.1 apk, dev-host containers, RSS delta at ste
 - Synthetic single-A mix (90% single-A + 10% 5-CNAME/5-A CDN-chain responses), 20000 entries, cache 65536: +28.7 MB =
   **1.43 kB/entry**.
 - Real-world top-20k domains over DoT (`validate = false`), ~19962 successful responses, cache 65536: +43.1 MB = **2.16
-  kB/entry** - real-world entries are ~50% larger than the synthetic mix (CNAME chains, multi-A answers).
-- Same 20k domains with `validate = true` (DNSSEC): +56.0 MB = **2.84 kB/entry** - the +0.7 kB/entry over the
+  kB/entry** – real-world entries are ~50% larger than the synthetic mix (CNAME chains, multi-A answers).
+- Same 20k domains with `validate = true` (DNSSEC): +56.0 MB = **2.84 kB/entry** – the +0.7 kB/entry over the
   non-validating arm is cached DNSKEY/DS chain-of-trust material, NOT answer RRSIGs (cache hits replay RRSIG-free: a
   DO-flagged query of a cached name returned zero RRSIGs; validation artifacts live in separate cache entries).
 - **The LRU bound works**: 20000 queries against the 8192-entry default (2.4x capacity) plateau at +13.9 MB RSS = 1.69
-  kB/entry (synthetic mix) - the daemon evicts to capacity, so steady-state memory is bounded by
+  kB/entry (synthetic mix) – the daemon evicts to capacity, so steady-state memory is bounded by
   `cache_size × per-entry cost`, never by query volume.
 - TTL expiry is the second bound: entries live at most `positive_max_ttl`/`negative_max_ttl` (generator pin: 3600 s,
   §"Generated named.toml").
 
 Consequence: at home scale the 8192-entry default costs ~14 MB (synthetic mix) to ~23 MB worst case (8192 × 2.84 kB,
-signed real-world) - negligible against 2 GB+ HAOS devices, and the TTL caps bound the useful depth anyway (a
+signed real-world) – negligible against 2 GB+ HAOS devices, and the TTL caps bound the useful depth anyway (a
 household's unique names asked within one hour stay well below 8192; an eviction's only cost is one extra upstream
 query). Larger capacities only pay off when >8192 distinct names are asked within a single TTL window.
 
@@ -149,13 +149,13 @@ query). Larger capacities only pay off when >8192 distinct names are asked withi
 Verified against v0.26.3 source; revisit when a tagged release + the apk carry the features (hickory-dns/TODO.md).
 
 - **Blocklist store**: upstream has a `blocklist` store (compiled into the apk: the `_cargo_opts_bin` feature list
-  includes `blocklist`; plain domain lists and `0.0.0.0 <domain>` hosts lines only - no other hosts-file flavors). Local
-  files are read once at startup with NO hot reload (upstream issue #3460 - restart the app to refresh); non-address
+  includes `blocklist`; plain domain lists and `0.0.0.0 <domain>` hosts lines only – no other hosts-file flavors). Local
+  files are read once at startup with NO hot reload (upstream issue #3460 – restart the app to refresh); non-address
   query types sink to a forged sinkhole A/AAAA (sinkhole_ipv4 defaults 0.0.0.0); absolute file paths are allowed since
   0.26.2 (PR #3864). Design sketch when pursued: download list URLs in cont-init into `/data` (curl), chain a
   `[[zones.stores]] type = "blocklist"` ahead of the forward store.
 - **DoH3 upstreams**: the bin `h3-aws-lc-rs`/`h3-ring` features are merged upstream (PRs #3993/#3994, 2026-09-25) but
-  NOT in any tagged release, so no apk can ship them (the aports feature list - §"apk package pins and CA trust" - has
+  NOT in any tagged release, so no apk can ship them (the aports feature list – §"apk package pins and CA trust" – has
   no h3 either). The generator already rejects `protocol = h3` with a pointed error; the H3 protocol table also needs
   `path`, like https (`crates/resolver/src/config.rs` `ProtocolConfig::H3`).
 - **SPKI pinning for configured upstreams**: there is NO config surface for it. Upstream connection config is `ip` +
@@ -163,37 +163,37 @@ Verified against v0.26.3 source; revisit when a tagged release + the apk carry t
   TLS verification is fixed to rustls-platform-verifier / webpki-roots (`crates/net/src/tls.rs` `client_config()`), and
   the only SPKI-adjacent code is TLSA record parsing (`crates/proto/src/rr/rdata/tlsa.rs`), not wired into upstream
   validation. A genuine gap for the app's threat model (a mis-issued CA could impersonate `dns.quad9.net`) and not
-  patchable into the apk binary - needs an upstream feature request, then an app option.
+  patchable into the apk binary – needs an upstream feature request, then an app option.
 
 ## Port 53 binding and privileges
 
-- **Host network + port 53**: the daemon binds DNS port 53 in the HOST network namespace (`host_network: true` - the
+- **Host network + port 53**: the daemon binds DNS port 53 in the HOST network namespace (`host_network: true` – the
   AdGuard Home/Pi-hole precedent). The HAOS host itself binds nothing on 53 (systemd-resolved runs with
   DNSStubListener=no). No `privileged:` entry is needed: the launcher's capabilities come from the Docker default set,
   none is on the supervisor's high-risk rating list, and none is in `REDUCED_CAPABILITIES_DROP` (repository-root
   KNOWLEDGE.md §"Supervisor: app security rating").
 - **Source IPs stay intact** under `host_network`: LAN clients connect to the host's :53 directly, so the ACL sees the
-  real client addresses - port *publishing* would DNAT/conntrack them into host-local ones and defeat per-network
+  real client addresses – port *publishing* would DNAT/conntrack them into host-local ones and defeat per-network
   allow/deny.
 - **Never-root launcher**: the s6 run script execs the daemon as `nobody:nobody` (65534/65534, Alpine baselayout) via
-  util-linux `setpriv` (`/bin/setpriv`, apk `setpriv` - floats per the apk policy; the busybox applet has no `--reuid`
+  util-linux `setpriv` (`/bin/setpriv`, apk `setpriv` – floats per the apk policy; the busybox applet has no `--reuid`
   and is replaced by the package):
   `--no-new-privs --reuid 65534 --regid 65534 --clear-groups --inh-caps=+net_bind_service --ambient-caps=+net_bind_service`.
-  The daemon's credential set is exactly ONE capability - ambient `CAP_NET_BIND_SERVICE` for the :53 bind -
+  The daemon's credential set is exactly ONE capability – ambient `CAP_NET_BIND_SERVICE` for the :53 bind -
   lab-verified: `Uid`/`Gid` all 65534, `CapEff`/`CapPrm`/`CapAmb` = `0000000000000400`, and the bind works even with
   `NoNewPrivs: 1`. Ambient capabilities are runtime prctl state (kernel >= 4.3), not exec-acquired, so they survive
   `no_new_privs`, which the launcher also sets. The daemon never runs as root and never holds a privilege-change
-  capability - unlike a post-bind self-drop, which requires the daemon to run as root and to possess setuid/setgid
+  capability – unlike a post-bind self-drop, which requires the daemon to run as root and to possess setuid/setgid
   during its lifetime.
 - **The binary's own privilege drop is a no-op here**: `bin/src/lib.rs` `check_drop_privs` (v0.26.1, verified source)
   looks up `user`/`group` from the config (defaults `nobody`/`nobody`) via getpwnam/getgrnam and drops via bare setgid +
-  setuid - but ONLY `if uid == 0 || euid == 0`. Running as 65534 it just logs the ids. NO setgroups, NO prctl/capset in
+  setuid – but ONLY `if uid == 0 || euid == 0`. Running as 65534 it just logs the ids. NO setgroups, NO prctl/capset in
   the binary.
 - **AppArmor grants** (`apparmor.txt`): `net_bind_service` (the :53 bind's ns_capable), `setgid`/`setuid` (setpriv's
   setgroups/setresgid/setresuid), `setpcap` (capset raising the inheritable set, prctl ambient-raise/no_new_privs).
   AppArmor mediates the kernel's capable() LSM hook (repository-root KNOWLEDGE.md §"AppArmor: mediation and profile
   mechanics"). The grants serve the launcher; the daemon exec's holding exactly one capability.
-- The `dns` healthcheck binary runs as root (docker HEALTHCHECK exec) - a plain UDP query, no capabilities.
+- The `dns` healthcheck binary runs as root (docker HEALTHCHECK exec) – a plain UDP query, no capabilities.
 - **Device-verified (2026-10-24, HAOS 18.3, app 0.1.0 / daemon 0.26.1)** via `.mise/tasks/test/live/hickory-dns.sh` (log +
   dev-host client evidence per repository-root `KNOWLEDGE.md` §"Device SSH: sessions run in the Terminal & SSH app"):
   the launcher's setpriv path ran exactly once per boot (its setgid/setuid/setpcap use is not denied), the daemon logged
@@ -204,42 +204,42 @@ Verified against v0.26.3 source; revisit when a tagged release + the apk carry t
 ## Healthcheck
 
 `/usr/bin/hickory-dns-healthcheck` probes with a REAL query (`dns -n 127.0.0.1:53 query localhost SOA`,
-hickory-dns-utils' client CLI) - socket + catalog + response, authoritative (no upstream dependency: a dead upstream
+hickory-dns-utils' client CLI) – socket + catalog + response, authoritative (no upstream dependency: a dead upstream
 must not mark a healthy local DNS server unhealthy). HEALTHCHECK timeout 10s (client query timeout is smaller). The
-daemon has no HTTP endpoint (the apk compiles without metrics features), so there is no watchdog URL - HEALTHCHECK is
+daemon has no HTTP endpoint (the apk compiles without metrics features), so there is no watchdog URL – HEALTHCHECK is
 the only container-level wedge signal (repository-root KNOWLEDGE.md §"Supervisor: health events and the app watchdog").
-A configured ACL without loopback entries gets them appended by the generator (with a warning) - loopback clients are
+A configured ACL without loopback entries gets them appended by the generator (with a warning) – loopback clients are
 always served.
 
 - **The probe queries SOA, not the A record** (device-verified 2026-10-24: A and AAAA positive answers WARN + exit 0;
   SOA and MX-NODATA stay silent + exit 0; a dead server exits 1): a positive non-SOA answer from the app's unsigned
   authoritative zones makes the daemon log
-  `WARN hickory_server::zone_handler::catalog: unexpected lookup skip for request` per query - v0.26.1 AND v0.26.3
+  `WARN hickory_server::zone_handler::catalog: unexpected lookup skip for request` per query – v0.26.1 AND v0.26.3
   `crates/server/src/zone_handler/catalog.rs` `build_authoritative_response`: the NSEC-proof match's `_ => None` arm
   (`nx_proof_kind() == None` for unsigned zones, likewise NSEC zones without a wildcard match) is warned as an
   "unexpected lookup skip", with no `dnssec_ok` gate on that branch. The SOA query takes the `is_soa()` branch instead
-  (NS companion lookup - the zone ships NS records) and the NODATA branch never warns. The WARN remains for OTHER
-  clients' positive answers to authoritative-zone names (localhost, static zones) - benign, not a hygiene failure;
+  (NS companion lookup – the zone ships NS records) and the NODATA branch never warns. The WARN remains for OTHER
+  clients' positive answers to authoritative-zone names (localhost, static zones) – benign, not a hygiene failure;
   forwarded (external-zone) answers never take that path. Upstream status (verified 2026-10-24): introduced in the
   0.26.0 cycle (commit e7fed0e, 2025-10-30), present unchanged in 0.26.0/0.26.1/0.26.3 and main (c6b2e6d, 2026-10-22);
-  no duplicate on the tracker - the skip is the normal path (RFC 4035 §3.1.3), so the WARN is spurious.
+  no duplicate on the tracker – the skip is the normal path (RFC 4035 §3.1.3), so the WARN is spurious.
 
 ## apk package pins and CA trust
 
 `hickory-dns` + `hickory-dns-utils` are pinned with full `pkgver-pkgrel` (the generated config encodes the binary's
-interface - named.toml schema + CLI; repository-root KNOWLEDGE.md §"apk package version policy"). Pin 0.26.3-r0 (v0.26.2
+interface – named.toml schema + CLI; repository-root KNOWLEDGE.md §"apk package version policy"). Pin 0.26.3-r0 (v0.26.2
 fixed ~38 GHSA advisories). The aports APKBUILD compiles with
 `tls-aws-lc-rs,https-aws-lc-rs,quic-aws-lc-rs,dnssec-aws-lc-rs,rustls-platform-verifier` (+ blocklist, recursor,
-resolver for the bin) - DoH3 is absent (§"Deferred feature ground truth (upstream gaps)"). `rustls-platform-verifier`
+resolver for the bin) – DoH3 is absent (§"Deferred feature ground truth (upstream gaps)"). `rustls-platform-verifier`
 reads the system trust store: `ca-certificates-bundle` is installed explicitly (floating; certificate data package).
 `hickory-dns-utils` ships `/usr/bin/dns`, `/usr/bin/recurse`, `/usr/bin/resolve` (used by the healthcheck and the
 hostname resolution); the main package ships `/usr/bin/hickory-dns` (renamed from `named` at 0.24.0, no alias).
 
 ## Config-file and data layout
 
-`/data/named.toml` (persistent, user-inspectable; written atomically - `.new` is validated, then moved),
+`/data/named.toml` (persistent, user-inspectable; written atomically – `.new` is validated, then moved),
 `/etc/hickory-dns/zones/default/*.zone` (shipped default zones, image-owned), `/etc/hickory-dns/zones/static/`
-(generated leaf zones, regenerated at every boot - stale files removed), `/etc/hickory-dns.args` (the s6 service command
+(generated leaf zones, regenerated at every boot – stale files removed), `/etc/hickory-dns.args` (the s6 service command
 line, `--config /data/named.toml` + optional `--debug`), `/data/hickory-dns.upstreams.cache` (last-known-good
 resolutions). The debug option maps to the daemon CLI's `--debug` flag; `-q`/`-d`/`-p` and RUST_LOG are available for
 manual debugging (`docker exec`).
@@ -252,6 +252,6 @@ upstream connections, bashio supervisor API, healthcheck probe), the s6/bashio/`
 profile, and documented (blanket-covered) rules for the app's config surface (`/etc/hickory-dns/{,**}`), the s6 service
 command line (`/etc/hickory-dns.args`), the privilege-drop lookups (`/etc/passwd`, `/etc/group`), `/etc/resolv.conf`
 (hostname upstreams), and `/etc/ssl/certs/{,**}` (rustls-platform-verifier trust store). No sub-profile: the daemon
-needs network in the same profile. The lab has no AppArmor enforcement - the capability rules (`net_bind_service` for
-the bind, `setgid`/`setuid`/`setpcap` for the drop) are device-verified (2026-10-24 - §"Port 53 binding and
+needs network in the same profile. The lab has no AppArmor enforcement – the capability rules (`net_bind_service` for
+the bind, `setgid`/`setuid`/`setpcap` for the drop) are device-verified (2026-10-24 – §"Port 53 binding and
 privileges").
