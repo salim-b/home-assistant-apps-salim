@@ -48,8 +48,7 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   # AppArmor status reporting (s6 sets this up; harmless otherwise)
   /sys/kernel/security/apparmor/** r,
 
-  # Address detection (APP_IP): `ip` is a busybox applet, hence the
-  # /bin/busybox ix (see KNOWLEDGE.md on busybox-applet exec mediation)
+  # Address detection (APP_IP): `ip` is a busybox applet, hence the /bin/busybox ix.
   /sbin/ip rix,
   /bin/busybox ix,
 
@@ -92,6 +91,9 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
   ## Sub-profiles: the privileged NFS binaries run under their own tighter profiles (cx = change profile on
   ## execute). They still need the procfs/exports access listed above, hence re-granted here.
+  ## Official docs template: every sub-profile's signal receive is peer-scoped to the app's own top profile -
+  ## the supervisor renames the top profile to the installed slug on the device (e.g. local_nfs-server; the
+  ## *_nfs-server glob covers repo installs too).
 
   # exportfs (nfsd-start: exportfs -a; nfsd-stop: exportfs -au)
   /usr/sbin/exportfs cx -> exportfs,
@@ -101,8 +103,6 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
     file,
     signal (send) set=(kill,term,int,hup,cont),
-    # Official docs template: scope receive to the app's own top profile (the supervisor renames it to the
-    # installed slug on the device, e.g. local_nfs-server — the *_nfs-server glob covers repo installs too).
     signal (receive) peer=*_nfs-server,
 
     # inet/inet6 stream+dgram: in case exportfs attempts RPC-based cache flushes toward mountd/rpcbind.
@@ -131,8 +131,6 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
     file,
     signal (send) set=(kill,term,int,hup,cont),
-    # Official docs template: scope receive to the app's own top profile (the supervisor renames it to the
-    # installed slug on the device, e.g. local_nfs-server — the *_nfs-server glob covers repo installs too).
     signal (receive) peer=*_nfs-server,
 
     # Inert under the network deny below (no socket can exist to bind; capability mediation is independent of the
@@ -168,8 +166,6 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
     file,
     signal (send) set=(kill,term,int,hup,cont),
-    # Official docs template: scope receive to the app's own top profile (the supervisor renames it to the
-    # installed slug on the device, e.g. local_nfs-server — the *_nfs-server glob covers repo installs too).
     signal (receive) peer=*_nfs-server,
 
     capability net_bind_service,
@@ -177,8 +173,9 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     capability setuid,
     capability dac_override,
 
-    # inet/inet6 stream+dgram: rpc.mountd is an actual RPC server (MNT service sockets TCP/UDP, v4+v6) and
-    # attempts rpcbind registration (fails harmlessly without rpcbind).
+    # inet/inet6 stream+dgram: mountd binds no ports (-F -N 2 -N 3 - it services the kernel's export-cache upcalls,
+    # see the mountd run script); whether it touches TCP/UDP sockets at all is an open question (device strace:
+    # nfs-server/TODO.md) - the rules stay until the grants' live surface is known.
     network inet stream,
     network inet dgram,
     network inet6 stream,
@@ -202,8 +199,6 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
     file,
     signal (send) set=(kill,term,int,hup,cont),
-    # Official docs template: scope receive to the app's own top profile (the supervisor renames it to the
-    # installed slug on the device, e.g. local_nfs-server — the *_nfs-server glob covers repo installs too).
     signal (receive) peer=*_nfs-server,
 
     # setpcap: nfsdcld prunes its own capability set at startup (prctl PR_CAPBSET_DROP + a final capset); without

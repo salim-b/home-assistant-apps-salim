@@ -37,12 +37,8 @@ options:
   lease_time: 300
 schema:
   shares:
-    # Defense in depth (the scripts validate the runtime semantics): no whitespace anywhere (/etc/exports entries
-    # are whitespace-separated - a newline would inject an extra export line, parsed as root), no backslashes
-    # (/proc/mounts and /proc/self/mountinfo escape them as \134 and awk -v processes escapes, so nfsd-apply's
-    # mount detection would misjudge them); path: mapped roots only, no empty path components (see DOCS.md);
-    # network: exports(5) machine-name charset; options: comma-separated exports(5) tokens, no parentheses.
-    # Facts: nfs-server/KNOWLEDGE.md §"Export-cache and fsid semantics"
+    # Schema-level defense in depth (the scripts re-validate the runtime semantics): what each field regex blocks
+    # and why - nfs-server/KNOWLEDGE.md §"Export-cache and fsid semantics"; path prefixes and empty components: DOCS.md.
     - path: "match(^/(share|media)(/[^\\s/\\\\]+)*$)"
       network: "match(^[^\\s()\\\\]+$)"
       options: "match(^[^\\s(),\\\\]+(,[^\\s(),\\\\]+)*$)"

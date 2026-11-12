@@ -55,10 +55,11 @@ Open work items only (resolved items live in git history). Underlying technical 
   Track removed (path, network) pairs and rmdir an orphaned mirror once no remaining share uses the path (mind the
   dedup: a path may back several shares across networks).
 
-- Resolve the rpc.mountd socket-behavior contradiction (device strace): `KNOWLEDGE.md` §"mountd and the pseudo file
-  system root" and the runtime skill say "binds no ports, only services upcalls" while the `apparmor.txt` mountd comment
-  says "actual RPC server (MNT service sockets TCP/UDP, v4+v6)" – both cannot be true; the answer decides whether
-  mountd's `net_bind_service` + network grants are live surface.
+- Mountd's live network surface (device strace): the run script and `KNOWLEDGE.md` §"mountd and the pseudo file system
+  root" say `rpc.mountd -F -N 2 -N 3` binds no ports and only services export-cache upcalls – whether it touches any
+  TCP/UDP socket at all is unverified; the answer decides whether mountd's `net_bind_service` + network grants are live
+  surface (scoping/dropping candidates). The `apparmor.txt` comment no longer contradicts this (it defers to the run
+  script and points here).
 
 - AppArmor sub-profiles: the unscoped `signal (send)` grants are template-inherited and unused (nothing in the app sends
   signals; s6-svc talks to s6 over its control fifo, not kill(2)). Scope or drop them – device-verify first (no audit

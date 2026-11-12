@@ -39,7 +39,7 @@ if [ ! -s /etc/nfsd.args ]; then
   exit 1
 fi
 ## NOTE: execute as an array ("${NFSD_CMD[@]}") - a string-built command must run unquoted (word splitting), which
-## the lint's quoting hardening quotes away: `"$NFSD_CMD"` becomes one literal command name (the 0.6.1 release breakage).
+## the lint's quoting hardening quotes away: `"$NFSD_CMD"` becomes one literal command name.
 read -r -a NFSD_CMD </etc/nfsd.args
 
 bashio::log.info "Executing nfsd with: ${NFSD_CMD[*]}"

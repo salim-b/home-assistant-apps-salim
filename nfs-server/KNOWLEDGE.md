@@ -62,7 +62,8 @@ Runtime semantics of the generated `/etc/exports` content (schema-side constrain
   defense in depth): `/etc/exports` is whitespace-separated (a newline in a value would inject an extra export line,
   parsed as a root export), and backslash paths would misjudge the mount-state detection (mountinfo escapes them as
   `\134`, `awk -v` processes escape sequences – §"Automatic mirror refresh (nfsd-watch)"). Paths: absolute, no empty
-  components; `network`: the `exports(5)` machine-name charset; `options`: comma-separated export-option tokens.
+  components; `network`: the `exports(5)` machine-name charset; `options`: comma-separated export-option tokens, no
+  parentheses (they delimit the option list: `<mirror> <network>(fsid=N,<options>)`).
 
 ## mountd and the pseudo file system root
 

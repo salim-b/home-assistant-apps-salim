@@ -6,6 +6,11 @@
 
 - Maintainability: no behavior change – the `config.yaml` image comment matches the repository's one-line pointer style
   (CI image-name contract: README §"CI") instead of spelling out the per-arch image names.
+- Maintainability: the remaining comment-hygiene items, no behavior change – the shares-schema comment points at its
+  canonical `KNOWLEDGE.md` section instead of restating it; the `apparmor.txt` mountd network comment now matches the
+  run script (no ports bound – export-cache upcalls) instead of contradicting it; the "Official docs template"
+  signal-receive note is stated once in the sub-profile header instead of four times; and a dangling busybox-applet
+  citation plus an episodic release-breakage parenthetical in `nfsd-start` are gone.
 
 ## 0.7.4
 
