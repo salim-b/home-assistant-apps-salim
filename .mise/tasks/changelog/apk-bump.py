@@ -12,9 +12,9 @@
 The Renovate apk-pin PR is merged without a changelog entry - the apk-bump workflow's changelog
 job runs this task post-merge to fill it (policy: root KNOWLEDGE.md §apk package version policy);
 local runs share the same code path. Idempotent: the `## <version>` section is inserted only when
-that heading is absent. The bullet is greedy-wrapped at the repository's Markdown width (panache,
-120 chars) so `mise run fmt` right after the insertion is a no-op and the dry-run output matches
-the committed form.
+that heading is absent. The bullet is end-user phrased ("Updated the bundled <pkg> from <old> to
+<new>") and greedy-wrapped at the repository's Markdown width (panache, 120 chars) so `mise run
+fmt` right after the insertion is a no-op and the dry-run output matches the committed form.
 """
 from __future__ import annotations
 
@@ -79,6 +79,15 @@ def wrap_bullet(text: str) -> list[str]:
     return lines
 
 
+def bullet(pkg: str, old: str, new: str) -> str:
+    """The changelog bullet for one apk pin bump."""
+    prefix = f"- Updated the bundled {pkg} from {old} to {new}"
+    if old.rsplit("-", 1)[0] == new.rsplit("-", 1)[0]:
+        # pkgrel-only: same upstream release, Alpine repackaged it.
+        return f"{prefix} (Alpine packaging update)."
+    return f"{prefix}."
+
+
 def main() -> int:
     app = _val("app")
     pkg = _val("pkg")
@@ -94,12 +103,7 @@ def main() -> int:
         sys.exit(f"changelog:apk-bump: {changelog} does not exist (app '{app}')")
 
     heading = f"## {version}"
-    bullet = (
-        f"- Internals: bumped the pinned {pkg} package from {old} to {new} "
-        f"(Alpine package update; see the repository-root `KNOWLEDGE.md` "
-        f"apk package version policy)."
-    )
-    bullet_lines = wrap_bullet(bullet)
+    bullet_lines = wrap_bullet(bullet(pkg, old, new))
 
     lines = changelog.read_text().splitlines()
 
