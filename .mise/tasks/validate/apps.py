@@ -44,7 +44,7 @@ def _supervisor_ref() -> str:
     try:
         import tomllib
 
-        with open(ROOT / "mise.toml", "rb") as f:
+        with (ROOT / "mise.toml").open("rb") as f:
             return tomllib.load(f)["vars"]["supervisor_ref"]
     except Exception:
         sys.exit("cannot determine supervisor ref (mise.toml [vars].supervisor_ref)")
@@ -71,7 +71,7 @@ def fetch(name: str) -> str:
     dest.parent.mkdir(parents=True, exist_ok=True)
     url = f"{RAW}/{REF}/{name}"
     print(f"fetching {url}")
-    dest.write_text(urllib.request.urlopen(url).read().decode())
+    dest.write_text(urllib.request.urlopen(url).read().decode())  # noqa: S310 - pinned supervisor ref, https only
     return dest.read_text()
 
 
@@ -146,8 +146,8 @@ def validate_rumdl_no_autofix() -> None:
         canary_file = pathlib.Path(td) / "canary.md"
         canary_file.write_text(canary)
         try:
-            subprocess.run(
-                [
+            subprocess.run(  # noqa: S603 - fixed argument list, no untrusted input
+                [  # noqa: S607 - rumdl resolves via mise-managed PATH
                     "rumdl",
                     "fmt",
                     "--config",

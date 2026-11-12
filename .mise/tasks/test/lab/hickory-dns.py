@@ -34,5 +34,6 @@ def lab_adapt_fixture(options):
     elif variant == "tls":
         options["upstreams"] = [{"protocol": "tls", "host": "dns.quad9.net"}]
     elif variant != "":
-        raise ValueError(f"unknown upstreams lab variant: {variant}")
+        msg = f"unknown upstreams lab variant: {variant}"
+        raise ValueError(msg)
     return options

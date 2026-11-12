@@ -21,7 +21,9 @@
   # idioms; UP pyupgrade; N naming; A builtin shadowing; EXE shebang sanity; RET504 needless
   # assigns; ISC002/003 string-concatenation slips (ISC001 stays out - formatter conflict).
   # Security: S307 marks the deliberate eval() sites (the `# noqa: S307` comments in
-  # validate/apps.py go live with it). noqa hygiene: RUF100 + PGH004.
+  # validate/apps.py go live with it); S603/S607/S310 keep the subprocess and URL surfaces
+  # audited (inline noqa with reasons where intentional). Exception messages: EM + TRY.
+  # pathlib idioms: PTH. noqa hygiene: RUF100 + PGH004.
   select = [
     "E4",
     "E7",
@@ -39,6 +41,12 @@
     "ISC002",
     "ISC003",
     "S307",
+    "S603",
+    "S607",
+    "S310",
+    "EM",
+    "TRY",
+    "PTH",
     "RUF100",
     "PGH004",
   ]
