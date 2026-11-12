@@ -1,6 +1,6 @@
 ---
 name: ha-app-device-testing
-description: How to verify Home Assistant apps on a real HAOS device — the deploy:local/deploy:registry/apply-options/test:live
+description: How to verify Home Assistant apps on a real HAOS device – the deploy:local/deploy:registry/apply-options/test:live
   tasks, stored-options fate and backups, and the per-app live-test hook contract. Use when the user asks for on-device
   testing or when lab verification is insufficient.
 ---
@@ -8,13 +8,13 @@ description: How to verify Home Assistant apps on a real HAOS device — the dep
 # Device testing
 
 Tasks: `mise run deploy:local`, `mise run deploy:registry`, `mise run apply-options`, `mise run test:live`,
-`mise run hd-idle:regen-drives.md`. Usage and flags via `mise run <task> --help` — not duplicated here. Device access
+`mise run hd-idle:regen-drives.md`. Usage and flags via `mise run <task> --help` – not duplicated here. Device access
 over SSH only on explicit user request (skill `ha-app-workflow`); otherwise hand the user exact commands to run.
 
 ## Semantics that outlive the flags
 
 - **Remote evidence model**: SSH sessions run inside the Terminal & SSH app, not the HAOS host (facts: root
-  `KNOWLEDGE.md` §"Device SSH: sessions run in the Terminal & SSH app") — assert process/socket-level behavior from the
+  `KNOWLEDGE.md` §"Device SSH: sessions run in the Terminal & SSH app") – assert process/socket-level behavior from the
   app's own log and network behavior from client probes on the dev host.
 
 - **Stored options are user data**: `config.yaml` default changes never reach existing installs (facts: root
@@ -22,14 +22,14 @@ over SSH only on explicit user request (skill `ha-app-workflow`); otherwise hand
 
 - **An uninstall purges stored options** in every case, so a reinstall always runs the app's default options (facts:
   root `KNOWLEDGE.md` §"Supervisor: option schema quirks"). Any option set that would die with an uninstall is archived
-  to a local backup file first (path printed) — that backup is the only surviving copy.
+  to a local backup file first (path printed) – that backup is the only surviving copy.
 
-- **`apply-options`** applies a JSON (or YAML) options file to an installed copy as its complete options —
+- **`apply-options`** applies a JSON (or YAML) options file to an installed copy as its complete options –
   schema-filtered with dropped keys reported (facts: root `KNOWLEDGE.md` §"Supervisor: option schema quirks"), with the
   copy's current options backed up locally first (path printed).
 
 - **Deploy tasks build from your working tree, not GHCR** (they comment out the top-level `image:` key in the
-  *device-side* `config.yaml` copy) and refuse on a conflicting repository-installed copy — facts: root `KNOWLEDGE.md`
+  *device-side* `config.yaml` copy) and refuse on a conflicting repository-installed copy – facts: root `KNOWLEDGE.md`
   §"Deploy tasks: local builds and store-copy conflicts".
 
 ## test:live specifics
@@ -37,7 +37,7 @@ over SSH only on explicit user request (skill `ha-app-workflow`); otherwise hand
 - Deploys (forwarding `--replace`) plus live checks. `--test-options` applies the app's test options
   (`.mise/tasks/test/live/<app>.yaml`, top-level key override) to the device app for the run only, with an options
   backup restored on exit.
-- Per-app hook: `.mise/tasks/test/live/<app>.sh` with the contract `live_prepare`, `live_runtime_check`, `LIVE_*` vars —
+- Per-app hook: `.mise/tasks/test/live/<app>.sh` with the contract `live_prepare`, `live_runtime_check`, `LIVE_*` vars –
   analogous to the lab hooks (skill `ha-app-lab-testing`). Apps without a hook get deploy plus state-wait only.
 - Hooks may define their own env knobs; example: hd-idle's `LIVE_HDIDLE_LABEL_GLOB` selects the drives to exercise by
   filesystem label and generates the test options on the fly.

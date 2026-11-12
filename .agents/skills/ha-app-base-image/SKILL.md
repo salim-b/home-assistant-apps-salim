@@ -1,6 +1,6 @@
 ---
 name: ha-app-base-image
-description: HA base image shell gotchas and safe procedures for app scripts — writing to procfs/sysfs transaction files
+description: HA base image shell gotchas and safe procedures for app scripts – writing to procfs/sysfs transaction files
   (the writev/EINVAL trap), failed-redirection diagnostics, S6_KEEP_ENV, PATH differences between docker exec and s6
   services, and stubbing bashio::config in tests. Use when writing or debugging app shell scripts.
 ---
@@ -26,7 +26,7 @@ gotchas"). To capture message and exit code: `out=$( (echo x > /ro/path) 2>&1 )`
 
 ## Environment passing
 
-Scripts invoked via `docker exec` (or tests seeding inherited variables) need `S6_KEEP_ENV=1` — `with-contenv` otherwise
+Scripts invoked via `docker exec` (or tests seeding inherited variables) need `S6_KEEP_ENV=1` – `with-contenv` otherwise
 wipes the inherited environment (facts: root `KNOWLEDGE.md` §"HA base image: shell gotchas").
 
 ## PATH
@@ -36,7 +36,7 @@ gotchas"). Exec-driven commands must therefore call s6 tools by absolute path (`
 
 ## Stubbing `bashio::config` in bare-container script tests
 
-`bashio::config` fetches the app options from the Supervisor API via a file cache — it never reads `/data/options.json`
+`bashio::config` fetches the app options from the Supervisor API via a file cache – it never reads `/data/options.json`
 (facts: root `KNOWLEDGE.md` §"HA base image: shell gotchas"). Seed `${CACHE_DIR}/addons.self.options.config.cache` with
 the crafted options JSON; requires `S6_KEEP_ENV=1`, since `CACHE_DIR` is an inherited variable. Worked example:
 hd-idle's per-drive decision-matrix tests.
@@ -45,4 +45,4 @@ hd-idle's per-drive decision-matrix tests.
 
 User-bundle services: directories under `/etc/s6-overlay/user-bundles.d/`, never under `s6-rc.d/`; every service needs
 an empty `dependencies.d/base` file (facts: root `KNOWLEDGE.md` §"s6-overlay: user bundles live OUTSIDE s6-rc.d"). Any
-change under those trees must be lab-booted before deploy (`mise run test:lab <app>` — skill `ha-app-lab-testing`).
+change under those trees must be lab-booted before deploy (`mise run test:lab <app>` – skill `ha-app-lab-testing`).

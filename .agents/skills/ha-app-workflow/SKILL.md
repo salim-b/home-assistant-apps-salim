@@ -1,6 +1,6 @@
 ---
 name: ha-app-workflow
-description: Change and release discipline for this Home Assistant apps repository — branching, Conventional Commits,
+description: Change and release discipline for this Home Assistant apps repository – branching, Conventional Commits,
   lint gates, the single-version-per-branch release rule with changelogs, CI-as-source-of-truth, device-access policy,
   and the version-sensitive-facts rule. Use before making any change, commit, or release in this repo.
 ---
@@ -19,13 +19,13 @@ description: Change and release discipline for this Home Assistant apps reposito
 
 - Conventional Commits (`build`, `chore:`, `ci`, `docs:`, `feat:`, `fix:`, `perf`, `refactor`, `revert`, `style`,
   `test`); scope app changes (`fix(nfs-server): …`); one commit per logical unit.
-- Final trailer line: `Assisted-by: Goose:<model-slug>` — the model name without provider prefix, e.g.
+- Final trailer line: `Assisted-by: Goose:<model-slug>` – the model name without provider prefix, e.g.
   `Assisted-by: Goose:glm-5.3-flash`.
 - The commit-msg hook enforces the format; escape hatch `HK=0 git commit`.
 
 ## Before finishing a change
 
-Run `mise run check` — lint plus validate; it is the same gate CI runs. Lint-stack details and scoped checking: skill
+Run `mise run check` – lint plus validate; it is the same gate CI runs. Lint-stack details and scoped checking: skill
 `ha-app-tooling`. Task usage: `mise run check --help`.
 
 ## App releases
@@ -34,12 +34,12 @@ Run `mise run check` — lint plus validate; it is the same gate CI runs. Lint-s
   patch by semantic versioning): the branch ships one version, not one per commit, and continuously expands that
   version's `CHANGELOG.md` entry until it lands on `main`.
 - Transitory extra versions within the branch are fine where testing demands one (AppArmor profile changes are only
-  re-applied on app *update*, never on rebuild) — squash them back into the single version (config plus one merged
+  re-applied on app *update*, never on rebuild) – squash them back into the single version (config plus one merged
   changelog entry) before merging.
 - CI enforces the rule: `.github/workflows/version-guard.yaml` fails when device-visible app files (`rootfs/`,
-  `Dockerfile`, `config.yaml`, `apparmor.txt`, `translations/`) changed without a version bump — the Supervisor's update
+  `Dockerfile`, `config.yaml`, `apparmor.txt`, `translations/`) changed without a version bump – the Supervisor's update
   model makes a no-bump change a silent no-op that only repoints an already-published version tag. Exception: if the
-  base version's GHCR tag was never published (its release's build/publish failed), the guard probes GHCR and passes —
+  base version's GHCR tag was never published (its release's build/publish failed), the guard probes GHCR and passes –
   reusing the version then repoints nothing; unprovable fails closed. Changes to docs-only files (README, DOCS,
   CHANGELOG, KNOWLEDGE, TODO, `.agents/`), the per-app `.dockerignore` (it shapes the build context but never changes
   the image the device receives), and repo tooling do not require a version bump.
@@ -47,8 +47,8 @@ Run `mise run check` — lint plus validate; it is the same gate CI runs. Lint-s
 ## CI/CD is the source of truth for what gets published
 
 - Pushes to `main` build and publish images (`.github/workflows/builder.yaml`). If CI fails, fix the repo, not CI config
-  — unless the CI config itself is wrong.
-- Builder caveats: the init job needs `fetch-depth: 0` — the changed-files filter otherwise only sees the tip commit and
+  – unless the CI config itself is wrong.
+- Builder caveats: the init job needs `fetch-depth: 0` – the changed-files filter otherwise only sees the tip commit and
   silently skips multi-commit merges, so use regular merges instead of squash merges.
 - The app `Dockerfile` must not pull from Docker Hub at build time (rule and rationale: skill `ha-app-scaffolding`).
 - The lint workflow runs frenck's app linter natively (pinned source plus pypi requirements), not via its Docker action

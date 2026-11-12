@@ -1,6 +1,6 @@
 ---
 name: ha-app-markdown
-description: Markdown formatting conventions for this repository — panache owns all formatting, rumdl is the semantic
+description: Markdown formatting conventions for this repository – panache owns all formatting, rumdl is the semantic
   second linter, and specific constructs break the toolchain. Use when writing or editing any Markdown file here.
 ---
 
@@ -9,9 +9,9 @@ description: Markdown formatting conventions for this repository — panache own
 ## Formatting ownership
 
 - panache (`panache.toml`) owns ALL formatting: `mise run fmt` reflows prose to the 120-char width. Never hand-wrap
-  prose — write naturally and let `fmt` shape it.
-- The lint gate runs `panache format --check` and `panache lint` over tracked `.md` files (excluding `AI_POLICY.md` —
-  the Open Home Foundation's policy text, kept verbatim for upstream syncs — and `**/LICENSE.md`, mirroring panache's
+  prose – write naturally and let `fmt` shape it.
+- The lint gate runs `panache format --check` and `panache lint` over tracked `.md` files (excluding `AI_POLICY.md` –
+  the Open Home Foundation's policy text, kept verbatim for upstream syncs – and `**/LICENSE.md`, mirroring panache's
   default Markdown exclude). Explicit file paths bypass panache's config excludes, so hk's `mdExcludes` in `hk.pkl`
   repeats the exclusion for both step invocations. The lint adds semantic checks (references, heading hierarchy, …).
 
@@ -29,8 +29,8 @@ description: Markdown formatting conventions for this repository — panache own
   verified through rumdl 0.3.1; behavioral canary in `validate/apps.py`). Formatting fixes go through panache
   (`mise run fmt`); non-format rumdl findings are fixed by hand.
 
-## Constructs that break the toolchain — write around them
+## Constructs that break the toolchain – write around them
 
-- Do not let prose wrap so that a line starts with an ordered-list marker (`4)`, `2026.` — a parenthetical ending in
+- Do not let prose wrap so that a line starts with an ordered-list marker (`4)`, `2026.` – a parenthetical ending in
   digits does this at wrap boundaries): CommonMark renders such a line as prose, panache formats it as a nested list,
   and the two disagree.
