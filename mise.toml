@@ -63,7 +63,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   shfmt = "3.14.1"
   tombi = "1.10.0"
   uv = "0.13.7"
-  yq = "4.54.1"
+  yq = "4.54.3"
   # Node runtime + renovate package for the renovate-config-validator hk step (.github/renovate.json gate).
   # trust_policy_excludes: @yarnpkg/libzip@3.2.2 (a renovate dependency) lost npm provenance vs 3.2.1
   # because the release branch lacked `npmPublishProvenance: true` (yarnpkg/berry#7182); aube
