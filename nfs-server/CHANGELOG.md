@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.7.5
+
+- Maintainability: no behavior change – the `config.yaml` image comment matches the repository's one-line pointer style
+  (CI image-name contract: README §"CI") instead of spelling out the per-arch image names.
+
 ## 0.7.4
 
 - Fix: board support information corrected. The `nfsd` kernel module the app requires is also present on Raspberry Pi
