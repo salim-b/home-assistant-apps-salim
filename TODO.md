@@ -5,23 +5,23 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
 
 ## Tasks
 
-- Upstream: file an hk issue/PR against [jdx/hk](https://github.com/jdx/hk) — its shebang-based file typing (v2.7.0,
+- Upstream: file an hk issue/PR against [jdx/hk](https://github.com/jdx/hk) – its shebang-based file typing (v2.7.0,
   `src/file_type.rs`) does not recognize `#!/usr/bin/with-contenv bashio` (the Home Assistant base image's interpreter
   for s6-overlay scripts): wrapper interpreter plus unknown `bashio` argument resolve to plain text, so hk's
   shellcheck/shfmt/shellharden builtins (types `sh`/`bash`) silently skip every app script. Desired: look through
-  s6-overlay's `with-contenv` (and similar env-style wrappers) to the real interpreter and type `bashio` as shell — the
+  s6-overlay's `with-contenv` (and similar env-style wrappers) to the real interpreter and type `bashio` as shell – the
   file content is plain bash. Until then, `hk.pkl` re-declares each shell builtin's `match_any` with added glob
   selectors for the s6 script paths (see the `s6Globs` comment there); the glob additions can be dropped once this
   lands. All three shell steps also cover the apps' `/usr/bin` scripts via the `appBinGlobs` selector.
 
 - Upstream: file an hk issue against [jdx/hk](https://github.com/jdx/hk) (likely co-filed with
-  [owenlamont/ryl](https://github.com/owenlamont/ryl)) — the `ryl` builtin's fix-mode wiring silently passes files with
+  [owenlamont/ryl](https://github.com/owenlamont/ryl)) – the `ryl` builtin's fix-mode wiring silently passes files with
   unfixable violations. hk's fix mode runs `check_diff` first and skips the fixer when it exits 0; ryl 0.26.0's `--diff`
-  exit code reflects only patch presence: it exits 0 whenever nothing is fixable — including files carrying unfixable
+  exit code reflects only patch presence: it exits 0 whenever nothing is fixable – including files carrying unfixable
   warnings or errors (probed 2026-10-20: `ryl check --diff` on a duplicate-key error file exits 0, and `--strict` does
   not change `--diff` exit codes; a fixable brace-spacing file prints the patch and exits 1). With the builtin as
   shipped (hk v2.7.0 `pkl/builtins/ryl.pkl`: `check_diff = ryl check --diff {{files}}`, `check_after_diff = true`),
-  every pre-commit run (fix mode) passes files that `hk check --all` fails — the `check_after_diff` recheck never fires
+  every pre-commit run (fix mode) passes files that `hk check --all` fails – the `check_after_diff` recheck never fires
   because no diff was applied. hk's own builtin test misses this: `testMaker.fixFail` exercises the fix command
   directly, not the check_diff-first flow the hook actually takes. Investigate which side should own the fix: ryl
   exiting non-zero from `--diff` when diagnostics exist without fixes, or hk not treating `check_diff` exit 0 as "clean"
@@ -35,33 +35,33 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   a custom hk step (`check = panache format --check {{files}}`, `fix = panache format {{files}}` over
   `**/*.md`/`**/*.markdown`), installed via the aqua registry (`aqua:jolars/panache`), so a builtin would let repos drop
   the custom step the same way the rumdl/ryl builtins do. Design point to settle in the PR: hk passes explicit file
-  paths, and panache bypasses its own config excludes for explicit paths (observed here — hence the `mdExcludes` for
+  paths, and panache bypasses its own config excludes for explicit paths (observed here – hence the `mdExcludes` for
   `AI_POLICY.md` and `**/LICENSE.md` in `hk.pkl`); decide whether the builtin filters such files itself, documents the
   interaction, or waits for panache to honor excludes on explicit paths.
 
 - Upstream: investigate whether [shellharden](https://github.com/anordal/shellharden) mangles `for` loops and file an
   issue if none exists (check for existing ones first). Verified with v4.3.2 (2026-10): `--transform`/`--replace` quotes
-  command substitutions in the iterable — `for _ in $(seq 1 120)` becomes `for _ in "$(seq 1 120)"` — which kills word
+  command substitutions in the iterable – `for _ in $(seq 1 120)` becomes `for _ in "$(seq 1 120)"` – which kills word
   splitting and makes the loop run exactly once (shellcheck flags the result as SC2066, error severity); an unquoted
   substitution in a for iterable is the idiomatic splitting form and not flagged by shellcheck. Minimal repro is a
   4-line script; the workaround rule (brace expansion, `read -r -a`, `mapfile`) and the 9 repo sites rewritten
   accordingly are documented in skill `ha-app-tooling`. The same run also confirmed the cosmetic nit of `[ -n "$x" ]`
   being rewritten to `[ "$x" != "" ]`. A second, worse defect (same version): the parser loses sync on nested
-  parentheses inside arithmetic expansion — `printf '%04x' "$(( (a << 8) | b ))"` reports "the parser got lost" on a
+  parentheses inside arithmetic expansion – `printf '%04x' "$(( (a << 8) | b ))"` reports "the parser got lost" on a
   syntactically complete file, and everything after it is mangled (spurious `""` prefixes; quotes inserted into
-  single-quoted strings, which corrupts generated output). Flat arithmetic (`$(( 10#$a ))`) is unaffected — but an
+  single-quoted strings, which corrupts generated output). Flat arithmetic (`$(( 10#$a ))`) is unaffected – but an
   arithmetic `<<` alone also breaks it (verified 2026-11, v4.3.2: `$((5 << attempt))` → "Unexpected end of file" on a
   syntactically complete file, likely lexed as a heredoc delimiter; `$((5 * 2 ** attempt))` parses and is equivalent).
   The one repo site was rewritten arithmetic-free (`printf '%02x%02x'`; workaround rule in skill `ha-app-tooling`). If
   upstream is unresponsive, reconsider whether shellharden should stay a fix step here (vs check-only or dropped).
 
-- apk-pin checker: deduplicate the triplicated pin parser — the `pkg=version` regex plus the backslash-continuation
+- apk-pin checker: deduplicate the triplicated pin parser – the `pkg=version` regex plus the backslash-continuation
   state machine over `apk add` blocks exists three times (`.mise/tasks/validate/apk-pins.py`, and the changelog + nudge
   jobs of `.github/workflows/apk-bump.yaml`; the trigger is the literal substring `apk add` in a line) with no canary
-  fixture locking their behavior together — and align the index/arch semantics between the task and the nudge job
+  fixture locking their behavior together – and align the index/arch semantics between the task and the nudge job
   (facts: root `KNOWLEDGE.md` §"apk package version policy").
 
-- Comment hygiene in device-visible files — each alignment needs a version bump + changelog entry, so fold into the
+- Comment hygiene in device-visible files – each alignment needs a version bump + changelog entry, so fold into the
   apps' next natural bumps:
   - hd-idle, nfs-server: align the `config.yaml` `image:` comment with hickory-dns's one-line pointer style (the CI
     image-name contract lives in the repository README §"CI").
@@ -73,7 +73,7 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
     `rootfs/usr/bin/hickory-dns-genconfig` so the citation names stay on one line (a wrap inserts `#`/`##` inside the
     quoted section name, breaking greppability).
   - nfs-server: compress the `config.yaml` shares-schema comment (restates §"Export-cache and fsid semantics"); fix the
-    mountd grant comment (contradicts the run script — tracked in `nfs-server/TODO.md`); resolve the dangling
+    mountd grant comment (contradicts the run script – tracked in `nfs-server/TODO.md`); resolve the dangling
     "busybox-applet exec mediation" citation in `apparmor.txt` (no such content exists); state the "Official docs
     template" comment once in the sub-profile header instead of four times; drop the episodic release-breakage
     parenthetical in `rootfs/etc/s6-overlay/scripts/nfsd-start`.

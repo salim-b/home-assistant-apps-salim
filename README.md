@@ -79,7 +79,7 @@ ssh root@homeassistant.local 'ha apps logs --follow local_nfs-server'
 ### Testing on a device
 
 `mise run test:live` deploys the app to a real HAOS device as a local app (like `deploy:local`, forwarding `--replace`)
-and then runs an end-to-end test against it — for the `nfs-server` app, this includes an NFS client roundtrip against
+and then runs an end-to-end test against it – for the `nfs-server` app, this includes an NFS client roundtrip against
 the running app. With `--test-options`, the repo's test options are applied for the run only, with the device app's own
 options backed up and restored automatically:
 
@@ -93,8 +93,8 @@ mise run test:live nfs-server root@homeassistant.local
 mise run test:live nfs-server root@homeassistant.local --test-options
 ```
 
-Deploy-task mechanics that are not visible in `--help` — why the device-side app config's `image:` key gets commented
-out, and what happens when the app is also installed from the app repository — are documented in [`KNOWLEDGE.md`
+Deploy-task mechanics that are not visible in `--help` – why the device-side app config's `image:` key gets commented
+out, and what happens when the app is also installed from the app repository – are documented in [`KNOWLEDGE.md`
 §"Deploy tasks: local builds and store-copy
 conflicts"](KNOWLEDGE.md#deploy-tasks-local-builds-and-store-copy-conflicts).
 
@@ -104,7 +104,7 @@ On every push to `main`, the [Builder](./.github/workflows/builder.yaml) workflo
 changed and publishes its container images to GHCR via the [Build app](./.github/workflows/build-app.yaml) workflow:
 per-arch images (e.g. `ghcr.io/salim-b/amd64-app-nfs-server`) plus a multi-arch manifest (e.g.
 `ghcr.io/salim-b/app-nfs-server`), tagged with the app's `version` and `latest`. Each app's `image:` key in
-`config.yaml` is the generic manifest name — the Builder derives the per-arch image names (`{arch}-app-<slug>`) from it
+`config.yaml` is the generic manifest name – the Builder derives the per-arch image names (`{arch}-app-<slug>`) from it
 and the app's `arch:` list, so the key needs no per-arch maintenance. Pull requests only build without publishing.
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
