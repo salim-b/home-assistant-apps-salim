@@ -15,8 +15,8 @@
 #   (hd-idle only monitors sd*); the supervisor's device validation is the final layer refusing
 #   system-used devices. Each included disk maps to its preferred /dev/disk/by-id path (usb-* > ata-*
 #   > wwn-*) and gets a 30 s idle (as in the lab fixture) so the daemon exercises its natural spindown
-#   path within the check window; the FIRST discovered drive additionally carries a per-drive drive-PM
-#   toggle in its off state (disable_drive_pm=false), exercised end to end (asserted in live_runtime_check).
+#   path within the check window; the FIRST discovered drive additionally opts out of the drive-PM
+#   treatment (keep_drive_pm=true), exercised end to end (asserted in live_runtime_check).
 #   Without the variable, the repo's test options file (a safe no-op: no drives) is applied unchanged. A
 #   match-everything glob includes every labeled disk - choose it deliberately.
 # - LIVE_HDIDLE_DISKS_JSON (set by live_prepare): JSON object mapping the disks' kernel names to
@@ -34,7 +34,7 @@ live_prepare() {
   local glob="$LIVE_HDIDLE_LABEL_GLOB" raw kind name disk rank lb byid
   local -A disk_labels=() disk_byid=() byid_rank=()
   local included=() included_sorted=() labels=() ok
-  local disks_json="[]" disks_map="{}" tmpfile pm_override_disk
+  local disks_json="[]" disks_map="{}" tmpfile pm_optout_disk
 
   echo "-- discovering drives on the device (label glob: $glob)"
   ## Partition -> parent disk via sysfs; by-id links -> kernel names.
@@ -124,18 +124,18 @@ live_prepare() {
       '. + {($d): {label: $l, device: $dev}}' <<<"$disks_map")
   done
 
-  ## Per-drive drive-PM toggle: the FIRST discovered drive gets disable_drive_pm=false, exercised end
+  ## Per-drive keep-drive-PM opt-out: the FIRST discovered drive gets keep_drive_pm=true, exercised end
   ## to end on the device (hd-idle-pmfix must skip exactly that drive - asserted in
   ## live_runtime_check; the drives file is not reachable over SSH, HAOS ships no docker CLI).
   ## keys[0] == the first inserted (sorted) drive.
-  pm_override_disk=$(jq -r 'keys[0]' <<<"$disks_map")
-  disks_json=$(jq -c '.[0].disable_drive_pm = false' <<<"$disks_json")
-  disks_map=$(jq -c --arg d "$pm_override_disk" '.[$d].pm_override = true' <<<"$disks_map")
+  pm_optout_disk=$(jq -r 'keys[0]' <<<"$disks_map")
+  disks_json=$(jq -c '.[0].keep_drive_pm = true' <<<"$disks_json")
+  disks_map=$(jq -c --arg d "$pm_optout_disk" '.[$d].pm_optout = true' <<<"$disks_map")
 
   tmpfile=$(mktemp "${TMPDIR:-/tmp}/hd-idle-live-options.XXXXXX")
   jq -n --argjson disks "$disks_json" '{disks: $disks}' >"$tmpfile"
   echo "-- generated test options (30s idle, scsi):"
-  jq -r 'to_entries[] | "   \(.value.device) (\(.key), label \(.value.label)\(if .value.pm_override == true then ", drive-PM override: no" else "" end))"' <<<"$disks_map"
+  jq -r 'to_entries[] | "   \(.value.device) (\(.key), label \(.value.label)\(if .value.pm_optout == true then ", keep drive power management: on" else "" end))"' <<<"$disks_map"
 
   ## Must outlive the run: restore_options() re-reads it from the EXIT trap for its backup sanity check.
   LIVE_TEST_OPTIONS_FILE="$tmpfile"
@@ -225,32 +225,32 @@ live_runtime_check() {
           if [ "$declared_excluded" != "" ]; then
             echo "   (excluded via idle-0 entries: ${declared_excluded%- })"
           fi
-          ## Per-drive drive-PM override plumbing (boot log; the drives file is not reachable over SSH - HAOS
-          ## ships no docker CLI): pmfix must have skipped EXACTLY the override drive and attempted the
+          ## Per-drive keep-drive-PM opt-out plumbing (boot log; the drives file is not reachable over SSH - HAOS
+          ## ships no docker CLI): pmfix must have skipped EXACTLY the opt-out drive and attempted the
           ## treatment for every other managed drive.
-          pm_override_disk=$(jq -r 'to_entries[] | select(.value.pm_override == true) | .key' <<<"$disks_json")
-          if [ "$pm_override_disk" != "" ]; then
-            if ! grep -qF "Drive ${pm_override_disk}: drive-PM treatment disabled for this drive" <<<"$tail_log"; then
-              echo "   FAIL: no hd-idle-pmfix skip log for the override drive ${pm_override_disk}" >&2
+          pm_optout_disk=$(jq -r 'to_entries[] | select(.value.pm_optout == true) | .key' <<<"$disks_json")
+          if [ "$pm_optout_disk" != "" ]; then
+            if ! grep -qF "Drive ${pm_optout_disk}: drive-PM treatment disabled for this drive" <<<"$tail_log"; then
+              echo "   FAIL: no hd-idle-pmfix skip log for the opt-out drive ${pm_optout_disk}" >&2
               return 1
             fi
-            if grep -qF "Drive ${pm_override_disk}: APM disable" <<<"$tail_log"; then
-              echo "   FAIL: the override drive ${pm_override_disk} received the drive-PM treatment despite disable_drive_pm=false" >&2
+            if grep -qF "Drive ${pm_optout_disk}: APM disable" <<<"$tail_log"; then
+              echo "   FAIL: the opt-out drive ${pm_optout_disk} received the drive-PM treatment despite keep_drive_pm=true" >&2
               return 1
             fi
             pm_skip_count=$(grep -cF "drive-PM treatment disabled for this drive" <<<"$tail_log" || true)
             if [ "$pm_skip_count" != "1" ]; then
-              echo "   FAIL: expected exactly one hd-idle-pmfix skip line (the override drive), got ${pm_skip_count}" >&2
+              echo "   FAIL: expected exactly one hd-idle-pmfix skip line (the opt-out drive), got ${pm_skip_count}" >&2
               return 1
             fi
             for disk in "${!labels_by_disk[@]}"; do
-              if [ "$disk" = "$pm_override_disk" ]; then continue; fi
+              if [ "$disk" = "$pm_optout_disk" ]; then continue; fi
               if ! grep -qF "Drive ${disk}: APM disable" <<<"$tail_log"; then
                 echo "   FAIL: no hd-idle-pmfix treatment attempt logged for ${disk}" >&2
                 return 1
               fi
             done
-            echo "   PASS: per-drive drive-PM override (hd-idle-pmfix skipped ${pm_override_disk} only)"
+            echo "   PASS: per-drive keep-drive-PM opt-out (hd-idle-pmfix skipped ${pm_optout_disk} only)"
           fi
         else
           if grep -q "No drives configured" <<<"$tail_log"; then

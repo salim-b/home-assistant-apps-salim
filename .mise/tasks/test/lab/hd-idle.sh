@@ -461,33 +461,34 @@ EOF
     echo "   FAIL: unexpected drives-file row shape (exclusion rows '<name> 0 - 0', drive rows '<name> <idle> <scsi|ata> <0|1>')"
     return 1
   fi
-  ## Per-drive drive-PM toggle: the drives file carries the per-drive decision in a 4th column
-  ## (1 = treat, 0 = leave the drive's own power management alone); the fixture sets disable_drive_pm=false
-  ## on the FIRST drive so the off state is exercised end to end (pm-flag 0, hd-idle-pmfix logs the skip),
-  ## while the other drives carry no key at all (absent = enabled - pm-flag 1).
+  ## Per-drive drive-PM opt-out: the drives file carries the per-drive decision in a 4th column
+  ## (1 = treat, 0 = leave the drive's own power management alone); the fixture sets keep_drive_pm=true
+  ## on the FIRST drive so the opt-out is exercised end to end (pm-flag 0, hd-idle-pmfix logs the skip),
+  ## while the other drives carry no key at all (absent = the treatment applies - pm-flag 1).
   pm_skip="${drives%%,*}"
   pm_zero_count=$(docker exec "$app" sh -c "awk '\$3 != \"-\" && \$4 == 0' /etc/hd-idle.drives | wc -l")
   if [ "$pm_zero_count" != "1" ]; then
-    echo "   FAIL: expected exactly one managed drive with pm-flag 0 (the override drive), got ${pm_zero_count}"
+    echo "   FAIL: expected exactly one managed drive with pm-flag 0 (the opt-out drive), got ${pm_zero_count}"
     return 1
   fi
   docker exec "$app" grep -qx "${pm_skip} .* 0" /etc/hd-idle.drives \
     || {
-      echo "   FAIL: override drive ${pm_skip} has no pm-flag 0 in the drives file"
+      echo "   FAIL: opt-out drive ${pm_skip} has no pm-flag 0 in the drives file"
       return 1
     }
   docker logs "$app" 2>&1 | grep -q "drive-PM treatment disabled for this drive" \
     || {
-      echo "   FAIL: no hd-idle-pmfix skip log for the per-drive override drive"
+      echo "   FAIL: no hd-idle-pmfix skip log for the per-drive opt-out drive"
       return 1
     }
-  echo "   PASS: per-drive drive-PM override (4-column drives file, override drive skipped by hd-idle-pmfix)"
+  echo "   PASS: per-drive keep-drive-PM opt-out (4-column drives file, opt-out drive skipped by hd-idle-pmfix)"
 
   ## Spindown smoke test (read-only on the drives).
   ##
   ## hd-idle -t quirks (verified, see hd-idle/KNOWLEDGE.md): needs the FULL /dev path (single-shot
-  ## mode does not prepend /dev/; the usage string's "-t sda" is misleading) and uses the GLOBAL
-  ## default command type (single-shot has no per-device config; the fixture's per-drive set is ignored).
+  ## mode does not prepend /dev/; the usage string's "-t sda" is misleading) and uses hd-idle's
+  ## built-in defaults (scsi, power condition 0 - the app sets no global defaults anymore; the
+  ## fixture's per-drive set is ignored).
   check_img="local/hdidle-lab-check:smartctl"
   if ! docker image inspect "$check_img" >/dev/null 2>&1; then
     echo "-- building the spindown-check image ($check_img)"

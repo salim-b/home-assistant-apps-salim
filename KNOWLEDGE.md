@@ -371,10 +371,12 @@ gotchas".
 - **Raw string lines must NOT go through `bashio::jq`**: jq parses the line as JSON, so an unquoted value like
   `127.0.0.0/8` fails with `jq: parse error: Invalid numeric literal` (exit 5) — only object lines (valid JSON) do.
 - **`'<field> // empty'` is valid only for STRING-typed fields**: jq treats `false` as empty, so an optional BOOLEAN
-  field cannot distinguish "absent" from "false" (absent → "null", false → "false") — optional per-item checkboxes are
-  therefore modeled as `list(yes|no)?` dropdowns, not `bool?` — UNLESS the absence itself carries meaning (a default-on
-  switch): then read the field WITHOUT `// empty` and match `null`/`true`/`false` explicitly (hd-idle's per-drive
-  `disable_drive_pm`; schema mechanics: §"Supervisor: option schema quirks").
+  field cannot distinguish "absent" from "false" (absent → "null", false → "false"). Shape optional per-item booleans so
+  absent and false MEAN THE SAME (invert the polarity: the safe default is the off state, which an untouched toggle then
+  both renders and behaves as - hd-idle's per-drive `keep_drive_pm`); a `list(yes|no)?` dropdown is for genuine
+  tri-state choices where absence must differ from both. Reading the field WITHOUT `// empty` and matching
+  `null`/`true`/`false` explicitly additionally rejects hand-edited non-boolean values loudly (schema mechanics:
+  §"Supervisor: option schema quirks").
 
 App-specific uses and consequences: `hd-idle/KNOWLEDGE.md` §"bashio option parsing (list-of-object options)",
 `hickory-dns/KNOWLEDGE.md` §"Option consumption (bashio)".

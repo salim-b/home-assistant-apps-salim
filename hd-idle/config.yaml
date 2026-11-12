@@ -34,12 +34,13 @@ schema:
       idle: "int(0,)"
       command_type: "list(scsi|ata)"
       power_condition: "int(0,15)"
-      # Per-drive drive-PM treatment toggle. An optional bool, read by hd-idle-genargs WITHOUT jq's `// empty`
-      # (jq folds an explicit false into "absent": root KNOWLEDGE.md §"bashio option consumption"): absent =
-      # enabled (the treatment default), false = keep the drive's own power management. The UI renders an
-      # untouched toggle as off - the field description states the default explicitly. Emitted as the drives
-      # file's pm-flag column.
-      disable_drive_pm: "bool?"
+      # Per-drive drive-PM opt-out. An optional bool, read by hd-idle-genargs WITHOUT jq's `// empty` (jq folds an
+      # explicit false into "absent", root KNOWLEDGE.md §"bashio option consumption") so hand-edited non-boolean
+      # values are rejected instead of silently folded: absent/false = the treatment applies (the default), true =
+      # the drive keeps its own power management. The inverted polarity makes the UI truthful - an untouched toggle
+      # renders off and behaves as off - so no app-side default handling is needed. Emitted as the drives file's
+      # pm-flag column.
+      keep_drive_pm: "bool?"
   debug: "bool?"
   activity_log: "bool?"
   ignore_spin_down_detection: "bool?"

@@ -34,20 +34,20 @@ configuration:
           Value sent with the SCSI spin-down command (`0`-`15`). `0` is
           right for nearly all drives. Only real SCSI/SAS drives need other
           values.
-      disable_drive_pm:
-        name: Disable drive power management
+      keep_drive_pm:
+        name: Keep drive power management
         description: >-
-          When enabled, the app disables this drive's own power management
-          (the Advanced Power Management (APM) level and the built-in
-          standby timer), so only the configured idle time puts the drive
-          to sleep - some drives and USB bridges otherwise wake themselves
-          up again shortly after a spin-down, invisibly to this app.
-          Enabled by default: a drive entry saved without touching this
-          switch behaves as enabled. Switch it off only for drives that
-          must keep their own power management. Note: switching this off
-          does not re-enable the drive's power management right away -
-          settings applied earlier are volatile but persist until the drive
-          is power-cycled.
+          When enabled, the app leaves this drive's own power management
+          alone: the drive keeps its Advanced Power Management (APM) level
+          and its built-in standby timer. The default is the opposite: the
+          app disables the drive's own power management so only the
+          configured idle time puts the drive to sleep - some drives and USB
+          bridges otherwise wake themselves up again shortly after a
+          spin-down, invisibly to this app. Switch this on only for drives
+          that must keep their own power management. Note: switching this on
+          does not restore the drive's power management right away - settings
+          the app applied earlier are volatile but persist until the drive is
+          power-cycled.
   debug:
     name: Debug mode
     description: >-

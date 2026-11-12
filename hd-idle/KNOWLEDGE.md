@@ -19,11 +19,11 @@ far are toolchain rebuilds with an unchanged CLI).
 The bashio option-consumption mechanics (array-option line shapes, the no-trailing-newline last-element hazard, the
 `// empty` string-only rule) are repository-wide facts: repository-root `KNOWLEDGE.md` §"bashio option consumption".
 hd-idle's reliance: hd-idle-genargs reads the `disks` option line by line (`bashio::jq "${entry}" '.field'`) — a shape
-change would break every entry (a lab boot with configured drives catches it), and the per-drive `disable_drive_pm`
-switch is a `bool?` read WITHOUT `// empty` (jq folds an explicit false into "absent", root `KNOWLEDGE.md` §"bashio
-option consumption"): hd-idle-genargs matches `null` (absent → treatment default: enabled), `true`, `false` and rejects
-anything else — the supervisor coerces legacy yes/no dropdown strings to booleans before the app ever sees them
-(`config.yaml`).
+change would break every entry (a lab boot with configured drives catches it), and the per-drive `keep_drive_pm` opt-out
+is a `bool?` read WITHOUT `// empty` (jq folds an explicit false into "absent", root `KNOWLEDGE.md` §"bashio option
+consumption"): hd-idle-genargs matches `true` (the drive keeps its own power management), `null`/`false` (both = the
+treatment applies) and rejects anything else — the supervisor coerces legacy yes/no dropdown strings to booleans before
+the app ever sees them (`config.yaml`).
 
 ## hd-idle CLI semantics relied upon by config.sh
 
@@ -195,9 +195,9 @@ Empirical findings from WD USB bridges (My Book 1110/1230/25EE, Elements 107C/25
 ## Drive-PM treatment
 
 `hd-idle-pmfix` disables the drives' own power management (ATA SET FEATURES: APM level off + standby timer off) for
-every managed drive whose pm-flag is 1 (the per-drive `disable_drive_pm` switch; entries saved without it behave as
-enabled) at boot and on drive (re)appearance — the watcher re-applies to NEW/CHANGED drives only (redundant treatment of
-sleeping drives risks bridge-mediated motor starts, §"USB-bridge behaviors").
+every managed drive whose pm-flag is 1 (pm-flag 0 = the per-drive `keep_drive_pm` opt-out) at boot and on drive
+(re)appearance — the watcher re-applies to NEW/CHANGED drives only (redundant treatment of sleeping drives risks
+bridge-mediated motor starts, §"USB-bridge behaviors").
 
 The drives file (`/etc/hd-idle.drives`, written by hd-idle-genargs next to the args file) is pmfix's machine-readable
 interface and the single source of truth for the per-drive decision: one `<kernel-name> <idle> <command-type> <pm-flag>`
@@ -205,8 +205,8 @@ line per drive (system-disk exclusion rows: `<kernel-name> 0 - 0` — the comman
 command is ever issued for them). pmfix treats only pm-flag 1 entries; the idle time plays no role — an idle-0 drive is
 a treatment target all the same (its firmware timer must not fight the user's "never spin down" config). config.sh and
 the watcher run pmfix unconditionally (a global-only bashio gate could not express per-drive switches);
-`--since <old-file>` treats only lines NEW or CHANGED relative to it — a flipped pm-flag counts as changed, so a newly
-overridden drive is treated exactly once and an unchanged override stays skipped.
+`--since <old-file>` treats only lines NEW or CHANGED relative to it — a flipped pm-flag counts as changed, so a drive
+whose opt-out flips is handled exactly once and an unchanged opt-out stays skipped.
 
 The treatment runs concurrently: hd-idle-pmfix dispatches one background job per treated drive (each drive's two SET
 FEATURES calls stay sequential) and logs the results in drives-file order after they all finish. Concurrent SG_IO to

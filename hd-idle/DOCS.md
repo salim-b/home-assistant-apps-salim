@@ -34,11 +34,10 @@ managers:
 
 ### Drive power management
 
-Drives – and some USB bridges – run their own power management that can conflict with hd-idle; the per-drive **Disable
-drive power management** switch handles that – it is enabled by default (a drive entry saved without touching the switch
-behaves as enabled), and its field description in the options UI has the why and the details. Switch it off for
-individual drives – for example when only some bridges need the treatment or one drive must keep its own power
-management.
+Drives – and some USB bridges – run their own power management that can conflict with hd-idle, so the app disables it by
+default (the drive-PM treatment; every managed drive gets it unless it opts out). The per-drive **Keep drive power
+management** switch opts individual drives out – switch it on for drives that must keep their own power management; its
+field description in the options UI has the why and the details.
 
 ### Command types
 
@@ -91,6 +90,6 @@ disk (useful when drives refuse to spin down); **Activity log** writes per-drive
   granted per configured drive by the supervisor's device policy – the system disk cannot be granted at all.
 - The hd-idle daemon runs under its own AppArmor sub-profile with all networking denied; it talks to no network service
   whatsoever.
-- The app never writes data to managed drives: it issues standby commands and, when the drive-PM treatment is enabled,
-  ATA SET FEATURES requests that switch off the drive's own power management (the settings described under **Disable
-  drive power management**) – but no data is ever written.
+- The app never writes data to managed drives: it issues standby commands and, unless a drive opts out via the **Keep
+  drive power management** switch, ATA SET FEATURES requests that switch off the drive's own power management – but no
+  data is ever written.
