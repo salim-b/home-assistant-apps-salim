@@ -17,14 +17,13 @@ Turn your Home Assistant instance into a secure DNS server that resolves via enc
 - **Static entries**: [`hosts.txt`](https://en.wikipedia.org/wiki/Hosts_(file))-style hostname-to-IP answers served
   locally as authoritative zones – reach self-hosted services by name from every LAN device without touching public DNS.
 - **Client ACL**: Only queries from the configured networks are served (private ranges + loopback by default).
-- **Hardened runtime**: Ships a custom [AppArmor](https://apparmor.net/) profile, and the daemon never runs as root: it
-  starts as `nobody` holding only the capability the port-53 bind requires.
+- **Hardened runtime**: Ships a custom [AppArmor](https://apparmor.net/) profile, and the daemon never runs as root
+  (details in the [documentation](/config/app/f8b2d53d_hickory-dns/documentation)).
 
 ## Limitations
 
-- **One port-53 binder per host**: The app joins the host network namespace and binds port 53 – it cannot run alongside
-  another DNS app (e.g. [AdGuard Home](https://github.com/hassio-addons/app-adguard-home) or
-  [Dnsmasq](https://github.com/home-assistant/apps/tree/master/dnsmasq)) on the same device.
+- **One port-53 binder per host**: the app cannot run alongside another DNS app (e.g. AdGuard Home, dnsmasq) on the same
+  device – details in the [documentation](/config/app/f8b2d53d_hickory-dns/documentation).
 - **DoH3 (HTTP/3) upstreams are not available yet**: the packaged binary's h3 feature is not in any tagged upstream
   release, so the app rejects DoH3 upstreams for now.
 - **No ad/blocklist support yet**: planned for a later release.

@@ -103,9 +103,8 @@
 - The grace period is only paid when there is client state to reclaim: after a boot with no recorded clients the server
   skips it entirely (the kernel's own fast path), and it ends early once all recorded clients have reclaimed. The
   default `grace_time` therefore grows from 10 seconds to the `lease_time` value (matching the kernel's 1:1 default
-  ratio): idle clients
-  - their state-manager renewals fire at ~lease/3 intervals - now get a full grace window to recover in, while fresh
-    boots and restarts without connected clients stay instant.
+  ratio): idle clients (their state-manager renewals fire at ~lease/3 intervals) now get a full grace window to recover
+  in, while fresh boots and restarts without connected clients stay instant.
 
 ## 0.4.0
 

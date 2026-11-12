@@ -198,8 +198,8 @@ Verified against v0.26.3 source; revisit when a tagged release + the apk carry t
   dev-host client evidence per repository-root `KNOWLEDGE.md` §"Device SSH: sessions run in the Terminal & SSH app"):
   the launcher's setpriv path ran exactly once per boot (its setgid/setuid/setpcap use is not denied), the daemon logged
   its dropped uid/gid 65534, the :53 binds serve real queries (UDP + TCP from a LAN client, plus the healthcheck's
-  loopback probes), and neither the app log nor the host journal carries an error/denial/AppArmor line. Re-verify after
-  the apk bump (app `TODO.md`).
+  loopback probes), and neither the app log nor the host journal carries an error/denial/AppArmor line. Re-verify on a
+  device after any apk pin bump (app `TODO.md`).
 
 ## Healthcheck
 
@@ -207,8 +207,8 @@ Verified against v0.26.3 source; revisit when a tagged release + the apk carry t
 hickory-dns-utils' client CLI) - socket + catalog + response, authoritative (no upstream dependency: a dead upstream
 must not mark a healthy local DNS server unhealthy). HEALTHCHECK timeout 10s (client query timeout is smaller). The
 daemon has no HTTP endpoint (the apk compiles without metrics features), so there is no watchdog URL - HEALTHCHECK is
-the only container-level wedge signal (repository-root KNOWLEDGE.md §"Supervisor: health events / watchdog"). A
-configured ACL without loopback entries gets them appended by the generator (with a warning) - loopback clients are
+the only container-level wedge signal (repository-root KNOWLEDGE.md §"Supervisor: health events and the app watchdog").
+A configured ACL without loopback entries gets them appended by the generator (with a warning) - loopback clients are
 always served.
 
 - **The probe queries SOA, not the A record** (device-verified 2026-10-24: A and AAAA positive answers WARN + exit 0;
@@ -227,14 +227,13 @@ always served.
 ## apk package pins and CA trust
 
 `hickory-dns` + `hickory-dns-utils` are pinned with full `pkgver-pkgrel` (the generated config encodes the binary's
-interface - named.toml schema + CLI; repository-root KNOWLEDGE.md §"apk package version policy"). Pin 0.26.1-r0; the
-aports MRs bumping to v0.26.3 (v0.26.2 fixed ~38 GHSA advisories) are tracked in `hickory-dns/TODO.md`. The aports
-APKBUILD compiles with `tls-aws-lc-rs,https-aws-lc-rs,quic-aws-lc-rs,dnssec-aws-lc-rs,rustls-platform-verifier` (+
-blocklist, recursor, resolver for the bin) - DoH3 is absent (§"Deferred feature ground truth (upstream gaps)").
-`rustls-platform-verifier` reads the system trust store: `ca-certificates-bundle` is installed explicitly (floating;
-certificate data package). `hickory-dns-utils` ships `/usr/bin/dns`, `/usr/bin/recurse`, `/usr/bin/resolve` (used by the
-healthcheck and the hostname resolution); the main package ships `/usr/bin/hickory-dns` (renamed from `named` at 0.24.0,
-no alias).
+interface - named.toml schema + CLI; repository-root KNOWLEDGE.md §"apk package version policy"). Pin 0.26.3-r0 (v0.26.2
+fixed ~38 GHSA advisories). The aports APKBUILD compiles with
+`tls-aws-lc-rs,https-aws-lc-rs,quic-aws-lc-rs,dnssec-aws-lc-rs,rustls-platform-verifier` (+ blocklist, recursor,
+resolver for the bin) - DoH3 is absent (§"Deferred feature ground truth (upstream gaps)"). `rustls-platform-verifier`
+reads the system trust store: `ca-certificates-bundle` is installed explicitly (floating; certificate data package).
+`hickory-dns-utils` ships `/usr/bin/dns`, `/usr/bin/recurse`, `/usr/bin/resolve` (used by the healthcheck and the
+hostname resolution); the main package ships `/usr/bin/hickory-dns` (renamed from `named` at 0.24.0, no alias).
 
 ## Config-file and data layout
 

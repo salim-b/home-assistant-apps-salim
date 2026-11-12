@@ -15,9 +15,9 @@ device access on Home Assistant OS, which also keeps the system disk out of reac
 
 ### Selecting drives
 
-Pick each drive from the dropdown, which lists the system's block devices by their stable `/dev/disk/by-id` paths (these
-survive re-plugging and reboots, even when the kernel name changes); select the **disk itself**, never a partition. See
-the **Drives** field description in the options UI for the details.
+Pick each drive from the dropdown and select the **disk itself**, never a partition — see the **Drives** field
+description in the options UI for the details. The by-id paths survive re-plugging and reboots even when the kernel name
+changes.
 
 On startup the app logs an inventory of all detected `sd*` disks and the mapping of every configured drive to its kernel
 name, so log lines like `sda spindown` can be attributed. Each inventory line shows the drive model, its by-id path and
@@ -34,21 +34,16 @@ managers:
 
 ### Drive power management
 
-Drives run their own power management (an APM level and an internal standby timer) that can conflict with hd-idle - some
-USB bridge firmwares wake the drive again shortly after an external spindown, invisibly to the app's I/O monitoring. The
-**Disable drive power management** option (on by default) disables both for every managed drive - regardless of the
-drive's idle time, so even a drive configured to never spin down does not get put to sleep by its own power management;
-see its field description in the options UI for the details. Individual drives can override the global setting with
-their own **Disable drive power management** field in the drive list (`yes`/`no`; empty follows the global setting) -
-for example when only some bridges need the treatment or one drive must keep its own power management. Switching the
-treatment off (globally or per drive) does not actively restore the drive's power management: the settings applied
-earlier are volatile but persist until the drive is power-cycled.
+Drives - and some USB bridges - run their own power management that can conflict with hd-idle; the **Disable drive power
+management** option (on by default) handles that - its field description in the options UI has the why and the details.
+Individual drives can override it with their own **Disable drive power management** field in the drive list (`yes`/`no`;
+empty follows the global setting) - for example when only some bridges need the treatment or one drive must keep its own
+power management.
 
 ### Command types
 
-The spin-down command is sent via one of two APIs - **`scsi`** (default) or **`ata`**; see the **Command type** and
-**Power condition** field descriptions in the options UI for the details and when to use which. If a USB drive refuses
-to spin down with `scsi`, try `ata`.
+The spin-down command is sent via one of two APIs - **`scsi`** (default) or **`ata`**; the **Command type** and **Power
+condition** field descriptions in the options UI explain both and when to use which.
 
 ### System disk protection
 
@@ -72,14 +67,15 @@ automatically with the updated configuration (within about half a minute); no ma
 
 ## Activity log and debugging
 
-With **Activity log** enabled, hd-idle writes per-drive spin-up records (running/standby durations) to
-`/data/hd-idle.log` in the app's persistent data directory. Spin-down/spin-up events always appear in the app log;
-**Debug mode** adds a per-monitoring-cycle state dump for every disk (useful when drives refuse to spin down).
+Spin-down/spin-up events always appear in the app log. **Debug mode** adds a per-monitoring-cycle state dump for every
+disk (useful when drives refuse to spin down); **Activity log** writes per-drive run/standby records to
+`/data/hd-idle.log` - both field descriptions in the options UI have the details.
 
 ## Limitations
 
-- **Only `sd*` disks are monitored** (see the README): NVMe, SD/eMMC and loop devices are never touched, and NVMe drives
-  cannot be managed.
+- **Only `sd*` disks are monitored**: hd-idle reads `/proc/diskstats` and only acts on SCSI-layer disks (`sdX`) and
+  device-mapper devices attributed to them; NVMe, SD/eMMC and loop devices are never touched, and NVMe drives cannot be
+  managed.
 - **Do not run SMART-polling tools alongside** (smartmontools and apps built on it): their polling keeps waking drives
   and their activities are invisible to hd-idle. The upstream hd-idle documentation says the same about disk monitoring
   tools generally.

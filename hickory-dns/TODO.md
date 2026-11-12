@@ -20,6 +20,9 @@ procedures in the skill `hickory-dns-runtime`.
 - Once hickory-dns 0.26.4+ is released shipping <https://github.com/hickory-dns/hickory-dns/pull/4128>, query an `A`
   instead of `SOA` record in `hickory-dns-healthcheck`.
 
+- Re-run the live test on a device against the current pin (0.26.3-r0): the launcher's capability path was
+  device-verified on daemon 0.26.1 only (facts: `KNOWLEDGE.md` §"Port 53 binding and privileges").
+
 - **Blocklist support (deferred)**: upstream ground truth and the design sketch: `KNOWLEDGE.md` §"Deferred feature
   ground truth (upstream gaps)".
 
@@ -78,4 +81,5 @@ procedures in the skill `hickory-dns-runtime`.
   zone's `$TTL` directive and validated (0 is legal per RFC 1035 - clients then don't cache). Settle in design: whether
   the SOA minimum (the leaf zones' negative TTL, currently 300) follows the entry TTL, and which entry's TTL the shared
   reverse zone gets when several entries share one address. Covers: config option/schema/translations, generator
-  emission + validation, §"Static entries" facts, regression-sandbox snapshot update, lab, version bump + CHANGELOG.
+  emission + validation, §"Static entries (no hosts-file store upstream)" facts, regression-sandbox snapshot update,
+  lab, version bump + CHANGELOG.

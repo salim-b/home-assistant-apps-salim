@@ -92,10 +92,10 @@ clients' write opens get `NFS4ERR_GRACE` and retry — writes appear to stall; a
 fails with `EINTR` (busybox ash: `can't create …: Interrupted system call`). With the shipped `nfsdcld` tracker the
 grace is only paid when client records exist: fresh boots skip it via the kernel's fast path (needs
 `track_reclaim_completes`, set by the cld-v2 tracker init — `nfs4_state_start_net`'s skip path), and the grace ends
-early once all recorded clients have reclaimed. The app's `--grace-time` default matches the lease time (before the
-tracker shipped it was 10 s of pure dead time; see `nfsd-start`). Writes to `/proc/fs/nfsd/v4_end_grace` end the grace
-regardless of any tracker (v6.18: the only guard is a running server, else `EBUSY`) — but that would deny late
-reclaimers their window, so it is not a useful lever for a server that wants clients to recover.
+early once all recorded clients have reclaimed. The app's `--grace-time` default matches the lease time. Writes to
+`/proc/fs/nfsd/v4_end_grace` end the grace regardless of any tracker (v6.18: the only guard is a running server, else
+`EBUSY`) — but that would deny late reclaimers their window, so it is not a useful lever for a server that wants clients
+to recover.
 
 ## NFSv4 client state recovery (nfsdcld + per-netns rpc_pipefs)
 

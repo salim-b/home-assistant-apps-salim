@@ -13,25 +13,22 @@ server.
   clients with its own export options ([`exports(5)`](https://man.cx/exports(5)) syntax). The same directory may be
   exported to different networks with different options. Entries are validated in the configuration dialog and again at
   startup.
-- **Client state recovery**: NFSv4 clients that are connected across an app restart or update keep their state – open
-  files, byte-range locks and delegations – and reclaim it from the tracker's records during the grace period that
-  follows. The tracker (`nfsdcld`) keeps its persistent state in the app's data directory, and the grace period is
-  skipped entirely when there is nothing to recover.
+- **Client state recovery**: NFSv4 clients connected across an app restart or update keep their state – open files,
+  byte-range locks and delegations (details in the [documentation](/config/app/f8b2d53d_nfs-server/documentation)).
 - **Hardened runtime**: Ships a custom [AppArmor](https://apparmor.net/) profile that restricts mounts and capabilities
   to what the server needs.
 
 ## Limitations
 
-- **Requires kernel support**: The host kernel must provide the `nfsd` kernel module (`CONFIG_NFSD`). [Home Assistant
-  OS](https://github.com/home-assistant/operating-system) ships it on the ODROID-M1/M1S, Home Assistant Green, Raspberry
-  Pi 3/4/5 and Home Assistant Yellow boards — not yet on the generic/OVA images and ODROID-C2/C4/N2 and Khadas VIM3
-  ([upstream proposal](https://github.com/orgs/home-assistant/discussions/5334)); on boards without the module the app
-  fails to start with an explanatory error message.
+- **Requires kernel support**: The host kernel must provide the `nfsd` kernel module (`CONFIG_NFSD`) – shipped on
+  several [Home Assistant OS](https://github.com/home-assistant/operating-system) boards, missing on others (board list
+  in the [documentation](/config/app/f8b2d53d_nfs-server/documentation)); on boards without the module the app fails to
+  start with an explanatory error message.
 - **NFSv4+ only**: The app serves the [NFSv4+](https://en.wikipedia.org/wiki/Network_File_System#NFSv4) protocol; NFSv2
   and NFSv3 clients cannot connect. Mount with `-t nfs4`.
 - **Network-level access control only**: No cryptographic authentication (`sec=sys`) – a client's claimed user ID is
-  taken at face value. The allowed client networks of each share are the only access control, and the NFS port is
-  published on all host interfaces (restricting reachability is a router/firewall concern).
+  taken at face value; the allowed client networks are the only access control (details in the
+  [documentation](/config/app/f8b2d53d_nfs-server/documentation)).
 
 ## Documentation
 

@@ -153,8 +153,7 @@ Formula, branches and sources: repository-root `KNOWLEDGE.md` §"Supervisor: app
 - It uses the **global default** command type / power condition only (single-disk mode skips the per-device config
   entirely).
 
-No in-app caller since the diagnostics build was reverted; the lab spindown smoke test drives it via `docker exec`, and
-it is useful for manual debugging.
+No in-app caller; the lab spindown smoke test drives it via `docker exec`, and it is useful for manual debugging.
 
 ## USB-bridge behaviors
 

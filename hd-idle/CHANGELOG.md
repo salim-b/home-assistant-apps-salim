@@ -139,11 +139,11 @@
 
 ## 0.1.2
 
-Development version, never published - consumed by a transitory test build during the 0.1.3 branch's development.
+Development version, never published.
 
 ## 0.1.1
 
-Development version, never published - consumed by a transitory test build during the 0.1.3 branch's development.
+Development version, never published.
 
 ## 0.1.0
 
