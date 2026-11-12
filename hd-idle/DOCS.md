@@ -8,10 +8,10 @@ restarts the app, which re-validates the configuration and regenerates the hd-id
 
 ### Drive list semantics
 
-Every **listed** drive is managed: it follows the global defaults (**Default idle time**, **Default command type**,
-**Default power condition**) wherever its own fields are left empty, an idle time of `0` never spins it down, and
-unlisted drives – including anything that appears on the system later – are never touched. Only listed drives receive
-device access on Home Assistant OS, which also keeps the system disk out of reach.
+Every **listed** drive is managed with the settings configured on its own entry (**Idle time**, **Command type**,
+**Power condition** – all required); an idle time of `0` never spins it down, and unlisted drives – including anything
+that appears on the system later – are never touched. Only listed drives receive device access on Home Assistant OS,
+which also keeps the system disk out of reach.
 
 ### Selecting drives
 
@@ -34,15 +34,15 @@ managers:
 
 ### Drive power management
 
-Drives – and some USB bridges – run their own power management that can conflict with hd-idle; the **Disable drive power
-management** option (on by default) handles that – its field description in the options UI has the why and the details.
-Individual drives can override it with their own **Disable drive power management** field in the drive list (`yes`/`no`;
-empty follows the global setting) – for example when only some bridges need the treatment or one drive must keep its own
-power management.
+Drives – and some USB bridges – run their own power management that can conflict with hd-idle; the per-drive **Disable
+drive power management** switch handles that – it is enabled by default (a drive entry saved without touching the switch
+behaves as enabled), and its field description in the options UI has the why and the details. Switch it off for
+individual drives – for example when only some bridges need the treatment or one drive must keep its own power
+management.
 
 ### Command types
 
-The spin-down command is sent via one of two APIs – **`scsi`** (default) or **`ata`**; the **Command type** and **Power
+The spin-down command is sent via one of two APIs – **`scsi`** or **`ata`**; the **Command type** and **Power
 condition** field descriptions in the options UI explain both and when to use which.
 
 ### System disk protection
@@ -87,8 +87,8 @@ disk (useful when drives refuse to spin down); **Activity log** writes per-drive
 ## Security notes
 
 - The app requests `SYS_RAWIO` because hd-idle's `ata` command type uses SCSI passthrough commands (ATA PASS-THROUGH)
-  that the kernel only permits with that capability; the default `scsi` command type works without it. Drive access
-  itself is granted per configured drive by the supervisor's device policy – the system disk cannot be granted at all.
+  that the kernel only permits with that capability; the `scsi` command type works without it. Drive access itself is
+  granted per configured drive by the supervisor's device policy – the system disk cannot be granted at all.
 - The hd-idle daemon runs under its own AppArmor sub-profile with all networking denied; it talks to no network service
   whatsoever.
 - The app never writes data to managed drives: it issues standby commands and, when the drive-PM treatment is enabled,

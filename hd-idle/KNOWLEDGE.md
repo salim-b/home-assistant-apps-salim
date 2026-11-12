@@ -20,7 +20,9 @@ The bashio option-consumption mechanics (array-option line shapes, the no-traili
 `// empty` string-only rule) are repository-wide facts: repository-root `KNOWLEDGE.md` §"bashio option consumption".
 hd-idle's reliance: hd-idle-genargs reads the `disks` option line by line (`bashio::jq "${entry}" '.field'`) — a shape
 change would break every entry (a lab boot with configured drives catches it), and the per-drive `disable_drive_pm`
-override is a `list(yes|no)?` dropdown, not a `bool?`, so "empty" visibly means "follow the global setting"
+switch is a `bool?` read WITHOUT `// empty` (jq folds an explicit false into "absent", root `KNOWLEDGE.md` §"bashio
+option consumption"): hd-idle-genargs matches `null` (absent → treatment default: enabled), `true`, `false` and rejects
+anything else — the supervisor coerces legacy yes/no dropdown strings to booleans before the app ever sees them
 (`config.yaml`).
 
 ## hd-idle CLI semantics relied upon by config.sh
@@ -28,7 +30,8 @@ override is a `list(yes|no)?` dropdown, not a `bool?`, so "empty" visibly means 
 Verified against the v1.22 source (`main.go`, `hdidle.go`):
 
 - Arguments before the first `-a` set the global defaults; each `-a` seeds a per-device config from the defaults parsed
-  so far; `-i`/`-c`/`-p` after a `-a` override that device — the generator emits defaults first, then entries.
+  so far; `-i`/`-c`/`-p` after a `-a` override that device — the generator emits `-s 1 -i 0` globally (unlisted drives
+  are pinned to never spin down) and explicit `-i`/`-c`/`-p` per entry; there are no app-level global defaults.
 - First-match-wins: `deviceConfig()` returns the first entry matching the `/proc/diskstats` name. The global idle is
   pinned to `0` (unlisted drives are never touched — device access is per listed drive only); an explicit `-i` follows
   EVERY `-a` (per-drive or default idle), so the passthrough path for detached drives inherits the right idle without a
@@ -150,8 +153,9 @@ Formula, branches and sources: repository-root `KNOWLEDGE.md` §"Supervisor: app
 - The disk argument needs the **full `/dev/` path**: single-shot passes the argument straight to `openDevice` (the
   daemon path prefixes `/dev/`) — bare names fail (`open sda: no such file or directory`); the usage string's `-t sda`
   example is misleading.
-- It uses the **global default** command type / power condition only (single-disk mode skips the per-device config
-  entirely).
+- It uses hd-idle's **built-in defaults** for command type (`scsi`) and power condition (`0`) — verified against the
+  v1.22 source (`main.go`, `defaultConf`), which matter because the app no longer sets global `-c`/`-p` (single-disk
+  mode skips the per-device config entirely, so per-drive settings are ignored).
 
 No in-app caller; the lab spindown smoke test drives it via `docker exec`, and it is useful for manual debugging.
 
@@ -191,18 +195,18 @@ Empirical findings from WD USB bridges (My Book 1110/1230/25EE, Elements 107C/25
 ## Drive-PM treatment
 
 `hd-idle-pmfix` disables the drives' own power management (ATA SET FEATURES: APM level off + standby timer off) for
-every managed drive whose EFFECTIVE pm-flag is 1 (the global `disable_drive_pm` option as the default, per-drive
-`disable_drive_pm` yes/no overrides) at boot and on drive (re)appearance — the watcher re-applies to NEW/CHANGED drives
-only (redundant treatment of sleeping drives risks bridge-mediated motor starts, §"USB-bridge behaviors").
+every managed drive whose pm-flag is 1 (the per-drive `disable_drive_pm` switch; entries saved without it behave as
+enabled) at boot and on drive (re)appearance — the watcher re-applies to NEW/CHANGED drives only (redundant treatment of
+sleeping drives risks bridge-mediated motor starts, §"USB-bridge behaviors").
 
 The drives file (`/etc/hd-idle.drives`, written by hd-idle-genargs next to the args file) is pmfix's machine-readable
-interface and the single source of truth for the effective per-drive decision: one
-`<kernel-name> <idle> <command-type> <pm-flag>` line per drive with effective values (exclusions: idle 0, pm-flag 0).
-pmfix treats only pm-flag 1 entries; the idle time plays no role — an idle-0 drive is a treatment target all the same
-(its firmware timer must not fight the user's "never spin down" config). config.sh and the watcher run pmfix
-unconditionally (a global-only bashio gate could not express per-drive overrides); `--since <old-file>` treats only
-lines NEW or CHANGED relative to it — a flipped pm-flag counts as changed, so a newly overridden drive is treated
-exactly once and an unchanged override stays skipped.
+interface and the single source of truth for the per-drive decision: one `<kernel-name> <idle> <command-type> <pm-flag>`
+line per drive (system-disk exclusion rows: `<kernel-name> 0 - 0` — the command-type column is `-` because no spin-down
+command is ever issued for them). pmfix treats only pm-flag 1 entries; the idle time plays no role — an idle-0 drive is
+a treatment target all the same (its firmware timer must not fight the user's "never spin down" config). config.sh and
+the watcher run pmfix unconditionally (a global-only bashio gate could not express per-drive switches);
+`--since <old-file>` treats only lines NEW or CHANGED relative to it — a flipped pm-flag counts as changed, so a newly
+overridden drive is treated exactly once and an unchanged override stays skipped.
 
 The treatment runs concurrently: hd-idle-pmfix dispatches one background job per treated drive (each drive's two SET
 FEATURES calls stay sequential) and logs the results in drives-file order after they all finish. Concurrent SG_IO to

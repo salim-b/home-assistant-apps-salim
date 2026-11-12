@@ -17,7 +17,8 @@ The app generates that command line from the app options and keeps it in sync wi
   option reads and no jq (facts: §"hd-idle-watch design").
 - `/etc/hd-idle.args` — one line: the daemon argv, word-split by the s6 run script (every token must be space-free).
 - `/etc/hd-idle.drives` — hd-idle-pmfix's interface: one `<kernel-name> <idle> <command-type> <pm-flag>` line per drive
-  with effective values (format and semantics: §"Drive-PM treatment").
+  with per-drive values (format and semantics: §"Drive-PM treatment"; system-disk exclusion rows use `-` as the
+  command-type column).
 - `/etc/hd-idle.resolution` — the baseline state file, written LAST (commit point of the three-file install).
 - `/usr/bin/hd-idle-pmfix` — drive-PM treatment via smartctl (§"Drive-PM treatment").
 - `/usr/bin/hd-idle-healthcheck` — the Docker HEALTHCHECK probe (stats file + daemon process; §"Daemon failure
@@ -54,7 +55,7 @@ Why the watcher exists at all — hd-idle's `-s 1` never re-verifies resolved en
 ## Drive-PM treatment flow
 
 `hd-idle-pmfix` runs unconditionally at boot and after every regeneration (a global-only gate could not express
-per-drive overrides; drives-file interface and why: §"Drive-PM treatment"); it skips pm-flag-0 drives.
+per-drive switches; drives-file interface and why: §"Drive-PM treatment"); it skips pm-flag-0 drives.
 `--since <old-drives-file>` restricts treatment to lines that are NEW or CHANGED (a flipped pm-flag counts as changed —
 redundant-treatment risk: §"USB-bridge behaviors").
 
@@ -72,15 +73,18 @@ redundant-treatment risk: §"USB-bridge behaviors").
 - ata-path commands failing with EPERM: two independent gates must be open — `capability sys_rawio,` in BOTH profiles
   and `/dev/sd* rwk,` (§"SG_IO privileges").
 - Power-state probes: `hdparm -C` wakes drives — use `smartctl -H -n standby` (§"USB-bridge behaviors").
-- Manual single-shot: `hd-idle -t /dev/sdX` needs the full `/dev/` path and uses the global defaults only (§"hd-idle -t
-  quirks"); in the lab drive it via `docker exec`.
+- Manual single-shot: `hd-idle -t /dev/sdX` needs the full `/dev/` path and uses hd-idle's built-in defaults for command
+  type/power condition (`scsi`/`0`; the app no longer sets global `-c`/`-p`) (§"hd-idle -t quirks"); in the lab drive it
+  via `docker exec`.
 
 ## Extending
 
-- Adding a per-drive option: add the schema field — optional per-drive dropdowns are `list(yes|no)?`, never `bool?`
-  (§"bashio option parsing (list-of-object options)"); read it in hd-idle-genargs (space-free check), emit it as a
-  drives-file column or argv token, and let the consumer (pmfix or hd-idle) decide per drive. Extend the genargs/pmfix
-  decision matrix in the lab.
+- Adding a per-drive option: add the schema field — a tri-state per-drive choice is a `list(yes|no)?` dropdown, never a
+  `bool?` with `// empty` (the jq false-vs-empty rule); a `bool?` is only for switches whose ABSENCE must mean the
+  default (read without `// empty`, match `null`/`true`/`false` — the per-drive `disable_drive_pm` pattern) (§"bashio
+  option parsing (list-of-object options)"); read it in hd-idle-genargs (space-free check), emit it as a drives-file
+  column or argv token, and let the consumer (pmfix or hd-idle) decide per drive. Extend the genargs/pmfix decision
+  matrix in the lab.
 - hd-idle CLI/packaging: the Dockerfile pins apk package versions because genargs encodes the CLI — a package bump is a
   deliberate app release (root `KNOWLEDGE.md` §"apk package version policy"; release discipline: skill
   `ha-app-workflow`).

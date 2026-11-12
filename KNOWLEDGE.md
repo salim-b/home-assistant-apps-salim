@@ -372,7 +372,9 @@ gotchas".
   `127.0.0.0/8` fails with `jq: parse error: Invalid numeric literal` (exit 5) — only object lines (valid JSON) do.
 - **`'<field> // empty'` is valid only for STRING-typed fields**: jq treats `false` as empty, so an optional BOOLEAN
   field cannot distinguish "absent" from "false" (absent → "null", false → "false") — optional per-item checkboxes are
-  therefore modeled as `list(yes|no)?` dropdowns, not `bool?` (schema mechanics: §"Supervisor: option schema quirks").
+  therefore modeled as `list(yes|no)?` dropdowns, not `bool?` — UNLESS the absence itself carries meaning (a default-on
+  switch): then read the field WITHOUT `// empty` and match `null`/`true`/`false` explicitly (hd-idle's per-drive
+  `disable_drive_pm`; schema mechanics: §"Supervisor: option schema quirks").
 
 App-specific uses and consequences: `hd-idle/KNOWLEDGE.md` §"bashio option parsing (list-of-object options)",
 `hickory-dns/KNOWLEDGE.md` §"Option consumption (bashio)".

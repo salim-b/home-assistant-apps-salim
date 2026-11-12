@@ -11,8 +11,8 @@ Spin down idle USB and SATA hard disk drives automatically.
   time.
 - **Per-drive configuration**: Every managed drive gets its own idle time, command type, power condition and
   power-management treatment, selected from a dropdown of the system's drives by their stable `/dev/disk/by-id` paths.
-- **Drive list with global defaults**: List each drive once – it follows the global default idle time unless configured
-  individually (`0` = never spin down). Unlisted drives are never touched.
+- **Explicit drive list**: List each drive once with its own settings – idle time (`0` = never spin down), spin-down
+  command type and power condition. Unlisted drives are never touched.
 - **Hotplug-aware**: Drives are granted device access dynamically (including after re-plugging), and disk IDs are
   re-resolved to their device paths at runtime – drives moved between ports or machines are picked up automatically
   without a restart.
