@@ -13,31 +13,23 @@ over SSH only on explicit user request (skill `ha-app-workflow`); otherwise hand
 
 ## Semantics that outlive the flags
 
-- **Remote evidence model**: SSH sessions run inside the Terminal & SSH app, not the HAOS host — host processes and
-  sockets are invisible (facts: root `KNOWLEDGE.md` §"Device SSH: sessions run in the Terminal & SSH app"). Assert
-  process/socket-level behavior from the app's own log and network behavior from client probes on the dev host.
+- **Remote evidence model**: SSH sessions run inside the Terminal & SSH app, not the HAOS host (facts: root
+  `KNOWLEDGE.md` §"Device SSH: sessions run in the Terminal & SSH app") — assert process/socket-level behavior from the
+  app's own log and network behavior from client probes on the dev host.
 
-- **Stored options are user data**: written at first install and at save time only; update and rebuild preserve them;
-  `config.yaml` default changes never reach existing installs. Facts: root `KNOWLEDGE.md` §"Supervisor: option schema
-  quirks".
+- **Stored options are user data**: `config.yaml` default changes never reach existing installs (facts: root
+  `KNOWLEDGE.md` §"Supervisor: option schema quirks").
 
-- **An uninstall purges stored options** in every case (the `--remove-config` flag only additionally deletes the app's
-  `/data` config folder), so a reinstall always runs the app's default options. Any option set that would die with an
-  uninstall is archived to a local backup file first (path printed) — that backup is the only surviving copy.
+- **An uninstall purges stored options** in every case, so a reinstall always runs the app's default options (facts:
+  root `KNOWLEDGE.md` §"Supervisor: option schema quirks"). Any option set that would die with an uninstall is archived
+  to a local backup file first (path printed) — that backup is the only surviving copy.
 
 - **`apply-options`** applies a JSON (or YAML) options file to an installed copy as its complete options —
-  schema-filtered like the `--config migrate` flows (dropped keys reported), with the copy's current options backed up
-  locally first (path printed). Facts: root `KNOWLEDGE.md` §"Supervisor: option schema quirks".
+  schema-filtered with dropped keys reported (facts: root `KNOWLEDGE.md` §"Supervisor: option schema quirks"), with the
+  copy's current options backed up locally first (path printed).
 
-- The `deploy` task comments out the top-level `image:` key in the device copy so the Supervisor builds the image
-  locally instead of pulling from GHCR (only `deploy:local` does this; `deploy:registry` reinstalls from the app
-  repository and migrates the options).
-
-- A repository-installed copy uses a hashed store slug (e.g. `f8b2d53d_nfs-server`) and conflicts on ports with a local
-  install; `--replace` uninstalls it first. `--config` decides the previous options' fate — see `--help`.
-
-- `deploy:registry` switches a device from the local `/local_apps` copy to the app-repository install (the hashed store
-  slug is discovered from the device's store listing).
+- Deploy-task semantics (image-key commenting-out, store-slug conflicts, `--replace`/`--config` option fates) are
+  documented for users in repository `README.md` §"Development".
 
 ## test:live specifics
 

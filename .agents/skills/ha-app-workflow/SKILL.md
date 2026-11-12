@@ -50,8 +50,7 @@ Run `mise run check` — lint plus validate; it is the same gate CI runs. Lint-s
   — unless the CI config itself is wrong.
 - Builder caveats: the init job needs `fetch-depth: 0` — the changed-files filter otherwise only sees the tip commit and
   silently skips multi-commit merges, so use regular merges instead of squash merges.
-- The app `Dockerfile` must not pull from Docker Hub at build time — this includes the `# syntax=docker/dockerfile:1`
-  directive (its frontend image comes from Docker Hub; buildx's builtin frontend suffices).
+- The app `Dockerfile` must not pull from Docker Hub at build time (rule and rationale: skill `ha-app-scaffolding`).
 - The lint workflow runs frenck's app linter natively (pinned source plus pypi requirements), not via its Docker action
   (whose Docker Hub image builds flaked with 504s and 429 runner-pool rate limits).
 - In `.github/workflows/`, match GitHub users and bots by immutable user id, never by `login` (root `KNOWLEDGE.md`

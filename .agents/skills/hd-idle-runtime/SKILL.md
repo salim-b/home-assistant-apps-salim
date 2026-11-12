@@ -53,12 +53,10 @@ Why the watcher exists at all — hd-idle's `-s 1` never re-verifies resolved en
 
 ## Drive-PM treatment flow
 
-- The drives file is the single source of truth for the effective per-drive decision: the global `disable_drive_pm`
-  option is the default, per-drive yes/no overrides land in the pm-flag column. config.sh and the watcher therefore run
-  `hd-idle-pmfix` unconditionally (a global-only gate could not express per-drive overrides); it skips pm-flag-0 drives.
-- `--since <old-drives-file>` restricts treatment to lines that are NEW or CHANGED (a flipped pm-flag counts as changed,
-  so a newly overridden drive is treated exactly once): redundant treatment of sleeping drives risks bridge-mediated
-  motor starts (per-bridge reality: §"Drive-PM treatment" and §"USB-bridge behaviors").
+`hd-idle-pmfix` runs unconditionally at boot and after every regeneration (a global-only gate could not express
+per-drive overrides; drives-file interface and why: §"Drive-PM treatment"); it skips pm-flag-0 drives.
+`--since <old-drives-file>` restricts treatment to lines that are NEW or CHANGED (a flipped pm-flag counts as changed —
+redundant-treatment risk: §"USB-bridge behaviors").
 
 ## Debugging playbook
 
@@ -69,9 +67,8 @@ Why the watcher exists at all — hd-idle's `-s 1` never re-verifies resolved en
 - A drive detached at boot is passed through for hd-idle's runtime resolution and recorded as PASSTHRU in the baseline;
   the watcher restarts hd-idle once it resolves.
 - Two by-id symlinks for the same drive with one detached at boot: genargs' duplicate-entry rejection fires every tick
-  (ERROR lines every 30 s until the config is fixed); the known-good configuration stays in place meanwhile.
-- A restart does NOT spin up drives in standby: hd-idle sends no command at startup; idle timers restart and an
-  activity-log "running" period spanning a restart is misaccounted.
+  while the known-good configuration stays in place (§"hd-idle-watch design").
+- A restart does not spin up drives in standby; idle timers restart (§"hd-idle-watch design").
 - ata-path commands failing with EPERM: two independent gates must be open — `capability sys_rawio,` in BOTH profiles
   and `/dev/sd* rwk,` (§"SG_IO privileges").
 - Power-state probes: `hdparm -C` wakes drives — use `smartctl -H -n standby` (§"USB-bridge behaviors").

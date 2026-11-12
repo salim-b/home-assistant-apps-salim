@@ -14,12 +14,12 @@ Procedures for lab/device testing and releases live in the skills `ha-app-lab-te
 
 ## Architecture orientation
 
-- **NFSv4 only**: the server is started with `--no-nfs-version 3` (NFSv2 server support is not compiled into current
-  kernels anyway); no `rpcbind`, no MOUNT protocol.
+- **NFSv4 only**: the server is started with `--no-nfs-version 3` (NFSv2 support: §"`rpc.nfsd` is not a daemon"); no
+  `rpcbind`, no MOUNT protocol.
 - **Pseudo root + bind-mount mirrors**: the container's overlayfs root is not NFS-exportable, so the app builds the
   NFSv4 pseudo file system root on `/data` (the persistent volume) at `/data/pseudo_root`: every share path under
-  `/share`/`/media` is bind-mounted at `/data/pseudo_root<share-path>` (a private bind clone, outside the host's mount
-  propagation chain) and the export lines point at the mirrored paths — client-visible paths stay unchanged.
+  `/share`/`/media` is bind-mounted at `/data/pseudo_root<share-path>` (private bind clones: §"Automatic mirror refresh
+  (nfsd-watch)") and the export lines point at the mirrored paths — client-visible paths stay unchanged.
 - **`/etc/exports` generation**: the shared helper `/usr/bin/nfsd-apply` writes one line per (share, network) with a
   distinct numeric `fsid=` (per-apply counter), plus a read-only `fsid=0` pseudo-root entry per client network. Why
   numeric fsids are essential and how duplicate lines behave: §"mountd and the pseudo file system root", §"Export-cache
@@ -43,8 +43,8 @@ s6-rc.d"), in dependency order:
 4. **`nfsd` oneshot** — up script `/etc/s6-overlay/scripts/nfsd-start`: `exportfs -a`, then the generated command line
    from `/etc/nfsd.args` (execute it as an array — see the invariant comment in nfsd-start for why the string form
    breaks). **`rpc.nfsd` is NOT a daemon**: it configures the in-kernel server (version set, sockets, lease/grace time,
-   thread count) and exits, hence a oneshot (§"rpc.nfsd is not a daemon"); its down script `nfsd-stop` tears the server
-   and the mirrors down, deepest mirror first.
+   thread count) and exits, hence a oneshot (§"`rpc.nfsd` is not a daemon"); its down script `nfsd-stop` tears the
+   server and the mirrors down, deepest mirror first.
 5. **`nfsd-watch` longrun**: 30 s poll (override `NFSD_WATCH_INTERVAL`, floored at 5 s), runs
    `nfsd-apply --quiet --check` and cycles the kernel server on change (§"Automatic mirror refresh (nfsd-watch)").
 6. **`nfsd-healthcheck`**: the Docker HEALTHCHECK probe — TCP connect to port 2049 at the recorded app IP, with a
@@ -94,7 +94,7 @@ recovery (nfsdcld + per-netns rpc_pipefs)").
   the legacy trackers logs "Unable to initialize client recovery tracking! (-2)" there) — §"NFSv4 client state recovery
   (nfsdcld + per-netns rpc_pipefs)".
 - **`write error: Invalid argument` writing `/proc/fs/nfsd/*` from bash** → the writev(2) trap, not a content problem;
-  use busybox `echo`/`cat`/rpc.nfsd — skill `ha-app-base-image`, §"nfsd control files reject writev(2)".
+  use busybox `echo`/`cat`/rpc.nfsd — skill `ha-app-base-image`, §"nfsd control files reject `writev(2)`".
 - **Version-set reconfiguration fails (`EBUSY`)** → the set is fixed while a server instance exists; `rpc.nfsd 0` first
   — §"The NFS version set is fixed while the server runs".
 - **mount/umount denied** → distinguish EACCES (mount-rule denial) from EPERM (capability denial); HAOS produces no

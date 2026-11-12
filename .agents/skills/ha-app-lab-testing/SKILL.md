@@ -20,7 +20,7 @@ then a graceful stop. `--keep` keeps containers/directories for debugging.
 ## Boot-only default
 
 Apps without a hook get a boot-only lab (config fetch, full boot, graceful stop, exit code 0) — zero ceremony for new
-apps (skill `ha-app-scaffolding`).
+apps.
 
 ## Hook contract
 
@@ -50,8 +50,7 @@ The lab boots app containers `--privileged` on the lab host, so host-side hardwa
 - Assert event-based, never "stays in state for N minutes": hardware state can legitimately change (a drive woken by
   unrelated IO is correct system behavior). Assert the event/transition — log lines, state probes right after a
   triggered command — rather than persistence of a state.
-- Verify probes are side-effect-free: `hdparm -C` both races spin-down windows and can wake USB-attached drives;
-  `smartctl -n standby` is designed not to. Device/bridge-specific findings live in the apps' `KNOWLEDGE.md`.
-- Plain Docker exposes no `/dev/disk` udev symlink trees (HAOS binds the host `/dev` read-only into app containers):
-  when an app's behavior depends on them, mirror it in the hook (`-v /dev/disk:/dev/disk:ro`). Facts: root
-  `KNOWLEDGE.md` §"Supervisor: device access".
+- Verify probes are side-effect-free (hd-idle/KNOWLEDGE.md §"USB-bridge behaviors": `hdparm -C` can wake USB-attached
+  drives; `smartctl -n standby` is designed not to). Device/bridge-specific findings live in the apps' `KNOWLEDGE.md`.
+- Plain Docker exposes no `/dev/disk` udev symlink trees: when an app's behavior depends on them, mirror it in the hook
+  (`-v /dev/disk:/dev/disk:ro`). Facts: root `KNOWLEDGE.md` §"Supervisor: device access".
