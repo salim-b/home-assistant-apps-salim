@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.2.1
+
+- Internals: the hd-idle daemon's AppArmor sub-profile no longer carries the unscoped `signal (send)` grant. The daemon
+  sends no signals to other processes (s6-supervise signals it directly on stop, and the drive-PM watcher restarts it
+  via s6's control fifo, not kill(2)); same-process signal delivery (the Go runtime's own preemption) stays covered by
+  the profile's `<abstractions/base>` include. The grant was docs-template headroom only. No configuration change; no
+  behavior change for the daemon's supervised lifecycle.
+
 ## 0.2.0
 
 - Breaking: per-drive spin-down settings are now required and the global defaults are gone. Every drive entry must set

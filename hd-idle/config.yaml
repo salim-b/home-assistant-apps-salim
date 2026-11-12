@@ -1,6 +1,6 @@
 # https://contributors.home-assistant.io/apps/reference/configuration/
 name: hd-idle
-version: "0.2.0"
+version: "0.2.1"
 slug: hd-idle
 description: Spin down idle hard disks (USB, SATA) automatically using hd-idle
 # Generic multi-arch manifest name; per-arch image names are derived by CI – repository README §"CI".

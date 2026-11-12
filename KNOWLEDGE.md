@@ -217,6 +217,14 @@ Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7. Authoring
   containers never hit this. List every capability the binaries need. Sub-profile subtlety: capabilities a binary needs
   *for its own self-management* also need rules – `prctl(PR_CAPBSET_DROP)` and `capset(2)` require `CAP_SETPCAP`
   (without the rule, a bounding-set-pruning daemon exits in a restart loop).
+- **Signal mediation is cross-label on both sides**: a signal send needs `signal (send)` for the receiver's label in the
+  sender's profile AND `signal (receive)` for the sender's label in the receiver's profile (kernel
+  `security/apparmor/ipc.c::aa_may_signal` checks both directions via `xcheck_labels`; verified 2026-11 against linux
+  master). A rule without a `peer=` qualifier grants the operation against every label – the official docs template's
+  sub-profile `signal (send)` grants are unscoped headroom of exactly that kind. `<abstractions/base>` (AppArmor 3.1)
+  already grants same-label self-delivery (`signal peer=@{profile_name}` – covers the Go runtime's tgkill preemption)
+  and signal-existence probes (`signal (receive, send) set=("exists")`); a sub-profile that sends no cross-label signals
+  needs no `signal (send)` rule at all.
 - **Errno forensics replace missing denial logs**: HAOS produces *no* AppArmor audit messages in the host journal
   (`ha host logs` carries kernel lines but nothing apparmor/DENIED – no usable audit plumbing). Useful signals: busybox
   `mount` prints `mounting SRC on DST failed: Permission denied` for **EACCES** (mount-rule denial) and

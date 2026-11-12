@@ -5,8 +5,8 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
 
   ## Modeled on the nfs-server profile and the official dev-docs AppArmor template. Mediation mechanics and gotchas:
   ## repository-root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics"; app facts: hd-idle/KNOWLEDGE.md.
-  ## Sub-profile `signal (send)` grants are template-inherited headroom: nothing in them sends signals (s6-svc talks
-  ## to s6 over its control fifo, not kill(2)) – scoping/dropping them is tracked in hd-idle/TODO.md.
+  ## Sub-profiles carry no `signal (send)` grant: nothing in them sends cross-label signals (s6-svc talks to s6 over
+  ## its control fifo, not kill(2)); same-label self-delivery is covered by <abstractions/base>.
 
   # Generic file access, signals (s6 supervision, bash job control). `file,` is the upstream HA convention – the
   # confinement value sits in the non-file classes (network, capability); repository-root
@@ -85,9 +85,9 @@ profile hd-idle flags=(attach_disconnected,mediate_deleted) {
     file,
     # CAP_SYS_RAWIO for the daemon's ata path: see the top profile (hd-idle/KNOWLEDGE.md §"SG_IO privileges").
     capability sys_rawio,
-    signal (send) set=(kill,term,int,hup,cont),
     # Official docs template: scope receive to the app's own top profile (the supervisor renames it to the installed
-    # slug on the device – the glob covers repo installs too).
+    # slug on the device – the glob covers repo installs too). No send rule: nothing here sends cross-label signals
+    # (see the header note); same-label self-delivery is covered by <abstractions/base>.
     signal (receive) peer=*_hd-idle,
 
     # hd-idle creates no sockets (reads /proc/diskstats, sysfs, SG_IO ioctls); a deny-only network class denies everything in it.

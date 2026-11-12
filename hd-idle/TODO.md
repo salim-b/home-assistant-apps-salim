@@ -101,7 +101,3 @@ Open work items only (resolved items live in git history). Underlying technical 
   device-specific drives and run the live hook through a short idle soak; (b) verify the watcher's core promise
   end-to-end – a drive moved to another port (kernel rename) is re-granted (cgroup rules), re-resolved (by-id) and the
   daemon restarted under the new name (DOCS.md's "drives moved between ports are picked up automatically").
-
-- AppArmor sub-profiles: the unscoped `signal (send)` grant is template-inherited and unused (the daemon sends no
-  signals; s6-svc talks to s6 over its control fifo, not kill(2)). Scope or drop it – device-verify first (no audit logs
-  on HAOS: skill `ha-app-apparmor`).
