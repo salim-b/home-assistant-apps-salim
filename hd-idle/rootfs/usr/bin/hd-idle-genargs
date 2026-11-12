@@ -446,13 +446,12 @@ while IFS= read -r disk; do
   if ! [[ "$POWER_CONDITION" =~ ^[0-9]+$ ]] || [ "$POWER_CONDITION" -gt 15 ]; then
     bashio::exit.nok "Drive '${DEV}': invalid power condition '${POWER_CONDITION}': must be 0-15."
   fi
-  ## Per-drive drive-PM opt-out (bool?), read WITHOUT `// empty`: jq folds an explicit false into "absent"
-  ## (root KNOWLEDGE.md §"bashio option consumption"), and matching null/true/false explicitly rejects hand-edited
-  ## non-boolean values instead of silently folding them. Absent (null) and false mean the same thing here - the
-  ## treatment applies (the default); true exempts the drive. The supervisor coerces legacy yes/no dropdown strings
-  ## to booleans before the app ever sees them.
+  ## Per-drive drive-PM opt-out (bool?), read WITHOUT `// empty` and matched strictly: jq folds an explicit false into
+  ## "absent" (root KNOWLEDGE.md §"bashio option consumption"). Absent (null) and false mean the same thing here – the
+  ## treatment applies (the default); true exempts the drive. Defense in depth like the re-checks above – the
+  ## supervisor normalizes bool options before the app ever sees them (root KNOWLEDGE.md §"Supervisor: option schema
+  ## quirks").
   PM=$(bashio::jq "$disk" '.keep_drive_pm')
-  require_space_free 'keep_drive_pm' "$PM"
   case "$PM" in
     true) DRIVE_PM=0 ;;
     false | null) DRIVE_PM=1 ;;
