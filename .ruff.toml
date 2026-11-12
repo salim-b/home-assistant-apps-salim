@@ -40,5 +40,5 @@
     convention = "google"
 
   [lint.pycodestyle]
-    # panache wraps Markdown prose at 120 (skill ha-app-tooling); the formatter stays at ruff's 88.
+    # Wrap prose at 120 (skill ha-app-tooling); the formatter stays at ruff's 88.
     max-line-length = 120

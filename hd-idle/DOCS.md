@@ -10,7 +10,7 @@ restarts the app, which re-validates the configuration and regenerates the hd-id
 
 Every **listed** drive is managed: it follows the global defaults (**Default idle time**, **Default command type**,
 **Default power condition**) wherever its own fields are left empty, an idle time of `0` never spins it down, and
-unlisted drives - including anything that appears on the system later - are never touched. Only listed drives receive
+unlisted drives – including anything that appears on the system later – are never touched. Only listed drives receive
 device access on Home Assistant OS, which also keeps the system disk out of reach.
 
 ### Selecting drives
@@ -34,42 +34,42 @@ managers:
 
 ### Drive power management
 
-Drives - and some USB bridges - run their own power management that can conflict with hd-idle; the **Disable drive power
-management** option (on by default) handles that - its field description in the options UI has the why and the details.
+Drives – and some USB bridges – run their own power management that can conflict with hd-idle; the **Disable drive power
+management** option (on by default) handles that – its field description in the options UI has the why and the details.
 Individual drives can override it with their own **Disable drive power management** field in the drive list (`yes`/`no`;
-empty follows the global setting) - for example when only some bridges need the treatment or one drive must keep its own
+empty follows the global setting) – for example when only some bridges need the treatment or one drive must keep its own
 power management.
 
 ### Command types
 
-The spin-down command is sent via one of two APIs - **`scsi`** (default) or **`ata`**; the **Command type** and **Power
+The spin-down command is sent via one of two APIs – **`scsi`** (default) or **`ata`**; the **Command type** and **Power
 condition** field descriptions in the options UI explain both and when to use which.
 
 ### System disk protection
 
 The drive(s) Home Assistant runs from are excluded from spin-down by three independent layers:
 
-1. The supervisor never grants the app device access to devices the system uses - a configured system disk is rejected
+1. The supervisor never grants the app device access to devices the system uses – a configured system disk is rejected
    at startup with an explanatory message.
 2. The app resolves the boot device (kernel `root=` parameter) plus all `hassos-*` partitions at startup and pins those
-   disks to "never spin down" (logged as `Excluding the system disk(s) ...`) - this also covers USB-booted systems,
+   disks to "never spin down" (logged as `Excluding the system disk(s) ...`) – this also covers USB-booted systems,
    where the system disk is an `sd*` disk hd-idle would otherwise monitor.
 3. hd-idle itself only ever monitors `sd*` disks; system disks on SD/eMMC/NVMe are out of its reach anyway.
 
 ### Hotplug behavior
 
-Drives are granted device access dynamically by the supervisor - including when re-attached later, without an app
+Drives are granted device access dynamically by the supervisor – including when re-attached later, without an app
 restart. A drive that is detached when the app starts is passed to hd-idle for runtime resolution (by-id symlinks are
-re-resolved once the drive appears) - and hd-idle applies its configured idle time to it immediately upon resolution,
+re-resolved once the drive appears) – and hd-idle applies its configured idle time to it immediately upon resolution,
 without waiting for a configuration restart. The app also periodically re-resolves its configured drives: after moving
-drives between ports or machines - which changes their kernel names (`/dev/sda`, `/dev/sdb`, ...) - hd-idle is restarted
+drives between ports or machines – which changes their kernel names (`/dev/sda`, `/dev/sdb`, ...) – hd-idle is restarted
 automatically with the updated configuration (within about half a minute); no manual restart is needed.
 
 ## Activity log and debugging
 
 Spin-down/spin-up events always appear in the app log. **Debug mode** adds a per-monitoring-cycle state dump for every
 disk (useful when drives refuse to spin down); **Activity log** writes per-drive run/standby records to
-`/data/hd-idle.log` - both field descriptions in the options UI have the details.
+`/data/hd-idle.log` – both field descriptions in the options UI have the details.
 
 ## Limitations
 
@@ -88,9 +88,9 @@ disk (useful when drives refuse to spin down); **Activity log** writes per-drive
 
 - The app requests `SYS_RAWIO` because hd-idle's `ata` command type uses SCSI passthrough commands (ATA PASS-THROUGH)
   that the kernel only permits with that capability; the default `scsi` command type works without it. Drive access
-  itself is granted per configured drive by the supervisor's device policy - the system disk cannot be granted at all.
+  itself is granted per configured drive by the supervisor's device policy – the system disk cannot be granted at all.
 - The hd-idle daemon runs under its own AppArmor sub-profile with all networking denied; it talks to no network service
   whatsoever.
 - The app never writes data to managed drives: it issues standby commands and, when the drive-PM treatment is enabled,
   ATA SET FEATURES requests that switch off the drive's own power management (the settings described under **Disable
-  drive power management**) - but no data is ever written.
+  drive power management**) – but no data is ever written.

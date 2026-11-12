@@ -16,7 +16,8 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   run `hk check --all` over every tracked file; plain `hk check` lints only modified files (fast local feedback).
   Untracked files are never selected (verified for hk 2.7.1, `check` and `--all` alike, independent of HK_STASH
   settings); `HK_MISE=1` lets hk resolve mise environments in hooks and `HK_STASH_UNTRACKED=0` additionally keeps
-  untracked worktree files out of the pre-commit stash/restore cycle and skips their discovery (both set in mise.toml).
+  untracked worktree files out of the pre-commit stash/restore cycle and skips their discovery (both set in
+  `mise.toml`).
 - To check an explicit file set, pipe NUL-separated paths to hk:
   `git diff --name-only -z HEAD | hk check --files0-from=-`.
 - Git hooks (enable once per machine: `mise run install-git-hooks`, after `mise install --locked`; needs Git 2.54+,

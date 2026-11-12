@@ -22,11 +22,11 @@ Turn your Home Assistant instance into a secure DNS server that resolves via enc
 
 ## Limitations
 
-- **One port-53 binder per host**: the app cannot run alongside another DNS app (e.g. AdGuard Home, dnsmasq) on the same
+- **One port-53 binder per host**: The app cannot run alongside another DNS app (e.g. AdGuard Home, dnsmasq) on the same
   device – details in the [documentation](/config/app/f8b2d53d_hickory-dns/documentation).
-- **DoH3 (HTTP/3) upstreams are not available yet**: the packaged binary's h3 feature is not in any tagged upstream
+- **DoH3 (HTTP/3) upstreams are not available yet**: The packaged binary's h3 feature is not in any tagged upstream
   release, so the app rejects DoH3 upstreams for now.
-- **No ad/blocklist support yet**: planned for a later release.
+- **No ad/blocklist support yet**: Planned for a later release.
 
 ## Documentation
 

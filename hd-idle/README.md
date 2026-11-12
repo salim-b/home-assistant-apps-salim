@@ -11,10 +11,10 @@ Spin down idle USB and SATA hard disk drives automatically.
   time.
 - **Per-drive configuration**: Every managed drive gets its own idle time, command type, power condition and
   power-management treatment, selected from a dropdown of the system's drives by their stable `/dev/disk/by-id` paths.
-- **Drive list with global defaults**: list each drive once - it follows the global default idle time unless configured
+- **Drive list with global defaults**: List each drive once – it follows the global default idle time unless configured
   individually (`0` = never spin down). Unlisted drives are never touched.
 - **Hotplug-aware**: Drives are granted device access dynamically (including after re-plugging), and disk IDs are
-  re-resolved to their device paths at runtime - drives moved between ports or machines are picked up automatically
+  re-resolved to their device paths at runtime – drives moved between ports or machines are picked up automatically
   without a restart.
 - **System disk is always protected**: The drive(s) Home Assistant runs from are excluded by three independent layers
   (details in the [documentation](/config/app/f8b2d53d_hd-idle/documentation)) – regardless of whether Home Assistant
@@ -27,7 +27,8 @@ Spin down idle USB and SATA hard disk drives automatically.
 - **Only `sd*` disks are monitored**: NVMe, SD/eMMC and loop devices are never touched (details in the
   [documentation](/config/app/f8b2d53d_hd-idle/documentation)).
 - **Do not run other disk-monitoring tools alongside**: SMART polling keeps waking the drives.
-- **Spin-up wear**: keep idle times at 3-5 minutes minimum (hd-idle's default is 10).
+- **Spin-up wear**: Shorter idle times result in more drive spin-ups, which eventually wear out the spindle motor and
+  bearings; keep it at 3–5 minutes minimum (hd-idle's default is 10 minutes).
 
 ## Documentation
 
