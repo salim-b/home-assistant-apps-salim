@@ -318,6 +318,21 @@ decode_udev_name() {
   printf '%b' "$1"
 }
 
+## Fill MAP (nameref) from the udev symlink tree DIR: resolved node's kernel name -> decoded label
+## (sda1, or the disk name itself for a whole-disk filesystem). Dangling links (vanished filesystems)
+## are skipped - the same staleness guard as the by-id scan in the inventory below.
+fill_label_map() {
+  local -n map=$2
+  local link target
+  for link in "$1"/*; do
+    [ -L "$link" ] || continue
+    target=$(readlink -f "$link" 2>/dev/null) || continue
+    [ -e "$target" ] || continue
+    # shellcheck disable=SC2034  # nameref: the write lands in the caller's map
+    map["${target##*/}"]=$(decode_udev_name "${link##*/}")
+  done
+}
+
 ## Label fragment for one inventory line: the first partition in start order that carries a
 ## filesystem label (preferred) and/or a GPT partition label (fallback; both shown when they
 ## differ) - or, on an unpartitioned disk, the whole-disk filesystem label. Empty when nothing
@@ -330,6 +345,7 @@ drive_label_info() {
     [ -d "$part_dir" ] || continue
     part="${part_dir##*/}"
     start=$(cat "${part_dir}/start" 2>/dev/null) || start=""
+    ## No readable start file: the sentinel sorts the partition last (cosmetic order only).
     if [ "$start" = "" ]; then
       start=999999999999
     fi
@@ -362,22 +378,9 @@ drive_label_info() {
 }
 
 if [ "$QUIET" = 0 ]; then
-  ## Node -> label maps from the udev symlink trees, keyed by the resolved node's kernel name (sda1,
-  ## or the disk name itself for a whole-disk filesystem). Dangling links (vanished filesystems)
-  ## are skipped - the same staleness guard as the by-id scan below.
   declare -A FS_LABELS=() PART_LABELS=()
-  for link in /dev/disk/by-label/*; do
-    [ -L "$link" ] || continue
-    target=$(readlink -f "$link" 2>/dev/null) || continue
-    [ -e "$target" ] || continue
-    FS_LABELS["${target##*/}"]=$(decode_udev_name "${link##*/}")
-  done
-  for link in /dev/disk/by-partlabel/*; do
-    [ -L "$link" ] || continue
-    target=$(readlink -f "$link" 2>/dev/null) || continue
-    [ -e "$target" ] || continue
-    PART_LABELS["${target##*/}"]=$(decode_udev_name "${link##*/}")
-  done
+  fill_label_map /dev/disk/by-label FS_LABELS
+  fill_label_map /dev/disk/by-partlabel PART_LABELS
 
   qlog_info "Detected sd* disks:"
   for block in /sys/block/sd*; do

@@ -82,7 +82,8 @@ lab_runtime_check() {
     }
   ## Boot inventory label smoke: the lab mirrors the lab host's /dev/disk, so when the host has labeled
   ## sd* partitions the boot inventory must show one (the hermetic matrix below covers the logic
-  ## deterministically, including hosts without labeled sd* partitions).
+  ## deterministically, including hosts without labeled sd* partitions). The grep also matches
+  ## partlabel-only output: 'partlabel (sd' contains 'label (sd' as a substring.
   if docker exec "$app" sh -c 'for l in /dev/disk/by-label/*; do
       [ -L "$l" ] || continue
       t=$(readlink -f "$l" 2>/dev/null) || continue
