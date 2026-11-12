@@ -9,7 +9,7 @@ source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
 ha_connect "${usage_host:?}"
 OUT_FILE="hd-idle/.drives.md"
 
-## The sheet carries stable by-id IDs (per-machine inventory) - must stay gitignored; refuse to
+## The sheet carries stable by-id IDs (per-machine inventory) – must stay gitignored; refuse to
 ## write if the .gitignore entry went missing.
 if ! git check-ignore --quiet "$OUT_FILE"; then
   echo "ERROR: ${OUT_FILE} is not gitignored - refusing to write drive IDs into a trackable file (add it to .gitignore first)" >&2
@@ -30,7 +30,7 @@ pick_from() { # $1 disk, $2 candidates, $3 class description
 }
 
 ## Physical-drive identity (stdout): the ata-<MODEL>_<SERIAL> by-id link (model + serial as printed on
-## the drive; present for SATA and SAT-capable USB bridges) - partition links (-partN) are skipped.
+## the drive; present for SATA and SAT-capable USB bridges) – partition links (-partN) are skipped.
 pick_phys() {
   local disk="$1" name links=() ata="" out
   read -ra links <<<"${DISK_LINKS[$disk]:-}"
@@ -66,7 +66,7 @@ pick_usb() {
 }
 
 ## Discovery (same walk as the test:live hook): label -> parent disk, plus every by-id link. Kernel names are
-## deliberately NOT carried into the sheet - they change across boots and re-plugs.
+## deliberately NOT carried into the sheet – they change across boots and re-plugs.
 raw=$(ssh -n "${SSH_OPTS[@]}" "$host" '
   for l in /dev/disk/by-label/*; do
     [ -e "$l" ] || continue
@@ -108,7 +108,7 @@ if [ "${#DISK_LABELS[@]}" -eq 0 ]; then
 fi
 
 ## System-disk exclusion: any disk hosting a hassos-* labeled partition is the disk Home Assistant runs
-## from (boot/system/data/overlay slots - covers eMMC systems and USB-booted systems alike).
+## from (boot/system/data/overlay slots – covers eMMC systems and USB-booted systems alike).
 excluded=""
 rows=()
 mapfile -t sorted_disks < <(printf '%s\n' "${!DISK_LABELS[@]}" | sort)

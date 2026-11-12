@@ -12,7 +12,7 @@
 # shellcheck disable=SC2034  # LIVE_* are the harness contract variables
 
 live_prepare() {
-  # The app creates missing dirs with its configured defaults but never modifies existing ones - pre-made
+  # The app creates missing dirs with its configured defaults but never modifies existing ones – pre-made
   # root-owned dirs would break the rw roundtrip (default_uid 1000). (-n: keep the loop's stdin away from ssh)
   while IFS=$'\t' read -r spath sopts; do
     [ "$spath" != "" ] || continue
@@ -32,11 +32,11 @@ live_runtime_check() {
   local fails=0 spath snetwork soptions smode rc row
 
   # Client-recovery tracker (cld): the kernel's host-journal lines are the authoritative end-to-end
-  # proof - "NFSD: Using nfsdcld client tracking operations." appears only after the daemon answered
+  # proof – "NFSD: Using nfsdcld client tracking operations." appears only after the daemon answered
   # the kernel's GetVersion + GraceStart upcalls (daemon, rpc_pipefs channel and store all working);
   # "NFSD: Unable to initialize client recovery tracking" is the failure signature (the kernel fell
   # through to the container-refusing legacy trackers). NOTE: HAOS ships no docker CLI, so
-  # container-internal probes are not reachable from here - the journal check is strictly stronger.
+  # container-internal probes are not reachable from here – the journal check is strictly stronger.
   echo "-- checking the client-recovery tracker (host kernel journal)"
   klog=$(ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
     "ha host logs 2>/dev/null | grep -E 'NFSD:' | tail -10") || true
@@ -44,15 +44,15 @@ live_runtime_check() {
     echo "   PASS: kernel uses the cld tracker (upcalls answered by nfsdcld)"
   elif grep -q "Unable to initialize client recovery tracking" <<<"$klog"; then
     echo "   FAIL: kernel fell back to the container-refusing legacy trackers" >&2
-    echo "         (nfsdcld daemon or rpc_pipefs channel missing — NFSD journal tail):" >&2
+    echo "         (nfsdcld daemon or rpc_pipefs channel missing – NFSD journal tail):" >&2
     while IFS= read -r line; do echo "         $line" >&2; done <<<"$klog"
     fails=$((fails + 1))
   else
-    echo "   (note: no NFSD tracker lines in the journal tail — tracker state unknown,"
+    echo "   (note: no NFSD tracker lines in the journal tail – tracker state unknown,"
     echo "         app log lines about nfsdcld would indicate a daemon problem)"
   fi
 
-  # Mode detection per share: exports(5) defaults to read-only - writable only with an explicit rw
+  # Mode detection per share: exports(5) defaults to read-only – writable only with an explicit rw
   share_mode() {
     case ",$1," in
       *,rw,*) echo "rw" ;;
@@ -61,7 +61,7 @@ live_runtime_check() {
   }
 
   # Roundtrip against one share: mount, listing, write+read-back+delete (rw; grace-aware retries) or
-  # EROFS assertion (ro; rc-only judgement after the grace period has surely passed - the write's
+  # EROFS assertion (ro; rc-only judgement after the grace period has surely passed – the write's
   # error message cannot be captured through the shell redirect)
   test_share() { # test_share <path> <mode>
     local target="$LIVE_DEVICE_IP:$1" mode="$2" testfile rc
@@ -78,7 +78,7 @@ live_runtime_check() {
     if [ "$MODE" = rw ]; then
       # With the recovery tracker, a grace period only runs when client records exist (fresh boots
       # skip it) and ends early once recorded clients reclaimed; during it, writes BLOCK (the client
-      # retries the open) instead of failing - the subshell captures the message if the retries never
+      # retries the open) instead of failing – the subshell captures the message if the retries never
       # succeed. A failed redirection is diagnosed by the shell itself and would bypass the per-command
       # 2>/dev/null.
       i=0
@@ -121,7 +121,7 @@ live_runtime_check() {
           }
         echo "   PASS: write verified on the device filesystem"
       else
-        echo "   (note: $1 not visible from the SSH session — verified via NFS read-back only)"
+        echo "   (note: $1 not visible from the SSH session – verified via NFS read-back only)"
       fi
     fi
     return 0
@@ -164,7 +164,7 @@ sys.exit(0 if ipaddress.ip_address('$LIVE_HOST_IP') in ipaddress.ip_network('$sn
   echo "   -- pseudo-root listing:"; ls /mnt/root
   ls /mnt/root | grep -q share || { echo "FAIL: pseudo-root does not list the share tree"; exit 1; }
   echo "   PASS: pseudo-root (fsid=0) export browsable"
-  # The write attempt may block during a running grace period - bound it (as in the ro share check).
+  # The write attempt may block during a running grace period – bound it (as in the ro share check).
   # subshell: a failed redirection is diagnosed by the shell itself and would bypass the per-command
   # 2>/dev/null (same as in test_share)
   if timeout 30 sh -ec "(echo x > /mnt/root/probe) 2>/dev/null"; then

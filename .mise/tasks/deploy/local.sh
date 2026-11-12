@@ -52,7 +52,7 @@ if [ "$repo_installs" != "" ] && [ "$repo_installs" != "[]" ]; then
   if [ "${usage_replace:-false}" = "true" ]; then
     echo "-- --replace given: uninstalling the repository-installed copy first"
     # --- hickory-dns: uninstalling the store copy can cut the DEVICE's own DNS ---------------------------------
-    # (the store reload and the local image build below need DNS - device_resolves_through_self)
+    # (the store reload and the local image build below need DNS – device_resolves_through_self)
     if [ "$app" = "hickory-dns" ]; then
       rc=0
       device_resolves_through_self || rc=$?
@@ -81,7 +81,7 @@ if [ "$repo_installs" != "" ] && [ "$repo_installs" != "[]" ]; then
       esac
     fi
     for repo_slug in "${repo_slugs[@]}"; do
-      # Options die with the uninstall - back them up first (--config migrate additionally carries them over).
+      # Options die with the uninstall – back them up first (--config migrate additionally carries them over).
       repo_opts=$(ha_app_options "$repo_slug")
       if [ "$repo_opts" != "" ] && [ "$repo_opts" != "{}" ]; then
         echo "-- options of $repo_slug backed up locally: $(ha_backup_options "$app" "$repo_opts")"
@@ -91,7 +91,7 @@ if [ "$repo_installs" != "" ] && [ "$repo_installs" != "[]" ]; then
     done
   else
     echo "ERROR: two installations would conflict on the app's published port. Uninstall it first, e.g." >&2
-    echo "       \`ssh $host 'ha apps uninstall ${repo_slugs[0]}'\` — or re-run with \`--replace\`." >&2
+    echo "       \`ssh $host 'ha apps uninstall ${repo_slugs[0]}'\` – or re-run with \`--replace\`." >&2
     exit 1
   fi
 fi
@@ -102,7 +102,7 @@ ssh "${SSH_OPTS[@]}" "$host" "rm -rf /local_apps/$app"
 scp -r "${SSH_OPTS[@]}" "$app" "$host:/local_apps/"
 
 # DEVICE copy only: the Supervisor must build locally instead of pulling GHCR (an image-based app
-# would never rebuild) - see .agents/skills/ha-app-device-testing.
+# would never rebuild) – see .agents/skills/ha-app-device-testing.
 if ssh "${SSH_OPTS[@]}" "$host" \
   "sed -i 's|^image:|#image:|' /local_apps/$app/config.yaml && grep -q '^#image:' /local_apps/$app/config.yaml"; then
   echo "-- commented out top-level 'image:' key in the device copy (forces local build)"
@@ -116,7 +116,7 @@ ha_retry 180 ssh "${SSH_OPTS[@]}" "$host" 'ha store reload'
 store_info=$(ssh "${SSH_OPTS[@]}" "$host" "ha apps info $local_slug --raw-json" 2>/dev/null || true)
 if [ "$store_info" = "" ] || ! echo "$store_info" | jq -e '.result == "ok"' >/dev/null 2>&1; then
   echo "ERROR: $local_slug not found in the app store after reload." >&2
-  echo "       Usually the device-side app config is invalid — check the Supervisor logs." >&2
+  echo "       Usually the device-side app config is invalid – check the Supervisor logs." >&2
   exit 1
 fi
 
@@ -137,8 +137,8 @@ fi
 
 # --- --config handling -------------------------------------------------------
 # Stored options are user data (survive update/rebuild); POSTed options apply at the app's next
-# start - restart after posting. Reset posts the config.yaml DEFAULTS, never {} (rejected for
-# schemas with required keys; the defaults always satisfy it) - see .agents/skills/ha-app-device-testing.
+# start – restart after posting. Reset posts the config.yaml DEFAULTS, never {} (rejected for
+# schemas with required keys; the defaults always satisfy it) – see .agents/skills/ha-app-device-testing.
 if [ "$CONFIG_MODE" = "reset" ]; then
   old=$(ha_app_options "$local_slug")
   if [ "$old" != "" ] && [ "$old" != "{}" ]; then

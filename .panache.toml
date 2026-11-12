@@ -1,12 +1,12 @@
 #:schema https://panache.bz/panache.schema.json
 
 # Markdown formatter + semantic linter (https://panache.bz/reference/configuration.html).
-# Panache owns ALL Markdown autoformatting - conventions: .agents/skills/ha-app-markdown.
+# Panache owns ALL Markdown autoformatting – conventions: .agents/skills/ha-app-markdown.
 
 # Plain GitHub-Flavored Markdown repository.
 flavor = "gfm"
 
-# Open Home Foundation policy text, kept verbatim for upstream syncs - not this repo's prose to style.
+# Open Home Foundation policy text, kept verbatim for upstream syncs – not this repo's prose to style.
 extend-exclude = [ "AI_POLICY.md" ]
 
 [format]

@@ -24,7 +24,7 @@ for app in "${apps[@]}"; do
   version=$(yq -r '.version' "$app/config.yaml")
   slug=$(yq -r '.slug' "$app/config.yaml")
   ## make-style freshness: the whole app dir is the build context, so any file newer than the last
-  ## successful build's stamp means stale. The stamp - not the image's .Created - is the reference
+  ## successful build's stamp means stale. The stamp – not the image's .Created – is the reference
   ## point: buildx rebuilds unchanged content from cache into the SAME image (docker keeps the old
   ## .Created), so an mtime-vs-image check would never converge. A doc-only edit may over-trigger;
   ## the rebuild is then all-CACHED, costing seconds. --rebuild bypasses the check.

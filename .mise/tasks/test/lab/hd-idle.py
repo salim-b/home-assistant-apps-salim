@@ -32,7 +32,7 @@ def lab_adapt_fixture(options: dict[str, object]) -> dict[str, object]:
     ]
     ## The FIRST drive carries keep_drive_pm=true so the opt-out is exercised end to end: pm-flag 0 in
     ## the drives file, hd-idle-pmfix logs the skip (asserted by the lab hook); all other drives carry
-    ## no key at all - absent = the treatment applies (pm-flag 1, the default).
+    ## no key at all – absent = the treatment applies (pm-flag 1, the default).
     if entries:
         entries[0]["keep_drive_pm"] = True
     adapted["disks"] = entries

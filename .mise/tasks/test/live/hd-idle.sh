@@ -3,7 +3,7 @@
 #MISE description="⚠️ internal helper script"
 # App-specific live-test hook for hd-idle, sourced by .mise/tasks/test/live.sh; hook contract:
 # .agents/skills/ha-app-device-testing. HAOS ships no docker CLI, so container-internal probes
-# (and the lab's forced `hd-idle -t` single-shot spindown) are not reproducible from here - the
+# (and the lab's forced `hd-idle -t` single-shot spindown) are not reproducible from here – the
 # daemon's own log events are the strictly stronger end-to-end assertion anyway: a logged spindown
 # proves the whole chain (device cgroup access, the /dev node open inside the container, the SG_IO
 # ioctl under the device-enforced AppArmor profile, and the command execution).
@@ -18,7 +18,7 @@
 #   path within the check window; the FIRST discovered drive additionally opts out of the drive-PM
 #   treatment (keep_drive_pm=true), exercised end to end (asserted in live_runtime_check).
 #   Without the variable, the repo's test options file (a safe no-op: no drives) is applied unchanged. A
-#   match-everything glob includes every labeled disk - choose it deliberately.
+#   match-everything glob includes every labeled disk – choose it deliberately.
 # - LIVE_HDIDLE_DISKS_JSON (set by live_prepare): JSON object mapping the disks' kernel names to
 #   {label, device}; drives the per-drive assertions in live_runtime_check().
 #
@@ -125,7 +125,7 @@ live_prepare() {
   done
 
   ## Per-drive keep-drive-PM opt-out: the FIRST discovered drive gets keep_drive_pm=true, exercised end
-  ## to end on the device (hd-idle-pmfix must skip exactly that drive - asserted in
+  ## to end on the device (hd-idle-pmfix must skip exactly that drive – asserted in
   ## live_runtime_check; the drives file is not reachable over SSH, HAOS ships no docker CLI).
   ## keys[0] == the first inserted (sorted) drive.
   pm_optout_disk=$(jq -r 'keys[0]' <<<"$disks_map")
@@ -157,7 +157,7 @@ live_runtime_check() {
 
   ## Only the CURRENT boot's log matters: `ha apps logs` accumulates across app restarts, and this
   ## run restarts the app after applying the test options (a previous boot's "No drives configured"
-  ## lines would defeat the assertions) - cut at the last "Configuring hd-idle..." line (config.sh
+  ## lines would defeat the assertions) – cut at the last "Configuring hd-idle..." line (config.sh
   ## logs it at every boot).
   while :; do
     logs=$(ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
@@ -172,7 +172,7 @@ live_runtime_check() {
         tail -15 <<<"$tail_log" | sed 's/^/         /' >&2
         return 1
       else
-        ## The generated command line must manage EXACTLY the discovered drives (by kernel name) - anything
+        ## The generated command line must manage EXACTLY the discovered drives (by kernel name) – anything
         ## else would spin the wrong disks. -a entries with idle 0 are the system-disk exclusions
         ## (defense in depth); every other -a entry must be one of the discovered drives.
         cmdline=$(grep -m1 "hd-idle command line:" <<<"$tail_log" | sed 's/^.*hd-idle command line: //')
@@ -225,7 +225,7 @@ live_runtime_check() {
           if [ "$declared_excluded" != "" ]; then
             echo "   (excluded via idle-0 entries: ${declared_excluded%- })"
           fi
-          ## Per-drive keep-drive-PM opt-out plumbing (boot log; the drives file is not reachable over SSH - HAOS
+          ## Per-drive keep-drive-PM opt-out plumbing (boot log; the drives file is not reachable over SSH – HAOS
           ## ships no docker CLI): pmfix must have skipped EXACTLY the opt-out drive and attempted the
           ## treatment for every other managed drive.
           pm_optout_disk=$(jq -r 'to_entries[] | select(.value.pm_optout == true) | .key' <<<"$disks_json")
@@ -267,7 +267,7 @@ live_runtime_check() {
       done < <(jq -r 'keys[]' <<<"$disks_json")
     fi
 
-    ## All discovered drives have issued their spindown event - or (no-op options) the boot assertions passed.
+    ## All discovered drives have issued their spindown event – or (no-op options) the boot assertions passed.
     if [ "$hard_pending" = 0 ]; then
       if [ "$disks_json" = "" ] || [ "${#spun[@]}" -eq "$(jq length <<<"$disks_json")" ]; then
         break

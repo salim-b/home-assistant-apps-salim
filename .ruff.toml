@@ -4,7 +4,7 @@
 # Conventions and rule-family rationale: .agents/skills/ha-app-tooling ("Python linting: ruff").
 
 [lint]
-  # extend-select over ruff's default rule set - the gate tracks ruff's canonical upstream defaults.
+  # extend-select over ruff's default rule set – the gate tracks ruff's canonical upstream defaults.
   # Selection whys, the formatter-conflict rule and the noqa policy: .agents/skills/ha-app-tooling.
   extend-select = [
     "E4",

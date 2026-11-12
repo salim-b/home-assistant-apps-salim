@@ -7,7 +7,7 @@
 
 ## Fixture adaptation: .mise/tasks/test/lab/hickory-dns.py adds one static entry so the runtime check can
 ## probe an authoritative leaf-zone answer (the default options serve none); LAB_FIXTURE_ENV=upstreams=tls|https|quic
-## selects the upstream-pool variant - usage matrix in that file's docstring.
+## selects the upstream-pool variant – usage matrix in that file's docstring.
 
 lab_runtime_check() {
   ## The fixture variant must have taken effect: a lost docker-cp race would otherwise serve the default
@@ -47,7 +47,7 @@ lab_runtime_check() {
     sleep 1
   done
 
-  ## Never-root credentials: the daemon must run as nobody (65534) holding exactly one capability - the ambient
+  ## Never-root credentials: the daemon must run as nobody (65534) holding exactly one capability – the ambient
   ## CAP_NET_BIND_SERVICE (bit 10 = 0x400). Regresses if the launcher ever runs the daemon as root again or the
   ## ambient hand-off breaks (a root daemon would show Uid 0 and the full default capability set).
   local pid creds
@@ -96,7 +96,7 @@ lab_runtime_check() {
     return 1
   }
 
-  ## Forwarded query: the real path - resolver pool, encrypted upstream (DoQ to Quad9), DNSSEC
+  ## Forwarded query: the real path – resolver pool, encrypted upstream (DoQ to Quad9), DNSSEC
   ## validation of the signed example.com. Needs outbound internet from the lab network.
   out=$(docker exec "$LAB_NET_NAME-app" /usr/bin/dns -n 127.0.0.1:53 query example.com A) \
     || {

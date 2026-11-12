@@ -18,7 +18,7 @@ lab_docker_args+=(
   -v "$LAB_TMPDIR/share:/share"
   -v "$LAB_TMPDIR/media:/media"
   ## Drive content for the replug test (bound over /media/usb0 in-container by the runtime check): must
-  ## be an NFS-exportable filesystem - the container's overlayfs root is NOT, and exportfs refuses
+  ## be an NFS-exportable filesystem – the container's overlayfs root is NOT, and exportfs refuses
   ## overlay-backed mirrors.
   -v "$LAB_TMPDIR/drive-b:/mnt/drive-b"
   -e "NFSD_WATCH_INTERVAL=$lab_watch_interval"
@@ -29,7 +29,7 @@ echo b-content >"$LAB_TMPDIR/drive-b/b.txt"
 ## Fixture adaptation: .mise/tasks/test/lab/nfs-server.py (every share's client network must point at the lab subnet)
 
 lab_runtime_check() {
-  ## `docker logs --since` keeps polls O(window) instead of O(full history) - the container's log
+  ## `docker logs --since` keeps polls O(window) instead of O(full history) – the container's log
   ## history only grows (boot + roundtrip logs pile up), and the container shares the host's clock,
   ## so the host wall-clock anchors are valid.
   log_since() { # $1: pattern, $2: unix wall-clock ts to start counting from
@@ -86,16 +86,16 @@ lab_runtime_check() {
 
   ## nfsd-watch mirror refresh: an in-container unplug/replug of a "drive" mounted at the /media share
   ## path (privileged: bind over the share path = replug, its umount = unplug) must be picked up within
-  ## a poll interval without an app restart - the export switches to the new mount's content and, on
+  ## a poll interval without an app restart – the export switches to the new mount's content and, on
   ## unplug, stops serving the detached superblock clone. The real trigger path (HAOS mounts under /media,
   ## propagated rslave) is supervisor-source-verified: nfs-server/KNOWLEDGE.md.
   if ! (
     set -e
 
-    ## The watcher logs the detected change first and restarts the kernel server last - the export only
+    ## The watcher logs the detected change first and restarts the kernel server last – the export only
     ## switches once BOTH log lines are in, so gate the client roundtrips on those (cheap docker-logs
-    ## polls) instead of spinning up a client per poll (burned a container per tick - the lab's biggest
-    ## runtime cost - and leaked failing grep errors into the output). Each phase anchors its own log
+    ## polls) instead of spinning up a client per poll (burned a container per tick – the lab's biggest
+    ## runtime cost – and leaked failing grep errors into the output). Each phase anchors its own log
     ## window and asserts its own cycle (1 change + 1 server start).
 
     ## Wait until the watcher logged a change and the cycle's server restart completed (both within the
@@ -118,7 +118,7 @@ lab_runtime_check() {
       return 1
     }
 
-    ## One throwaway client per check: mount with retries against a cycling server, then poll - the
+    ## One throwaway client per check: mount with retries against a cycling server, then poll – the
     ## kernel's grace period (lease_time, 15 s in the fixture) delays the client's state ops (NFSv4
     ## OPEN) until it ends, so the poll window covers grace + the cycle's runtime.
     ##
@@ -162,7 +162,7 @@ lab_runtime_check() {
       "replug: export did not switch to the new mount's content within the wait window"
     echo "watcher replug OK: export switched to the new mount's content"
 
-    ## "Unplug": remove the mount again - the mirror would keep serving the detached clone, so the export
+    ## "Unplug": remove the mount again – the mirror would keep serving the detached clone, so the export
     ## must become empty (also the umount-after-rpc.nfsd-0 assertion: the cycle's proven order releases the pins)
     ts "$SECONDS" "-- unplug: waiting for the stale (detached) mirror content to disappear"
     phase_start_wall=$(date +%s)
@@ -198,7 +198,7 @@ lab_runtime_check() {
 
   ## Client-state reclaim across an app restart (the recovery tracker's actual feature): hold an
   ## exclusive flock from a dedicated client, restart the app container (fresh netns, sqlite store
-  ## on /data persists) and verify the held state survives - a plain boot cannot catch broken store
+  ## on /data persists) and verify the held state survives – a plain boot cannot catch broken store
   ## paths or missing record persistence (boot, boot log and roundtrip all still pass). The fixture's
   ## short lease (15 s) and the holder's tight RPC timeout (timeo=5) make recovery land seconds after
   ## the restarted server is up (a default 60 s timeout would wait out the retransmission interval).
@@ -207,7 +207,7 @@ lab_runtime_check() {
     trap 'docker rm -f "$reclaim" >/dev/null 2>&1 || true' EXIT
     docker run -d --privileged --name "$reclaim" --network "$LAB_NET_NAME" \
       local/nfslab-client:alpine3.24 sleep infinity >/dev/null
-    # Holder: open + exclusive flock + periodic writes through the held fd - the ticks drive the client's
+    # Holder: open + exclusive flock + periodic writes through the held fd – the ticks drive the client's
     # recovery; the server-side file growth is the recovery-landed signal (client-side stat/mountstats
     # lie from the page cache)
     docker exec -d "$reclaim" sh -c '

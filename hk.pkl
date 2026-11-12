@@ -1,4 +1,4 @@
-// The package version must stay in sync with the hk binary pin in mise.toml [tools] - the package provides the
+// The package version must stay in sync with the hk binary pin in mise.toml [tools] – the package provides the
 // builtin step definitions the binary executes.
 amends "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Builtins.pkl"
@@ -13,7 +13,7 @@ import "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Builtin
     "**/s6-rc.d/*/run",
     "**/s6-rc.d/*/finish",
   )
-  // The apps' extension-less /usr/bin scripts (bashio shebangs - same typing gap); all three shell steps cover them.
+  // The apps' extension-less /usr/bin scripts (bashio shebangs – same typing gap); all three shell steps cover them.
   local appBinGlobs = List("**/rootfs/usr/bin/*")
 local mdGlobs = List("**/*.md", "**/*.markdown")
 // AI_POLICY.md is upstream-verbatim; **/LICENSE.md mirrors panache's default Markdown exclude
@@ -33,7 +33,7 @@ local linters = new Mapping<String, Step> {
       }
     }
   }
-  // -x follows `source`d helpers (.mise/tasks/lib/ - without it SC1091); the fix-mode check_diff path needs the same flag.
+  // -x follows `source`d helpers (.mise/tasks/lib/ – without it SC1091); the fix-mode check_diff path needs the same flag.
   ["shellcheck"] = (Builtins.shellcheck) {
     match_any = List(
       new FileSelector { glob = List("**/*.sh", "**/*.bash") },
@@ -53,7 +53,7 @@ local linters = new Mapping<String, Step> {
     )
   }
   ["shellharden"] = (Builtins.shellharden) {
-    // The builtin's step-level `types` cannot coexist with `match_any` - cleared and re-declared as a selector.
+    // The builtin's step-level `types` cannot coexist with `match_any` – cleared and re-declared as a selector.
     types = null
     match_any = List(
       new FileSelector { types = List("bash", "sh") },
@@ -85,7 +85,7 @@ local linters = new Mapping<String, Step> {
     check = "renovate-config-validator --no-global --strict {{files}}"
   }
   // ryl (Rust yamllint re-implementation, configured in .ryl.toml); --strict on check and fix.
-  // check_diff/check_after_diff are cleared on purpose - why: .agents/skills/ha-app-tooling (upstream: root TODO.md).
+  // check_diff/check_after_diff are cleared on purpose – why: .agents/skills/ha-app-tooling (upstream: root TODO.md).
   ["ryl"] = (Builtins.ryl) {
     check_diff = null
     check_after_diff = false
@@ -102,7 +102,7 @@ local linters = new Mapping<String, Step> {
     }
   }
   // tombi (TOML linter/formatter): schemas bind per-file via `#:schema` top directives
-  // (strict mode - unknown keys are errors).
+  // (strict mode – unknown keys are errors).
   ["tombi-format"] = Builtins.tombi_format
   // tombi exits 0 on its warn-severity rules by default, so --error-on-warnings makes them gate-fail
   // Conventions: .agents/skills/ha-app-tooling

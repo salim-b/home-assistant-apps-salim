@@ -44,7 +44,7 @@ def lab_adapt_fixture(options: dict[str, object]) -> dict[str, object]:
     )
     # Short lease: the client's renewal/recovery cycle fires at ~lease/3 (300 s default => ~2 min per
     # run), and every kernel-server restart stalls client state ops (NFSv4 OPEN) for the grace period
-    # (= lease) - a long lease stalls each watcher phase on top of the poll interval.
+    # (= lease) – a long lease stalls each watcher phase on top of the poll interval.
     adapted["lease_time"] = 15
     # substituted below by the harness (subnet unknown to this file)
     return adapted

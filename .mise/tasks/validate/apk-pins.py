@@ -144,7 +144,7 @@ def main() -> int:
                         f"pinned apk {pkg}={pin} differs from the Alpine "
                         f"v{branch} {arch} index ({ver}): bump the pin and "
                         f"the app's config.yaml version + changelog (one "
-                        f"release per package version - the index serves "
+                        f"release per package version – the index serves "
                         f"only the current version, a stale pin breaks the "
                         f"build)",
                     )

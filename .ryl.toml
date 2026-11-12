@@ -1,6 +1,6 @@
 #:schema https://raw.githubusercontent.com/owenlamont/ryl/main/ryl.toml.schema.json
 
-# YAML linter config (hk `ryl` step). https://ryl-docs.pages.dev/config-presets/ - no `extends`, so the
+# YAML linter config (hk `ryl` step). https://ryl-docs.pages.dev/config-presets/ – no `extends`, so the
 # tables below inline the `default` preset (ryl enables no rules by default) with this repo's overrides
 # applied; the override whys: .agents/skills/ha-app-tooling ("YAML linting: ryl").
 

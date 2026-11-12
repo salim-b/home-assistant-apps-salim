@@ -8,7 +8,7 @@
 #USAGE flag "--spindown-drives <drives>" help="Comma-separated `sd*` kernel names an app hook may spin down for real (hd-idle smoke test; read-only: no data is written)"
 #
 # Per-app hooks: .mise/tasks/test/lab/<app>.sh (docker args + runtime check), optional fixture
-# adapter .mise/tasks/test/lab/<app>.py - see .agents/skills/ha-app-lab-testing. No hook: boot-only lab.
+# adapter .mise/tasks/test/lab/<app>.py – see .agents/skills/ha-app-lab-testing. No hook: boot-only lab.
 
 set -euo pipefail
 

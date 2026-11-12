@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Apply a JSON (or YAML) options file to an installed HA app on a device - schema-filtered, previous options backed up"
+#MISE description="Apply a JSON (or YAML) options file to an installed HA app on a device – schema-filtered, previous options backed up"
 #USAGE arg "<app>" help="App to apply the options to (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
 #USAGE }
@@ -7,11 +7,11 @@
 #USAGE arg "<file>" help="""
 #USAGE   JSON file with the options to apply (top-level option keys, e.g. `options.json`; `.yaml`/`.yml` files are converted
 #USAGE   via yq; relative paths resolve from the mise invocation directory). The schema-filtered keys become the install's
-#USAGE   complete options - a fresh options POST replaces the stored set (unknown keys are dropped, reported), and the
+#USAGE   complete options – a fresh options POST replaces the stored set (unknown keys are dropped, reported), and the
 #USAGE   previous options are backed up locally first (path printed).
 #USAGE """
 #USAGE flag "--slug <slug>" help="Apply to this exact install slug on the device instead of auto-detecting the app's installed copy (e.g. `local_nfs-server` or `f8b2d53d_nfs-server`)"
-#USAGE flag "--no-restart" help="Do not restart/start the app after posting - the options apply at its next start"
+#USAGE flag "--no-restart" help="Do not restart/start the app after posting – the options apply at its next start"
 #USAGE flag "--dry-run" help="Show the schema-filtered options and dropped keys; change nothing on the device"
 # shellcheck disable=SC2029  # remote commands intentionally embed client-side values
 
@@ -22,7 +22,7 @@ file="${usage_file:?}"
 
 # --- read and validate the options file --------------------------------------------------------
 # Relative paths resolve from the mise invocation directory (tasks run in the project root;
-# MISE_ORIGINAL_CWD holds the caller's cwd - the same directory for repo-root invocations).
+# MISE_ORIGINAL_CWD holds the caller's cwd – the same directory for repo-root invocations).
 if [ "${file#/}" = "$file" ] && [ -f "${MISE_ORIGINAL_CWD:-.}/$file" ]; then
   file="${MISE_ORIGINAL_CWD:-.}/$file"
 fi
@@ -87,7 +87,7 @@ esac
 
 # --- schema safety (the same filter as the deploy/deploy-registry --config migrate flows) --------
 # A fresh options POST replaces the whole stored set and silently drops keys unknown to the schema
-# (fact: root KNOWLEDGE.md §"Supervisor: option schema quirks") - the filter makes the drops explicit.
+# (fact: root KNOWLEDGE.md §"Supervisor: option schema quirks") – the filter makes the drops explicit.
 filtered=$(ha_filter_options "$options" "$target")
 dropped=$(ha_dropped_keys "$options" "$target")
 [ "$dropped" != "" ] && echo "-- (dropped, unknown to the app's schema: $dropped)"
@@ -106,7 +106,7 @@ if [ "${usage_dry_run:-false}" = "true" ]; then
   exit 0
 fi
 
-# --- apply (the POST replaces the stored set; the current options are user data - back them up first) ---
+# --- apply (the POST replaces the stored set; the current options are user data – back them up first) ---
 old=$(ha_app_options "$target")
 if [ "$old" != "" ] && [ "$old" != "{}" ]; then
   echo "-- current options backed up locally: $(ha_backup_options "$app" "$old")"

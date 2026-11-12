@@ -6,7 +6,7 @@
 #
 # HAOS binds the host's /dev read-only into every app container, so /dev/disk/by-* udev
 # symlink trees are visible to the app on a real device (config.sh's system-disk detection
-# and by-id inventory rely on it); plain Docker creates bare device nodes only - mirror
+# and by-id inventory rely on it); plain Docker creates bare device nodes only – mirror
 # the HAOS behavior here (hd-idle's whole by-id UX would be lab-invisible otherwise).
 
 # shellcheck disable=SC2034  # contract variables are consumed by the harness
@@ -24,7 +24,7 @@ lab_docker_args+=(-e HD_IDLE_WATCH_INTERVAL=5)
 # adapter (.mise/tasks/test/lab/hd-idle.py) configures a 30 s idle for the natural spindown path.
 #
 # Host-side spindown mechanisms (udisks2, hdparm.conf, TLP, smartd, ...) and desktop IO on mounted
-# drives can skew spindown tests (background: hd-idle/KNOWLEDGE.md; lab_preflight warns) - assertions
+# drives can skew spindown tests (background: hd-idle/KNOWLEDGE.md; lab_preflight warns) – assertions
 # are therefore event-based, never "stays spundown for N minutes".
 
 lab_preflight() {
@@ -107,7 +107,7 @@ lab_runtime_check() {
       return 1
     }
   ## Per-drive argv completeness: after each `-a <name>`, `-i` must follow; a non-zero idle must be followed by
-  ## `-c <scsi|ata> -p <0-15>` (exclusion entries - system disks - end after `-i 0`; there are no global
+  ## `-c <scsi|ata> -p <0-15>` (exclusion entries – system disks – end after `-i 0`; there are no global
   ## -c/-p defaults anymore). Every managed drive's argv is therefore fully explicit.
   if ! docker exec -i "$app" sh -s <<'EOF'
 awk '
@@ -156,8 +156,8 @@ EOF
   ## Watcher mechanics: run for EVERY lab, before the LAB_SPINDOWN_DRIVES gate (the roundtrips need no
   ## spindownable drives). Kernel-name moves cannot be simulated in the lab (renames happen kernel-side),
   ## so verify deterministically: first the hermetic --check exit-code matrix below (every detection
-  ## path against a known mutation), then the roundtrips - corrupt /etc/hd-idle.args (content drift) and
-  ## the baseline state file (state drift), expecting restoration within a poll interval - content drift
+  ## path against a known mutation), then the roundtrips – corrupt /etc/hd-idle.args (content drift) and
+  ## the baseline state file (state drift), expecting restoration within a poll interval – content drift
   ## restarts hd-idle, state drift must resync WITHOUT a restart (only the restart path emits the
   ## watcher's change-tick log line).
   if docker exec "$app" sh -c "test -x /usr/bin/hd-idle-genargs" 2>/dev/null; then
@@ -230,7 +230,7 @@ EOF
         || return 1
     else
       ## No configured drives: inject a dev line whose outcome the replay cannot confirm (the device
-      ## does not exist -> PASSTHRU) - a drift nonetheless, the recorded outcome is a kernel name.
+      ## does not exist -> PASSTHRU) – a drift nonetheless, the recorded outcome is a kernel name.
       mx_case "device outcome drift (injected)" \
         "printf 'dev /dev/mx-no-such-device sda\n' >> /etc/hd-idle.resolution" 3 \
         || return 1
@@ -242,7 +242,7 @@ EOF
     ## Drive-inventory label logic: hermetic fixture (fake /sys/block + /dev/disk bind-mounted over
     ## the real trees while the watcher is paused, restored below BEFORE any failure can leak into
     ## the later checks), asserted against the real non-quiet generation run writing throwaway args
-    ## files. The fixture "devices" are plain files - no device nodes, no hardware - so every label
+    ## files. The fixture "devices" are plain files – no device nodes, no hardware – so every label
     ## branch is covered deterministically: start order, fs/partlabel precedence, both-differ,
     ## whole-disk label, \xNN decoding, unlabeled silence.
     if ! docker exec -i "$app" sh -s <<'EOF'
@@ -300,7 +300,7 @@ EOF
     fi
     gen_rc=0
     label_out=$(docker exec "$app" /usr/bin/hd-idle-genargs /tmp/labeltest.args 2>&1) || gen_rc=$?
-    ## Restore the real trees before asserting - the watcher roundtrips and the spindown smoke test
+    ## Restore the real trees before asserting – the watcher roundtrips and the spindown smoke test
     ## below need them (the watcher is still paused here).
     um_fail=0
     docker exec "$app" umount /dev/disk || {
@@ -347,7 +347,7 @@ EOF
     ## sdg: identical fs label and partlabel -> shown once, without a partlabel fragment.
     mx_label "sdg: TestDisk G (label (sdg1): twin)" || return 1
     mx_absent "partlabel (sdg1)" || return 1
-    ## sdc/sdf: unlabeled disks (no partitions resp. no labeled partitions) - no fragment at all. The
+    ## sdc/sdf: unlabeled disks (no partitions resp. no labeled partitions) – no fragment at all. The
     ## check is ANSI-agnostic on purpose (bashio wraps every log line in color codes): a fragment
     ## would put a parenthesized group right after the model name.
     mx_absent "sdc: TestDisk C (" || return 1
@@ -391,7 +391,7 @@ EOF
       return 1
     }
     ## The restore precedes the restart by ~1 s (drives+state mv, pmfix, s6-svc -r, then the daemon logs
-    ## 'Starting hd-idle' again) - a single grep right after the cmp success can land in that window and
+    ## 'Starting hd-idle' again) – a single grep right after the cmp success can land in that window and
     ## count 1. Poll for the restarted daemon instead.
     restarts=0
     for _ in {1..10}; do
@@ -464,7 +464,7 @@ EOF
   ## Per-drive drive-PM opt-out: the drives file carries the per-drive decision in a 4th column
   ## (1 = treat, 0 = leave the drive's own power management alone); the fixture sets keep_drive_pm=true
   ## on the FIRST drive so the opt-out is exercised end to end (pm-flag 0, hd-idle-pmfix logs the skip),
-  ## while the other drives carry no key at all (absent = the treatment applies - pm-flag 1).
+  ## while the other drives carry no key at all (absent = the treatment applies – pm-flag 1).
   pm_skip="${drives%%,*}"
   pm_zero_count=$(docker exec "$app" sh -c "awk '\$3 != \"-\" && \$4 == 0' /etc/hd-idle.drives | wc -l")
   if [ "$pm_zero_count" != "1" ]; then
@@ -487,7 +487,7 @@ EOF
   ##
   ## hd-idle -t quirks (verified, see hd-idle/KNOWLEDGE.md): needs the FULL /dev path (single-shot
   ## mode does not prepend /dev/; the usage string's "-t sda" is misleading) and uses hd-idle's
-  ## built-in defaults (scsi, power condition 0 - the app sets no global defaults anymore; the
+  ## built-in defaults (scsi, power condition 0 – the app sets no global defaults anymore; the
   ## fixture's per-drive set is ignored).
   check_img="local/hdidle-lab-check:smartctl"
   if ! docker image inspect "$check_img" >/dev/null 2>&1; then
@@ -509,7 +509,7 @@ EOF
       fail=1
       continue
     fi
-    ## smartctl -n standby: the probe designed not to wake drives (hdparm -C is NOT usable here - it
+    ## smartctl -n standby: the probe designed not to wake drives (hdparm -C is NOT usable here – it
     ## races the spindown window and actually wakes the bridge's drive; empirical, see
     ## hd-idle/KNOWLEDGE.md). Desktop IO on a mounted drive may wake it between command and probe -
     ## hence the polling retries instead of a single read.
@@ -536,7 +536,7 @@ EOF
   [ "$fail" = 0 ] || return 1
 
   ## Natural-path assertion: the daemon (fixture idle: 30 s) must log its own spindown events; desktop
-  ## IO can delay this (drive gets woken, daemon spins it down again) - the event must appear, the
+  ## IO can delay this (drive gets woken, daemon spins it down again) – the event must appear, the
   ## drive does not need to STAY in standby.
   echo "-- waiting for the daemon's own spindown events (fixture idle: 30 s)"
   while [ "$waited" -lt 180 ]; do

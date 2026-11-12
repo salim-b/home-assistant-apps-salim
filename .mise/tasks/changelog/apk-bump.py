@@ -11,7 +11,7 @@
 
 """changelog:apk-bump: insert the templated changelog section for an apk pin bump.
 
-The Renovate apk-pin PR is merged without a changelog entry - the apk-bump workflow's changelog
+The Renovate apk-pin PR is merged without a changelog entry – the apk-bump workflow's changelog
 job runs this task post-merge to fill it (policy: root KNOWLEDGE.md §apk package version policy);
 local runs share the same code path. Idempotent: the `## <version>` section is inserted only when
 that heading is absent. The bullet is end-user phrased ("Updated the bundled <pkg> from <old> to
@@ -49,7 +49,7 @@ def _val(name: str) -> str:
     """Read a mise #USAGE option value (env var; argv fallback for direct runs).
 
     The spec declares the flag required=true, so mise fails a missing flag
-    before the script runs - but empty values pass mise's check and are
+    before the script runs – but empty values pass mise's check and are
     rejected here (the Python equivalent of the shell's `${usage_name:?}`).
     """
     value = os.environ.get(f"usage_{name.replace('-', '_')}", "") or _argv_value(name)
@@ -121,7 +121,7 @@ def main() -> int:
     heading_re = re.compile(rf"^## {re.escape(version)}(?:\s|$)")
     if any(heading_re.match(line) for line in lines):
         print(
-            f"changelog:apk-bump: [{app}] a '## {version}' section already exists - nothing to do"
+            f"changelog:apk-bump: [{app}] a '## {version}' section already exists – nothing to do"
         )
         return 0
 
@@ -130,7 +130,7 @@ def main() -> int:
     )
     if anchor is None:
         sys.exit(
-            f"changelog:apk-bump: {changelog} has no '# Changelog' heading - unexpected "
+            f"changelog:apk-bump: {changelog} has no '# Changelog' heading – unexpected "
             f"structure, refusing to modify"
         )
 

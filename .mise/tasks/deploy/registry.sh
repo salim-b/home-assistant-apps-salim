@@ -94,7 +94,7 @@ echo "-- registry: $store_slug (latest version $store_version)"
   && echo "-- repository-installed: $store_slug (version $(echo "$repo_installed" | jq -r '.version'))"
 
 # The app's config.yaml default options: the reset target ({} would be rejected for schemas with
-# required option keys - the defaults always satisfy the schema).
+# required option keys – the defaults always satisfy the schema).
 default_options=$(yq -o json '.options' "$app/config.yaml" | jq -c .)
 
 # --- decide what to do -------------------------------------------------------
@@ -140,7 +140,7 @@ else
   fi
 
   # --- hickory-dns: uninstalling the local copy can cut the DEVICE's own DNS -----------------------------------
-  # (the registry install below cannot download without DNS - device_resolves_through_self)
+  # (the registry install below cannot download without DNS – device_resolves_through_self)
   if [ "$app" = "hickory-dns" ] && [ "$local_version" != "" ]; then
     rc=0
     device_resolves_through_self || rc=$?
@@ -187,13 +187,13 @@ else
       ;;
     reset)
       ## The reset POST runs after the install below: a fresh install already carries the app's default
-      ## options (stored options never survive an uninstall) - no-op there, deterministic wipe otherwise.
+      ## options (stored options never survive an uninstall) – no-op there, deterministic wipe otherwise.
       echo "-- --config reset: the registry install will run with the app's default options (previous options: $backup_note)"
       old_options=""
       ;;
     *)
       ## unset = keep (the default): an UPDATE preserves the options; on a local->store switch they are
-      ## NOT carried over (options never survive an uninstall - only the backup file keeps a copy).
+      ## NOT carried over (options never survive an uninstall – only the backup file keeps a copy).
       [ "$old_options" != "" ] \
         && echo "-- options not carried over (options do not survive the uninstall; $backup_note)"
       old_options=""

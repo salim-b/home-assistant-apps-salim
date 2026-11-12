@@ -18,7 +18,7 @@ source "$MISE_PROJECT_ROOT/.mise/tasks/lib/ssh-ha.sh"
 ha_connect "${usage_host:?}"
 
 # --------------------------------------------------------------------------
-# Generic live-test harness; per-app checks live in .mise/tasks/test/live/<app>.sh - hook contract
+# Generic live-test harness; per-app checks live in .mise/tasks/test/live/<app>.sh – hook contract
 # (live_prepare/live_runtime_check, LIVE_* contract vars): .agents/skills/ha-app-device-testing.
 # --------------------------------------------------------------------------
 slug=$(ha_app_slug "$app")
@@ -41,7 +41,7 @@ wait_started() { # wait until the app reaches a running state (60 x ~3 s budget 
 }
 
 # The client container runs with --network host, so its source IP is this
-# machine's IP — servers with network ACLs deny mounts/connections from
+# machine's IP – servers with network ACLs deny mounts/connections from
 # outside their configured networks.
 device_ip=$(getent hosts "$host_addr" | awk '{print $1; exit}')
 [ "$device_ip" != "" ] || {
@@ -119,7 +119,7 @@ if [ "${usage_test_options:-false}" = "true" ]; then
 fi
 
 # Runs on every exit path: leaving test options active is the worst failure mode. Define+trap BEFORE
-# the checks - a failing check aborts under set -e and a later trap would never fire (device-verified).
+# the checks – a failing check aborts under set -e and a later trap would never fire (device-verified).
 restore_options() {
   local suspicious test_keys tkey
   [ "${usage_test_options:-false}" = "true" ] || return 0
@@ -132,7 +132,7 @@ restore_options() {
       && echo "$restore_result" | jq -e '.result == "ok"' >/dev/null 2>&1; then
       # Refuse to apply a backup that IS the test options (a failed run may have saved them as
       # "original"): suspicious when every overridden top-level key carries exactly the test value.
-      # Generic key comparison - no app-specific field name may be hardwired here.
+      # Generic key comparison – no app-specific field name may be hardwired here.
       suspicious=0
       if [ -f "$LIVE_TEST_OPTIONS_FILE" ]; then
         test_keys=$(yq '. | keys | .[]' "$LIVE_TEST_OPTIONS_FILE")
@@ -151,7 +151,7 @@ restore_options() {
         fi
       fi
       if [ "$suspicious" = 1 ]; then
-        echo "WARNING: the device backup contains the TEST options — not applying them as" >&2
+        echo "WARNING: the device backup contains the TEST options – not applying them as" >&2
         echo "         'original'. Restore your real options via the app options UI; the" >&2
         echo "         backup stays at $backup for reference." >&2
       else
@@ -164,7 +164,7 @@ restore_options() {
       echo "         The backup remains at $backup" >&2
     fi
   else
-    echo "-- note: no options backup on the device; the test options remain active —"
+    echo "-- note: no options backup on the device; the test options remain active – "
     echo "        restore your options via the app options UI"
   fi
 }

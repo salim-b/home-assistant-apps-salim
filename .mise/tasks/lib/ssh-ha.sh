@@ -2,7 +2,7 @@
 #MISE hide=true
 #MISE description="⚠️ internal helper (sourced by device tasks, not runnable on its own)"
 # Sourced by the device tasks (see .agents/skills/ha-app-device-testing): call `ha_connect <host-arg>` right after
-# sourcing - it sets the contract variables `host` + SSH_OPTS that the other helpers read.
+# sourcing – it sets the contract variables `host` + SSH_OPTS that the other helpers read.
 
 # shellcheck shell=bash
 # shellcheck disable=SC2154  # host + SSH_OPTS are set by ha_connect
@@ -33,7 +33,7 @@ wait_supervisor() { # poll until the supervisor API answers
       "ha supervisor info --raw-json 2>&1 | jq -e '.result == \"ok\"' >/dev/null" 2>&1) && rc=0 || rc=$?
     [ "$rc" -eq 0 ] && return 0
     if [ "$rc" -eq 255 ]; then
-      # rc=255 = ssh itself failed (network/auth) — no retry can fix that
+      # rc=255 = ssh itself failed (network/auth) – no retry can fix that
       echo "ERROR: cannot ssh to $host: ${probe:-<no output>}" >&2
       return 1
     fi
@@ -139,7 +139,7 @@ sup_expect_ok() { # sup_expect_ok <api-path> <what>: sup_get + require result=="
 # The device resolves through the CoreDNS forward chain: manual servers, then the host's DHCP-learned DNS
 # servers ("locals"), then the DoT fallback (root KNOWLEDGE.md §"Supervisor: DNS resolution chain (CoreDNS)").
 # When the device's own IP is among them, whatever app serves :53 on the device sits in the device's own
-# resolution path - a deploy task uninstalling that app (e.g. a hickory-dns copy) cuts the supervisor's DNS
+# resolution path – a deploy task uninstalling that app (e.g. a hickory-dns copy) cuts the supervisor's DNS
 # off, and the task's remaining DNS-dependent steps (registry downloads, store reloads, on-device builds)
 # fail with a broken resolver on top.
 device_resolves_through_self() { # 0 = the device's DNS servers include its own IP, 1 = no, 2 = undetermined
@@ -147,7 +147,7 @@ device_resolves_through_self() { # 0 = the device's DNS servers include its own 
   dns_info=$(sup_get dns/info) || return 2
   net_info=$(sup_get network/info) || return 2
   # The device's own IPs: v1 nests the CIDR lists under .ipv4/.ipv6, v2 under .state/.config (both shapes
-  # exist - root KNOWLEDGE.md §"Supervisor: DNS resolution chain (CoreDNS)").
+  # exist – root KNOWLEDGE.md §"Supervisor: DNS resolution chain (CoreDNS)").
   own_ips=$(jq -r '(.data.interfaces // [])[]
       | (.ipv4.address // []) + (.ipv6.address // [])
         + (.state.ipv4.addresses // []) + (.state.ipv6.addresses // [])
@@ -180,13 +180,13 @@ ha_post_options() { # ha_post_options <slug> <options-json>: POST {options: ...}
 }
 
 ha_schema_keys() { # ha_schema_keys <slug>: the app's schema keys as a JSON array (the info endpoint's schema field is
-  # an array of {name, ...} objects or a key->spec object - both shapes exist, device-verified 2026-10-16)
+  # an array of {name, ...} objects or a key->spec object – both shapes exist, device-verified 2026-10-16)
   ssh "${SSH_OPTS[@]}" "$host" "ha apps info $1 --raw-json" \
     | jq -c 'if (.data.schema | type) == "array" then [.data.schema[] | .name] else [.data.schema | keys[]] end'
 }
 
 ha_filter_options() { # ha_filter_options <options-json> <target-slug>: the options filtered to the target's schema
-  # keys. A fresh options POST silently DROPS keys unknown to the schema (device-verified 2026-10-16) - the
+  # keys. A fresh options POST silently DROPS keys unknown to the schema (device-verified 2026-10-16) – the
   # filter makes those drops explicit (fact: root KNOWLEDGE.md §Supervisor: option schema quirks).
   local keys
   keys=$(ha_schema_keys "$2")
@@ -194,7 +194,7 @@ ha_filter_options() { # ha_filter_options <options-json> <target-slug>: the opti
 }
 
 ha_dropped_keys() { # ha_dropped_keys <options-json> <target-slug>: the options' keys unknown to the target's schema,
-  # comma-joined ('' when none) - the counterpart of ha_filter_options, reporting the drops instead of filtering
+  # comma-joined ('' when none) – the counterpart of ha_filter_options, reporting the drops instead of filtering
   jq -r --argjson keys "$(ha_schema_keys "$2")" \
     'to_entries | map(select(.key as $k | $keys | index($k) | not) | .key) | join(", ")' <<<"$1"
 }
