@@ -80,6 +80,22 @@ lab_runtime_check() {
       echo "config.sh disk inventory missing from the app log"
       return 1
     }
+  ## Boot inventory label smoke: the lab mirrors the lab host's /dev/disk, so when the host has labeled
+  ## sd* partitions the boot inventory must show one (the hermetic matrix below covers the logic
+  ## deterministically, including hosts without labeled sd* partitions).
+  if docker exec "$app" sh -c 'for l in /dev/disk/by-label/*; do
+      [ -L "$l" ] || continue
+      t=$(readlink -f "$l" 2>/dev/null) || continue
+      [ -e "$t" ] || continue
+      case "${t##*/}" in sd[a-z][0-9]* | sd[a-z][a-z][0-9]*) exit 0 ;; esac
+    done
+    exit 1'; then
+    docker logs "$app" 2>&1 | grep -q "label (sd" \
+      || {
+        echo "the boot inventory shows no partition label although the lab host has labeled sd* partitions"
+        return 1
+      }
+  fi
   if docker logs "$app" 2>&1 | grep -q "./run: line"; then
     echo "a run script crashed during boot (raw './run: line N:' error in the app log)"
     return 1
@@ -178,6 +194,124 @@ lab_runtime_check() {
     mx_case "state file restore (4)" "cp /tmp/mx.state /etc/hd-idle.resolution" 0 \
       || return 1
     docker exec "$app" sh -c 'rm -f /tmp/mx.args /tmp/mx.drives /tmp/mx.state'
+
+    ## Drive-inventory label logic: hermetic fixture (fake /sys/block + /dev/disk bind-mounted over
+    ## the real trees while the watcher is paused, restored below BEFORE any failure can leak into
+    ## the later checks), asserted against the real non-quiet generation run writing throwaway args
+    ## files. The fixture "devices" are plain files - no device nodes, no hardware - so every label
+    ## branch is covered deterministically: start order, fs/partlabel precedence, both-differ,
+    ## whole-disk label, \xNN decoding, unlabeled silence.
+    if ! docker exec -i "$app" sh -s <<'EOF'
+set -e
+root=/tmp/labeltest
+rm -rf "$root"
+mkdir -p "$root/dev" "$root/disk/by-label" "$root/disk/by-partlabel" "$root/sys/block"
+mkdisk() {
+  mkdir -p "$root/sys/block/$1/device"
+  printf 'TestDisk %s\n' "$2" >"$root/sys/block/$1/device/model"
+  : >"$root/dev/$1"
+}
+mkpart() {
+  mkdir -p "$root/sys/block/$1/$2"
+  printf '%s\n' "$3" >"$root/sys/block/$1/$2/start"
+  : >"$root/dev/$2"
+}
+mkdisk sda A
+mkpart sda sda1 2048
+mkpart sda sda2 1048576
+mkdisk sdb B
+mkdisk sdc C
+mkdisk sdd D
+mkpart sdd sdd1 2048
+mkdisk sde E
+mkpart sde sde1 2048
+mkdisk sdf F
+mkpart sdf sdf1 2048
+mkpart sdf sdf2 8192
+mkdisk sdg G
+mkpart sdg sdg1 2048
+## Filesystem labels (by-label); \x20 is udev's space escaping, decoded for display.
+ln -s "$root/dev/sda2" "$root/disk/by-label/Movies\x204K"
+ln -s "$root/dev/sdb" "$root/disk/by-label/vintage-audio"
+ln -s "$root/dev/sde1" "$root/disk/by-label/plain"
+ln -s "$root/dev/sdg1" "$root/disk/by-label/twin"
+## GPT partition labels (by-partlabel).
+ln -s "$root/dev/sda2" "$root/disk/by-partlabel/Backup\x20stuff"
+ln -s "$root/dev/sdd1" "$root/disk/by-partlabel/WinInstall"
+ln -s "$root/dev/sdg1" "$root/disk/by-partlabel/twin"
+EOF
+    then
+      echo "   FAIL: building the label fixture failed"
+      return 1
+    fi
+    docker exec "$app" mkdir -p /dev/disk
+    if ! docker exec "$app" mount -o bind /tmp/labeltest/disk /dev/disk; then
+      echo "   FAIL: mounting the label fixture over /dev/disk failed"
+      return 1
+    fi
+    if ! docker exec "$app" mount -o bind /tmp/labeltest/sys/block /sys/block; then
+      echo "   FAIL: mounting the label fixture over /sys/block failed"
+      docker exec "$app" umount /dev/disk || true
+      return 1
+    fi
+    gen_rc=0
+    label_out=$(docker exec "$app" /usr/bin/hd-idle-genargs /tmp/labeltest.args 2>&1) || gen_rc=$?
+    ## Restore the real trees before asserting - the watcher roundtrips and the spindown smoke test
+    ## below need them (the watcher is still paused here).
+    um_fail=0
+    docker exec "$app" umount /dev/disk || {
+      echo "   WARNING: fixture /dev/disk unmount failed" >&2
+      um_fail=1
+    }
+    docker exec "$app" umount /sys/block || {
+      echo "   WARNING: fixture /sys/block unmount failed" >&2
+      um_fail=1
+    }
+    if [ "$um_fail" != 0 ]; then
+      echo "   FAIL: restoring the real /dev/disk and /sys/block after the label matrix failed"
+      return 1
+    fi
+    if [ "$gen_rc" != 0 ]; then
+      echo "   FAIL: the label-fixture generation run failed (rc ${gen_rc})"
+      echo "$label_out"
+      return 1
+    fi
+    mx_label() { ## <expected inventory line fragment>
+      if ! grep -qF -- "$1" <<<"$label_out"; then
+        echo "   FAIL: label matrix: inventory fragment not found: ${1}"
+        echo "$label_out"
+        return 1
+      fi
+      echo "   PASS: label matrix: ${1}"
+    }
+    mx_absent() { ## <fragment that must NOT appear>
+      if grep -qF -- "$1" <<<"$label_out"; then
+        echo "   FAIL: label matrix: unexpected inventory fragment: ${1}"
+        echo "$label_out"
+        return 1
+      fi
+    }
+    ## sda: first partition unlabeled, second carries DIFFERING fs + partlabel (start order,
+    ## \x20 decoding, both shown when they differ).
+    mx_label "sda: TestDisk A (label (sda2): Movies 4K, partlabel (sda2): Backup stuff)" || return 1
+    ## sdb: unpartitioned disk with a whole-disk filesystem label.
+    mx_label "sdb: TestDisk B (label: vintage-audio)" || return 1
+    ## sdd: partlabel-only fallback.
+    mx_label "sdd: TestDisk D (partlabel (sdd1): WinInstall)" || return 1
+    ## sde: fs label only.
+    mx_label "sde: TestDisk E (label (sde1): plain)" || return 1
+    ## sdg: identical fs label and partlabel -> shown once, without a partlabel fragment.
+    mx_label "sdg: TestDisk G (label (sdg1): twin)" || return 1
+    mx_absent "partlabel (sdg1)" || return 1
+    ## sdc/sdf: unlabeled disks (no partitions resp. no labeled partitions) - no fragment at all. The
+    ## check is ANSI-agnostic on purpose (bashio wraps every log line in color codes): a fragment
+    ## would put a parenthesized group right after the model name.
+    mx_absent "sdc: TestDisk C (" || return 1
+    mx_absent "sdf: TestDisk F (" || return 1
+    mx_absent "label (sda1)" || return 1
+    docker exec "$app" rm -rf /tmp/labeltest /tmp/labeltest.args /tmp/labeltest.drives /tmp/labeltest.resolution
+    echo "   PASS: label matrix green"
+
     echo "-- resuming the watcher after the matrix (s6-svc -u)"
     docker exec "$app" /command/s6-svc -u /run/service/hd-idle-watch
     mx_up=0

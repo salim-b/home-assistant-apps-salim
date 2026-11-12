@@ -62,9 +62,10 @@ Why the watcher exists at all — hd-idle's `-s 1` never re-verifies resolved en
 
 ## Debugging playbook
 
-- Which log carries what: boot-time configuration messages and the drive inventory (by-id mapping) come from the
-  non-quiet cont-init run; daemon stdout (`sda spindown`/`spinup` events, debug lines) and watcher notices land in the
-  app log — unchanged watcher ticks are silent. The optional activity log (-l) is `/data/hd-idle.log`.
+- Which log carries what: boot-time configuration messages and the drive inventory (by-id mapping and first-partition
+  labels; facts: hd-idle/KNOWLEDGE.md §"Drive inventory") come from the non-quiet cont-init run; daemon stdout
+  (`sda spindown`/`spinup` events, debug lines) and watcher notices land in the app log — unchanged watcher ticks are
+  silent. The optional activity log (-l) is `/data/hd-idle.log`.
 - A drive detached at boot is passed through for hd-idle's runtime resolution and recorded as PASSTHRU in the baseline;
   the watcher restarts hd-idle once it resolves.
 - Two by-id symlinks for the same drive with one detached at boot: genargs' duplicate-entry rejection fires every tick

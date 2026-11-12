@@ -19,11 +19,17 @@ Pick each drive from the dropdown, which lists the system's block devices by the
 survive re-plugging and reboots, even when the kernel name changes); select the **disk itself**, never a partition. See
 the **Drives** field description in the options UI for the details.
 
-On startup the app logs an inventory of all detected `sd*` disks (model and by-id path) and the mapping of every
-configured drive to its kernel name, so log lines like `sda spindown` can be attributed:
+On startup the app logs an inventory of all detected `sd*` disks and the mapping of every configured drive to its kernel
+name, so log lines like `sda spindown` can be attributed. Each inventory line shows the drive model, its by-id path and
+— when set – the label of the drive's first labeled partition (filesystem label preferred, GPT partition label as
+fallback; an unpartitioned disk shows its whole-disk filesystem label) – usually the name the drive carries in file
+managers:
 
 ```text
-Drive /dev/disk/by-id/usb-WD_Elements_1234567890AB-0:0 -> sda
+# with command type `scsi`
+[10:30:00] INFO:   sda: Elements 25A3 (by-id: usb-WD_Elements_1234567890AB-0:0, label (sda1): my_movies)
+# with command type `ata`
+[22:49:21] INFO:   sda: Elements 25A3 (by-id: ata-WDC_WD160EDGZ-0AB4567_876543XY, label (sda1): my_movies)
 ```
 
 ### Drive power management

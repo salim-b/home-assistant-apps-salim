@@ -305,12 +305,80 @@ fi
 detect_system_disks
 
 ## ---------------------------------------------------------------------------
-## Drive inventory (helps users map by-id paths to kernel names)
+## Drive inventory (helps users map by-id paths and labels to kernel names)
 ## ---------------------------------------------------------------------------
 
-## Boot-time UX only (non-quiet cont-init run): maps by-id paths to kernel names. Since the --check baseline replay
-## the watcher never reaches this code; the guard just keeps the inventory out of regeneration ticks.
+## Boot-time UX only (non-quiet cont-init run). Since the --check baseline replay the watcher never
+## reaches this code; the guard just keeps the inventory out of regeneration ticks. Label sources,
+## escaping and known gaps: hd-idle/KNOWLEDGE.md §"Drive inventory".
+
+## udev escapes bytes outside its safe set in /dev/disk/by-* link names as \xNN (a space becomes
+## \x20); %b resolves exactly that escape alphabet and passes raw bytes through unchanged.
+decode_udev_name() {
+  printf '%b' "$1"
+}
+
+## Label fragment for one inventory line: the first partition in start order that carries a
+## filesystem label (preferred) and/or a GPT partition label (fallback; both shown when they
+## differ) - or, on an unpartitioned disk, the whole-disk filesystem label. Empty when nothing
+## is labeled. Reads sysfs and the label maps only: no device-node access, so standby drives
+## stay asleep (hd-idle/KNOWLEDGE.md §"Drive inventory").
+drive_label_info() {
+  local block="$1" name="$2" part_dir part start fs pl line
+  local -a parts=()
+  for part_dir in "${block}/${name}"[0-9]*; do
+    [ -d "$part_dir" ] || continue
+    part="${part_dir##*/}"
+    start=$(cat "${part_dir}/start" 2>/dev/null) || start=""
+    if [ "$start" = "" ]; then
+      start=999999999999
+    fi
+    parts+=("${start} ${part}")
+  done
+  if [ "${#parts[@]}" -gt 0 ]; then
+    while IFS= read -r line; do
+      part="${line#* }"
+      fs="${FS_LABELS[$part]:-}"
+      pl="${PART_LABELS[$part]:-}"
+      if [ "$fs" = "$pl" ]; then
+        pl=""
+      fi
+      if [ "$fs" != "" ]; then
+        printf 'label (%s): %s' "$part" "$fs"
+        if [ "$pl" != "" ]; then
+          printf ', partlabel (%s): %s' "$part" "$pl"
+        fi
+      elif [ "$pl" != "" ]; then
+        printf 'partlabel (%s): %s' "$part" "$pl"
+      else
+        continue
+      fi
+      return 0
+    done < <(printf '%s\n' "${parts[@]}" | sort -n)
+  elif [ "${FS_LABELS[$name]:-}" != "" ]; then
+    printf 'label: %s' "${FS_LABELS[$name]}"
+  fi
+  return 0
+}
+
 if [ "$QUIET" = 0 ]; then
+  ## Node -> label maps from the udev symlink trees, keyed by the resolved node's kernel name (sda1,
+  ## or the disk name itself for a whole-disk filesystem). Dangling links (vanished filesystems)
+  ## are skipped - the same staleness guard as the by-id scan below.
+  declare -A FS_LABELS=() PART_LABELS=()
+  for link in /dev/disk/by-label/*; do
+    [ -L "$link" ] || continue
+    target=$(readlink -f "$link" 2>/dev/null) || continue
+    [ -e "$target" ] || continue
+    FS_LABELS["${target##*/}"]=$(decode_udev_name "${link##*/}")
+  done
+  for link in /dev/disk/by-partlabel/*; do
+    [ -L "$link" ] || continue
+    target=$(readlink -f "$link" 2>/dev/null) || continue
+    [ -e "$target" ] || continue
+    PART_LABELS["${target##*/}"]=$(decode_udev_name "${link##*/}")
+  done
+
   qlog_info "Detected sd* disks:"
   for block in /sys/block/sd*; do
     [ -e "$block" ] || continue
@@ -324,7 +392,15 @@ if [ "$QUIET" = 0 ]; then
         break
       fi
     done
-    qlog_info "  ${name}: ${model:-unknown} ${byid:+(by-id: ${byid})}"
+    labelinfo=$(drive_label_info "$block" "$name")
+    info=""
+    if [ "$byid" != "" ]; then
+      info="by-id: ${byid}"
+    fi
+    if [ "$labelinfo" != "" ]; then
+      info="${info:+${info}, }${labelinfo}"
+    fi
+    qlog_info "  ${name}: ${model:-unknown}${info:+ (${info})}"
   done
 fi
 

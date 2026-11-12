@@ -60,6 +60,27 @@ deterministic; the app's own attribution is likewise single-holder): a multi-hol
 managed correctly; the common dm-crypt case (one holder) is exact. Source:
 [snapshot.go](https://github.com/adelolmo/hd-idle/blob/v1.22/diskstats/snapshot.go).
 
+## Drive inventory
+
+The startup inventory (non-quiet `hd-idle-genargs` run only) maps every `sd*` disk to its model, first by-id link and
+the label of its first labeled partition: filesystem label preferred (`/dev/disk/by-label`), GPT partition label as
+fallback (`by-partlabel`), both shown when they differ; partitions are ordered by start sector
+(`/sys/block/sdX/sdXN/start`); an unpartitioned disk shows its whole-disk filesystem label; a drive with no labeled
+partition shows no label. Purely display output - nothing enters the args/drives/baseline files, so relabeling a
+partition never triggers a watcher regeneration.
+
+- The udev symlink trees are readable without any device-node access (device-access mechanics: §"Device access in this
+  app") - reading symlinks cannot wake a standby drive. Superblock probing (`blkid`/`lsblk`) is NOT a viable label
+  source: unlisted drives have no cgroup device access, and a superblock read spins up standby drives at every app
+  (re)start.
+- udev escapes bytes outside its safe set in by-label/by-partlabel link names as `\xNN` (space → `\x20`; observed on
+  udev 259 - re-verify on the device's HAOS per the version-sensitive-facts rule); the inventory decodes them for
+  display and passes raw names through unchanged.
+- Duplicate filesystem labels (cloned drives): udev keeps only the first by-label link - the second drive shows no label
+  (the inventory is an identification aid, not authoritative).
+- LUKS/dm: a filesystem label on the unlocked volume points at the dm node and is not attributed to the holding
+  partition; the container partition's GPT partlabel still is.
+
 ## Daemon failure semantics
 
 The daemon is crash-only, with two fatal paths (v1.22 source): a `log.Fatal` when `/proc/diskstats` cannot be opened or

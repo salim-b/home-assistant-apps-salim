@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.1.15
+
+- The startup drive inventory now also shows the label of each drive's first labeled partition (filesystem label
+  preferred, GPT partition label as fallback; an unpartitioned disk shows its whole-disk filesystem label) - usually the
+  name the drive carries in file managers, so drives are easier to identify. No configuration change.
+
 ## 0.1.14
 
 - Internals: the `/usr/bin` helper scripts (`hd-idle-genargs`, `hd-idle-pmfix`) now sit under the repository's full
