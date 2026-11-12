@@ -9,25 +9,33 @@ Rewrites the config.yaml options so the roundtrip works inside the lab network.
 """
 
 
+def _adapt_value(value: object) -> object:
+    """Recursively re-point every network value inside a lab option at LABNETWORK."""
+    if isinstance(value, dict):
+        return {
+            k: "LABNETWORK" if k == "network" else _adapt_value(value[k]) for k in value
+        }
+    if isinstance(value, list):
+        return [_adapt_value(v) for v in value]
+    return value
+
+
 def lab_adapt_fixture(options: dict[str, object]) -> dict[str, object]:
     """Adapt the lab options: re-point networks at LABNETWORK, add the hotplug share.
 
-    The walk rewrites every network value; lease_time drops to 15 s so client renewal and
-    server-restart recovery complete inside the check window.
+    Network values are rewritten recursively; lease_time drops to 15 s so client renewal
+    and server-restart recovery complete inside the check window.
     """
-
-    def walk(value: object) -> object:
-        if isinstance(value, dict):
-            return {
-                k: "LABNETWORK" if k == "network" else walk(value[k]) for k in value
-            }
-        if isinstance(value, list):
-            return [walk(v) for v in value]
-        return value
-
-    adapted = walk(options)
+    adapted = {
+        k: "LABNETWORK" if k == "network" else _adapt_value(v)
+        for k, v in options.items()
+    }
     # Second share on the hotplug path (/media): the runtime check replugs a "drive" mounted there in-container.
-    adapted["shares"].append(
+    shares = adapted["shares"]
+    if not isinstance(shares, list):
+        msg = f"lab fixture 'shares' must be a list, got {type(shares).__name__}"
+        raise TypeError(msg)
+    shares.append(
         {
             "path": "/media/usb0",
             "network": "LABNETWORK",

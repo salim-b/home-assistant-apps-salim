@@ -86,7 +86,13 @@ def _apkindex_versions(branch: str, package: str) -> dict[str, str]:
                 continue
             dest.parent.mkdir(parents=True, exist_ok=True)
             with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tar:
-                index = tar.extractfile("APKINDEX").read().decode()
+                member = tar.extractfile("APKINDEX")
+                if member is None:
+                    fail(
+                        "apk-pins", f"APKINDEX missing from tarball (v{branch}/{arch})"
+                    )
+                    continue
+                index = member.read().decode()
             dest.write_text(index)
         text = dest.read_text()
         for block in text.split("\n\n"):
