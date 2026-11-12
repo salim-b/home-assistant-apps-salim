@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# shellcheck shell=bash
 #MISE hide=true
 #MISE description="⚠️ internal helper (sourced by device tasks, not runnable on its own)"
 # Sourced by the device tasks (see .agents/skills/ha-app-device-testing): call `ha_connect <host-arg>` right after
 # sourcing - it sets the contract variables `host` + SSH_OPTS that the other helpers read.
+
+# shellcheck shell=bash
 # shellcheck disable=SC2154  # host + SSH_OPTS are set by ha_connect
 # shellcheck disable=SC2029  # the remote commands intentionally embed client-side values (function args)
 

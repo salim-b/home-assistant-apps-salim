@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2029  # remote commands intentionally embed client-side values ($local_slug)
 #MISE description="Deploy an app to a real HAOS device: copy to `/local_apps`, install/update/rebuild as needed and ensure it's running"
 #USAGE arg "<app>" help="App to deploy (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
@@ -14,6 +13,7 @@
 #USAGE """ {
 #USAGE   choices "migrate" "reset"
 #USAGE }
+# shellcheck disable=SC2029  # remote commands intentionally embed client-side values ($local_slug)
 
 set -euo pipefail
 

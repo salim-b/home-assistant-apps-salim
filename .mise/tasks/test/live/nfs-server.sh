@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2029  # remote/docker commands intentionally embed client-side values
 #MISE hide=true
 #MISE description="⚠️ internal helper script"
 # App-specific live-test hook for nfs-server, sourced by .mise/tasks/test/live.sh; hook contract:
@@ -9,6 +8,7 @@
 #   - live_runtime_check() the NFS client roundtrips: per-share mount / write+read+delete (rw) or
 #                          EROFS assertion (ro) / pseudo-root browse
 
+# shellcheck disable=SC2029  # remote/docker commands intentionally embed client-side values
 # shellcheck disable=SC2034  # LIVE_* are the harness contract variables
 
 live_prepare() {

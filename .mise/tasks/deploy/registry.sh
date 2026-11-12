@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2029  # remote commands intentionally embed client-side values
 #MISE description="Switch a HAOS device to the app's latest registry/store version and tear down any locally installed copy"
 #USAGE arg "<app>" help="App to switch to the registry version (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
@@ -13,6 +12,7 @@
 #USAGE """ {
 #USAGE   choices "migrate" "reset"
 #USAGE }
+# shellcheck disable=SC2029  # remote commands intentionally embed client-side values
 
 set -euo pipefail
 

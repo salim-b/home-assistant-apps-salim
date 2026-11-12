@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2029  # remote commands intentionally embed client-side values
 #MISE hide=true
 #MISE description="⚠️ internal helper script"
 # App-specific live-test hook for hickory-dns, sourced by .mise/tasks/test/live.sh; hook contract:
@@ -40,6 +39,7 @@
 # forwarding; the generator's validation knobs are sandbox/lab territory (skill
 # hickory-dns-runtime).
 
+# shellcheck disable=SC2029  # remote commands intentionally embed client-side values
 # shellcheck disable=SC2034  # LIVE_* are the harness contract variables
 
 hickory_digq() { # dig with bounded latency; comments (status + flags) plus answer records

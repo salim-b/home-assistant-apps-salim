@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2029  # remote commands intentionally embed client-side values
 #MISE hide=true
 #MISE description="⚠️ internal helper script"
 # App-specific live-test hook for hd-idle, sourced by .mise/tasks/test/live.sh; hook contract:
@@ -27,6 +26,7 @@
 # boundary by itself (a disk whose partitions are all unlabeled is invisible). Never run with a loose
 # glob on a device whose important data lives on unlabeled partitions.
 
+# shellcheck disable=SC2029  # remote commands intentionally embed client-side values
 # shellcheck disable=SC2034  # LIVE_* are the harness contract variables
 
 live_prepare() {

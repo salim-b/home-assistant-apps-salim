@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2029  # remote commands intentionally embed client-side values
 #MISE description="Apply a JSON (or YAML) options file to an installed HA app on a device - schema-filtered, previous options backed up"
 #USAGE arg "<app>" help="App to apply the options to (repo subfolder name)" {
 #USAGE   complete run="git ls-files | grep -E '^[^/]+/config.yaml$' | cut -d/ -f1"
@@ -14,6 +13,7 @@
 #USAGE flag "--slug <slug>" help="Apply to this exact install slug on the device instead of auto-detecting the app's installed copy (e.g. `local_nfs-server` or `f8b2d53d_nfs-server`)"
 #USAGE flag "--no-restart" help="Do not restart/start the app after posting - the options apply at its next start"
 #USAGE flag "--dry-run" help="Show the schema-filtered options and dropped keys; change nothing on the device"
+# shellcheck disable=SC2029  # remote commands intentionally embed client-side values
 
 set -euo pipefail
 

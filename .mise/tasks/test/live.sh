@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2029  # remote/docker commands intentionally embed client-side values
 #MISE description="Deploy an app to a HAOS device and run live checks against it (app hook provides the checks)"
 #MISE depends="deploy:local {{ usage.app }} {{ usage.host }}{% if usage.replace %} --replace{% endif %}"
 #USAGE arg "<app>" help="App to test (repo subfolder name)" {
@@ -8,6 +7,7 @@
 #USAGE arg "<host>" help="SSH target of the Home Assistant OS device (bare host defaults to `root`), e.g. `root@homeassistant.local` or just `homeassistant.local`"
 #USAGE flag "--replace" help="Forwarded to the `deploy` task: uninstall an existing repository-installed copy first"
 #USAGE flag "--test-options" help="Apply the app's test options (`.mise/tasks/test/live/<app>.yaml`) to the device app for the run (backup kept, restored on exit)"
+# shellcheck disable=SC2029  # remote/docker commands intentionally embed client-side values
 
 set -euo pipefail
 

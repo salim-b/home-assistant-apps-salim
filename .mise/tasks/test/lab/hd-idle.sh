@@ -9,6 +9,8 @@
 # and by-id inventory rely on it); plain Docker creates bare device nodes only - mirror
 # the HAOS behavior here (hd-idle's whole by-id UX would be lab-invisible otherwise).
 
+# shellcheck disable=SC2034  # contract variables are consumed by the harness
+
 lab_docker_args=()
 if [ -d /dev/disk ]; then
   lab_docker_args+=(-v /dev/disk:/dev/disk:ro)
@@ -24,8 +26,6 @@ lab_docker_args+=(-e HD_IDLE_WATCH_INTERVAL=5)
 # Host-side spindown mechanisms (udisks2, hdparm.conf, TLP, smartd, ...) and desktop IO on mounted
 # drives can skew spindown tests (background: hd-idle/KNOWLEDGE.md; lab_preflight warns) - assertions
 # are therefore event-based, never "stays spundown for N minutes".
-
-# shellcheck disable=SC2034  # contract variables are consumed by the harness
 
 lab_preflight() {
   ## Read-only warning sweep for host-side disk power-management mechanisms that could interfere with spindown tests.
