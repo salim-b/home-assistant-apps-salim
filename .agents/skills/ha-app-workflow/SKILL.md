@@ -38,9 +38,11 @@ Run `mise run check` — lint plus validate; it is the same gate CI runs. Lint-s
   changelog entry) before merging.
 - CI enforces the rule: `.github/workflows/version-guard.yaml` fails when device-visible app files (`rootfs/`,
   `Dockerfile`, `config.yaml`, `apparmor.txt`, `translations/`) changed without a version bump — the Supervisor's update
-  model makes a no-bump change a silent no-op that only repoints an already-published version tag. Changes to docs-only
-  files (README, DOCS, CHANGELOG, KNOWLEDGE, TODO, `.agents/`), the per-app `.dockerignore` (it shapes the build context
-  but never changes the image the device receives), and repo tooling do not require a version bump.
+  model makes a no-bump change a silent no-op that only repoints an already-published version tag. Exception: if the
+  base version's GHCR tag was never published (its release's build/publish failed), the guard probes GHCR and passes —
+  reusing the version then repoints nothing; unprovable fails closed. Changes to docs-only files (README, DOCS,
+  CHANGELOG, KNOWLEDGE, TODO, `.agents/`), the per-app `.dockerignore` (it shapes the build context but never changes
+  the image the device receives), and repo tooling do not require a version bump.
 
 ## CI/CD is the source of truth for what gets published
 

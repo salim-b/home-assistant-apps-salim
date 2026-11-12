@@ -4,7 +4,10 @@ name: Version guard
 # the installed version - the image is published under exactly that version as its tag. Device-
 # visible app files changed without a bump therefore ship to nobody and silently repoint an
 # already-published version tag; this workflow fails when that happens (bump discipline:
-# .agents/skills/ha-app-workflow).
+# .agents/skills/ha-app-workflow). Exception: a version whose tag was never published (its
+# release's build/publish failed) repoints nothing when reused - the guard probes GHCR for the
+# base version's multi-arch manifest tag (shared .github/scripts/probe-ghcr-tag.sh) and passes
+# when it is absent; unprovable (probe unreachable, no image: key) fails closed.
 
 on:
   pull_request:
@@ -79,6 +82,21 @@ jobs:
             return 0
           }
 
+          # image_at <git-rev> <app dir>: the app's generic image manifest name at a revision
+          # (repository README §"CI" - the image: key; the per-arch names derive from it)
+          image_at() {
+            local f
+            for f in config.yaml config.yml config.json; do
+              if git cat-file -e "$1:$2/$f" 2>/dev/null; then
+                git show "$1:$2/$f" \
+                  | sed -n -E 's/^[[:space:]]*"?image"?:[[:space:]]*"?([^",]*)"?,?[[:space:]]*$/\1/p' \
+                  | head -n 1
+                break
+              fi
+            done
+            return 0
+          }
+
           case "$EVENT_NAME" in
             pull_request | push) ;;
             *) echo "version-guard: unsupported event '$EVENT_NAME' - skipping"; exit 0 ;;
@@ -136,6 +154,30 @@ jobs:
               continue
             fi
             if [ "$vbase" = "$vhead" ]; then
+              # Reusing a version repoints an already-published tag - but only if the tag was
+              # ever published: a release whose build/publish failed left no tag behind, so the
+              # same version can legitimately be rebuilt and published later. Probe the base
+              # version's multi-arch manifest tag under the base's image name (the manifest is
+              # published after the per-arch images - build-app.yaml - so its existence implies
+              # the full release). Absent -> pass; exists -> fail (genuine repoint); unprovable
+              # (probe unreachable, or no image: key to derive the tag from) -> fail closed.
+              image="$(image_at "$BASE_SHA" "$app")"
+              probe_note=""
+              if [ -n "$image" ]; then
+                verdict="$(.github/scripts/probe-ghcr-tag.sh "$image:$vbase")"
+                if [ "$verdict" = "missing" ]; then
+                  echo "version-guard: '$app' changed device-visible files with version unchanged ($vbase) - ok:"
+                  echo "  $image:$vbase is absent from GHCR (that version's publish never completed),"
+                  echo "  so reusing the version repoints no published tag"
+                  continue
+                fi
+                if [ "$verdict" = "unreachable" ]; then
+                  probe_note="  (the GHCR probe could not classify $image:$vbase - failing closed;"
+                  probe_note+=" re-run to retry the probe)"
+                fi
+              else
+                probe_note="  (no 'image:' key in the app config - GHCR tag existence could not be probed)"
+              fi
               {
                 echo "version-guard: ERROR: app '$app' changed device-visible files without a version bump:"
                 echo "  (version unchanged: $vbase -> $vhead); triggering files:"
@@ -147,6 +189,7 @@ jobs:
                 echo "  Without a bump this change ships to nobody (existing installs never see it)"
                 echo "  and silently repoints an already-published version tag, so 'the same version'"
                 echo "  means different images depending on install time."
+                [ -z "$probe_note" ] || echo "$probe_note"
                 echo "  Fix: bump 'version' in $app/config.yaml and describe the change in $app/CHANGELOG.md."
               } >&2
               fails=$((fails + 1))
