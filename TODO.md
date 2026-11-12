@@ -63,11 +63,6 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
 
 - Comment hygiene in device-visible files – each alignment needs a version bump + changelog entry, so fold into the
   apps' next natural bumps:
-  - hd-idle, nfs-server: align the `config.yaml` `image:` comment with hickory-dns's one-line pointer style (the CI
-    image-name contract lives in the repository README §"CI").
-  - hd-idle: compress `rootfs/usr/bin/hd-idle-pmfix`'s header and `smart()` comments (they restate
-    `hd-idle/KNOWLEDGE.md` §"Drive-PM treatment") to a pointer; state the fatal-path rationale once, not in both
-    `hd-idle-healthcheck` and the `Dockerfile`; drop the episodic grep narration in `hd-idle-genargs`.
   - hickory-dns: compress the `apparmor.txt` capability comment (restates the app's AppArmor knowledge sections);
     re-wrap the §-citations in `apparmor.txt`, `rootfs/etc/s6-overlay/s6-rc.d/hickory-dns/run` and
     `rootfs/usr/bin/hickory-dns-genconfig` so the citation names stay on one line (a wrap inserts `#`/`##` inside the
