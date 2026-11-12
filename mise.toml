@@ -51,7 +51,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   zizmor = "1.32.0"
   # hk's binary pin and the hk@X.Y.Z package imported by hk.pkl must move together (the package provides the builtin
   # step definitions the binary executes).
-  hk = { version = "2.11.1", workflow = "release.yml" }
+  hk = { version = "2.12.0", workflow = "release.yml" }
   jq = "1.8.2"
   "aqua:jolars/panache" = "3.17.2"
   python = "3.15.2"
