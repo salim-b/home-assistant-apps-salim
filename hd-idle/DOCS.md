@@ -15,13 +15,13 @@ which also keeps the system disk out of reach.
 
 ### Selecting drives
 
-Pick each drive from the dropdown and select the **disk itself**, never a partition — see the **Drives** field
+Pick each drive from the dropdown and select the **disk itself**, never a partition – see the **Drives** field
 description in the options UI for the details. The by-id paths survive re-plugging and reboots even when the kernel name
 changes.
 
 On startup the app logs an inventory of all detected `sd*` disks and the mapping of every configured drive to its kernel
 name, so log lines like `sda spindown` can be attributed. Each inventory line shows the drive model, its by-id path and
-— when set – the label of the drive's first labeled partition (filesystem label preferred, GPT partition label as
+– when set – the label of the drive's first labeled partition (filesystem label preferred, GPT partition label as
 fallback; an unpartitioned disk shows its whole-disk filesystem label) – usually the name the drive carries in file
 managers:
 
@@ -37,7 +37,8 @@ managers:
 Drives – and some USB bridges – run their own power management that can conflict with hd-idle, so the app disables it by
 default (the drive-PM treatment; every managed drive gets it unless it opts out). The per-drive **Keep drive power
 management** switch opts individual drives out – switch it on for drives that must keep their own power management; its
-field description in the options UI has the why and the details.
+field description in the options UI has the why and the details. A drive or bridge that does not support one of the
+treatment's commands logs a one-time failure in the app log – harmless.
 
 ### Command types
 
@@ -78,7 +79,7 @@ disk (useful when drives refuse to spin down); **Activity log** writes per-drive
 - **Do not run SMART-polling tools alongside** (smartmontools and apps built on it): their polling keeps waking drives
   and their activities are invisible to hd-idle. The upstream hd-idle documentation says the same about disk monitoring
   tools generally.
-- **Spin-up wear**: frequent spin-down/spin-up cycles stress the spindle motor and bearings; keep idle times at 3-5
+- **Spin-up wear**: frequent spin-down/spin-up cycles stress the spindle motor and bearings; keep idle times at 3–5
   minutes minimum (hd-idle's default is 10).
 - **Ignore spin-down detection** is a global hd-idle setting and cannot be set per drive (upstream limitation), and can
   cause extra wear on some bridges (see its description in the options UI).

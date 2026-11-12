@@ -33,7 +33,7 @@ Verified against the v1.22 source (`main.go`, `hdidle.go`):
   are pinned to never spin down) and explicit `-i`/`-c`/`-p` per entry; there are no app-level global defaults.
 - First-match-wins: `deviceConfig()` returns the first entry matching the `/proc/diskstats` name. The global idle is
   pinned to `0` (unlisted drives are never touched — device access is per listed drive only); an explicit `-i` follows
-  EVERY `-a` (per-drive or default idle), so the passthrough path for detached drives inherits the right idle without a
+  EVERY `-a` (every drive sets its own), so the passthrough path for detached drives inherits the right idle without a
   watcher restart.
 - `-a` accepts a bare kernel name, a `/dev` node (`filepath.Base`), or a `/dev/disk/by-*` symlink (readlink + basename +
   trailing-digit strip — partition links resolve to their disk). `-s 0` resolves once at startup; `-s 1` re-resolves at
@@ -153,8 +153,8 @@ Formula, branches and sources: repository-root `KNOWLEDGE.md` §"Supervisor: app
   daemon path prefixes `/dev/`) — bare names fail (`open sda: no such file or directory`); the usage string's `-t sda`
   example is misleading.
 - It uses hd-idle's **built-in defaults** for command type (`scsi`) and power condition (`0`) — verified against the
-  v1.22 source (`main.go`, `defaultConf`), which matter because the app no longer sets global `-c`/`-p` (single-disk
-  mode skips the per-device config entirely, so per-drive settings are ignored).
+  v1.22 source (`main.go`, `defaultConf`), which matter because the app sets no global `-c`/`-p` (single-disk mode skips
+  the per-device config entirely, so per-drive settings are ignored).
 
 No in-app caller; the lab spindown smoke test drives it via `docker exec`, and it is useful for manual debugging.
 

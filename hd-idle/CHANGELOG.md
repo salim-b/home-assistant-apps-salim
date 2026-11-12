@@ -8,16 +8,17 @@
   its own idle time, command type and power condition (the options UI marks all three as required); the Default idle
   time, Default command type and Default power condition options are removed. Existing installations must re-save the
   drive list with these values set: until then the app refuses to start (the supervisor names the missing options), and
-  with automatic updates enabled the update itself is held back until the configuration matches the new schema - open
+  with automatic updates enabled the update itself is held back until the configuration matches the new schema – open
   the app's settings on the still-running old version, set the values per drive, save, and the next update proceeds.
 - Change: the global Disable drive power management option is removed, and the per-drive setting is now the **Keep drive
   power management** toggle: switched on, the app leaves that drive's own power management alone; by default (switch off
-  or untouched) the app disables it, as before. If you had the global setting switched off, switch **Keep drive power
-  management** on for each drive that must keep its own power management. The old per-drive setting's stored values do
-  not carry over (the old option key is dropped as unknown) - every drive starts with the default until the drive list
-  is re-saved, which the required per-drive settings force anyway.
+  or untouched) the app disables it, as before. If you had the global setting switched off, or had set the old per-drive
+  **Disable drive power management** field to `no` on individual drives, switch **Keep drive power management** on for
+  every drive that must keep its own power management. The old per-drive setting's stored values do not carry over (the
+  old option key is dropped as unknown) – every drive starts with the default until the drive list is re-saved, which
+  the required per-drive settings force anyway.
 - Internals: the generated command line no longer sets global command-type/-power-condition defaults (every drive entry
-  carries its own), so the hd-idle -t single-shot path now uses hd-idle's built-in defaults (scsi, power condition 0 -
+  carries its own), so the hd-idle -t single-shot path now uses hd-idle's built-in defaults (scsi, power condition 0 –
   the same values the app used to set). System-disk exclusion rows in the internal drives file use `-` as their
   command-type placeholder (no spin-down command is ever issued for them).
 

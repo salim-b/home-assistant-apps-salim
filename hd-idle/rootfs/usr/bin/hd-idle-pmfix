@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-## Disable the drives' own power management (APM level + internal standby timer) - the app's drive-PM treatment
+## Disable the drives' own power management (APM level + internal standby timer) – the app's drive-PM treatment
 ## (the per-drive keep_drive_pm opt-out decides; the drives file's pm-flag column carries the per-drive decision).
 ## Why, per-bridge reality, volatility, the same-kernel-name gap:
 ## hd-idle/KNOWLEDGE.md §"Drive-PM treatment"; user-facing behavior: DOCS.md.
