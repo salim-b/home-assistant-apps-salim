@@ -352,6 +352,10 @@ drive_label_info() {
   return 0
 }
 
+## The by-id link the inventory shows per disk (filled in the non-quiet run): the configured-drive mapping
+## line in the configuration loop below is redundant when it names exactly this link.
+declare -A INVENTORY_BYID=()
+
 if [ "$QUIET" = 0 ]; then
   declare -A FS_LABELS=() PART_LABELS=()
   fill_label_map /dev/disk/by-label FS_LABELS
@@ -374,6 +378,7 @@ if [ "$QUIET" = 0 ]; then
     info=""
     if [ "$byid" != "" ]; then
       info="by-id: ${byid}"
+      INVENTORY_BYID["${name}"]="$byid"
     fi
     if [ "$labelinfo" != "" ]; then
       info="${info:+${info}, }${labelinfo}"
@@ -480,7 +485,13 @@ while IFS= read -r disk; do
       bashio::exit.nok "Drive ${NAME} (${DEV}) is configured more than once: one configuration per disk - remove the redundant entry."
     fi
     SEEN_DEVICES["${NAME}"]=1
-    qlog_info "Drive ${DEV} -> ${NAME}"
+    ## The boot inventory already pairs each disk with its by-id link: a configured path that IS that link
+    ## needs no separate mapping line (the common ata-* case); a different path (usb-*/wwn-*, /dev node,
+    ## dm- holder) keeps its resolution line. The map stays empty in quiet runs – qlog_info no-ops there.
+    DEV_LINK=${DEV#/dev/disk/by-id/}
+    if [ "${INVENTORY_BYID[${NAME}]:-}" != "$DEV_LINK" ]; then
+      qlog_info "Drive ${DEV} -> ${NAME}"
+    fi
     record_resolution "$DEV" "$NAME"
     EMIT_NAME="$NAME"
   else

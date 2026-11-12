@@ -10,6 +10,10 @@
   drive list with these values set: until then the app refuses to start (the supervisor names the missing options), and
   with automatic updates enabled the update itself is held back until the configuration matches the new schema – open
   the app's settings on the still-running old version, set the values per drive, save, and the next update proceeds.
+- Change: the boot log no longer prints a `Drive <configured path> -> <kernel name>` line for every configured drive –
+  the startup inventory already pairs each disk with its by-id path, and the logged command line names the managed
+  drives. A mapping line is still logged when the configured path is a different by-id link or /dev node than the one
+  the inventory shows for the resolved disk, so its resolution stays visible. No configuration change.
 - Change: the global Disable drive power management option is removed, and the per-drive setting is now the **Keep drive
   power management** toggle: switched on, the app leaves that drive's own power management alone; by default (switch off
   or untouched) the app disables it, as before. If you had the global setting switched off, or had set the old per-drive

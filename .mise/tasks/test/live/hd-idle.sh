@@ -145,7 +145,7 @@ live_prepare() {
 }
 
 live_runtime_check() {
-  local disks_json="${LIVE_HDIDLE_DISKS_JSON:-}" logs tail_log disk label device
+  local disks_json="${LIVE_HDIDLE_DISKS_JSON:-}" logs tail_log disk label device byid inv_line
   local -A spun=() labels_by_disk=()
   local -r poll=15 hard_window=90 event_window=300
   local hard_pending=1 hard_deadline=$((SECONDS + hard_window))
@@ -211,10 +211,17 @@ live_runtime_check() {
           label=$(jq -r --arg d "$disk" '.[$d].label' <<<"$disks_json")
           device=$(jq -r --arg d "$disk" '.[$d].device' <<<"$disks_json")
           labels_by_disk[$disk]=$label
+          ## The configured path must resolve to the host-discovered disk inside the container. The mapping
+          ## line is logged only when the configured path is not the by-id link the inventory shows for the
+          ## disk; otherwise the disk's inventory line carries that link itself.
+          byid=${device#/dev/disk/by-id/}
           if ! grep -qF "Drive ${device} -> ${disk}" <<<"$tail_log"; then
-            echo "   FAIL: no 'Drive ${device} -> ${disk}' mapping in the app log" >&2
-            echo "         (the configured by-id path did not resolve to the expected disk inside the container)" >&2
-            return 1
+            inv_line=$(grep -F "  ${disk}: " <<<"$tail_log" || true)
+            if ! grep -qF "by-id: ${byid}" <<<"$inv_line"; then
+              echo "   FAIL: no 'Drive ${device} -> ${disk}' mapping and no 'by-id: ${byid}' on the ${disk} inventory line" >&2
+              echo "         (the configured by-id path did not resolve to the expected disk inside the container)" >&2
+              return 1
+            fi
           fi
         done < <(jq -r 'keys[]' <<<"$disks_json")
         hard_pending=0

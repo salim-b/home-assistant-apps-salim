@@ -19,11 +19,11 @@ Pick each drive from the dropdown and select the **disk itself**, never a partit
 description in the options UI for the details. The by-id paths survive re-plugging and reboots even when the kernel name
 changes.
 
-On startup the app logs an inventory of all detected `sd*` disks and the mapping of every configured drive to its kernel
-name, so log lines like `sda spindown` can be attributed. Each inventory line shows the drive model, its by-id path and
-– when set – the label of the drive's first labeled partition (filesystem label preferred, GPT partition label as
-fallback; an unpartitioned disk shows its whole-disk filesystem label) – usually the name the drive carries in file
-managers:
+On startup the app logs an inventory of all detected `sd*` disks and the generated hd-idle command line (one `-a` entry
+per managed drive), so log lines like `sda spindown` can be attributed. Each inventory line shows the drive model, its
+by-id path and – when set – the label of the drive's first labeled partition (filesystem label preferred, GPT partition
+label as fallback; an unpartitioned disk shows its whole-disk filesystem label) – usually the name the drive carries in
+file managers:
 
 ```text
 # with command type `scsi`
