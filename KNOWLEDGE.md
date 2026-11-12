@@ -182,6 +182,7 @@ repository-installed copy (hashed store slug: §"Supervisor: store slugs (in-app
 `deploy:local` refuse: uninstall it first (the error message shows the exact `ha apps uninstall` command) or pass
 `--replace` to have the task uninstall it automatically. `deploy:registry` switches a device from a local install by
 uninstalling it, but refuses while a local and a repository-installed copy both exist (no flag – uninstall one by hand).
+Whether a device can build at all depends on its DNS chain – see §"Supervisor: DNS resolution chain (CoreDNS)".
 
 ## Supervisor: ha CLI HTTP client timeouts
 
@@ -205,6 +206,23 @@ CloudFlare DoT when `fallback` is true (`supervisor/plugins/dns.py::_write_confi
 nests them under `state`/`config` instead). If the device's DNS servers include the device's own IP, the device resolves
 through whatever app serves :53 on it – uninstalling that app (e.g. a locally installed hickory-dns) cuts the
 supervisor's own DNS off mid-task, so subsequent registry downloads fail.
+
+Setting a host DNS server equal to the CoreDNS plugin's own address (`GET /dns/info` `data.host`, `172.30.32.3` on
+standard installs) is fatal: CoreDNS's loop probe detects the self-loop and the container exits (CoreDNS log
+`plugin/loop: Loop` → exit 1). The supervisor raises the `dns_loop` issue and rewrites the config dropping both
+`servers` and `locals` (fallback-DoT-only config, `supervisor/plugins/dns.py::_write_config`, ref `6556811`), but the
+watchdog does not reliably revive the dead container – observed on-device 2026-11-12, where it stayed dead across two
+network reconfigurations until `ha dns restart`. Since `locals` always mirrors the host's NetworkManager nameservers,
+the CoreDNS plugin can therefore never be the host's own resolver. Recovery order after such an outage: restore the host
+DNS servers (`ha network update <iface> --ipv4-method auto --ipv4-nameserver <ip>…`; omitting `--ipv4-method` makes the
+supervisor reject the update with `method 'manual' requires at least an address`), then `ha dns restart`.
+
+The same mirroring also blocks on-device image builds (`deploy:local`) on devices whose only working plaintext resolver
+is the device itself: the buildkit CLI container resolves the registry through a copy of the host's `resolv.conf`, and a
+host-networked resolver answers container-sourced UDP queries with the egress route's gateway address as source IP
+(per-route source selection), which DNS clients discard as source-mismatched – the build fails at
+`load metadata for <base image>` before any `RUN` step runs. Substituting `172.30.32.3` as the host resolver triggers
+the loop death above instead. Such devices can only take registry-deployed images (`deploy:registry`).
 
 ## AppArmor: mediation and profile mechanics
 
