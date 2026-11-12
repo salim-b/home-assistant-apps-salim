@@ -2,12 +2,12 @@
 # Probe one registry tag's existence and classify the outcome. Consumers of the image-name
 # contract (repository README §"CI"): the publish-reconcile workflow's tag check and the
 # version-guard workflow's unpublished-base-version exception. Probes via the preinstalled
-# `docker buildx imagetools inspect` (talks to the registry API directly - no daemon, no login
+# `docker buildx imagetools inspect` (talks to the registry API directly – no daemon, no login
 # for the repo's public GHCR packages).
 #
 # Classification follows project-copacetic's ensure-tag-absent.sh: success -> ok, not-found-class
 # errors -> missing, anything else unreachable (retried with exponential backoff; diagnostics to
-# stderr). Each attempt is time-bounded (SIGTERM then SIGKILL - buildx traps SIGTERM and would
+# stderr). Each attempt is time-bounded (SIGTERM then SIGKILL – buildx traps SIGTERM and would
 # outlive plain `timeout`); "404 not found" also matches the error-text variants of other buildx
 # versions.
 #

@@ -18,7 +18,7 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "The supervisor ref the validate:apps task fetches schemas from (mise.toml [vars].supervisor_ref; see .mise/tasks/validate/apps.py). Tracks home-assistant/supervisor GitHub releases: validating against the newest release keeps the app configs ahead of the installed fleet (stable-channel rollout lags releases). PRs automerge once the CI check job is green - green means the new schemas validate our app configs.",
+      "description": "The supervisor ref the validate:apps task fetches schemas from (mise.toml [vars].supervisor_ref; see .mise/tasks/validate/apps.py). Tracks home-assistant/supervisor GitHub releases: validating against the newest release keeps the app configs ahead of the installed fleet (stable-channel rollout lags releases). PRs automerge once the CI check job is green – green means the new schemas validate our app configs.",
       "managerFilePatterns": [
         "/^mise\\.toml$/"
       ],
@@ -31,7 +31,7 @@
     },
     {
       "customType": "regex",
-      "description": "The hk@X.Y.Z pkl package that hk.pkl imports (amends + Builtins lines) must move together with the hk pin in mise.toml [tools] and mise.lock - the package provides the builtin step definitions the binary executes. The mise manager owns mise.toml + mise.lock; this manager keeps hk.pkl in the SAME update: same depName, datasource and currentValue as the mise manager's hk dep, so Renovate folds both into one branch and one PR bumps all three files. Two matchStrings because each import line carries the version twice (path segment and hk@X# marker) and both occurrences must be rewritten - the same invariant bump-hk.sh enforces for manual bumps. The CI check catches partial desyncs regardless: mise install --locked errors when mise.toml and mise.lock disagree.",
+      "description": "The hk@X.Y.Z pkl package that hk.pkl imports (amends + Builtins lines) must move together with the hk pin in mise.toml [tools] and mise.lock – the package provides the builtin step definitions the binary executes. The mise manager owns mise.toml + mise.lock; this manager keeps hk.pkl in the SAME update: same depName, datasource and currentValue as the mise manager's hk dep, so Renovate folds both into one branch and one PR bumps all three files. Two matchStrings because each import line carries the version twice (path segment and hk@X# marker) and both occurrences must be rewritten – the same invariant bump-hk.sh enforces for manual bumps. The CI check catches partial desyncs regardless: mise install --locked errors when mise.toml and mise.lock disagree.",
       "managerFilePatterns": [
         "/^hk\\.pkl$/"
       ],
@@ -47,7 +47,7 @@
   ],
   "packageRules": [
     {
-      "description": "Alpine apk pins in app Dockerfiles (e.g. hd-idle=1.22-r8): read the apk datasource's versions from the Alpine binary repositories and bump the app's config.yaml version in the same PR (experimental bumpVersions feature; generic for all apps). Renovate cannot infer the branch from the base-image ARG default - without registryUrls it silently skips these pins (skipReason unknown-registry) - so the branch is pinned here; update it together with the Dockerfile BUILD_FROM default on a base-image bump (the validate:apk-pins drift check derives the branch dynamically and cross-checks the pins either way). The changelog entry for the bumped version is filled post-merge by the apk-bump workflow (CI; the hosted Renovate app cannot run post-upgrade tasks). Merge behavior and grouping are decided per update type by the chained apk rules below - see the repository-root KNOWLEDGE.md apk package version policy.",
+      "description": "Alpine apk pins in app Dockerfiles (e.g. hd-idle=1.22-r8): read the apk datasource's versions from the Alpine binary repositories and bump the app's config.yaml version in the same PR (experimental bumpVersions feature; generic for all apps). Renovate cannot infer the branch from the base-image ARG default – without registryUrls it silently skips these pins (skipReason unknown-registry) – so the branch is pinned here; update it together with the Dockerfile BUILD_FROM default on a base-image bump (the validate:apk-pins drift check derives the branch dynamically and cross-checks the pins either way). The changelog entry for the bumped version is filled post-merge by the apk-bump workflow (CI; the hosted Renovate app cannot run post-upgrade tasks). Merge behavior and grouping are decided per update type by the chained apk rules below – see the repository-root KNOWLEDGE.md apk package version policy.",
       "matchDatasources": [
         "apk"
       ],
@@ -72,7 +72,7 @@
       ]
     },
     {
-      "description": "Automerge pkgrel-only apk pin bumps (the apk datasource's versioning classifies 1.22-r7 -> 1.22-r8 as patch): an Alpine rebuild of the same upstream release - the CLI is unchanged by definition, so no human review is needed (pkgver bumps are minor/major and stay manual via the next rule). Grouped into one branch (groupName): split packages built from one APKBUILD share pkgver and pkgrel and drift together, so per-package PRs would leave the sibling pin stale in each PR's own tree - the build's apk add cannot resolve it and the automerge deadlocks against the sibling PR; one grouped PR per upstream event carries every drifted pin and stays self-consistent. The changelog entry is added post-merge by the apk-bump workflow. automergeStrategy rebase: linear history without merge bubbles (conflicts block the automerge until resolved - same rationale as the supervisor-pin rule); applies on both merge paths (Renovate's own merge today - no branch protection, platformAutomerge: false - and platform-native automerge if branch protection ever arrives).",
+      "description": "Automerge pkgrel-only apk pin bumps (the apk datasource's versioning classifies 1.22-r7 -> 1.22-r8 as patch): an Alpine rebuild of the same upstream release – the CLI is unchanged by definition, so no human review is needed (pkgver bumps are minor/major and stay manual via the next rule). Grouped into one branch (groupName): split packages built from one APKBUILD share pkgver and pkgrel and drift together, so per-package PRs would leave the sibling pin stale in each PR's own tree – the build's apk add cannot resolve it and the automerge deadlocks against the sibling PR; one grouped PR per upstream event carries every drifted pin and stays self-consistent. The changelog entry is added post-merge by the apk-bump workflow. automergeStrategy rebase: linear history without merge bubbles (conflicts block the automerge until resolved – same rationale as the supervisor-pin rule); applies on both merge paths (Renovate's own merge today – no branch protection, platformAutomerge: false – and platform-native automerge if branch protection ever arrives).",
       "matchDatasources": [
         "apk"
       ],
@@ -85,7 +85,7 @@
       "automergeStrategy": "rebase"
     },
     {
-      "description": "apk pkgver bumps (upstream version changes) may change CLI semantics - cf. hd-idle-genargs - so they keep human review: label and leave automerge off (patch bumps automerge via the previous rule). Grouped like the patch rule: one reviewed release per pkgver event, all drifted pins in one self-consistent tree.",
+      "description": "apk pkgver bumps (upstream version changes) may change CLI semantics – cf. hd-idle-genargs – so they keep human review: label and leave automerge off (patch bumps automerge via the previous rule). Grouped like the patch rule: one reviewed release per pkgver event, all drifted pins in one self-consistent tree.",
       "matchDatasources": [
         "apk"
       ],
@@ -146,7 +146,7 @@
       ]
     },
     {
-      "description": "hk pkl-package manager (custom.regex): same weekly Monday cadence and label as the mise [tools] rule so BOTH hk deps of the pair update together (mise manager owns mise.toml + mise.lock, this one hk.pkl) - a schedule mismatch would open one-sided desync PRs on off-Monday runs. Listed for both match spellings because the mise manager's dep matches packageRules by its resolved packageName jdx/hk, not the depName hk that PR titles show (verified against Renovate 44.235.0, 2026-11-12, local reproduction), and which side wins for custom-manager deps is not pinned down.",
+      "description": "hk pkl-package manager (custom.regex): same weekly Monday cadence and label as the mise [tools] rule so BOTH hk deps of the pair update together (mise manager owns mise.toml + mise.lock, this one hk.pkl) – a schedule mismatch would open one-sided desync PRs on off-Monday runs. Listed for both match spellings because the mise manager's dep matches packageRules by its resolved packageName jdx/hk, not the depName hk that PR titles show (verified against Renovate 44.235.0, 2026-11-12, local reproduction), and which side wins for custom-manager deps is not pinned down.",
       "matchManagers": [
         "custom.regex"
       ],
@@ -162,7 +162,7 @@
       ]
     },
     {
-      "description": "Supervisor schema pin: weekly, same cadence as the actions manager; automerges once the CI check job (mise run validate:apps against the new ref) is green. The Renovate PR body lists the upstream changelog for an audit trail. automergeStrategy rebase: linear history without merge bubbles (GitHub rebase-merge; conflicts block the automerge until resolved — same as manual). Applies on both merge paths (Renovate's own merge today, platform-native automerge if branch protection ever arrives).",
+      "description": "Supervisor schema pin: weekly, same cadence as the actions manager; automerges once the CI check job (mise run validate:apps against the new ref) is green. The Renovate PR body lists the upstream changelog for an audit trail. automergeStrategy rebase: linear history without merge bubbles (GitHub rebase-merge; conflicts block the automerge until resolved – same as manual). Applies on both merge paths (Renovate's own merge today, platform-native automerge if branch protection ever arrives).",
       "matchManagers": [
         "custom.regex"
       ],

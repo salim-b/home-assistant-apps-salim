@@ -67,9 +67,9 @@ jobs:
       - name: 🚀 Run Home Assistant App Lint
         # lint.py reads its configuration from the GitHub action-input env convention (INPUT_*):
         # `path` is the app directory, `community` stays false (the action's default). The two
-        # JSON schemas are loaded from absolute paths (the Docker image copied them to /) - provide them.
+        # JSON schemas are loaded from absolute paths (the Docker image copied them to /) – provide them.
         env:
-          # matrix values are plain strings (no JSON quoting) - safe to pass through env:.
+          # matrix values are plain strings (no JSON quoting) – safe to pass through env:.
           INPUT_PATH: "./${{ matrix.path }}"
         run: |
           sudo cp linter/src/config.schema.json linter/src/build.schema.json /

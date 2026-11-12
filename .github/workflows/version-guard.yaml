@@ -1,11 +1,11 @@
 name: Version guard
 
 # The Supervisor detects app updates by comparing the `version` string in the app's config against
-# the installed version - the image is published under exactly that version as its tag. Device-
+# the installed version – the image is published under exactly that version as its tag. Device-
 # visible app files changed without a bump therefore ship to nobody and silently repoint an
 # already-published version tag; this workflow fails when that happens (bump discipline:
 # .agents/skills/ha-app-workflow). Exception: a version whose tag was never published (its
-# release's build/publish failed) repoints nothing when reused - the guard probes GHCR for the
+# release's build/publish failed) repoints nothing when reused – the guard probes GHCR for the
 # base version's multi-arch manifest tag (shared .github/scripts/probe-ghcr-tag.sh) and passes
 # when it is absent; unprovable (probe unreachable, no image: key) fails closed.
 
@@ -83,7 +83,7 @@ jobs:
           }
 
           # image_at <git-rev> <app dir>: the app's generic image manifest name at a revision
-          # (repository README §"CI" - the image: key; the per-arch names derive from it)
+          # (repository README §"CI" – the image: key; the per-arch names derive from it)
           image_at() {
             local f
             for f in config.yaml config.yml config.json; do
@@ -99,14 +99,14 @@ jobs:
 
           case "$EVENT_NAME" in
             pull_request | push) ;;
-            *) echo "version-guard: unsupported event '$EVENT_NAME' - skipping"; exit 0 ;;
+            *) echo "version-guard: unsupported event '$EVENT_NAME' – skipping"; exit 0 ;;
           esac
           if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            echo "version-guard: no base revision (new branch or force push) - skipping"
+            echo "version-guard: no base revision (new branch or force push) – skipping"
             exit 0
           fi
           if ! git cat-file -e "$BASE_SHA" 2>/dev/null; then
-            echo "version-guard: base revision $BASE_SHA not present in this checkout - skipping"
+            echo "version-guard: base revision $BASE_SHA not present in this checkout – skipping"
             exit 0
           fi
 
@@ -123,7 +123,7 @@ jobs:
           done < <(git ls-tree --name-only "$HEAD_SHA")
 
           if [ "${#appdirs[@]}" -eq 0 ]; then
-            echo "version-guard: no apps found - nothing to guard"
+            echo "version-guard: no apps found – nothing to guard"
             exit 0
           fi
 
@@ -145,7 +145,7 @@ jobs:
             vhead="$(version_at "$HEAD_SHA" "$app")"
 
             if [ -z "$vbase" ]; then
-              echo "version-guard: new app '$app' - ok"
+              echo "version-guard: new app '$app' – ok"
               continue
             fi
             if [ -z "$vhead" ]; then
@@ -154,11 +154,11 @@ jobs:
               continue
             fi
             if [ "$vbase" = "$vhead" ]; then
-              # Reusing a version repoints an already-published tag - but only if the tag was
+              # Reusing a version repoints an already-published tag – but only if the tag was
               # ever published: a release whose build/publish failed left no tag behind, so the
               # same version can legitimately be rebuilt and published later. Probe the base
               # version's multi-arch manifest tag under the base's image name (the manifest is
-              # published after the per-arch images - build-app.yaml - so its existence implies
+              # published after the per-arch images – build-app.yaml – so its existence implies
               # the full release). Absent -> pass; exists -> fail (genuine repoint); unprovable
               # (probe unreachable, or no image: key to derive the tag from) -> fail closed.
               image="$(image_at "$BASE_SHA" "$app")"
@@ -166,17 +166,17 @@ jobs:
               if [ -n "$image" ]; then
                 verdict="$(.github/scripts/probe-ghcr-tag.sh "$image:$vbase")"
                 if [ "$verdict" = "missing" ]; then
-                  echo "version-guard: '$app' changed device-visible files with version unchanged ($vbase) - ok:"
+                  echo "version-guard: '$app' changed device-visible files with version unchanged ($vbase) – ok:"
                   echo "  $image:$vbase is absent from GHCR (that version's publish never completed),"
                   echo "  so reusing the version repoints no published tag"
                   continue
                 fi
                 if [ "$verdict" = "unreachable" ]; then
-                  probe_note="  (the GHCR probe could not classify $image:$vbase - failing closed;"
+                  probe_note="  (the GHCR probe could not classify $image:$vbase – failing closed;"
                   probe_note+=" re-run to retry the probe)"
                 fi
               else
-                probe_note="  (no 'image:' key in the app config - GHCR tag existence could not be probed)"
+                probe_note="  (no 'image:' key in the app config – GHCR tag existence could not be probed)"
               fi
               {
                 echo "version-guard: ERROR: app '$app' changed device-visible files without a version bump:"
@@ -194,7 +194,7 @@ jobs:
               } >&2
               fails=$((fails + 1))
             else
-              echo "version-guard: '$app' $vbase -> $vhead (device-visible changes) - ok"
+              echo "version-guard: '$app' $vbase -> $vhead (device-visible changes) – ok"
             fi
           done
 

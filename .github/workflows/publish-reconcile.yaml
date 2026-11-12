@@ -3,14 +3,14 @@ name: Publish reconcile
 # Daily reconciliation of the published GHCR state against main's app configs: every app's version
 # tag must exist in the registry (per-arch images + multi-arch manifest). A missing tag (e.g. a
 # transient build/publish failure on the push-fired Builder) is self-healed by dispatching
-# build-app.yaml (publish=true, ref=main) - only a real miss dispatches, so a healthy registry is a
+# build-app.yaml (publish=true, ref=main) – only a real miss dispatches, so a healthy registry is a
 # green no-op run; the dispatched Builder run is the loud signal when publishing keeps failing.
 # GHCR unreachable (after backoff retries) or a failed dispatch fails this run (red).
 #
-# Known limitation: reconciles TAG EXISTENCE only - stale tag content is version-guard's and
+# Known limitation: reconciles TAG EXISTENCE only – stale tag content is version-guard's and
 # validate:apps' domain (both fail loudly on source drift).
 #
-# Cron offset: 03:15 UTC - away from the lint cron (00:00) and the apk-bump nudge (01:30). GHCR is
+# Cron offset: 03:15 UTC – away from the lint cron (00:00) and the apk-bump nudge (01:30). GHCR is
 # probed anonymously with the runner's preinstalled docker buildx CLI (public packages; only
 # ghcr.io supported); unclassified probe failures are retried with exponential backoff.
 
@@ -51,7 +51,7 @@ jobs:
     if: github.repository == 'salim-b/home-assistant-apps-salim'
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # actions: write - dispatching build-app.yaml via gh workflow run; contents: read - job
+    # actions: write – dispatching build-app.yaml via gh workflow run; contents: read – job
     # permissions replace top-level, so the checkout's read must be restated here. Bounded by the
     # probe's own retries (worst case ~3.5 min/tag across arches + the multi-arch manifest tag).
     permissions:
@@ -112,7 +112,7 @@ jobs:
           prefix="${REGISTRY_PREFIX}"
           image_name="${IMAGE_NAME}"
           if [ "${prefix%%/*}" != "ghcr.io" ]; then
-            echo "unsupported registry host '${prefix%%/*}' - only ghcr.io reconciliation is implemented" >&2
+            echo "unsupported registry host '${prefix%%/*}' – only ghcr.io reconciliation is implemented" >&2
             exit 1
           fi
 
@@ -160,7 +160,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          # matrix values are plain strings (no JSON quoting) - safe to pass through env:.
+          # matrix values are plain strings (no JSON quoting) – safe to pass through env:.
           DISPATCH_APP: ${{ matrix.app }}
         run: |
           gh workflow run build-app.yaml --ref main -f app="$DISPATCH_APP" -f publish=true

@@ -5,15 +5,15 @@ name: Apk pin bump
 #
 # changelog: a merged renovate[bot] apk_pin PR gets its templated changelog section inserted
 # post-merge (Renovate automerges pkgrel bumps without one). Docs-only CHANGELOG.md commit pushed
-# with the GITHUB_TOKEN - its workflow suppression is intended (no rebuild is needed).
+# with the GITHUB_TOKEN – its workflow suppression is intended (no rebuild is needed).
 #
 # nudge: Alpine repushes land per-arch asynchronously, so an early bump PR legitimately stays red
 # until every arch index serves the new pin (the PR build's apk add fails on the lagging arch).
-# Rebases such PRs daily (@renovate rebase - fresh check runs; re-running failed runs can still
+# Rebases such PRs daily (@renovate rebase – fresh check runs; re-running failed runs can still
 # count as red) once ALL arch indexes serve the pin; while an index lags it does nothing.
 # workflow_dispatch accepts dry_run for log-only verification runs.
 #
-# Cron offset: 01:30 UTC - away from the lint cron (00:00) and publish-reconcile (03:15).
+# Cron offset: 01:30 UTC – away from the lint cron (00:00) and publish-reconcile (03:15).
 
 on:
   pull_request:
@@ -50,7 +50,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: read
-    # Serialize changelog jobs - merge races with Renovate's own merges are possible
+    # Serialize changelog jobs – merge races with Renovate's own merges are possible
     concurrency:
       group: apk-bump-changelog
       cancel-in-progress: false
@@ -103,7 +103,7 @@ jobs:
                   page += 1
 
           def parse_pins(text):
-              """All pins from a full Dockerfile text: {pkg: pin} - same state
+              """All pins from a full Dockerfile text: {pkg: pin} – same state
               machine as the apk-pins task (apk add block tracked across
               backslash continuations)."""
               pins: dict = {}
@@ -122,7 +122,7 @@ jobs:
 
           def pin_changes(base_text, head_text):
               """Changed pins between two file versions:
-              {pkg: {"old": ..., "new": ...}} - diffing the pin sets parsed
+              {pkg: {"old": ..., "new": ...}} – diffing the pin sets parsed
               from the full Dockerfiles at the PR's base and head SHAs; a long
               apk add block cannot be truncated by patch hunk boundaries."""
               base_pins, head_pins = parse_pins(base_text), parse_pins(head_text)
@@ -175,7 +175,7 @@ jobs:
                       fh.write(f"| {pin['app']} | {pin['pkg']} | {pin['old'] or '-'} | {pin['new']} | "
                                f"{pin['version'] or '(not bumped in PR)'} |\n")
               else:
-                  fh.write("No apk pin changes found - nothing to do.\n")
+                  fh.write("No apk pin changes found – nothing to do.\n")
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"pins={json.dumps(result)}\n")
@@ -184,11 +184,11 @@ jobs:
 
       - name: Stop when the PR has no apk pin changes
         if: steps.pins.outputs.has_pins != 'true'
-        run: echo "No apk pin changes in the merged PR - green no-op."
+        run: echo "No apk pin changes in the merged PR – green no-op."
 
       - name: Check out main
         if: steps.pins.outputs.has_pins == 'true'
-        # zizmor: ignore[artipacked] - the "Commit and push changelog entries" step below pushes
+        # zizmor: ignore[artipacked] – the "Commit and push changelog entries" step below pushes
         # with the persisted GITHUB_TOKEN, so credentials must survive the checkout (docs-only
         # commit; the workflow header records the resulting workflow suppression as intended).
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -214,7 +214,7 @@ jobs:
             new=$(jq -r .new <<<"$pin")
             version=$(jq -r '.version // empty' <<<"$pin")
             if [ -z "$version" ] || [ -z "$old" ]; then
-              echo "::warning::PR #${PR_NUMBER}: no version bump and/or old pin found for app '${app}' - no changelog section for ${pkg}"
+              echo "::warning::PR #${PR_NUMBER}: no version bump and/or old pin found for app '${app}' – no changelog section for ${pkg}"
               continue
             fi
             mise run changelog:apk-bump --app "$app" --pkg "$pkg" --old "$old" --new "$new" --version "$version"
@@ -261,7 +261,7 @@ jobs:
           done < <(jq -c '[.[] | select(.version != null and .old != null)] | group_by(.app) | .[]' <<<"${PINS_JSON}")
 
           if [ "$committed" -eq 0 ]; then
-            echo "Nothing to commit - no changelog sections were inserted."
+            echo "Nothing to commit – no changelog sections were inserted."
             exit 0
           fi
 
@@ -279,8 +279,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      # issues: write - PR comments are issue comments (@renovate rebase)
-      # pull-requests: read - PR + files listing; contents: read - PR head files via the contents
+      # issues: write – PR comments are issue comments (@renovate rebase)
+      # pull-requests: read – PR + files listing; contents: read – PR head files via the contents
       # API (job permissions replace top-level, so the read must be restated here)
       issues: write
       pull-requests: read
@@ -340,7 +340,7 @@ jobs:
                   page += 1
 
           def parse_pins(text):
-              """All pins from a full Dockerfile text: {pkg: pin} - same state
+              """All pins from a full Dockerfile text: {pkg: pin} – same state
               machine as the apk-pins task (apk add block tracked across
               backslash continuations)."""
               pins: dict = {}
@@ -359,7 +359,7 @@ jobs:
 
           def pin_changes(base_text, head_text):
               """Changed pins between two file versions:
-              {pkg: {"old": ..., "new": ...}} - diffing the pin sets parsed
+              {pkg: {"old": ..., "new": ...}} – diffing the pin sets parsed
               from the full Dockerfiles at the PR's base and head SHAs; a long
               apk add block cannot be truncated by patch hunk boundaries."""
               base_pins, head_pins = parse_pins(base_text), parse_pins(head_text)
@@ -375,7 +375,7 @@ jobs:
               return base64.b64decode(data["content"]).decode()
 
           def config_text(app, ref):
-              """config.yaml or config.yml - both spellings exist in the wild."""
+              """config.yaml or config.yml – both spellings exist in the wild."""
               for name in ("config.yaml", "config.yml"):
                   try:
                       return contents(f"{app}/{name}", ref)
@@ -403,10 +403,10 @@ jobs:
 
           def index_map(branch, alpine_arch):
               """pkg -> version from the Alpine binary indexes (dl-cdn
-              APKINDEX, main + community merged with main winning - NOT the same
+              APKINDEX, main + community merged with main winning – NOT the same
               index semantics as the apk-pins task's _apkindex_versions, which consults
               one repo per arch (community preferred); alignment tracked in root
-              TODO.md - the APKBUILD source branch can outrun the index either way)."""
+              TODO.md – the APKBUILD source branch can outrun the index either way)."""
               key = (branch, alpine_arch)
               if key in INDEX_CACHE:
                   return INDEX_CACHE[key]
@@ -451,7 +451,7 @@ jobs:
                       if pair.get("new"):
                           pins.append((app, pkg, pair["new"]))
               if not pins:
-                  notes.append(f"PR #{number}: no apk pins in the PR's Dockerfiles - skip")
+                  notes.append(f"PR #{number}: no apk pins in the PR's Dockerfiles – skip")
                   continue
 
               ready, lagging = True, []
@@ -477,7 +477,7 @@ jobs:
                   lagging.append(f"fetch error: {err}")
 
               if not ready:
-                  notes.append(f"PR #{number}: indexes still lag - do nothing")
+                  notes.append(f"PR #{number}: indexes still lag – do nothing")
                   for note in lagging:
                       notes.append(f"  {note}")
                   continue
@@ -490,7 +490,7 @@ jobs:
               if prior >= MAX_NUDGES_PER_PR:
                   notes.append(
                       f"PR #{number}: all arches serve the pin, but the rebase nudge cap "
-                      f"({prior}/{MAX_NUDGES_PER_PR}) is reached - skip")
+                      f"({prior}/{MAX_NUDGES_PER_PR}) is reached – skip")
                   continue
               if DRY_RUN:
                   notes.append(f"PR #{number}: DRY-RUN would comment '@renovate rebase' (prior nudges: {prior}/{MAX_NUDGES_PER_PR})")

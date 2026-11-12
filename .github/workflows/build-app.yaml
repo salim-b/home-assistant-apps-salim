@@ -27,7 +27,7 @@ permissions:
 
 concurrency:
   # github.workflow is the CALLER's name inside a called workflow, and each called run evaluates
-  # this group - inputs.app keeps the caller's per-app matrix children in distinct groups so they
+  # this group – inputs.app keeps the caller's per-app matrix children in distinct groups so they
   # do not cancel each other, and the caller (builder.yaml) uses a -caller suffix so the two
   # never share a group (mutual cancellation would deadlock, GitHub docs).
   group: ${{ github.workflow }}-${{ inputs.app }}-${{ github.event.pull_request.number || github.ref }}
@@ -113,7 +113,7 @@ jobs:
 
       - name: Pre-pull the buildkit driver image (Docker Hub flake hardening)
         # setup-buildx-action (used internally by the builder) pulls the buildkit driver from
-        # Docker Hub; transient auth.docker.io outages fail the whole job - pre-pull with retries
+        # Docker Hub; transient auth.docker.io outages fail the whole job – pre-pull with retries
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           max_attempts: 3
