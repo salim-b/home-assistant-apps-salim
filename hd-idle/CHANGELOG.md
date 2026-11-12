@@ -24,7 +24,8 @@
 - Internals: comment hygiene, no behavior change – the `config.yaml` image comment matches the repository's one-line
   pointer style (CI image-name contract: README §"CI"), and the helper-script comments (`hd-idle-pmfix` header and
   `smart()`, `hd-idle-healthcheck`, `hd-idle-genargs`) point at their canonical `KNOWLEDGE.md` sections instead of
-  restating them; the fatal-path rationale now lives once, in the `Dockerfile` HEALTHCHECK comment.
+  restating them; the fatal-path rationale now lives once, in the `Dockerfile` HEALTHCHECK comment. A §-citation split
+  across lines in `hd-idle-genargs` is re-wrapped so the section name stays greppable.
 
 ## 0.1.15
 

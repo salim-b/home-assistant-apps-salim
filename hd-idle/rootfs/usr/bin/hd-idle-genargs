@@ -448,8 +448,8 @@ while IFS= read -r disk; do
   ## Per-drive drive-PM opt-out (bool?), read WITHOUT `// empty` and matched strictly: jq folds an explicit false into
   ## "absent" (root KNOWLEDGE.md §"bashio option consumption"). Absent (null) and false mean the same thing here – the
   ## treatment applies (the default); true exempts the drive. Defense in depth like the re-checks above – the
-  ## supervisor normalizes bool options before the app ever sees them (root KNOWLEDGE.md §"Supervisor: option schema
-  ## quirks").
+  ## supervisor normalizes bool options before the app ever sees them
+  ## (root KNOWLEDGE.md §"Supervisor: option schema quirks").
   PM=$(bashio::jq "$disk" '.keep_drive_pm')
   case "$PM" in
     true) DRIVE_PM=0 ;;
