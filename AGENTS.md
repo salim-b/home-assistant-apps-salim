@@ -21,7 +21,8 @@ runtime code.
 
 Never duplicate information across files. Place it where it belongs and reference it from everywhere else:
 
-- `README.md` — human users: what the repo is, how to install/test on a device.
+- `README.md` — human users: what the repo is and how to install the apps; human developers: development getting-started
+  (§"Development").
 - `KNOWLEDGE.md` (repo root) — cross-app technical **facts** (supervisor behaviors, AppArmor mechanics, base-image shell
   gotchas, apk policy). Skills and code comments cite its sections by exact name — keep section names stable.
 - `.agents/skills/<name>/` — **procedures** for coding agents (how to do things), in the
@@ -70,19 +71,16 @@ Load a skill's full text before doing the kind of work it covers:
 
 ## Environment setup
 
-```sh
-mise trust               # first use: mise config files are untrusted until then
-mise install --locked    # pinned tools from mise.toml/mise.lock
-```
-
-`docker` is required for the `build`, `test:lab`, `deploy:local`/`deploy:registry` and `test:live` tasks. For
-interactive supervisor-integrated testing use the devcontainer (`.devcontainer.json`), not the lab.
+Same as for human developers — repository [`README.md`](./README.md) §"Development": `mise trust`, then
+`mise install --locked`; `docker` for the build/lab/device tasks. For interactive supervisor-integrated testing use the
+devcontainer (`.devcontainer.json`), not the lab.
 
 ## Commands
 
 Task usage is not documented here: `mise run <task> --help` is the authoritative usage for every task;
-`mise tasks ls --local` lists the tasks (the `--local` flag excludes your global mise tasks). The discipline — always
-`mise run check` before finishing a change, lab-boot every runtime-affecting change — lives in skill `ha-app-workflow`.
+`mise tasks ls --local` lists the tasks (the `--local` flag excludes your global mise tasks); worked examples of the
+common ones are in repository [`README.md`](./README.md) §"Development". The discipline — always `mise run check` before
+finishing a change, lab-boot every runtime-affecting change — lives in skill `ha-app-workflow`.
 
 ## Workflow rules
 

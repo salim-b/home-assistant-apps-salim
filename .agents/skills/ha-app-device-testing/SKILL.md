@@ -28,8 +28,9 @@ over SSH only on explicit user request (skill `ha-app-workflow`); otherwise hand
   schema-filtered with dropped keys reported (facts: root `KNOWLEDGE.md` §"Supervisor: option schema quirks"), with the
   copy's current options backed up locally first (path printed).
 
-- Deploy-task semantics (image-key commenting-out, store-slug conflicts, `--replace`/`--config` option fates) are
-  documented for users in repository `README.md` §"Development".
+- **Deploy tasks build from your working tree, not GHCR** (they comment out the top-level `image:` key in the
+  *device-side* `config.yaml` copy) and refuse on a conflicting repository-installed copy — facts: root `KNOWLEDGE.md`
+  §"Deploy tasks: local builds and store-copy conflicts".
 
 ## test:live specifics
 

@@ -140,6 +140,20 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
 - In-app links (`README.md`/`DOCS.md` `/config/app/<hash>_<slug>/...`) must use the hashed form to work for the
   repository install (the normal user case); they are dead links for local test installs — expected, those are dev-only.
 
+## Deploy tasks: local builds and store-copy conflicts
+
+With a top-level `image:` key set, the supervisor **pulls that image from GHCR** instead of building the app folder
+locally — an image-based app never rebuilds from source (see the [dev docs on remote
+development](https://contributors.home-assistant.io/apps/guides/testing/#remote-development)). The repo's device deploy
+tasks (`deploy:local`, and `test:live` through it) therefore comment the key out in the *device-side* copy of the app's
+`config.yaml`.
+
+Two installations of the same app cannot coexist on one device — they conflict on the app's published ports. A
+repository-installed copy (hashed store slug: §"Supervisor: store slugs (in-app documentation links)") therefore makes
+`deploy:local` refuse: uninstall it first (the error message shows the exact `ha apps uninstall` command) or pass
+`--replace` to have the task uninstall it automatically. `deploy:registry` switches a device from a local install by
+uninstalling it, but refuses while a local and a repository-installed copy both exist (no flag — uninstall one by hand).
+
 ## Supervisor: ha CLI HTTP client timeouts
 
 Every `ha` CLI API call is capped by a hard-coded per-command HTTP client timeout — no flag or env var overrides it

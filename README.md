@@ -34,16 +34,27 @@ The structure of all apps in this repository follows Home Assistant's [best
 practices](https://contributors.home-assistant.io/apps/) as far as possible.
 
 Non-obvious development knowledge lives in [`KNOWLEDGE.md`](./KNOWLEDGE.md) (repository-wide: supervisor behaviors,
-AppArmor, base-image gotchas, testing) and in each app's own `KNOWLEDGE.md` (e.g.
-[`hd-idle/KNOWLEDGE.md`](./hd-idle/KNOWLEDGE.md), [`nfs-server/KNOWLEDGE.md`](./nfs-server/KNOWLEDGE.md),
-[`hickory-dns/KNOWLEDGE.md`](./hickory-dns/KNOWLEDGE.md)); step-by-step procedures live in the skills under
-[`.agents/skills/`](./.agents/skills) (index in [`AGENTS.md`](./AGENTS.md)).
+AppArmor, base-image gotchas, testing) and in each app's own `KNOWLEDGE.md`; step-by-step procedures live in the skills
+under [`.agents/skills/`](./.agents/skills) (index in [`AGENTS.md`](./AGENTS.md)).
 
-We use [mise](https://mise.jdx.dev/) as tool and environment manager and task runner. `mise run <task> --help` provides
-the full, current usage instructions for any task. Common tasks:
+### Setup
+
+We use [mise](https://mise.jdx.dev/) as tool and environment manager and task runner. Bootstrap the pinned toolchain:
 
 ```sh
-# check and validate files
+mise trust               # first use: mise config files are untrusted until then
+mise install --locked    # pinned tools from mise.toml/mise.lock
+```
+
+`docker` is additionally required for the `build`, `test:lab`, `deploy:local`/`deploy:registry` and `test:live` tasks.
+
+### Common tasks
+
+`mise run <task> --help` provides the full, current usage instructions for any task; `mise tasks ls --local` lists them.
+The most common ones:
+
+```sh
+# check and validate files (the same lint/validate gate CI runs)
 mise run check
 
 # test app in a containerized lab
@@ -65,15 +76,12 @@ mise run apply-options hd-idle root@homeassistant.local options.json
 ssh root@homeassistant.local 'ha apps logs --follow local_nfs-server'
 ```
 
-Note that the deploy tasks comment out the top-level `image:` key in the *device-side* copy of the app's `config.yaml`:
-with an `image` key set, the Supervisor would pull that image from GHCR instead of building locally from your working
-tree — see the [dev docs](https://contributors.home-assistant.io/apps/guides/testing/#remote-development). An app
-already installed **from an app repository** (not as a local app — such installs have a hashed store slug like
-`f8b2d53d_nfs-server`) would conflict on the app's published port, so the tasks refuse; uninstall that copy first (the
-error message shows the exact command) or pass `--replace` to have the task uninstall it automatically.
+### Testing on a device
 
-For a full end-to-end test on a HAOS device, run `test:live` (for the `nfs-server` app, this includes an NFS client
-roundtrip against the running app). It deploys the app, forwarding `--replace`/`--test-options`:
+`mise run test:live` deploys the app to a real HAOS device as a local app (like `deploy:local`, forwarding `--replace`)
+and then runs an end-to-end test against it — for the `nfs-server` app, this includes an NFS client roundtrip against
+the running app. With `--test-options`, the repo's test options are applied for the run only, with the device app's own
+options backed up and restored automatically:
 
 ```sh
 # plain: tests the device app's currently configured shares
@@ -81,10 +89,13 @@ mise run test:live nfs-server root@homeassistant.local
 
 # with the repo's test options applied for the run (a minimal set exercising
 # the whole export surface: default share, read-only share, /media share,
-# nested path, second client network — your app options are backed up and
-# restored automatically)
+# nested path, second client network)
 mise run test:live nfs-server root@homeassistant.local --test-options
 ```
+
+Deploy-task mechanics that are not visible in `--help` — why the device-side app config's `image:` key gets commented
+out, and what happens when the app is also installed from the app repository — are documented in
+[`KNOWLEDGE.md`](./KNOWLEDGE.md) §"Deploy tasks: local builds and store-copy conflicts".
 
 ## CI
 
