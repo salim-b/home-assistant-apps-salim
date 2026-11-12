@@ -102,7 +102,8 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   (`NFSD_CMD=(...); "${NFSD_CMD[@]}"`) so quoting is stable either way. Its parser also loses sync on nested parentheses
   inside arithmetic expansion (`"$(( (a << 8) | b ))"` reports "the parser got lost" on a syntactically complete file
   and mangles everything after it — spurious `""` prefixes, quotes inserted into single-quoted strings); keep arithmetic
-  flat, flat `$(( 10#$a ))` is fine. (Upstream items: root `TODO.md`.)
+  flat, flat `$(( 10#$a ))` is fine — and even flat, avoid `<<` in arithmetic (lexed as a heredoc delimiter, same loss
+  of sync; write it out: `$((5 * 2 ** attempt))`). (Upstream items: root `TODO.md`.)
 
 ## Workflow, Dockerfile and Renovate config linting
 

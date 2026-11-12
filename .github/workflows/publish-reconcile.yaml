@@ -100,33 +100,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Existence probe via the runner's preinstalled docker buildx CLI (talks to the registry
-          # directly - no daemon, no login for the public packages). Classification follows
-          # project-copacetic's ensure-tag-absent.sh: success -> ok, not-found-class errors ->
-          # missing, anything else unreachable (retried with exponential backoff). Each attempt is
-          # time-bounded (SIGTERM then SIGKILL - buildx traps SIGTERM and would outlive plain
-          # `timeout`); "404 not found" also matches the error-text variants of other buildx
-          # versions. RECONCILE_RETRIES overrides the retry count (testing/ops knob).
+          # Verdicts come from the shared probe script (.github/scripts/probe-ghcr-tag.sh) -
+          # classification, backoff and the buildx mechanics live there. RECONCILE_RETRIES
+          # overrides the retry count (testing/ops knob).
           retries="${RECONCILE_RETRIES:-3}"
           probe() {
-            local ref="$1" out attempt=0
-            while :; do
-              if out=$(timeout -k 10 60 docker buildx imagetools inspect "$ref" 2>&1); then
-                echo ok
-                return 0
-              fi
-              if grep -Eiq '(manifest unknown|name unknown|no such manifest|: not found[[:space:]]*$|404 not found)' <<<"$out"; then
-                echo missing
-                return 0
-              fi
-              if [ "$attempt" -ge "$retries" ]; then
-                echo unreachable
-                printf 'probe %s: unclassified failure after %d attempts, last error:\n%s\n' "$ref" "$((attempt + 1))" "$out" >&2
-                return 0
-              fi
-              sleep "$((5 * (2 ** attempt)))"
-              attempt=$((attempt + 1))
-            done
+            .github/scripts/probe-ghcr-tag.sh "$1" "$retries"
           }
 
           version="${VERSION}"

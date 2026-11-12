@@ -49,9 +49,11 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   being rewritten to `[ "$x" != "" ]`. A second, worse defect (same version): the parser loses sync on nested
   parentheses inside arithmetic expansion — `printf '%04x' "$(( (a << 8) | b ))"` reports "the parser got lost" on a
   syntactically complete file, and everything after it is mangled (spurious `""` prefixes; quotes inserted into
-  single-quoted strings, which corrupts generated output). Flat arithmetic (`$(( 10#$a ))`) is unaffected; the one repo
-  site was rewritten arithmetic-free (`printf '%02x%02x'`; workaround rule in skill `ha-app-tooling`). If upstream is
-  unresponsive, reconsider whether shellharden should stay a fix step here (vs check-only or dropped).
+  single-quoted strings, which corrupts generated output). Flat arithmetic (`$(( 10#$a ))`) is unaffected — but an
+  arithmetic `<<` alone also breaks it (verified 2026-11, v4.3.2: `$((5 << attempt))` → "Unexpected end of file" on a
+  syntactically complete file, likely lexed as a heredoc delimiter; `$((5 * 2 ** attempt))` parses and is equivalent).
+  The one repo site was rewritten arithmetic-free (`printf '%02x%02x'`; workaround rule in skill `ha-app-tooling`). If
+  upstream is unresponsive, reconsider whether shellharden should stay a fix step here (vs check-only or dropped).
 
 - apk-pin checker: deduplicate the triplicated pin parser — the `pkg=version` regex plus the backslash-continuation
   state machine over `apk add` blocks exists three times (`.mise/tasks/validate.py`, and the changelog + nudge jobs of

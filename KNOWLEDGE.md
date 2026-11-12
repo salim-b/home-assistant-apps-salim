@@ -278,13 +278,13 @@ idempotent, a pre-written section is never touched. The same workflow's nudge jo
 arch indexes serve the new pin: an early bump PR legitimately stays red until the lagging arch's index catches up, and
 re-running failed check runs can still count as red in Renovate's automerge evaluation. Missed image publishes self-heal
 via the publish-reconcile workflow (daily 03:15 UTC): GHCR version-tag probes for every app (per-arch tags plus the
-multi-arch manifest, anonymous `docker buildx imagetools inspect`; not-found-class errors mean a missing tag, other
-failures are retried with backoff then fail red) dispatch `build-app.yaml` (`workflow_dispatch`-able; publish=true,
-ref=main) on a genuine miss — idempotent, a healthy registry is a green no-op. Tag existence only: stale-content tags
-are not detected. Tooling landscape (researched 2026-10-18): no OSS tooling exists for apk-pin bumping with arch gates
-(linuxserver.io's scheduled external-trigger workflows are the closest precedent); Dependabot cannot bump apk pins at
-all (dependabot-core#2129), updatecli has no apk/APKINDEX plugin, and Chainguard's `melange bump` rewrites melange build
-YAML, not Dockerfiles.
+multi-arch manifest, via the shared `.github/scripts/probe-ghcr-tag.sh`; not-found-class errors mean a missing tag,
+other failures are retried with backoff then fail red) dispatch `build-app.yaml` (`workflow_dispatch`-able;
+publish=true, ref=main) on a genuine miss — idempotent, a healthy registry is a green no-op. Tag existence only:
+stale-content tags are not detected. Tooling landscape (researched 2026-10-18): no OSS tooling exists for apk-pin
+bumping with arch gates (linuxserver.io's scheduled external-trigger workflows are the closest precedent); Dependabot
+cannot bump apk pins at all (dependabot-core#2129), updatecli has no apk/APKINDEX plugin, and Chainguard's
+`melange bump` rewrites melange build YAML, not Dockerfiles.
 
 Version-sensitive gotchas:
 
