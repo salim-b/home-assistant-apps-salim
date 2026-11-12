@@ -9,11 +9,11 @@
   Rockchip-based boards (ODROID-M1/M1S, Home Assistant Green). `DOCS.md`, `README.md` and the startup error message now
   state which Home Assistant OS boards ship the module (missing: generic-aarch64/generic-x86-64, OVA, ODROID-C2/C4/N2,
   Khadas VIM3) and link the upstream proposal to enable it everywhere. Raspberry Pi/Yellow support is derived from
-  kernel configuration analysis, not verified on a device — please report if it does not hold.
+  kernel configuration analysis, not verified on a device – please report if it does not hold.
 
 ## 0.7.3
 
-- Maintainability: no behavior change - removed the stale `# hadolint ignore=DL3059` pragma from the Dockerfile (droast
+- Maintainability: no behavior change – removed the stale `# hadolint ignore=DL3059` pragma from the Dockerfile (droast
   has no rule with an equivalent finding, so it was dead weight).
 
 ## 0.7.2
@@ -21,12 +21,12 @@
 - Internals: pinned the nfs-utils apk package (2.6.4-r6): Alpine-side package updates now become explicit app releases
   guided by the CI drift check and auto-bumped by Renovate (like hd-idle's pins), instead of silently changing released
   images' package content on rebuilds. The app's runtime logic encodes nfs-utils's interface (exportfs's
-  export-table/fsid semantics, the rpc.nfsd CLI, nfsdcld's client-tracking store format) - see the repository-root
+  export-table/fsid semantics, the rpc.nfsd CLI, nfsdcld's client-tracking store format) – see the repository-root
   `KNOWLEDGE.md` apk package version policy.
 
 ## 0.7.1
 
-- Maintainability: no behavior change (the comment-stripped scripts and the AppArmor rule lines are unchanged) - code
+- Maintainability: no behavior change (the comment-stripped scripts and the AppArmor rule lines are unchanged) – code
   comments slimmed to purpose + references, `KNOWLEDGE.md` tightened to durable facts and `TODO.md` pruned to open
   items. The narratives and procedures now live in the repository's `KNOWLEDGE.md` and agent skills, their single
   canonical homes.
@@ -39,7 +39,7 @@
   shares temporarily export an empty directory (previously the stale, detached filesystem content was served until the
   next app restart). Connected clients keep working across these restarts via NFSv4 state recovery.
 - Internals: the nfsd-watch poll interval is overridable via the `NFSD_WATCH_INTERVAL` environment variable (integer
-  seconds, minimum 5, default 30) - the lab harness sets it to 5 s (the floor) to keep its full-interval waits short.
+  seconds, minimum 5, default 30) – the lab harness sets it to 5 s (the floor) to keep its full-interval waits short.
   Regular installs are unaffected (the variable is unset there).
 - Change: share paths, client networks and export options must not contain backslashes anymore; such configurations are
   rejected with a clear error at startup (and at save time by the schema). Backslash values could not be handled
@@ -47,7 +47,7 @@
 
 ## 0.6.2
 
-- Fix: every start failed with `rpc.nfsd   --no-nfs-version 3 …: command not found` - 0.6.1's shell-quoting reformat
+- Fix: every start failed with `rpc.nfsd   --no-nfs-version 3 …: command not found` – 0.6.1's shell-quoting reformat
   made the start script execute the whole command string as a single command name. All configurations were affected
   (found on-device after an auto-update); no configuration or data was touched.
 - Diagnostics: start failures now state their actual cause. Failed setup steps (exports table refresh, the nfsd and
@@ -58,21 +58,21 @@
 ## 0.6.1
 
 - Internals: the app's scripts were reformatted and quoting-hardened by the repository's new shell tooling (shfmt,
-  shellharden, shellcheck) - no functional changes.
+  shellharden, shellcheck) – no functional changes.
 
 ## 0.6.0
 
 - Rename: the app's slug changed from `nfs` to `nfs-server` to match the app folder and image name. The slug surfaces in
   the installed slug, container and DNS names, the AppArmor profile name and the app's UI URLs (`/config/app/...`). The
   AppArmor profile's signal-receive peer globs (`*_nfs` → `*_nfs-server`) were adjusted to the new installed-slug form.
-- Upgrade note: the Supervisor treats the renamed slug as a new app — existing installs must be uninstalled and
+- Upgrade note: the Supervisor treats the renamed slug as a new app – existing installs must be uninstalled and
   reinstalled, and stored options do not survive an uninstall. Note your options before uninstalling. NFS clients are
   unaffected (they mount the host's IP on port 2049, not the app slug).
 
 ## 0.5.4
 
 - Maintainability: code comments slimmed to purpose + references (the narratives now live in `KNOWLEDGE.md`, their
-  single canonical home) - no behavior change (the comment-stripped scripts are byte-identical).
+  single canonical home) – no behavior change (the comment-stripped scripts are byte-identical).
 
 ## 0.5.3
 
@@ -88,7 +88,7 @@
 
 - Reject duplicate share entries at startup: one option set applies per path and network pair (the kernel keeps a single
   export cache entry for it and silently applies the last `/etc/exports` line), so a second entry for the same path and
-  network is now a configuration error with an explanatory message - identical duplicates (redundant) and same-path
+  network is now a configuration error with an explanatory message – identical duplicates (redundant) and same-path
   same-network entries with conflicting options alike. The same path with *different* networks remains valid
   (per-network options). The app configuration schema cannot express this cross-entry constraint (supervisor options DSL
   has no uniqueness construct).
@@ -98,7 +98,7 @@
 - NFSv4 client state recovery: the app now runs the client-recovery tracker daemon (`nfsdcld`, part of the
   already-installed `nfs-utils` package) with its persistent sqlite store on the app's data volume, and mounts the
   per-network-namespace rpc_pipefs upcall channel it needs. NFSv4 clients that are connected across an app (re)start
-  keep their state - open files, byte-range locks and delegations - reclaiming it from the tracker's records during the
+  keep their state – open files, byte-range locks and delegations – reclaiming it from the tracker's records during the
   grace period, instead of losing it (previously, client recovery tracking could not work in a container).
 - The grace period is only paid when there is client state to reclaim: after a boot with no recorded clients the server
   skips it entirely (the kernel's own fast path), and it ends early once all recorded clients have reclaimed. The
@@ -108,13 +108,13 @@
 
 ## 0.4.0
 
-- AppArmor support: ships a custom, tightened AppArmor profile (`apparmor: true` instead of disabled) - single top-level
+- AppArmor support: ships a custom, tightened AppArmor profile (`apparmor: true` instead of disabled) – single top-level
   profile with per-binary sub-profiles for `exportfs`, `rpc.nfsd` and `rpc.mountd`, modeled on the official dev-docs
   template and the shipped dnsmasq app's profile:
   - the nfsd filesystem mount is restricted to the `nfsd` filesystem type (exact source string and mountpoint); the
     per-share bind-mount mirrors and their unmount are scoped accordingly
   - capabilities are granted explicitly and minimally (`sys_admin` for the mounts;
-    `net_bind_service`/`setgid`/`setuid`/`dac_override` in the daemon sub-profiles) - note that AppArmor mediates
+    `net_bind_service`/`setgid`/`setuid`/`dac_override` in the daemon sub-profiles) – note that AppArmor mediates
     capabilities even when the corresponding operation rule (e.g. the mount rule) already passes
   - network access is mediated (a profile without any network rules would leave it unmediated entirely): allowlists for
     inet/inet6 stream+dgram (supervisor API, DNS, the healthcheck probe, RPC sockets) plus `netlink raw` for address
@@ -122,7 +122,7 @@
   - verified on-device in enforcing mode: full boot, NFS client roundtrips (writable / read-only / pseudo-root exports)
     and a fresh reboot with the nfsd kernel module unloaded
 - Drop the app-level module loading: the kernel's mount-time autoload loads the nfsd module itself (in kernel context,
-  outside the AppArmor label - device-verified by rebooting with the module unloaded). The app no longer runs
+  outside the AppArmor label – device-verified by rebooting with the module unloaded). The app no longer runs
   `modprobe`, and the configuration no longer maps `/lib/modules` into the app or grants the `SYS_MODULE` capability
   (`kernel_modules` removed).
 - Slim the image: drop the unused tempio download (the app's rootfs contains no templates for it to render).
