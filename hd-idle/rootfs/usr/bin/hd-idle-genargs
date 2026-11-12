@@ -128,8 +128,7 @@ SYSTEM_DISKS=()
 SYSTEM_SD_DISKS=()
 ROOT_SOURCE=""
 
-## Dedup via an assoc array (the previous grep -qxF per candidate was one
-## spawn per detection – this runs on every --check tick too).
+## Dedup via an assoc array – this runs on every --check tick too, so keep it cheap.
 declare -A SYSTEM_SEEN=()
 add_system_disk() {
   local parent

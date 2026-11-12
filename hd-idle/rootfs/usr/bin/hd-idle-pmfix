@@ -2,18 +2,11 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-## Disable the drives' own power management (APM level + internal standby timer) – the app's drive-PM treatment
-## (the per-drive keep_drive_pm opt-out decides; the drives file's pm-flag column carries the per-drive decision).
-## Why, per-bridge reality, volatility, the same-kernel-name gap:
-## hd-idle/KNOWLEDGE.md §"Drive-PM treatment"; user-facing behavior: DOCS.md.
+## The app's drive-PM treatment: disable the drives' own power management for pm-flag-1 drives-file lines –
+## semantics, drives-file format, --since and concurrency: hd-idle/KNOWLEDGE.md §"Drive-PM treatment";
+## user-facing behavior: DOCS.md.
 ##
 ## Usage: hd-idle-pmfix <drives-file> [--since <old-drives-file>]
-## <drives-file>: one "<kernel-name> <idle> <command-type> <pm-flag>" line per drive (written by hd-idle-genargs;
-## format: hd-idle/KNOWLEDGE.md §"Drive-PM treatment"). Only pm-flag 1 drives are treated (the idle time plays no
-## role: an idle-0 drive is a treatment target all the same). With --since, only lines NEW or CHANGED relative to
-## the old file are treated – redundant treatment of asleep drives risks bridge-mediated motor starts.
-## Treated drives run CONCURRENTLY (one background job per drive; each drive's two smartctl calls stay sequential;
-## concurrent SG_IO to different disks is safe): a standby drive is woken by its first SET FEATURES command.
 
 DRIVES_FILE="${1:-/etc/hd-idle.drives}"
 SINCE_FILE=""
@@ -38,13 +31,10 @@ esac
   exit 0
 }
 
-# Success requires rc=0 AND no failed|unknown|unavailable output: smartctl's exit code alone does not certify that
-# ATA SET FEATURES took effect (feature-page-filtered bridges answer "APM feature is: Unavailable" with rc=0 – a
-# silent no-op). The detail grep's different word list only picks a log line for the failure message, truncated to
-# 80 chars: wide enough for full sense messages ("scsi error device will be ready soon"), still one short log line.
-# -d sat pins
-# SAT passthrough for every sd* device; timeout 60 keeps a wedged bridge from stalling the s6 boot or a watcher tick
-# (timed-out calls are never retried). Rationale: hd-idle/KNOWLEDGE.md §"Drive-PM treatment".
+# Success detection (rc=0 AND no failed|unknown|unavailable output), the -d sat pin and timeout 60 – rationale:
+# hd-idle/KNOWLEDGE.md §"Drive-PM treatment". The detail grep's different word list only picks a log line for the
+# failure message, truncated to 80 chars: wide enough for full sense messages ("scsi error device will be ready
+# soon"), still one short log line.
 smart() {
   local dev="$1" flag="$2" value="$3" out rc attempt
   for attempt in 1 2 3 4; do
@@ -54,11 +44,8 @@ smart() {
       if [ "$attempt" -gt 1 ]; then printf 'ok (attempt %s)' "$attempt"; else printf 'ok'; fi
       return 0
     fi
-    # Retry ONLY the transient spin-up race: an asleep drive is woken by the call itself and its bridge can answer
-    # with NOT READY sense instead of holding the command through the spin-up. The rc alone is too broad – FAILSMART
-    # (4) also covers the APM-filtered bridges' PERSISTENT rejection (hd-idle/KNOWLEDGE.md §"USB-bridge behaviors") -
-    # so the retry additionally requires the NOT READY message family in the output. Timed-out and other failures
-    # never retry.
+    # Retry filter: the NOT READY family only – timed-out and other failures never retry. Rationale (the rc alone
+    # is too broad): hd-idle/KNOWLEDGE.md §"Drive-PM treatment".
     if [ "$rc" != 0 ] && grep -qiE 'will be ready soon|device not ready' <<<"$out"; then
       continue
     fi

@@ -1,7 +1,7 @@
 #!/bin/bash
-# Docker HEALTHCHECK probe: hd-idle exits itself (log.Fatal, then s6 restarts it) if /proc/diskstats becomes
-# unreadable – check the stats file and the daemon process (plain /proc/*/comm scan, no pgrep dependency). The scan
-# uses the read builtin (no process per checked PID – the probe runs every 30 s).
+# Docker HEALTHCHECK probe: checks the stats file and the daemon process (plain /proc/*/comm scan, no pgrep
+# dependency; the read builtin spawns no process per checked PID – the probe runs every 30 s). What it guards
+# against and why both checks: the Dockerfile HEALTHCHECK comment.
 set -euo pipefail
 
 [ -r /proc/diskstats ] || exit 1

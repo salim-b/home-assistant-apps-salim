@@ -3,7 +3,7 @@ name: hd-idle
 version: "0.2.0"
 slug: hd-idle
 description: Spin down idle hard disks (USB, SATA) automatically using hd-idle
-# Generic image name; CI publishes per-arch images and a multi-arch manifest under this name on pushes to main.
+# Generic multi-arch manifest name; per-arch image names are derived by CI – repository README §"CI".
 image: "ghcr.io/salim-b/app-hd-idle"
 url: "https://github.com/salim-b/home-assistant-apps-salim/tree/main/hd-idle"
 panel_icon: mdi:harddisk

@@ -21,6 +21,10 @@
   carries its own), so the hd-idle -t single-shot path now uses hd-idle's built-in defaults (scsi, power condition 0 –
   the same values the app used to set). System-disk exclusion rows in the internal drives file use `-` as their
   command-type placeholder (no spin-down command is ever issued for them).
+- Internals: comment hygiene, no behavior change – the `config.yaml` image comment matches the repository's one-line
+  pointer style (CI image-name contract: README §"CI"), and the helper-script comments (`hd-idle-pmfix` header and
+  `smart()`, `hd-idle-healthcheck`, `hd-idle-genargs`) point at their canonical `KNOWLEDGE.md` sections instead of
+  restating them; the fatal-path rationale now lives once, in the `Dockerfile` HEALTHCHECK comment.
 
 ## 0.1.15
 
