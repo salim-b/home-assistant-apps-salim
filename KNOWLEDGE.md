@@ -257,17 +257,27 @@ derives the arch list from each app's `config.yaml` — task and nudge can disag
 dedupe: `TODO.md`). The index serves only the current pkgrel (old ones disappear), so the next build would break anyway
 — the alarm turns an Alpine-side repoint into a guided release instead of silent image drift.
 
-**Renovate opens the update PR, including the `config.yaml` version bump**: the Dockerfile manager extracts
-`apk add pkg=version` pins into the `apk` datasource, and the apk packageRule in `.github/renovate.json` supplies the
-dl-cdn APKINDEX `registryUrls` (branch plus arch pinned — without them Renovate silently skips the pins, it cannot infer
-the Alpine branch from the base-image ARG) plus a `bumpVersions` entry that patch-bumps the app's `config.yaml` in the
-same PR (matchString anchored at line start via `(?:^|\n)` emulation — Renovate compiles matchStrings without the `m`
-flag, so a plain `^` would bind to file offset 0; only the FIRST match per file is bumped). The version-guard workflow
-still passes on the Renovate PR as opened. `postUpgradeTasks` need `allowedPostUpgradeCommands` — a self-hosted-only
-option — so the changelog entry is filled post-merge by the CI changelog job instead. The rule's registryUrls branch
-value must be updated together with the Dockerfile's `BUILD_FROM` default on a base-image bump; the validate.py drift
-check derives the branch dynamically and remains the config-independent net. Floating apk packages are skipped
-(`unspecified-version`), as intended.
+**Renovate opens the update PRs, grouped by update type, including the `config.yaml` version bumps**: the Dockerfile
+manager extracts `apk add pkg=version` pins into the `apk` datasource, and the apk packageRule in
+`.github/renovate.json` supplies the dl-cdn APKINDEX `registryUrls` (branch plus arch pinned — without them Renovate
+silently skips the pins, it cannot infer the Alpine branch from the base-image ARG) plus a `bumpVersions` entry that
+patch-bumps the app's `config.yaml` in the same PR (matchString anchored at line start via `(?:^|\n)` emulation —
+Renovate compiles matchStrings without the `m` flag, so a plain `^` would bind to file offset 0; only the FIRST match
+per file is bumped; each pin update applies its own bumpVersions pass, so two drifted pins in one app patch-bump that
+app's version twice — bumpVersions is experimental, verify on the first grouped PR). Grouping is per update type
+(`apk-pkgrel` / `apk-pkgver` branch slugs): split packages built from one APKBUILD share pkgver and pkgrel and drift
+together, so per-package PRs would leave the sibling pin stale in each PR's own tree — its build's `apk add` cannot
+resolve the stale pin and the automerge deadlocks against the sibling PR — while one grouped PR per upstream event
+carries every drifted pin and stays self-consistent (all updates sharing a `groupName` go into one branch/PR; Renovate
+docs, configuration-options: groupName/rebaseWhen, verified 2026-11-12). Residual edge: independent packages pinned in
+one Dockerfile can drift with different update types — the two group branches then both touch that Dockerfile and the
+automerging pkgrel PR stays red until the pkgver PR merges (its build needs the newer sibling pin); the pkgrel group
+then rebases when behind base (rebaseWhen auto: behind-base-branch for automerging branches) and automerges, so the
+delay is bounded by the pkgver review. The version-guard workflow still passes on the Renovate PR as opened.
+`postUpgradeTasks` need `allowedPostUpgradeCommands` — a self-hosted-only option — so the changelog entry is filled
+post-merge by the CI changelog job instead. The rule's registryUrls branch value must be updated together with the
+Dockerfile's `BUILD_FROM` default on a base-image bump; the apk-pins task derives the branch dynamically and remains the
+config-independent net. Floating apk packages are skipped (`unspecified-version`), as intended.
 
 **Release automation (since 2026-10-18)**, chained apk rules in `.github/renovate.json`: pkgrel-only bumps (`1.22-r7` →
 `1.22-r8`, classified `patch`) **automerge once CI is green** (rebase strategy — linear history); pkgver bumps get the
