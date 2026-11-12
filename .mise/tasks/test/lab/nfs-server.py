@@ -3,12 +3,20 @@
 #MISE description="⚠️ internal helper script (fixture adapter, sourced by the lab task)"
 # fmt: on
 
-"""Fixture adapter for the nfs-server lab: rewrite the config.yaml options
-so the roundtrip works inside the lab network."""
+"""Fixture adapter for the nfs-server lab: keep the config roundtrip in the lab network.
+
+Rewrites the config.yaml options so the roundtrip works inside the lab network.
+"""
 
 
-def lab_adapt_fixture(options):
-    def walk(value):
+def lab_adapt_fixture(options: dict[str, object]) -> dict[str, object]:
+    """Adapt the lab options: re-point networks at LABNETWORK, add the hotplug share.
+
+    The walk rewrites every network value; lease_time drops to 15 s so client renewal and
+    server-restart recovery complete inside the check window.
+    """
+
+    def walk(value: object) -> object:
         if isinstance(value, dict):
             return {
                 k: "LABNETWORK" if k == "network" else walk(value[k]) for k in value

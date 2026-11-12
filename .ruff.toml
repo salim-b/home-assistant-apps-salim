@@ -49,9 +49,17 @@
     "EM",
     "TRY",
     "PTH",
+    "ANN",
+    "D",
     "RUF100",
     "PGH004",
   ]
+
+  [lint.pydocstyle]
+    # Google convention: silences the pydocstyle rules its style supersedes (D203, D213, D214, D215,
+    # D400, D404-D410, D415), so docstrings need a first-line summary ending in a period plus
+    # Args/Returns sections for documented parameters.
+    convention = "google"
 
   [lint.pycodestyle]
     # align prose width with our Markdown docs (panache wraps Markdown at 120). The formatter

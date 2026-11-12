@@ -103,6 +103,10 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   unpinned: it is inert for the selected rules and nothing couples it to the `python` mise.toml pin, so a pin would
   drift (ruff's own default applies). Note that UP is target-sensitive in the other direction: once ruff's default
   target crosses py314, its safe autofix will drop the no-longer-needed `from __future__ import annotations` imports.
+- Docstrings (D, google convention) and annotations (ANN) are committed regimes: a docstring's first line is the summary
+  (ends with a period), then a blank line before the body, and parameter names must appear in the text (ruff's D417
+  checks name presence, not section structure). Every function gets full annotations; dynamic dicts (lab-option
+  fixtures) are `dict[str, object]` - never explicit `Any` (ANN401).
 - ruff does not read `.editorconfig`; its formatter defaults (4-space indent, double quotes, 88 columns) match this
   repo's Python style. E501 is the outer fence at 120 columns (`.ruff.toml` `[lint.pycodestyle]`, panache's prose width)
   for what the formatter cannot split. Both builtins pass `--force-exclude`, so config excludes apply even to hk's

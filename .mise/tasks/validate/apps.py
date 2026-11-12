@@ -5,9 +5,9 @@
 #USAGE flag "--schemas-only" help="Only refetch the pinned Supervisor schemas"
 # fmt: on
 
-"""Validation harness: supervisor-side semantics the CI app linter does not
-cover, at a pinned supervisor ref (what each check is for: .agents/skills/ha-app-tooling).
+"""validate:apps: supervisor-side validation the CI app linter does not cover.
 
+Runs against a pinned supervisor ref (what each check is for: .agents/skills/ha-app-tooling).
 Parses all app YAML files (catching parse errors early); validates translations against the
 supervisor's voluptuous schemas (AST-extracted from the pinned ref - no drifting copies) and the
 AppArmor profile against the supervisor's profile-name regex (exactly one top-level profile);
@@ -65,6 +65,7 @@ APPARMOR_RE_NAME = "RE_PROFILE"
 
 
 def fetch(name: str) -> str:
+    """The cached supervisor schema file content for name (fetched from the pinned ref on miss)."""
     dest = CACHE / name
     if dest.is_file():
         return dest.read_text()
@@ -105,9 +106,11 @@ def supervisor_constants() -> dict[str, str]:
 
 
 def find_apps() -> list[str]:
-    """Selected app: `usage_app` env var (mise) or first argv token (direct
-    runs); empty/unset means all apps, like the optional arg's shell `:-`
-    expansion (empty ≡ unset)."""
+    """The apps to validate: the optional [app] arg, or all app dirs.
+
+    `usage_app` env var (mise) or first argv token (direct runs); empty/unset means all apps,
+    like the optional arg's shell `:-` expansion (empty ≡ unset).
+    """
     for src in (
         os.environ.get("usage_app", ""),
         sys.argv[1] if len(sys.argv) > 1 else "",
@@ -125,6 +128,7 @@ problems: list[str] = []
 
 
 def fail(app: str, msg: str) -> None:
+    """Record a problem for app (printed at exit with a nonzero status)."""
     problems.append(f"[{app}] {msg}")
 
 
@@ -137,10 +141,12 @@ def _flag(name: str) -> bool:
 
 
 def validate_rumdl_no_autofix() -> None:
-    """Behavioral canary: rumdl must not rewrite ANY file (panache owns all markdown
-    formatting). Runs `rumdl fmt` on a scratch violation file with the repo config and fails if
+    """Behavioral canary: rumdl must not rewrite ANY file (panache owns all markdown formatting).
+
+    Runs `rumdl fmt` on a scratch violation file with the repo config and fails if it changed - a
     it changed - a rumdl upgrade that flips the inert-`all` fixable semantics (see the comment in
-    .rumdl.toml) is caught at `mise run check`. Requires rumdl on PATH (`mise run validate:apps`)."""
+    .rumdl.toml) is caught at `mise run check`. Requires rumdl on PATH (`mise run validate:apps`).
+    """
     canary = "# canary\n\nSome  text with fixable issues.   \n\n- item one\n+ item two\nTab\there\n"
     with tempfile.TemporaryDirectory() as td:
         canary_file = pathlib.Path(td) / "canary.md"
@@ -174,6 +180,7 @@ def validate_rumdl_no_autofix() -> None:
 
 
 def main() -> int:
+    """Run every check for the selected apps (or refetch the pinned schemas with --schemas-only)."""
     global CONST_NAMES
     if _flag("schemas-only"):
         print("-- refetching pinned supervisor schemas (invalidating the cache)")

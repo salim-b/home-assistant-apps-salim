@@ -34,7 +34,9 @@ CONTINUATION_INDENT = "  "  # Markdown list-item continuation indent
 
 def _argv_value(name: str) -> str:
     """CLI fallback for direct (non-mise) runs: `--<name> <value>` in argv.
-    mise passes options as env vars; this keeps direct invocations honest."""
+
+    mise passes options as env vars; this keeps direct invocations honest.
+    """
     flag = f"--{name}"
     if flag in sys.argv:
         idx = sys.argv.index(flag)
@@ -45,9 +47,11 @@ def _argv_value(name: str) -> str:
 
 def _val(name: str) -> str:
     """Read a mise #USAGE option value (env var; argv fallback for direct runs).
+
     The spec declares the flag required=true, so mise fails a missing flag
     before the script runs - but empty values pass mise's check and are
-    rejected here (the Python equivalent of the shell's `${usage_name:?}`)."""
+    rejected here (the Python equivalent of the shell's `${usage_name:?}`).
+    """
     value = os.environ.get(f"usage_{name.replace('-', '_')}", "") or _argv_value(name)
     if not value:
         sys.exit(f"changelog:apk-bump: --{name} must not be empty")
@@ -63,9 +67,11 @@ def _flag(name: str) -> bool:
 
 
 def wrap_bullet(text: str) -> list[str]:
-    """Greedy word wrap at WIDTH with a CONTINUATION_INDENT continuation, so
-    the emitted bullet is already in panache's reflowed form (`mise run fmt`
-    after the insertion does not rewrite it)."""
+    """Greedy word wrap at WIDTH with a CONTINUATION_INDENT continuation.
+
+    The emitted bullet is already in panache's reflowed form (`mise run fmt`
+    after the insertion does not rewrite it).
+    """
     words = text.split()
     lines: list[str] = []
     current = ""
@@ -92,6 +98,7 @@ def bullet(pkg: str, old: str, new: str) -> str:
 
 
 def main() -> int:
+    """Insert the templated changelog section (or print it with --dry-run)."""
     app = _val("app")
     pkg = _val("pkg")
     old = _val("old")

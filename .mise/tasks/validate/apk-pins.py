@@ -4,10 +4,10 @@
 #USAGE arg "[app]" help="App directory to check (default: all apps)"
 # fmt: on
 
-"""validate:apk-pins: compare pinned apk package versions in app Dockerfiles against the Alpine binary
-indexes of the pinned base-image branch. Drift = guided release (policy + why: root KNOWLEDGE.md
-§"apk package version policy"); CI runs this task only on main pushes and the daily cron, never
-in the PR gate.
+"""validate:apk-pins: compare pinned apk package versions in app Dockerfiles against the Alpine binary indexes.
+
+Drift = guided release (policy + why: root KNOWLEDGE.md §"apk package version policy"); CI runs
+this task only on main pushes and the daily cron, never in the PR gate.
 """
 
 from __future__ import annotations
@@ -36,12 +36,16 @@ problems: list[str] = []
 
 
 def fail(app: str, msg: str) -> None:
+    """Record a problem for app (printed at exit with a nonzero status)."""
     problems.append(f"[{app}] {msg}")
 
 
 def find_apps() -> list[str]:
-    """Selected app: `usage_app` env var (mise) or first argv token (direct runs); empty/unset
-    means all apps, like the optional arg's shell `:-` expansion (empty ≡ unset)."""
+    """The apps to validate: the optional [app] arg, or all app dirs.
+
+    `usage_app` env var (mise) or first argv token (direct runs); empty/unset
+    means all apps, like the optional arg's shell `:-` expansion (empty ≡ unset).
+    """
     for src in (
         os.environ.get("usage_app", ""),
         sys.argv[1] if len(sys.argv) > 1 else "",
@@ -56,11 +60,13 @@ def find_apps() -> list[str]:
 
 
 def _apkindex_versions(branch: str, package: str) -> dict[str, str]:
-    """Version of <package> in the Alpine v<branch> binary indexes, per arch - the BINARY index
-    (dl-cdn APKINDEX) is what `apk add` resolves, not the aports APKBUILD source branch (a pkgrel
-    commit can outrun the published packages; policy: root KNOWLEDGE.md §apk package version
-    policy). Cached for APKINDEX_TTL so local runs stay snappy while the daily cron sees fresh
-    data."""
+    """Version of <package> in the Alpine v<branch> binary indexes, per arch.
+
+    The BINARY index (dl-cdn APKINDEX) is what `apk add` resolves, not the aports APKBUILD source
+    branch (a pkgrel commit can outrun the published packages; policy: root KNOWLEDGE.md §apk
+    package version policy). Cached for APKINDEX_TTL so local runs stay snappy while the daily
+    cron sees fresh data.
+    """
     versions: dict[str, str] = {}
     for arch in ("x86_64", "aarch64"):
         dest = CACHE / f"apkindex-v{branch}-{arch}"
@@ -96,6 +102,7 @@ def _apkindex_versions(branch: str, package: str) -> dict[str, str]:
 
 
 def main() -> int:
+    """Check every app's pinned apk versions against the Alpine indexes; exits nonzero on drift."""
     for app in find_apps():
         dockerfile = ROOT / app / "Dockerfile"
         if not dockerfile.is_file():

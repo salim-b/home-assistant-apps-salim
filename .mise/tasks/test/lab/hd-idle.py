@@ -3,14 +3,21 @@
 #MISE description="⚠️ internal helper script (fixture adapter, sourced by the lab task)"
 # fmt: on
 
-"""Fixture adapter for the hd-idle lab: configures the smoke-test drives
-(kernel names from LAB_SPINDOWN_DRIVES, e.g. "sda,sdb") on a short idle so the daemon
-exercises its natural spindown path within the check window. Bare kernel names pass the app's
-device resolution unchanged (rootfs/etc/cont-init.d/config.sh); only these drives are listed,
-so no other disk of the lab host is ever touched."""
+"""Fixture adapter for the hd-idle lab: drive the daemon's natural spindown path.
+
+Configures the smoke-test drives (kernel names from LAB_SPINDOWN_DRIVES, e.g. "sda,sdb") on a
+short idle so the daemon exercises its natural spindown path within the check window. Bare
+kernel names pass the app's device resolution unchanged (rootfs/etc/cont-init.d/config.sh);
+only these drives are listed, so no other disk of the lab host is ever touched.
+"""
 
 
-def lab_adapt_fixture(options):
+def lab_adapt_fixture(options: dict[str, object]) -> dict[str, object]:
+    """Adapt the lab options: list the smoke-test drives, first one with disable_drive_pm=no.
+
+    The drives come from LAB_SPINDOWN_DRIVES (comma-separated kernel names); the first drive
+    carries the per-drive override so the pm-flag skip path is exercised end to end.
+    """
     import os
 
     drives = [

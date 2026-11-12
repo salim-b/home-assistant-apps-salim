@@ -3,9 +3,10 @@
 #MISE description="⚠️ internal helper script (fixture adapter, sourced by the lab task)"
 # fmt: on
 
-"""Fixture adapter for the hickory-dns lab: add one static entry so the runtime
-check can probe an authoritative leaf-zone answer (the default options serve
-none).
+"""Fixture adapter for the hickory-dns lab: probe an authoritative leaf-zone answer.
+
+Adds one static entry so the runtime check can probe an authoritative leaf-zone answer (the
+default options serve none).
 
 The lab harness forwards a generic LAB_FIXTURE_ENV string to the fake-API
 container; the `upstreams=<variant>` item selects an upstream-pool variant for
@@ -16,12 +17,18 @@ default pool is Quad9's anycast IPs over DoQ; the resolve CLI cannot dial
 DoH/DoQ directly). Hostname-only upstreams additionally exercise the boot-time
 name resolution path (fresh lookup + last-known-good cache) that the default
 IP-based pool skips. Run all four after transport-affecting changes:
-`LAB_FIXTURE_ENV=upstreams=tls mise run lab hickory-dns` (and https, quic)."""
+`LAB_FIXTURE_ENV=upstreams=tls mise run lab hickory-dns` (and https, quic).
+"""
 
 import os
 
 
-def lab_adapt_fixture(options):
+def lab_adapt_fixture(options: dict[str, object]) -> dict[str, object]:
+    """Adapt the lab options: add a static probe entry, optionally swap the upstream pool.
+
+    `LAB_FIXTURE_ENV=upstreams=<variant>` selects tls/https/quic so the probe proves exactly
+    that encrypted transport end to end through the real daemon.
+    """
     options["static_entries"] = [{"hostname": "lab-probe.home.arpa", "ip": "192.0.2.1"}]
     variant = ""
     for item in os.environ.get("LAB_FIXTURE_ENV", "").split():
