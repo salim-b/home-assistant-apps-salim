@@ -65,9 +65,17 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
 - Options are validated **at save time** (schema incl. device-path existence) and delivered to the running app only at
   its next (re)start — option values cannot change under a running app (`supervisor/api/apps.py` options endpoint →
   `app.save_persist()`).
-- Installed options are **user data**: `config.yaml` default changes do NOT reach existing installs (`options.json` is
-  written at first install and at save time only) — new options need absent-key handling in app code
+- Installed options are **user data**: `config.yaml` default changes do NOT reach existing installs — an app's manifest
+  data (defaults included) is snapshotted into the apps data store at install/update (`supervisor/apps/data.py`
+  `install`/`update`), so the validated options merge that `App.start()` writes to `options.json` at every start
+  (`supervisor/apps/app.py` `write_options`, verified at 2026.10.2) keeps using the installed version's defaults until
+  the app is updated. New options without a `config.yaml` default need absent-key handling in app code
   (`bashio::config '<key>' <default>`), and changing a default is not a behavior change for existing users.
+- `bool` options validate through `vol.Boolean()` (`supervisor/apps/options.py` `_validate_typed`, verified at
+  2026.10.2; voluptuous 0.16.0): the case-insensitive strings `1`/`true`/`yes`/`on`/`enable` and
+  `0`/`false`/`no`/`off`/`disable` coerce to real booleans, other strings fail validation, non-string values are cast
+  with `bool()`. Since the validated result is what lands in `options.json` (bullet above), the app never sees raw
+  string booleans.
 - Options REMOVED from the schema stay in stored `options.json` and are simply inert: the supervisor logs a one-line
   warning ("Option 'X' does not exist in the schema") on each options read until the user re-saves — device-verified
   2026-10-16 (hd-idle 0.1.5 dropping `mode`; the stale key never broke the boot, only warned).
@@ -370,13 +378,14 @@ gotchas".
   `< <(echo "${RAW}")` (`echo` re-terminates the final line).
 - **Raw string lines must NOT go through `bashio::jq`**: jq parses the line as JSON, so an unquoted value like
   `127.0.0.0/8` fails with `jq: parse error: Invalid numeric literal` (exit 5) — only object lines (valid JSON) do.
-- **`'<field> // empty'` is valid only for STRING-typed fields**: jq treats `false` as empty, so an optional BOOLEAN
-  field cannot distinguish "absent" from "false" (absent → "null", false → "false"). Shape optional per-item booleans so
-  absent and false MEAN THE SAME (invert the polarity: the safe default is the off state, which an untouched toggle then
-  both renders and behaves as - hd-idle's per-drive `keep_drive_pm`); a `list(yes|no)?` dropdown is for genuine
-  tri-state choices where absence must differ from both. Reading the field WITHOUT `// empty` and matching
-  `null`/`true`/`false` explicitly additionally rejects hand-edited non-boolean values loudly (schema mechanics:
-  §"Supervisor: option schema quirks").
+- **jq's `//` alternative folds `false` and `null` into the fallback**: `'<field> // empty'` cannot distinguish "absent"
+  from "false" on a BOOLEAN field; for every other type it folds only absent values and is safe (hd-idle-genargs reads
+  its required int fields that way). Shape optional per-item booleans so absent and false MEAN THE SAME (invert the
+  polarity: the safe default is the off state, which an untouched toggle then both renders and behaves as – hd-idle's
+  per-drive `keep_drive_pm`); a `list(yes|no)?` dropdown is for genuine tri-state choices where absence must differ from
+  both. Read booleans WITHOUT `// empty` and match `null`/`true`/`false` explicitly: `// empty` would pass non-boolean
+  values through silently, the strict match rejects them loudly (defense in depth on top of the supervisor's bool
+  coercion, §"Supervisor: option schema quirks").
 
 App-specific uses and consequences: `hd-idle/KNOWLEDGE.md` §"bashio option parsing (list-of-object options)",
 `hickory-dns/KNOWLEDGE.md` §"Option consumption (bashio)".

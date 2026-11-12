@@ -74,17 +74,15 @@ redundant-treatment risk: §"USB-bridge behaviors").
   and `/dev/sd* rwk,` (§"SG_IO privileges").
 - Power-state probes: `hdparm -C` wakes drives — use `smartctl -H -n standby` (§"USB-bridge behaviors").
 - Manual single-shot: `hd-idle -t /dev/sdX` needs the full `/dev/` path and uses hd-idle's built-in defaults for command
-  type/power condition (`scsi`/`0`; the app no longer sets global `-c`/`-p`) (§"hd-idle -t quirks"); in the lab drive it
-  via `docker exec`.
+  type/power condition (`scsi`/`0`; the app sets no global `-c`/`-p`) (§"hd-idle -t quirks"); in the lab drive it via
+  `docker exec`.
 
 ## Extending
 
-- Adding a per-drive option: add the schema field — a tri-state per-drive choice is a `list(yes|no)?` dropdown, never a
-  `bool?` with `// empty` (the jq false-vs-empty rule); shape a `bool?` so absent and false mean the same (invert the
-  polarity: the safe default is the off state — the per-drive `keep_drive_pm` pattern), and read it WITHOUT `// empty`,
-  matching `null`/`true`/`false` explicitly so hand-edited non-boolean values fail loudly (§"bashio option parsing
-  (list-of-object options)"); read it in hd-idle-genargs (space-free check), emit it as a drives-file column or argv
-  token, and let the consumer (pmfix or hd-idle) decide per drive. Extend the genargs/pmfix decision matrix in the lab.
+- Adding a per-drive option: add the schema field (optional-boolean shaping: repository-root `KNOWLEDGE.md` §"bashio
+  option consumption"), read it in hd-idle-genargs, emit it as a drives-file column or argv token (verbatim values need
+  the space-free check), and let the consumer (pmfix or hd-idle) decide per drive. Extend the genargs/pmfix decision
+  matrix in the lab.
 - hd-idle CLI/packaging: the Dockerfile pins apk package versions because genargs encodes the CLI — a package bump is a
   deliberate app release (root `KNOWLEDGE.md` §"apk package version policy"; release discipline: skill
   `ha-app-workflow`).

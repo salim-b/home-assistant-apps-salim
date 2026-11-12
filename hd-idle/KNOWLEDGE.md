@@ -17,13 +17,12 @@ far are toolchain rebuilds with an unchanged CLI).
 ## bashio option parsing (list-of-object options)
 
 The bashio option-consumption mechanics (array-option line shapes, the no-trailing-newline last-element hazard, the
-`// empty` string-only rule) are repository-wide facts: repository-root `KNOWLEDGE.md` §"bashio option consumption".
+`// empty` boolean fold) are repository-wide facts: repository-root `KNOWLEDGE.md` §"bashio option consumption".
 hd-idle's reliance: hd-idle-genargs reads the `disks` option line by line (`bashio::jq "${entry}" '.field'`) — a shape
-change would break every entry (a lab boot with configured drives catches it), and the per-drive `keep_drive_pm` opt-out
-is a `bool?` read WITHOUT `// empty` (jq folds an explicit false into "absent", root `KNOWLEDGE.md` §"bashio option
-consumption"): hd-idle-genargs matches `true` (the drive keeps its own power management), `null`/`false` (both = the
-treatment applies) and rejects anything else — the supervisor coerces legacy yes/no dropdown strings to booleans before
-the app ever sees them (`config.yaml`).
+change would break every entry (a lab boot with configured drives catches it) — and the per-drive `keep_drive_pm`
+opt-out is a `bool?` read WITHOUT `// empty`, matched strictly against `true` (the drive keeps its own power management)
+and `null`/`false` (both = the treatment applies). Shaping rule and the supervisor coercion that makes the strict match
+defense in depth: repository-root `KNOWLEDGE.md` §"bashio option consumption" and §"Supervisor: option schema quirks".
 
 ## hd-idle CLI semantics relied upon by config.sh
 
