@@ -100,7 +100,8 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 - Config is `.ruff.toml` (TOML, `#:schema`-bound): rule selection is pinned explicitly
   (`select = ["E4", "E7", "E9", "F", "I", "B"]`) because ruff 0.17.0 expanded the default rule set and keeps drifting
   with releases (ruff CHANGELOG 0.17.0, astral-sh/ruff#28786) — don't swap `select` for `extend-select` unless the gate
-  should follow upstream defaults. `target-version` tracks the Python mise.toml pins (py315).
+  should follow upstream defaults. `target-version` stays unpinned: it is inert for the selected rules and nothing
+  couples it to the `python` mise.toml pin, so a pin would drift (ruff's own default applies).
 - ruff does not read `.editorconfig`; its formatter defaults (4-space indent, double quotes, 88 columns) match this
   repo's Python style. Both builtins pass `--force-exclude`, so config excludes apply even to hk's explicit file
   arguments, and ruff resolves the config by walking up from each target file — the root `.ruff.toml` covers every task

@@ -7,9 +7,11 @@
 # Formatter and quote style stay at ruff's defaults (4-space indent, double quotes, 88 columns):
 # ruff does not read .editorconfig, but its defaults match this repo's Python style.
 
-# The Python version mise.toml [tools] pins; ruff defaults to it anyway since 0.17, pinned here
-# explicitly so the config states what it targets.
-target-version = "py315"
+# target-version is deliberately NOT pinned: it is inert for the selected rule families (none of
+# E4/E7/E9/F/I/B is version-sensitive), and nothing couples this file to the `python` pin in
+# mise.toml [tools] - a pin here would only drift as Python moves on. Ruff's own default applies,
+# which is the conservative direction (no false positives on newer syntax); revisit only when
+# adopting target-sensitive rule families such as UP.
 
 [lint]
   # Pinned explicitly: ruff 0.17.0 expanded the default rule selection and keeps drifting with
