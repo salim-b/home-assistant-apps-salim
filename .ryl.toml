@@ -1,11 +1,10 @@
 #:schema https://raw.githubusercontent.com/owenlamont/ryl/main/ryl.toml.schema.json
 
-# https://ryl-docs.pages.dev/config-presets/
-# TOML config has no `extends`, so the tables below inline the `default` preset (ryl enables no rules by default) with this repo's overrides applied.
+# YAML linter config (hk `ryl` step). https://ryl-docs.pages.dev/config-presets/ - no `extends`, so the
+# tables below inline the `default` preset (ryl enables no rules by default) with this repo's overrides
+# applied; the override whys: .agents/skills/ha-app-tooling ("YAML linting: ryl").
 
 exclude = [
-  # Machine-generated mise lock artifacts (aube-lock.yaml): minified JSON blobs with unwrappable
-  # URLs - not prose to lint.
   ".mise/locks/**",
 ]
 
@@ -35,13 +34,10 @@ exclude = [
   quoted-strings = "disable"
   trailing-spaces = "enable"
 
-  # App config descriptions/translations use long lines intentionally, and Renovate pins action refs
-  # to full commit SHAs with a version comment - single-line by YAML grammar, impossible to wrap.
   [lint.rules.line-length]
     level = "warning"
     max = 140
 
-  # HA app files don't use a leading '---'
   [lint.rules.document-start]
     level = "warning"
     present = false
@@ -55,5 +51,4 @@ exclude = [
 
   [lint.rules.truthy]
     level = "warning"
-    # GitHub Actions workflow files key their triggers on `on:` - a bare truthy key must not be flagged
     check-keys = false

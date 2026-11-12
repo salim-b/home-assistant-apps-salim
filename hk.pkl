@@ -13,17 +13,14 @@ import "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Builtin
     "**/s6-rc.d/*/run",
     "**/s6-rc.d/*/finish",
   )
-  // The apps' extension-less /usr/bin scripts (bashio shebangs - the same typing gap as the s6
-  // scripts). All three shell steps cover them, so these scripts must stay conforming.
+  // The apps' extension-less /usr/bin scripts (bashio shebangs - same typing gap); all three shell steps cover them.
   local appBinGlobs = List("**/rootfs/usr/bin/*")
 local mdGlobs = List("**/*.md", "**/*.markdown")
-// Explicit paths bypass panache's config excludes; AI_POLICY.md is upstream-verbatim, **/LICENSE.md mirrors the default Markdown exclude.
+// AI_POLICY.md is upstream-verbatim; **/LICENSE.md mirrors panache's default Markdown exclude
+// (explicit-path bypass: skill ha-app-markdown).
 local mdExcludes = List("AI_POLICY.md", "**/LICENSE.md")
 
 local linters = new Mapping<String, Step> {
-  // -disable-indent-size: padding here is marker/string-driven (Markdown list indents, quoted
-  // string continuations), so the indent_size multiple rule is noise - shell indentation is the
-  // shfmt step's job (.editorconfig). Every other EditorConfig rule stays in force.
   ["editorconfig-checker"] = (Builtins.editorconfig_checker) {
     check {
       command {
@@ -64,19 +61,12 @@ local linters = new Mapping<String, Step> {
       new FileSelector { glob = appBinGlobs },
     )
   }
-  // jactionlint (maintained actionlint fork, hk builtin): workflows, composite actions and
-  // Dependabot config. Profile and per-rule policy live in .github/jactionlint.yaml (applies to
-  // hk, CI and editors alike; `default` = actionlint checks + zizmor-parity regular-persona rules).
+  // jactionlint (maintained actionlint fork, hk builtin); profile/per-rule policy: .github/jactionlint.yaml.
   ["jactionlint"] = Builtins.jactionlint
   // droast (Dockerfile linter, hk builtin); project-level skips: droast.toml.
   ["droast"] = Builtins.droast
-  // zizmor (GitHub Actions security audit, hk builtin). Mode follows the environment: a token
-  // (GH_TOKEN/GITHUB_TOKEN/ZIZMOR_GITHUB_TOKEN) enables zizmor's four online-only audits
-  // (impostor-commit, known-vulnerable-actions, ref-confusion, stale-action-refs); without one,
-  // the audit is fully offline. CI passes its default GITHUB_TOKEN for the strongest audit
-  // (lint.yaml check job). Rule policy: .github/zizmor.yml. -qq trims zizmor's tracing noise
-  // (version banner, per-file completion notices, offline-mode and YAML-anchors beta notices -
-  // anchors are used by design); findings render regardless of verbosity.
+  // zizmor (GitHub Actions security audit, hk builtin); rule policy: .github/zizmor.yml. Mode/token
+  // conventions: .agents/skills/ha-app-tooling.
   ["zizmor"] = (Builtins.zizmor) {
     check {
       command {
@@ -89,18 +79,13 @@ local linters = new Mapping<String, Step> {
       }
     }
   }
-  // Official Renovate config validation. --no-global matters: bare file args are validated as
-  // GLOBAL self-hosted config by default (renovate CLI), but .github/renovate.json is a repo
-  // config. --strict also fails when the installed renovate flags a needed config migration
-  // (renovate bumps surface it immediately).
+  // Official Renovate config validation (why the flags: .agents/skills/ha-app-tooling).
   ["renovate-config-validator"] {
     glob = List(".github/renovate.json", ".github/renovate.json5")
     check = "renovate-config-validator --no-global --strict {{files}}"
   }
-  // ryl (Rust yamllint re-implementation, configured in .ryl.toml); --strict on check and fix so
-  // the .ryl.toml warning-level rules keep blocking (fix's exit code is then self-verifying).
-  // check_diff/check_after_diff are cleared: hk's fix mode skips the fixer when check_diff exits
-  // 0, but ryl's --diff exits 0 even for unfixable findings (verified 2026-10-20; upstream: root TODO.md).
+  // ryl (Rust yamllint re-implementation, configured in .ryl.toml); --strict on check and fix.
+  // check_diff/check_after_diff are cleared on purpose - why: .agents/skills/ha-app-tooling (upstream: root TODO.md).
   ["ryl"] = (Builtins.ryl) {
     check_diff = null
     check_after_diff = false
@@ -128,10 +113,10 @@ local linters = new Mapping<String, Step> {
       }
     }
   }
-  // ruff (Python linter + formatter, hk builtins; config: .ruff.toml): formatter before linter.
+  // config: .ruff.toml; conventions: .agents/skills/ha-app-tooling
   ["ruff-format"] = Builtins.ruff_format
   ["ruff"] = Builtins.ruff
-  // ty (Python type checker, hk builtin; config: ty.toml) - runs after ruff on the same files.
+  // ty (Python type checker; config: ty.toml)
   ["ty"] = Builtins.ty
   // Panache owns ALL Markdown formatting (.agents/skills/ha-app-markdown, .panache.toml); explicit
   // paths bypass panache's config excludes, hence mdExcludes.

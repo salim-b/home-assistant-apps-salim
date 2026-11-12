@@ -1,13 +1,11 @@
 #:schema https://raw.githubusercontent.com/immanuwell/dockerfile-roast/main/schemas/droast.schema.json
 
-# droast (https://github.com/immanuwell/dockerfile-roast) configuration - read by the hk `droast`
-# step (pre-commit + `mise run lint`); failure threshold stays at the default `error`, so
-# info-level findings report but do not fail the gate.
+# droast (Dockerfile linter, https://github.com/immanuwell/dockerfile-roast) config, read by the hk
+# `droast` step. The failure threshold stays at the default `error`: info-level findings report but
+# do not fail the gate.
 
 skip = [
-  # HA app images inherit the runtime identity and init from the base image
-  # (ghcr.io/home-assistant/base): s6-overlay runs the rootfs services, so declaring USER/CMD/
-  # ENTRYPOINT here would be dead weight. DF020 (no USER), DF036 (no CMD/ENTRYPOINT).
+  # HA base image provides the runtime identity and init via s6-overlay (why: .agents/skills/ha-app-tooling).
   "DF020",
   "DF036",
 ]

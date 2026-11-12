@@ -1,34 +1,11 @@
 #:schema https://www.schemastore.org/ruff.json
 
-# Ruff configuration - Python linter + formatter for the .mise/tasks scripts, run by the hk
-# ruff/ruff-format steps (pre-commit + `mise run lint`); `mise run fmt` runs `ruff format .`.
-# Conventions: .agents/skills/ha-app-tooling
-
-# Formatter and quote style stay at ruff's defaults (4-space indent, double quotes, 88 columns):
-# ruff does not read .editorconfig, but its defaults match this repo's Python style.
-
-# target-version is deliberately NOT pinned: nothing couples this file to the `python` pin in
-# mise.toml [tools], so a pin here would only drift. Ruff's own default applies - the conservative
-# floor (no false positives on newer syntax): target-sensitive rules only propose syntax valid at
-# it, and ruff's default target rises with ruff releases, not with our mise pin.
+# Python linter + formatter for the .mise/tasks scripts (hk ruff/ruff-format steps; `mise run fmt`).
+# Conventions and rule-family rationale: .agents/skills/ha-app-tooling ("Python linting: ruff").
 
 [lint]
-  # extend-select = ruff's default rule set plus this list, so the gate tracks ruff's canonical
-  # defaults (0.17.0 expanded them and they keep drifting with releases - astral-sh/ruff#28786).
-  # Accepted trade-off: a ruff release that reshuffles the defaults can newly fire rules and
-  # break the gate with no repo change - treat that as a review prompt for the new findings,
-  # then fix them or noqa them with a reason. Entries the defaults already carry stay listed as
-  # drift insurance (today: E4/E7/E9 pycodestyle errors + F pyflakes, UP pyupgrade, W605 invalid
-  # escapes) in case a future default set drops them. Never add formatter-conflicting rules
-  # (COM812, ISC001, Q000/Q003, W191).
-  # The list: I import order (auto-fixable); B bugbear real-bug checks; W whitespace; C4
-  # comprehension idioms; N naming; A builtin shadowing; EXE shebang sanity; RET504 needless
-  # assigns; ISC002/003 string-concatenation slips (ISC001 stays out - formatter conflict).
-  # Security: S307 marks the deliberate eval() sites (the `# noqa: S307` comments in
-  # validate/apps.py go live with it); S603/S607/S310 keep the subprocess and URL surfaces
-  # audited (inline noqa with reasons where intentional). Exception messages: EM + TRY.
-  # pathlib idioms: PTH. noqa hygiene: RUF100 + PGH004. E501 is the outer fence for what the
-  # formatter cannot split (long strings) and for prose - see [lint.pycodestyle] below.
+  # extend-select over ruff's default rule set - the gate tracks ruff's canonical upstream defaults.
+  # Selection whys, the formatter-conflict rule and the noqa policy: .agents/skills/ha-app-tooling.
   extend-select = [
     "E4",
     "E7",
@@ -60,13 +37,8 @@
   ]
 
   [lint.pydocstyle]
-    # Google convention: silences the pydocstyle rules its style supersedes (D203, D213, D214, D215,
-    # D400, D404-D410, D415), so docstrings need a first-line summary ending in a period plus
-    # Args/Returns sections for documented parameters.
     convention = "google"
 
   [lint.pycodestyle]
-    # align prose width with our Markdown docs (panache wraps Markdown at 120). The formatter
-    # still wraps code at the 88-column default, so E501 only bites what the formatter cannot
-    # split plus over-long prose.
+    # panache wraps Markdown prose at 120 (skill ha-app-tooling); the formatter stays at ruff's 88.
     max-line-length = 120

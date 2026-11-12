@@ -4,9 +4,7 @@
 
 [env]
   DOCKER_BUILDKIT = "1"
-  # hk: resolve mise environments in hooks (HK_MISE). HK_STASH_UNTRACKED=0 keeps untracked worktree files out of the
-  # pre-commit stash/restore cycle and skips their discovery (hk docs; `hk check`/`hk check --all` select tracked
-  # files only in hk 2.7.1 regardless of it - verified with a bait untracked file).
+  # hk env knobs (whys: .agents/skills/ha-app-tooling, "Lint gate").
   HK_MISE = "1"
   HK_STASH_UNTRACKED = "0"
 
@@ -16,8 +14,6 @@
   depends = [ "lint", "validate:apps" ]
   output = "keep-order"
 
-# Panache owns ALL Markdown autoformatting (.panache.toml, .agents/skills/ha-app-markdown); rumdl stays check-only
-# tombi owns TOML autoformatting (.tombi.toml); ruff owns Python autoformatting (.ruff.toml)
 [tasks.fmt]
   description = "Auto-format the repository's Markdown (Panache), TOML (tombi) and Python (ruff)"
   run = [ "panache format .", "tombi format .", "ruff format ." ]
@@ -49,8 +45,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   editorconfig-checker = "4.0.2"
   jactionlint = { version = "v2.5.0", workflow = "release.yaml" }
   jq = "1.8.2"
-  # hk's binary pin and the hk@X.Y.Z package imported by hk.pkl must move together (the package provides the builtin
-  # step definitions the binary executes).
+  # hk's binary pin and the hk@X.Y.Z package imported by hk.pkl move together (skill ha-app-tooling, Renovate section).
   hk = { version = "2.12.0", workflow = "release.yml" }
   node = "26.13.1"
   "aqua:jolars/panache" = "3.18.0"
@@ -67,13 +62,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   uv = "0.13.7"
   yq = "4.54.3"
   zizmor = "1.32.0"
-  # renovate package for the renovate-config-validator hk step (.github/renovate.json gate).
-  # trust_policy_excludes: @yarnpkg/libzip@3.2.2 (a renovate dependency) lost npm provenance vs 3.2.1
-  # because the release branch lacked `npmPublishProvenance: true` (yarnpkg/berry#7182); aube
-  # otherwise blocks the tool tree.
-  # allow_builds: re2 (renovate's optional regex accelerator) ships a prebuilt native binary that its
-  # install script downloads; aube's default-deny lifecycle policy would skip it, leaving the module
-  # absent and renovate logging a verbose RegExp-fallback stack trace on every gate run.
+  # aube policy exemptions for renovate's tool tree (whys: .agents/skills/ha-app-tooling, Renovate section).
   "npm:renovate" = {
     version = "44.235.0",
     trust_policy_excludes = [ "@yarnpkg/libzip@3.2.2" ],
@@ -81,6 +70,5 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   }
 
 [vars]
-  # Single source of the supervisor-ref pin the validate task fetches schemas from. Renovate bumps it
-  # to the newest supervisor release and automerges once CI check is green (.github/renovate.json).
+  # The supervisor-ref pin validate:apps fetches schemas from (Renovate bumps + automerges it).
   supervisor_ref = "2026.11.0"

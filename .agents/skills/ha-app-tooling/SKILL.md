@@ -15,8 +15,8 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 - `mise run check` — lint plus validate; **always run before finishing a change**. CI's `check` job and `mise run lint`
   run `hk check --all` over every tracked file; plain `hk check` lints only modified files (fast local feedback).
   Untracked files are never selected (verified for hk 2.7.1, `check` and `--all` alike, independent of HK_STASH
-  settings); `env.HK_STASH_UNTRACKED=0` in mise.toml additionally keeps untracked worktree files out of the pre-commit
-  stash/restore cycle and skips their discovery.
+  settings); `HK_MISE=1` lets hk resolve mise environments in hooks and `HK_STASH_UNTRACKED=0` additionally keeps
+  untracked worktree files out of the pre-commit stash/restore cycle and skips their discovery (both set in mise.toml).
 - To check an explicit file set, pipe NUL-separated paths to hk:
   `git diff --name-only -z HEAD | hk check --files0-from=-`.
 - Git hooks (enable once per machine: `mise run install-git-hooks`, after `mise install --locked`; needs Git 2.54+,
@@ -66,6 +66,12 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   untouched. With `check_diff` gone, fix mode runs `fix` (carrying `--strict`) on every staged YAML file and its exit
   code decides: `0` only when nothing remains to fix or flag. (Upstream issue: root `TODO.md`.)
 - `line-length` ignores comments by default (yamllint parity): the 140 limit bites YAML scalars only.
+- `.ryl.toml` has no `extends`, so it inlines the `default` preset (ryl enables no rules by default) with this repo's
+  overrides applied. The override whys: `line-length` at 140/warning because app config descriptions/translations use
+  long lines intentionally and Renovate pins action refs to full commit SHAs with a version comment (single-line by YAML
+  grammar, impossible to wrap); `truthy.check-keys = false` because GitHub Actions workflows key their triggers on
+  `on:`; `document-start` off because HA app files use no leading `---`; `.mise/locks/**` excluded (machine-generated
+  minified aube blobs with unwrappable URLs, not prose to lint).
 - Config is TOML with `[lint.rules]` (`[rules]` is deprecated as of ryl 0.26). A rule with an option table must not also
   appear as a `"<name>" = "enable"` string in the same table — TOML duplicate key, ryl exits `2` loudly.
 
@@ -105,6 +111,10 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   `target-version` stays unpinned: nothing couples it to the `python` mise.toml pin, so a pin would drift (ruff's own
   default applies). Note that UP is target-sensitive in the other direction: once ruff's default target crosses py314,
   its safe autofix will drop the no-longer-needed `from __future__ import annotations` imports.
+- Never add formatter-conflicting rules (COM812, ISC001, Q000/Q003, W191) — the formatter and linter would fight. The
+  security/exception families are deliberately narrow: S307 marks the deliberate `eval()` sites (the `# noqa: S307`
+  comments in `validate/apps.py` go live with it); S603/S607/S310 keep the subprocess and URL surfaces audited (inline
+  noqa with a reason where intentional); EM + TRY police exception messages, PTH pushes pathlib idioms.
 - Type checking runs via the hk builtin `ty` (pinned as `ty` in mise.toml, config `ty.toml`, `#:schema`-bound) after
   ruff: `ty check` over `**/*.py`/`**/*.pyi`. The scripts have no repo-managed Python environment - stdlib-only scripts
   run on the mise python, `validate/apps.py` runs under `uv run --with voluptuous --with pyyaml` - so ty cannot resolve
@@ -130,6 +140,9 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 
 - shfmt (formatting; follows .editorconfig) and shellharden (quoting hardening) are hk *fix* steps — let pre-commit fix
   or run `hk check --fix` instead of hand-formatting; shellcheck `-x` is the lint gate.
+- The hk `editorconfig_checker` step runs with `-disable-indent-size`: padding here is marker/string-driven (Markdown
+  list indents, quoted-string continuations), so the indent_size-multiple rule is noise — shell indentation is the shfmt
+  step's job (.editorconfig). Every other EditorConfig rule stays in force.
 - The shfmt style (binary-next-line, indented case) is pinned under `.editorconfig`'s `[**]`, whose `root = true` stops
   EditorConfig discovery at the repo — without it a home-directory config silently defines the style locally and CI sees
   shfmt defaults instead.
@@ -180,7 +193,12 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   `mise.lock` in sync — including `hk`: a custom regex manager (`.github/renovate.json`) rewrites the `hk@X.Y.Z` package
   imports in `hk.pkl` with the same depName/datasource/currentValue as the mise manager's hk dep, so both land in one
   branch and one PR bumps all three files. Manual bumps use `mise run bump-hk <version>`; the CI check catches partial
-  desyncs (`mise install --locked` errors on a mise.toml/mise.lock disagreement).
+  desyncs (`mise install --locked` errors on a mise.toml/mise.lock disagreement). The `npm:renovate` pin carries two
+  aube-policy exemptions (mise.toml): `trust_policy_excludes` for `@yarnpkg/libzip` (3.2.2 lost npm provenance vs 3.2.1
+  — its release branch lacked `npmPublishProvenance: true`, yarnpkg/berry#7182; aube otherwise blocks the tool tree) and
+  `allow_builds` for `re2` (renovate's optional regex accelerator; its install script downloads a prebuilt native binary
+  that aube's default-deny lifecycle policy would skip, leaving the module absent and renovate logging a verbose
+  RegExp-fallback stack trace on every gate run).
 
 ## bashio shebang note
 
