@@ -75,37 +75,17 @@ mise trust               # first use: mise config files are untrusted until then
 mise install --locked    # pinned tools from mise.toml/mise.lock
 ```
 
-`docker` is required for the `build`, `lab`, `deploy` and `test:live` tasks. For interactive supervisor-integrated
-testing use the devcontainer (`.devcontainer.json`), not the lab.
+`docker` is required for the `build`, `test:lab`, `deploy:local`/`deploy:registry` and `test:live` tasks. For
+interactive supervisor-integrated testing use the devcontainer (`.devcontainer.json`), not the lab.
 
 ## Commands
 
-**Task usage is not documented here**: `mise run <task> --help` is the authoritative usage for every task;
-`mise tasks ls --local` lists the tasks (the `--local` flag excludes your global mise tasks). The essentials:
-
-- `mise run check` — lint + validate; **always run before finishing a change** (it is the CI gate).
-- `mise run validate:apk-pins` — compare pinned apk package versions against the Alpine binary indexes (drift alarm; CI
-  runs it on main pushes and the daily cron only, never in the PR gate).
-- `mise run fmt` — reformat (Markdown reflow); run it instead of hand-wrapping prose.
-- `mise run build` — build app images (native arch + cross-check) and assert image metadata.
-- `mise run test:lab` — full-fidelity boot lab; **run for every runtime-affecting change**.
-- `mise run deploy:local <app> <host>` and `mise run deploy:registry <app> <host>` — put an app on a real device.
-- `mise run test:live <app> <host>` — deploy plus per-app live checks.
-- `mise run apply-options <app> <host> <file>` — apply a JSON options file to the app's installed copy on a device.
-- `mise run hd-idle:regen-drives.md <host>` — regenerate the local drive cheat sheet (`hd-idle/.drives.md`, gitignored).
-- `mise run install-git-hooks` — enable hk pre-commit/commit-msg hooks (once per machine).
+Task usage is not documented here: `mise run <task> --help` is the authoritative usage for every task;
+`mise tasks ls --local` lists the tasks (the `--local` flag excludes your global mise tasks). The discipline — always
+`mise run check` before finishing a change, lab-boot every runtime-affecting change — lives in skill `ha-app-workflow`.
 
 ## Workflow rules
 
-The details and rationale live in skill `ha-app-workflow` — load it before making any change. The non-negotiables:
-
-- Work on a branch named `agent-<topic>`; check `git status` first — stray commits on `main` have happened repeatedly.
-- Conventional Commits, one commit per logical unit, final trailer `Assisted-by: Goose:<model-slug>`.
-- Every text file ends with a final newline.
-- Device-visible app changes (rootfs, Dockerfile, config.yaml, apparmor.txt, translations) always ship with a
-  `config.yaml` version bump plus a `CHANGELOG.md` entry (`version-guard.yaml` enforces this).
-- CI/CD is the source of truth for what gets published: fix the repo, not CI config, unless the CI config itself is
-  wrong.
-- Testing against the real HA device over SSH only on explicit user request — otherwise hand the user exact commands.
-- Version-sensitive facts (supervisor schemas, s6-overlay layout, HAOS kernel configs) carry a source citation (URL +
-  version/ref) and are re-verified against the latest docs/source before being relied on.
+Skill `ha-app-workflow` — load it before making any change. It owns the non-negotiables: `agent-<topic>` branches,
+Conventional Commits with the `Assisted-by` trailer, final newlines, version bump + changelog for device-visible app
+changes, CI-as-source-of-truth, device-SSH access policy, and citations for version-sensitive facts.
