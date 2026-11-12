@@ -72,7 +72,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   # install script downloads; aube's default-deny lifecycle policy would skip it, leaving the module
   # absent and renovate logging a verbose RegExp-fallback stack trace on every gate run.
   "npm:renovate" = {
-    version = "44.210.0",
+    version = "44.235.0",
     trust_policy_excludes = [ "@yarnpkg/libzip@3.2.2" ],
     allow_builds = [ "re2" ]
   }
