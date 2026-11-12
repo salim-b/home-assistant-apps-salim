@@ -16,10 +16,12 @@
 [lint]
   # Pinned explicitly: ruff 0.17.0 expanded the default rule selection and keeps drifting with
   # releases (ruff CHANGELOG 0.17.0, astral-sh/ruff#28786) - the gate must not move with it.
-  # E4/E7/E9 pycodestyle errors + F pyflakes is the classic core; I import order (auto-fixable);
-  # B bugbear real-bug checks; W invalid escape sequences and whitespace; C4 comprehension
-  # idioms; S307 marks the deliberate eval() sites (the `# noqa: S307` comments in
-  # validate/apps.py go live with it); RUF100 + PGH004 keep noqa directives honest.
+  # Core: E4/E7/E9 pycodestyle errors + F pyflakes; I import order (auto-fixable); B bugbear
+  # real-bug checks. Hygiene/consistency: W invalid escapes and whitespace; C4 comprehension
+  # idioms; UP pyupgrade; N naming; A builtin shadowing; EXE shebang sanity; RET504 needless
+  # assigns; ISC002/003 string-concatenation slips (ISC001 stays out - formatter conflict).
+  # Security: S307 marks the deliberate eval() sites (the `# noqa: S307` comments in
+  # validate/apps.py go live with it). noqa hygiene: RUF100 + PGH004.
   select = [
     "E4",
     "E7",
@@ -29,6 +31,13 @@
     "B",
     "W",
     "C4",
+    "UP",
+    "N",
+    "A",
+    "EXE",
+    "RET504",
+    "ISC002",
+    "ISC003",
     "S307",
     "RUF100",
     "PGH004",

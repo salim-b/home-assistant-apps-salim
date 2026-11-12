@@ -97,12 +97,12 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   `ruff check`; the fix path preflights with the builtin's `check_diff`) and `ruff_format` (check via
   `ruff format --diff`, fix via `ruff format`), pinned as `aqua:astral-sh/ruff` in mise.toml. The formatter step runs
   before the linter step; `mise run fmt` runs `ruff format .`.
-- Config is `.ruff.toml` (TOML, `#:schema`-bound): rule selection is pinned explicitly
-  (`select = ["E4", "E7", "E9", "F", "I", "B", "W", "C4", "S307", "RUF100", "PGH004"]`) because ruff 0.17.0 expanded the
-  default rule set and keeps drifting with releases (ruff CHANGELOG 0.17.0, astral-sh/ruff#28786) — don't swap `select`
-  for `extend-select` unless the gate should follow upstream defaults. `target-version` stays unpinned: it is inert for
-  the selected rules and nothing couples it to the `python` mise.toml pin, so a pin would drift (ruff's own default
-  applies).
+- Config is `.ruff.toml` (TOML, `#:schema`-bound): the rule selection is pinned explicitly there (don't swap `select`
+  for `extend-select`) because ruff 0.17.0 expanded the default rule set and keeps drifting with releases (ruff
+  CHANGELOG 0.17.0, astral-sh/ruff#28786) — the gate must not move with upstream defaults. `target-version` stays
+  unpinned: it is inert for the selected rules and nothing couples it to the `python` mise.toml pin, so a pin would
+  drift (ruff's own default applies). Note that UP is target-sensitive in the other direction: once ruff's default
+  target crosses py314, its safe autofix will drop the no-longer-needed `from __future__ import annotations` imports.
 - ruff does not read `.editorconfig`; its formatter defaults (4-space indent, double quotes, 88 columns) match this
   repo's Python style. Both builtins pass `--force-exclude`, so config excludes apply even to hk's explicit file
   arguments, and ruff resolves the config by walking up from each target file — the root `.ruff.toml` covers every task
