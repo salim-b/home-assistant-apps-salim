@@ -25,13 +25,13 @@
 ## 0.1.15
 
 - The startup drive inventory now also shows the label of each drive's first labeled partition (filesystem label
-  preferred, GPT partition label as fallback; an unpartitioned disk shows its whole-disk filesystem label) - usually the
+  preferred, GPT partition label as fallback; an unpartitioned disk shows its whole-disk filesystem label) – usually the
   name the drive carries in file managers, so drives are easier to identify. No configuration change.
 
 ## 0.1.14
 
 - Internals: the `/usr/bin` helper scripts (`hd-idle-genargs`, `hd-idle-pmfix`) now sit under the repository's full
-  shell gate (shfmt, shellharden, shellcheck) and were reformatted and quoting-hardened accordingly - no functional
+  shell gate (shfmt, shellharden, shellcheck) and were reformatted and quoting-hardened accordingly – no functional
   changes.
 
 ## 0.1.13
@@ -43,7 +43,7 @@
 
 - Internals: the drive-PM treatment now retries the transient spin-up race. A drive that is asleep when the treatment
   runs is woken by its first command, and the bridge may answer it with SCSI NOT READY ("device will be ready soon")
-  instead of holding the command through the spin-up — a spurious `rc=2` failure that self-heals once the spin-up
+  instead of holding the command through the spin-up – a spurious `rc=2` failure that self-heals once the spin-up
   finishes (also observed on the sequential code path, so it is unrelated to the parallel treatment). Failed calls whose
   output matches the NOT READY message family are re-issued up to 4 times with 10 s backoff and a late success is logged
   as "ok (attempt N)"; timed-out and persistent failures (e.g. the APM-filtered bridges) are never retried. No
@@ -65,24 +65,24 @@
 
 ## 0.1.10
 
-- Maintainability: no behavior change (the comment-stripped scripts are unchanged; AppArmor confinement unchanged - the
-  only rule edit is two blanket-covered `/proc` documentation rules) - code comments slimmed to purpose + references,
+- Maintainability: no behavior change (the comment-stripped scripts are unchanged; AppArmor confinement unchanged – the
+  only rule edit is two blanket-covered `/proc` documentation rules) – code comments slimmed to purpose + references,
   `KNOWLEDGE.md` tightened to durable facts and `TODO.md` pruned to open items. The narratives and procedures now live
   in the repository's `KNOWLEDGE.md` and agent skills, their single canonical homes.
 
 ## 0.1.9
 
 - Internals: the drive re-resolution watcher's per-tick detection now replays a recorded resolution baseline
-  (`hd-idle-genargs --check` - the pattern the nfs-server app's watcher uses) instead of regenerating the full
+  (`hd-idle-genargs --check` – the pattern the nfs-server app's watcher uses) instead of regenerating the full
   configuration every 30 s: unchanged ticks no longer read the options, run jq, or write candidate files, and a stale
   baseline resyncs without restarting the daemon.
 - Internals: the watcher's poll interval is overridable via `HD_IDLE_WATCH_INTERVAL` (default 30 s, floored at 5 s),
   mirroring the nfs-server app.
 - Internals: the AppArmor profile's documented file surface now includes the watcher's previous-drives copy
   (`/etc/hd-idle.drives.prev`, written for the `--since` diff) and the resolution baseline (`/etc/hd-idle.resolution`).
-  File rules document the surface - the profile's `file,` blanket already allowed all file access (repository-root
+  File rules document the surface – the profile's `file,` blanket already allowed all file access (repository-root
   KNOWLEDGE.md §AppArmor), so nothing changes on devices. (Corrects the 8cc76ff claim that the missing rule broke the
-  copy on enforcing devices - a bare `file,` grants every file permission, apparmor.d(5).)
+  copy on enforcing devices – a bare `file,` grants every file permission, apparmor.d(5).)
 - Fixed: drives configured with an idle time of `0` (never spin down) now also get their own power management disabled
   by the **Disable drive power management** treatment. Previously the treatment silently skipped idle-`0` drives, so
   their firmware timer could still put them to sleep despite the explicit "never spin down" configuration (a drive
@@ -91,11 +91,11 @@
 ## 0.1.8
 
 - Internals: the app's scripts were reformatted and quoting-hardened by the repository's new shell tooling (shfmt,
-  shellharden, shellcheck) - no functional changes.
+  shellharden, shellcheck) – no functional changes.
 
 ## 0.1.7
 
-- Internals: bumped the pinned hd-idle package to Alpine's current build (1.22-r8 - a Go 1.26.5 toolchain rebuild of the
+- Internals: bumped the pinned hd-idle package to Alpine's current build (1.22-r8 – a Go 1.26.5 toolchain rebuild of the
   same upstream 1.22 release; no functional or CLI changes, so the app's generated arguments are unaffected).
 
 ## 0.1.6
@@ -105,9 +105,9 @@
   keep it, empty = follow the global setting, which stays the default). Useful for mixed setups: only some bridges need
   the treatment (drives whose bridge filters the APM feature page log a failure for every treated drive), or one drive
   must keep its own power management. As with switching the global setting off, a per-drive `no` does not actively
-  re-enable the drive's power management - the previously applied volatile settings persist until the drive is
+  re-enable the drive's power management – the previously applied volatile settings persist until the drive is
   power-cycled.
-- Internals: the generated drives file (`/etc/hd-idle.drives`) gained a fourth column - the effective per-drive
+- Internals: the generated drives file (`/etc/hd-idle.drives`) gained a fourth column – the effective per-drive
   treatment flag (1 = treat, 0 = leave the drive's own power management alone). hd-idle-pmfix now decides per drive from
   this column and runs unconditionally at boot and on drive changes (the former global on/off gate could not express
   per-drive overrides); its log explains every skipped drive.
@@ -116,9 +116,9 @@
 
 - Change: the **Configuration mode** option is removed. The app now manages exactly the listed drives, and every listed
   drive follows the global defaults (default idle time, default command type, default power condition) wherever its own
-  fields are left empty - the convenience of the former opt-out mode is now simply how the app works. Unlisted drives
+  fields are left empty – the convenience of the former opt-out mode is now simply how the app works. Unlisted drives
   are never spun down: Home Assistant OS grants device access per listed drive only, so spinning down unlisted drives
-  was never realizable - previously the daemon attempted it once per idle cycle and logged 'operation not permitted'
+  was never realizable – previously the daemon attempted it once per idle cycle and logged 'operation not permitted'
   each time. The former opt-in rejection of entries without an idle time is gone (the default idle time fills them). A
   stored `mode` key from an older version is simply ignored (the supervisor logs a harmless one-line warning about the
   stale key; re-saving the options clears it). Migration device-verified 2026-10-16.
@@ -128,9 +128,9 @@
 - Fix: the hd-idle and hd-idle-watch services now start only after the boot-time configuration phase completed (s6-rc
   dependency on the built-in base bundle, like the nfs-server app's services). Previously the daemon could start before
   the generated configuration existed, crash on startup (`./run: line 9: /etc/hd-idle.args: No such file or directory`)
-  and only start once s6 restarted it - a raw error line in the app log on every boot, and a slightly late daemon.
+  and only start once s6 restarted it – a raw error line in the app log on every boot, and a slightly late daemon.
 - Log quality: the boot log now states the configuration mode prominently; the "no drives configured" message is phrased
-  per mode - in `opt-out` mode it explains that unlisted drives follow the global defaults but cannot actually be
+  per mode – in `opt-out` mode it explains that unlisted drives follow the global defaults but cannot actually be
   reached (Home Assistant OS grants device access per listed drive only), instead of the misleading "will not spin down
   anything"; the daemon start line includes the mode.
 
@@ -138,12 +138,12 @@
 
 - Fix: the AppArmor profile now grants `CAP_SYS_RAWIO` (`capability sys_rawio,` in the top and the daemon sub-profile).
   AppArmor mediates the kernel's capable() check itself (the security_capable LSM hook), so without the rule every
-  non-read-safe SCSI command failed with EPERM even though the container carried the capability - hd-idle's `ata`
+  non-read-safe SCSI command failed with EPERM even though the container carried the capability – hd-idle's `ata`
   spindown path (ATA PASS-THROUGH) and smartctl's ATA commands were affected, while the `scsi` path (START STOP UNIT, in
   the kernel's read-safe list) worked.
 - New option **Disable drive power management** (default on): the app issues `apm,off` and `standby,off` (via
   smartmontools) for every managed drive at app start and whenever a drive (re)appears, so hd-idle's idle time is the
-  only thing that puts a drive to sleep - this stops some WD USB bridge firmwares from waking drives shortly after an
+  only thing that puts a drive to sleep – this stops some WD USB bridge firmwares from waking drives shortly after an
   external spindown (an effect invisible to I/O monitoring). Bridges that do not forward APM produce a logged one-time
   failure; the standby-timer disable is honored by all tested bridges.
 - Robustness: the hd-idle-watch service compares and re-syncs both generated files (command line + drives list) every
@@ -155,7 +155,7 @@
   description now warns about possible extra wear on some bridges.
 - Performance: the watcher's per-tick configuration regeneration skips the boot-only disk inventory walk (two process
   spawns per disk plus one per by-id link per disk), and the healthcheck probe scans `/proc` with the read builtin
-  instead of one `cat` per process - cutting the app's periodic process churn by roughly 90% (no behavior change).
+  instead of one `cat` per process – cutting the app's periodic process churn by roughly 90% (no behavior change).
 
 ## 0.1.2
 

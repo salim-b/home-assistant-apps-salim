@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ## Generate the hd-idle command line from the app options (validated, written to <args-file>, default /etc/hd-idle.args)
-## for the s6 run script - hd-idle has no config file, everything is argv. Full generation (default) writes the args
+## for the s6 run script – hd-idle has no config file, everything is argv. Full generation (default) writes the args
 ## file plus two companions: the drives file (hd-idle-pmfix) and the resolution baseline (the state file --check
 ## replays: exit 0 = unchanged, 3 = changed (regeneration due), other = failure). CLI semantics, quiet-mode contract,
 ## drives-file format, baseline replay: hd-idle/KNOWLEDGE.md.
@@ -26,7 +26,7 @@ qlog_info() {
   [ "$QUIET" = 1 ] || bashio::log.info "$@"
 }
 
-## Expected-transient warnings (detached drive, non-sd* entry), suppressed in quiet mode - surfaced once per boot by
+## Expected-transient warnings (detached drive, non-sd* entry), suppressed in quiet mode – surfaced once per boot by
 ## the non-quiet cont-init run; genuine failures (bashio::exit.nok) always log.
 qlog_warning() {
   [ "$QUIET" = 1 ] || bashio::log.warning "$@"
@@ -40,7 +40,7 @@ require_space_free() {
     || bashio::exit.nok "Invalid ${what} '${value}': must not contain whitespace."
 }
 
-## Companion files next to the args file (<stem>.<suffix> for *.args paths, <args-file>.<suffix> otherwise - the
+## Companion files next to the args file (<stem>.<suffix> for *.args paths, <args-file>.<suffix> otherwise – the
 ## watcher's /tmp candidates). The derivation is mirrored inline in the hd-idle-watch run script.
 companion_file() {
   local args_file="$1" suffix="$2" file
@@ -60,7 +60,7 @@ STATE_FILE=$(companion_file "$ARGS_FILE" resolution)
 
 ## Parent block device of a partition name (sdi1 -> sdi, nvme0n1p2 -> nvme0n1). A trailing "p" is only stripped when
 ## preceded by a digit, so genuinely named disks (e.g. "sdp") survive; whole-disk names like nvme0n1/mmcblk0 lose
-## their final digit - harmless, since only the sd* subset is ever pinned, recorded, or compared.
+## their final digit – harmless, since only the sd* subset is ever pinned, recorded, or compared.
 parent_disk() {
   local name="$1"
   ## dm-* names have no partition suffixes; holder attribution via /sys/block/*/holders (resolve_device).
@@ -116,7 +116,7 @@ resolve_device() {
 }
 
 ## ---------------------------------------------------------------------------
-## System disk detection (always on - HA's own partitions are never spun down)
+## System disk detection (always on – HA's own partitions are never spun down)
 ## ---------------------------------------------------------------------------
 
 ## Three independent layers protect the system disk (hd-idle/KNOWLEDGE.md §"Monitoring scope"); this is the second:
@@ -129,7 +129,7 @@ SYSTEM_SD_DISKS=()
 ROOT_SOURCE=""
 
 ## Dedup via an assoc array (the previous grep -qxF per candidate was one
-## spawn per detection - this runs on every --check tick too).
+## spawn per detection – this runs on every --check tick too).
 declare -A SYSTEM_SEEN=()
 add_system_disk() {
   local parent
@@ -142,7 +142,7 @@ add_system_disk() {
 
 detect_system_disks() {
   ## The kernel command line's root= parameter (/proc/cmdline is not namespaced), resolved via the udev symlink trees
-  ## in /dev/disk. /proc/cmdline has no trailing newline: read exits nonzero at EOF - the words are assigned all the same.
+  ## in /dev/disk. /proc/cmdline has no trailing newline: read exits nonzero at EOF – the words are assigned all the same.
   local -a cmdline_words=()
   read -r -a cmdline_words </proc/cmdline || true
   local root_param="" root_link="" resolved="" word link disk
@@ -195,7 +195,7 @@ detect_system_disks() {
 ## ---------------------------------------------------------------------------
 
 ## The watcher's per-tick detection (nfsd-apply --check pattern, nfs-server commit d78c7ea): re-verify ONLY the
-## recorded detection facts - options cannot change mid-run, so if they all hold, the installed files are exactly
+## recorded detection facts – options cannot change mid-run, so if they all hold, the installed files are exactly
 ## what a regeneration would produce. Exit 0 = unchanged, 3 = changed (resolution/system-disk drift or installed-file
 ## drift), any other nonzero = check failure. Facts: hd-idle/KNOWLEDGE.md §"hd-idle-watch design".
 check_baseline_replay() {
@@ -296,7 +296,7 @@ decode_udev_name() {
 
 ## Fill MAP (nameref) from the udev symlink tree DIR: resolved node's kernel name -> decoded label
 ## (sda1, or the disk name itself for a whole-disk filesystem). Dangling links (vanished filesystems)
-## are skipped - the same staleness guard as the by-id scan in the inventory below.
+## are skipped – the same staleness guard as the by-id scan in the inventory below.
 fill_label_map() {
   local -n map=$2
   local link target
@@ -311,7 +311,7 @@ fill_label_map() {
 
 ## Label fragment for one inventory line: the first partition in start order that carries a
 ## filesystem label (preferred) and/or a GPT partition label (fallback; both shown when they
-## differ) - or, on an unpartitioned disk, the whole-disk filesystem label. Empty when nothing
+## differ) – or, on an unpartitioned disk, the whole-disk filesystem label. Empty when nothing
 ## is labeled. Reads sysfs and the label maps only: no device-node access, so standby drives
 ## stay asleep (hd-idle/KNOWLEDGE.md §"Drive inventory").
 drive_label_info() {
@@ -387,9 +387,9 @@ fi
 ## Drive configuration -> per-device entries
 ## ---------------------------------------------------------------------------
 
-## The global idle stays pinned to 0: unlisted drives (and runtime-appearing ones) are never touched - HAOS grants
+## The global idle stays pinned to 0: unlisted drives (and runtime-appearing ones) are never touched – HAOS grants
 ## device access per listed drive only. Every drive entry carries explicit -i/-c/-p (its own settings; there are no
-## global defaults - the CLI's built-in defaults cover only what no entry reaches).
+## global defaults – the CLI's built-in defaults cover only what no entry reaches).
 ARGS=(-s 1 -i 0)
 
 DRIVES_LINES=()
@@ -406,7 +406,7 @@ done
 N_DRIVES=0
 declare -A SEEN_DEVICES=()
 ## Baseline records for the state file: every configured device (options order, deterministic) with its resolution
-## OUTCOME (kernel name / PASSTHRU / IGNORED) - fully determines the generated configuration given immutable options.
+## OUTCOME (kernel name / PASSTHRU / IGNORED) – fully determines the generated configuration given immutable options.
 RECORD_DEVICES=()
 declare -A RECORD_RESOLVED=()
 record_resolution() {
@@ -525,7 +525,7 @@ printf '%s\n' "${ARGS[*]}" >"$ARGS_FILE"
 printf '%s\n' "${DRIVES_LINES[@]}" >"$DRIVES_FILE"
 
 ## Baseline state for the --check replay: shas of the two files just written plus the detection facts they were
-## generated from. Written LAST - the commit point of the three-file install; a crash before it is re-synced next tick.
+## generated from. Written LAST – the commit point of the three-file install; a crash before it is re-synced next tick.
 ARGS_SHA=$(sha256sum "$ARGS_FILE")
 DRIVES_SHA=$(sha256sum "$DRIVES_FILE")
 {

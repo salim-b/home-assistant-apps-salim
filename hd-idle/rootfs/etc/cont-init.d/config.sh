@@ -8,7 +8,7 @@ set -euo pipefail
 bashio::log.info "Configuring hd-idle..."
 if /usr/bin/hd-idle-genargs /etc/hd-idle.args; then
   ## Drive-PM treatment at boot (re-applied by the watcher on drive (re)appearance); runs unconditionally (the
-  ## drives file's pm-flag column carries the effective per-drive decision), non-fatal - the treatment is best-effort.
+  ## drives file's pm-flag column carries the effective per-drive decision), non-fatal – the treatment is best-effort.
   /usr/bin/hd-idle-pmfix /etc/hd-idle.drives \
     || bashio::log.warning "hd-idle-pmfix failed - the drives' power management stays as is."
   exit 0

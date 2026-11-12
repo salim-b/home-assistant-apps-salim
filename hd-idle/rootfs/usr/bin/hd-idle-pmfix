@@ -11,7 +11,7 @@ set -euo pipefail
 ## <drives-file>: one "<kernel-name> <idle> <command-type> <pm-flag>" line per drive (written by hd-idle-genargs;
 ## format: hd-idle/KNOWLEDGE.md §"Drive-PM treatment"). Only pm-flag 1 drives are treated (the idle time plays no
 ## role: an idle-0 drive is a treatment target all the same). With --since, only lines NEW or CHANGED relative to
-## the old file are treated - redundant treatment of asleep drives risks bridge-mediated motor starts.
+## the old file are treated – redundant treatment of asleep drives risks bridge-mediated motor starts.
 ## Treated drives run CONCURRENTLY (one background job per drive; each drive's two smartctl calls stay sequential;
 ## concurrent SG_IO to different disks is safe): a standby drive is woken by its first SET FEATURES command.
 
@@ -39,7 +39,7 @@ esac
 }
 
 # Success requires rc=0 AND no failed|unknown|unavailable output: smartctl's exit code alone does not certify that
-# ATA SET FEATURES took effect (feature-page-filtered bridges answer "APM feature is: Unavailable" with rc=0 - a
+# ATA SET FEATURES took effect (feature-page-filtered bridges answer "APM feature is: Unavailable" with rc=0 – a
 # silent no-op). The detail grep's different word list only picks a log line for the failure message, truncated to
 # 80 chars: wide enough for full sense messages ("scsi error device will be ready soon"), still one short log line.
 # -d sat pins
@@ -55,7 +55,7 @@ smart() {
       return 0
     fi
     # Retry ONLY the transient spin-up race: an asleep drive is woken by the call itself and its bridge can answer
-    # with NOT READY sense instead of holding the command through the spin-up. The rc alone is too broad - FAILSMART
+    # with NOT READY sense instead of holding the command through the spin-up. The rc alone is too broad – FAILSMART
     # (4) also covers the APM-filtered bridges' PERSISTENT rejection (hd-idle/KNOWLEDGE.md §"USB-bridge behaviors") -
     # so the retry additionally requires the NOT READY message family in the output. Timed-out and other failures
     # never retry.
@@ -75,7 +75,7 @@ is_treated_before() {
 ## Treatment targets: pm-flag-1 lines with a resolved sd* kernel name (a drive detached at boot appears under its
 ## by-id path and is skipped; the watcher's next cycle treats it under its resolved name). Treated drives dispatch
 ## to background jobs; each job writes its log line to a temp file numbered by drives-file order, logged after
-## `wait` - the log stays deterministic despite the concurrent smartctl calls.
+## `wait` – the log stays deterministic despite the concurrent smartctl calls.
 RESULT_DIR=$(mktemp -d)
 trap 'rm -rf "${RESULT_DIR}"' EXIT
 TREATED=0
