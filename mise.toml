@@ -61,7 +61,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   shellcheck = "0.11.0"
   shellharden = "4.3.2"
   shfmt = "3.14.1"
-  tombi = "1.10.0"
+  tombi = "1.11.2"
   uv = "0.13.7"
   yq = "4.54.1"
   # Node runtime + renovate package for the renovate-config-validator hk step (.github/renovate.json gate).
