@@ -7,25 +7,29 @@
 # Formatter and quote style stay at ruff's defaults (4-space indent, double quotes, 88 columns):
 # ruff does not read .editorconfig, but its defaults match this repo's Python style.
 
-# target-version is deliberately NOT pinned: it is inert for the selected rule families (none of
-# E4/E7/E9/F/I/B is version-sensitive), and nothing couples this file to the `python` pin in
-# mise.toml [tools] - a pin here would only drift as Python moves on. Ruff's own default applies,
-# which is the conservative direction (no false positives on newer syntax); revisit only when
-# adopting target-sensitive rule families such as UP.
+# target-version is deliberately NOT pinned: nothing couples this file to the `python` pin in
+# mise.toml [tools], so a pin here would only drift. Ruff's own default applies - the conservative
+# floor (no false positives on newer syntax): target-sensitive rules only propose syntax valid at
+# it, and ruff's default target rises with ruff releases, not with our mise pin.
 
 [lint]
-  # Pinned explicitly: ruff 0.17.0 expanded the default rule selection and keeps drifting with
-  # releases (ruff CHANGELOG 0.17.0, astral-sh/ruff#28786) - the gate must not move with it.
-  # Core: E4/E7/E9 pycodestyle errors + F pyflakes; I import order (auto-fixable); B bugbear
-  # real-bug checks. Hygiene/consistency: W invalid escapes and whitespace; C4 comprehension
-  # idioms; UP pyupgrade; N naming; A builtin shadowing; EXE shebang sanity; RET504 needless
+  # extend-select = ruff's default rule set plus this list, so the gate tracks ruff's canonical
+  # defaults (0.17.0 expanded them and they keep drifting with releases - astral-sh/ruff#28786).
+  # Accepted trade-off: a ruff release that reshuffles the defaults can newly fire rules and
+  # break the gate with no repo change - treat that as a review prompt for the new findings,
+  # then fix them or noqa them with a reason. Entries the defaults already carry stay listed as
+  # drift insurance (today: E4/E7/E9 pycodestyle errors + F pyflakes, UP pyupgrade, W605 invalid
+  # escapes) in case a future default set drops them. Never add formatter-conflicting rules
+  # (COM812, ISC001, Q000/Q003, W191).
+  # The list: I import order (auto-fixable); B bugbear real-bug checks; W whitespace; C4
+  # comprehension idioms; N naming; A builtin shadowing; EXE shebang sanity; RET504 needless
   # assigns; ISC002/003 string-concatenation slips (ISC001 stays out - formatter conflict).
   # Security: S307 marks the deliberate eval() sites (the `# noqa: S307` comments in
   # validate/apps.py go live with it); S603/S607/S310 keep the subprocess and URL surfaces
   # audited (inline noqa with reasons where intentional). Exception messages: EM + TRY.
   # pathlib idioms: PTH. noqa hygiene: RUF100 + PGH004. E501 is the outer fence for what the
   # formatter cannot split (long strings) and for prose - see [lint.pycodestyle] below.
-  select = [
+  extend-select = [
     "E4",
     "E7",
     "E9",

@@ -46,7 +46,7 @@ def _supervisor_ref() -> str:
 
         with (ROOT / "mise.toml").open("rb") as f:
             return tomllib.load(f)["vars"]["supervisor_ref"]
-    except Exception:
+    except Exception:  # noqa: BLE001 - fail-fast: exit with a message on any error
         sys.exit("cannot determine supervisor ref (mise.toml [vars].supervisor_ref)")
 
 
@@ -232,7 +232,7 @@ def main() -> int:
                         if tf.suffix != ".json"
                         else json.loads(tf.read_text())
                     )
-                except Exception as err:
+                except Exception as err:  # noqa: BLE001 - report any read/parse error, skip the file
                     fail(app, f"{tf.name} does not parse: {err}")
                     continue
                 ns: dict[str, object] = {"vol": voluptuous, **supervisor_constants()}

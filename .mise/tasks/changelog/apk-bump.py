@@ -61,9 +61,7 @@ def _val(name: str) -> str:
 def _flag(name: str) -> bool:
     """Read a mise #USAGE boolean flag (env vars, or argv for direct runs)."""
     env = f"usage_{name.replace('-', '_')}"
-    if os.environ.get(env, "").lower() in ("true", "1") or f"--{name}" in sys.argv:
-        return True
-    return False
+    return os.environ.get(env, "").lower() in ("true", "1") or f"--{name}" in sys.argv
 
 
 def wrap_bullet(text: str) -> list[str]:

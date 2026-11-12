@@ -97,12 +97,14 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   `ruff check`; the fix path preflights with the builtin's `check_diff`) and `ruff_format` (check via
   `ruff format --diff`, fix via `ruff format`), pinned as `aqua:astral-sh/ruff` in mise.toml. The formatter step runs
   before the linter step; `mise run fmt` runs `ruff format .`.
-- Config is `.ruff.toml` (TOML, `#:schema`-bound): the rule selection is pinned explicitly there (don't swap `select`
-  for `extend-select`) because ruff 0.17.0 expanded the default rule set and keeps drifting with releases (ruff
-  CHANGELOG 0.17.0, astral-sh/ruff#28786) — the gate must not move with upstream defaults. `target-version` stays
-  unpinned: it is inert for the selected rules and nothing couples it to the `python` mise.toml pin, so a pin would
-  drift (ruff's own default applies). Note that UP is target-sensitive in the other direction: once ruff's default
-  target crosses py314, its safe autofix will drop the no-longer-needed `from __future__ import annotations` imports.
+- Config is `.ruff.toml` (TOML, `#:schema`-bound): the selection is `extend-select` over ruff's default rule set, so the
+  gate tracks the canonical upstream defaults (ruff 0.17.0 expanded them and they keep drifting with releases,
+  astral-sh/ruff#28786). Accepted trade-off: a ruff release that reshuffles the defaults can newly fire rules and break
+  the gate with no repo change (Renovate bumps ruff regularly) - treat that as a review prompt for the new findings,
+  then fix them or noqa with a reason. Entries the defaults already carry stay listed as drift insurance.
+  `target-version` stays unpinned: nothing couples it to the `python` mise.toml pin, so a pin would drift (ruff's own
+  default applies). Note that UP is target-sensitive in the other direction: once ruff's default target crosses py314,
+  its safe autofix will drop the no-longer-needed `from __future__ import annotations` imports.
 - Docstrings (D, google convention) and annotations (ANN) are committed regimes: a docstring's first line is the summary
   (ends with a period), then a blank line before the body, and parameter names must appear in the text (ruff's D417
   checks name presence, not section structure). Every function gets full annotations; dynamic dicts (lab-option
