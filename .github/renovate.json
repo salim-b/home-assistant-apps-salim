@@ -131,12 +131,13 @@
       ]
     },
     {
-      "description": "hk stays out of the mise manager: its mise.toml binary pin and the hk@X.Y.Z package imported by hk.pkl must move together in one manual change (the package provides the builtin step definitions the binary executes - bumping only one leaves hk.pkl importing a version the binary or registry cannot resolve).",
+      "description": "hk stays out of the mise manager: its mise.toml binary pin and the hk@X.Y.Z package imported by hk.pkl must move together in one manual change (the package provides the builtin step definitions the binary executes - bumping only one leaves hk.pkl importing a version the binary or registry cannot resolve). matchPackageNames needs both names: the mise manager's dep matches by its resolved packageName jdx/hk (GitHub releases datasource), not the depName hk that PR titles show.",
       "matchManagers": [
         "mise"
       ],
       "matchPackageNames": [
-        "hk"
+        "hk",
+        "jdx/hk"
       ],
       "enabled": false
     },
