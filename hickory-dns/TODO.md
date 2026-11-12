@@ -5,15 +5,6 @@ procedures in the skill `hickory-dns-runtime`.
 
 ## Tasks
 
-- **Alpine aports bump MRs**: `community/hickory-dns` is currently still at 0.26.1-r0 on 3.24-stable and master
-  (identical) - facts: `KNOWLEDGE.md` §"apk package pins and CA trust".
-
-  Submitted two MRs upstream to bump to v0.26.3:
-  - <https://gitlab.alpinelinux.org/alpine/aports/-/merge_requests/110680> (`master`)
-  - <https://gitlab.alpinelinux.org/alpine/aports/-/merge_requests/110681> (`3.24-stable` backport)
-
-  Once merged and the bumped apk reaches the index, our CI should pick up the update automatically.
-
 - **Upstream DNSSEC validator false-Bogus on real-world response shapes**: with `dnssec` enabled the daemon SERVFAILs
   names that resolve fine everywhere else - two live repros, both reproduced with the pinned 0.26.1 apk against
   Cloudflare and Quad9 DoT upstreams and verified identical on a v0.26.3 source build: `public-dns.info` (unsigned
@@ -22,9 +13,9 @@ procedures in the skill `hickory-dns-runtime`.
   [#4063](https://github.com/hickory-dns/hickory-dns/issues/4063)) and `wiki.mint-system.ch` (wildcard-expanded CNAME in
   a signed NSEC zone - the recursor attaches only the wildcard's NSEC and the whole answer is rejected, CD=1 does not
   help; [#4047](https://github.com/hickory-dns/hickory-dns/issues/4047),
-  [#3888](https://github.com/hickory-dns/hickory-dns/issues/3888)). No released version fixes these - the 0.26.3 bump
-  MRs above do not include the fixes - so wait for an upstream release that carries them (interim for affected sites:
-  browser DoH, or the `dnssec` option off).
+  [#3888](https://github.com/hickory-dns/hickory-dns/issues/3888)). No released version fixes these (0.26.3 included) -
+  so wait for an upstream release that carries them (interim for affected sites: browser DoH, or the `dnssec` option
+  off).
 
 - Once hickory-dns 0.26.4+ is released shipping <https://github.com/hickory-dns/hickory-dns/pull/4128>, query an `A`
   instead of `SOA` record in `hickory-dns-healthcheck`.
