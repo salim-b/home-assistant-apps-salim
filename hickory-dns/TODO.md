@@ -83,3 +83,15 @@ procedures in the skill `hickory-dns-runtime`.
   reverse zone gets when several entries share one address. Covers: config option/schema/translations, generator
   emission + validation, §"Static entries (no hosts-file store upstream)" facts, regression-sandbox snapshot update,
   lab, version bump + CHANGELOG.
+
+- **Investigate replacing `host_network: true` with published `53/udp`+`53/tcp` ports (needs further investigation)**: a
+  host-networked `0.0.0.0:53` listener answers container-originated queries with replies sourced from the route back to
+  the client (the bridge gateway IP, not the queried device IP) – resolvers discard source-mismatched UDP replies, so
+  docker containers cannot resolve through the app (this broke on-device app builds on the deployment device,
+  2026-11-12: default-bridge build RUN steps copy the host's resolv.conf verbatim, apk cannot fetch the Alpine package
+  index; CoreDNS only keeps working via its DoT fallback). Published ports get conntrack reply rewriting instead: LAN
+  clients keep their source IPs (the reason host_network was chosen – `KNOWLEDGE.md` §"Port 53 binding and privileges"),
+  while container/hairpin clients appear as gateway IPs (covered by the default `allow_networks` ACL's `172.16.0.0/12`)
+  – fixing containers *and* CoreDNS everywhere. Migration needs care: re-verify the ACL/privilege story under DNAT and
+  the bootstrap ordering (the app's own on-device build hits the same DNS bug until the device's DNS path is fixed; see
+  the deploy:local pre-flight item in the root `TODO.md`).

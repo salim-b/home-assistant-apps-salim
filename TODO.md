@@ -60,3 +60,17 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   jobs of `.github/workflows/apk-bump.yaml`; the trigger is the literal substring `apk add` in a line) with no canary
   fixture locking their behavior together – and align the index/arch semantics between the task and the nudge job
   (facts: root `KNOWLEDGE.md` §"apk package version policy").
+
+- deploy:local pre-flight + device DNS facts: give `.mise/tasks/deploy/local.sh` a pre-install probe of the build
+  containers' DNS path (the Supervisor's on-device `docker buildx` RUN steps run on the default bridge, whose
+  resolv.conf is a verbatim copy of the host's) that fails early with an actionable message instead of the Supervisor's
+  cryptic "An unknown error occurred while trying to build the image" – device-verified 2026-11-12: apk first warned
+  "DNS: transient error (try again later)" on both APKINDEX fetches, then failed with the misleading "no such package"
+  for both pins. Fold the underlying facts into root `KNOWLEDGE.md` §"Supervisor: DNS resolution chain (CoreDNS)": the
+  host's NetworkManager-written `/etc/resolv.conf` names the device itself (the DHCP-advertised `192.168.1.11` – the
+  host-networked hickory-dns app); queries from default-bridge containers reach that listener and it answers them, but
+  its replies egress via the docker0 route carrying the bridge gateway IP as source, and resolvers (musl/apk, busybox)
+  discard source-mismatched UDP replies – legacy-bridge containers therefore cannot resolve through it at all, while
+  user-defined-network containers (embedded DNS → CoreDNS) only resolve because CoreDNS falls back to DoT. Repro:
+  ephemeral `docker run --rm ghcr.io/home-assistant/base:3.24 apk update` on the device. App-side counterpart:
+  `hickory-dns/TODO.md`.
