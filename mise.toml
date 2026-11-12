@@ -81,4 +81,4 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
 [vars]
   # Single source of the supervisor-ref pin the validate task fetches schemas from. Renovate bumps it
   # to the newest supervisor release and automerges once CI check is green (.github/renovate.json).
-  supervisor_ref = "2026.10.2"
+  supervisor_ref = "2026.11.0"
