@@ -3,6 +3,7 @@
   "extends": [
     "config:recommended",
     "default:semanticCommits",
+    "default:timezone(Europe/Zurich)",
     "helpers:pinGitHubActionDigests"
   ],
   "enabledManagers": [
