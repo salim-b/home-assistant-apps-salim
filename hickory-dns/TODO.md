@@ -92,3 +92,5 @@ procedures in the skill `hickory-dns-runtime`.
   – fixing containers *and* CoreDNS everywhere. Migration needs care: re-verify the ACL/privilege story under DNAT and
   the bootstrap ordering (the app's own on-device build hits the same DNS bug until the device's DNS path is fixed; see
   the deploy:local pre-flight item in the root `TODO.md`).
+
+  *Spontaneous question: could the issue actually be a regression from the bundled hickory-dns 0.26.3 bump?*
