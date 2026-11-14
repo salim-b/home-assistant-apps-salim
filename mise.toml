@@ -43,6 +43,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
 [tools]
   "github:immanuwell/dockerfile-roast" = "1.7.0"
   editorconfig-checker = "4.0.2"
+  entireio-cli = "0.13.4"
   jactionlint = { version = "v2.5.0", workflow = "release.yaml" }
   jq = "1.8.2"
   # hk's binary pin and the hk@X.Y.Z package imported by hk.pkl move together (skill ha-app-tooling, Renovate section).

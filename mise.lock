@@ -137,6 +137,52 @@ url = "https://github.com/editorconfig-checker/editorconfig-checker/releases/dow
 url_api = "https://api.github.com/repos/editorconfig-checker/editorconfig-checker/releases/assets/574675794"
 provenance = "github-attestations"
 
+[[tools.entireio-cli]]
+version = "0.13.4"
+backend = "aqua:entireio/cli"
+specifiers = ["0.13.4"]
+
+[tools.entireio-cli."platforms.linux-arm64"]
+checksum = "sha256:4d702394fc32986d23a3e0d1e37e42698994418580be62629baea578e47647e5"
+checksum_source = "mise-versions"
+url = "https://github.com/entireio/cli/releases/download/v0.13.4/entire_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/entireio/cli/releases/assets/744300233"
+
+[tools.entireio-cli."platforms.linux-arm64-musl"]
+checksum = "sha256:4d702394fc32986d23a3e0d1e37e42698994418580be62629baea578e47647e5"
+checksum_source = "mise-versions"
+url = "https://github.com/entireio/cli/releases/download/v0.13.4/entire_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/entireio/cli/releases/assets/744300233"
+
+[tools.entireio-cli."platforms.linux-x64"]
+checksum = "sha256:c58879f9000764714b1e9d9c6803cb613de1d3e7e61f75563815618918f2128b"
+url = "https://github.com/entireio/cli/releases/download/v0.13.4/entire_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/entireio/cli/releases/assets/744300228"
+
+[tools.entireio-cli."platforms.linux-x64-musl"]
+checksum = "sha256:c58879f9000764714b1e9d9c6803cb613de1d3e7e61f75563815618918f2128b"
+checksum_source = "mise-versions"
+url = "https://github.com/entireio/cli/releases/download/v0.13.4/entire_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/entireio/cli/releases/assets/744300228"
+
+[tools.entireio-cli."platforms.macos-arm64"]
+checksum = "sha256:1ab8e96b596d4ece40ecf2173d53855676ee859d2dfc5c1b459157e192b18c9e"
+checksum_source = "mise-versions"
+url = "https://github.com/entireio/cli/releases/download/v0.13.4/entire_darwin_arm64.tar.gz"
+url_api = "https://api.github.com/repos/entireio/cli/releases/assets/744300424"
+
+[tools.entireio-cli."platforms.macos-x64"]
+checksum = "sha256:0b8f05dffcde1c17f06edde8fac582e9b4509d215b7eaca80546ed346356c94f"
+checksum_source = "mise-versions"
+url = "https://github.com/entireio/cli/releases/download/v0.13.4/entire_darwin_amd64.tar.gz"
+url_api = "https://api.github.com/repos/entireio/cli/releases/assets/744300429"
+
+[tools.entireio-cli."platforms.windows-x64"]
+checksum = "sha256:80395e33c3500410e17026a4d83c3c832109d85cc6793b73f42909b929e86b70"
+checksum_source = "mise-versions"
+url = "https://github.com/entireio/cli/releases/download/v0.13.4/entire_windows_amd64.zip"
+url_api = "https://api.github.com/repos/entireio/cli/releases/assets/744300235"
+
 [[tools."github:immanuwell/dockerfile-roast"]]
 version = "1.7.0"
 backend = "github:immanuwell/dockerfile-roast"
