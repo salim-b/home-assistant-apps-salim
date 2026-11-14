@@ -44,6 +44,11 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   "github:immanuwell/dockerfile-roast" = "1.7.0"
   editorconfig-checker = "4.0.2"
   entireio-cli = "0.13.4"
+  # Toolchain for the go:-backend build below (mise builds go: tools with the project's go pin).
+  go = "1.26"
+  # Built from source; upstream external-agents has no tags/releases, so the pin is a commit pseudo-version.
+  # Renovate can't bump it (package-path dep of an untagged module) – bump manually, then `mise lock`.
+  "go:github.com/entireio/external-agents/agents/entire-agent-goose/cmd/entire-agent-goose" = "v0.0.0-20260912195008-9b268b339e17"
   jactionlint = { version = "v2.5.0", workflow = "release.yaml" }
   jq = "1.8.2"
   # hk's binary pin and the hk@X.Y.Z package imported by hk.pkl move together (skill ha-app-tooling, Renovate section).
