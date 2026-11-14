@@ -53,26 +53,20 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 
 ## YAML linting: ryl
 
-- YAML is linted by ryl (hk `ryl` step, config `.ryl.toml`, pinned as `aqua:owenlamont/ryl` in mise.toml).
+- YAML is linted by ryl (hk `ryl-lint` step, config `.ryl.toml`, pinned as `aqua:owenlamont/ryl` in mise.toml).
 - ryl parses YAML 1.2; yamllint defaulted to 1.1: bareword booleans (`yes`/`no`/`on`/`off`, any case) are plain strings
   and leading-zero integers like `0755` are decimal – while YAML 1.1 parsers (PyYAML and kin) still coerce both. Do not
   predict what a parser will load from ryl's lint view.
-- The hk step runs `ryl check --strict` (`--strict` added to both `check` and `fix`): warning-level rules (line-length,
-  comments, document-start, truthy – see `.ryl.toml`) fail the gate like errors (warning-only runs exit `2`, errors
-  `1`). The builtin's fix step auto-fixes mechanical issues (braces/brackets/commas spacing, comment spacing, final
-  newline, quoting) in pre-commit.
+- The hk step runs `ryl check --strict` (`--strict` added to both `check` and `fix`): warning-level rules fail the gate
+  like errors (warning-only runs exit `2`, errors `1`).
 - The builtin's `check_diff` wiring is cleared (`check_diff = null`, `check_after_diff = false`): ryl's `--diff` exit
   code only reflects patch presence – it exits `0` whenever nothing is fixable, including files with unfixable warnings
   or errors – and hk's fix mode skips the fixer when `check_diff` exits `0`, so violating files would pass pre-commit
   untouched. With `check_diff` gone, fix mode runs `fix` (carrying `--strict`) on every staged YAML file and its exit
   code decides: `0` only when nothing remains to fix or flag. (Upstream issue: root `TODO.md`.)
-- YAML is also formatted by `ryl format` (hk `ryl-format` step; `mise run fmt` runs `ryl format .`), sharing the
-  `.ryl.toml` selection and exclusions: double quotes become single where quoting must stay (`'755'`, `'*'`), quotes are
-  dropped when the plain scalar keeps the same YAML 1.2 core type, and trailing comments align two spaces out.
-  Pre-commit runs it after the `ryl` fix step (map order); the two converge – neither's output needs the other's fixes
-  (probed ryl 0.29.0). Reformatting an app's `config.yaml` is device-visible – version bump required (skill
-  ha-app-workflow).
-- `line-length` ignores comments by default (yamllint parity): the 140 limit bites YAML scalars only.
+- YAML is also formatted by `ryl format` (hk `ryl-format` step; also in `mise run fmt`), sharing `.ryl.toml` selection
+  and exclusions; its fixes supersede the lint fixer's, so the two pre-commit steps converge in either order (probed ryl
+  0.29.0).
 - `.ryl.toml` has no `extends`, so it inlines the `default` preset (ryl enables no rules by default) with this repo's
   overrides applied. The override whys: `line-length` at 140/warning because app config descriptions/translations use
   long lines intentionally and Renovate pins action refs to full commit SHAs with a version comment (single-line by YAML
@@ -101,8 +95,7 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   copies and silently skip un-cached schemas, while CI always runs online – schema checks therefore track upstream
   main/latest, not the installed tool version, and an upstream schema change can fail the gate with no local change
   (signal, like zizmor's online audits).
-- Formatter defaults match .editorconfig (2-space, LF, double quotes) and nothing is key-sorted by default; an
-  unformatted file is an Error (exit 1) in the format check.
+- Formatter defaults match .editorconfig; an unformatted file fails the format check.
 
 ## Python linting: ruff
 
@@ -132,11 +125,10 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   (ends with a period), then a blank line before the body, and parameter names must appear in the text (ruff's D417
   checks name presence, not section structure). Every function gets full annotations; dynamic dicts (lab-option
   fixtures) are `dict[str, object]` – never explicit `Any` (ANN401).
-- ruff does not read `.editorconfig`; its formatter defaults (4-space indent, double quotes, 88 columns) match this
-  repo's Python style. E501 is the outer fence at 120 columns (`.ruff.toml` `[lint.pycodestyle]`, panache's prose width)
-  for what the formatter cannot split. Both builtins pass `--force-exclude`, so config excludes apply even to hk's
-  explicit file arguments, and ruff resolves the config by walking up from each target file – the root `.ruff.toml`
-  covers every task script.
+- ruff does not read `.editorconfig`; its formatter defaults match this repo's Python style. E501 is the outer fence at
+  120 columns (`.ruff.toml` `[lint.pycodestyle]`, panache's prose width) for what the formatter cannot split. Both
+  builtins pass `--force-exclude`, so config excludes apply even to hk's explicit file arguments, and ruff resolves the
+  config by walking up from each target file – the root `.ruff.toml` covers every task script.
 - The `#MISE`/`#USAGE` task directives sit inside `# fmt: off`/`# fmt: on` markers in every task script: ruff format
   normalizes `#MISE` comment spacing (no comment-prefix exclusion exists) and must not touch them. mise's parser
   tolerates the spaced form (its prefix regexes match with `\s*` tolerance, unlike the usage crate's strict `#USAGE`
