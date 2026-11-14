@@ -83,3 +83,10 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   user-defined-network containers (embedded DNS → CoreDNS) only resolve because CoreDNS falls back to DoT. Repro:
   ephemeral `docker run --rm ghcr.io/home-assistant/base:3.24 apk update` on the device. App-side counterpart:
   `hickory-dns/TODO.md`.
+
+- CLAUDE.md shim: remove the repo-root `CLAUDE.md → AGENTS.md` symlink at the end of 2026 – the grace period for Claude
+  Code users to update their harness. Decisive fact: Claude Code v2.1.277 (2026-09-18) reads `AGENTS.md` as its project
+  instructions natively whenever no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` exists in the working
+  directory or above it, so the shim only still serves such sessions; goose, Codex, Cursor and friends read `AGENTS.md`
+  natively regardless. Nothing in the repository references `CLAUDE.md` (verified 2026-11-14). If such legacy sessions
+  ever matter again, a one-line `@AGENTS.md` `CLAUDE.md` import is the Windows-safe replacement.
