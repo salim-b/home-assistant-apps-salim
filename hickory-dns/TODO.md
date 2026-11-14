@@ -20,9 +20,6 @@ procedures in the skill `hickory-dns-runtime`.
 - Once hickory-dns 0.26.4+ is released shipping <https://github.com/hickory-dns/hickory-dns/pull/4128>, query an `A`
   instead of `SOA` record in `hickory-dns-healthcheck`.
 
-- Re-run the live test on a device against the current pin (0.26.3-r0): the launcher's capability path was
-  device-verified on daemon 0.26.1 only (facts: `KNOWLEDGE.md` §"Port 53 binding and privileges").
-
 - **Blocklist support (deferred)**: upstream ground truth and the design sketch: `KNOWLEDGE.md` §"Deferred feature
   ground truth (upstream gaps)".
 

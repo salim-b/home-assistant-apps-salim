@@ -194,12 +194,13 @@ Verified against v0.26.3 source; revisit when a tagged release + the apk carry t
   AppArmor mediates the kernel's capable() LSM hook (repository-root KNOWLEDGE.md §"AppArmor: mediation and profile
   mechanics"). The grants serve the launcher; the daemon exec's holding exactly one capability.
 - The `dns` healthcheck binary runs as root (docker HEALTHCHECK exec) – a plain UDP query, no capabilities.
-- **Device-verified (2026-10-24, HAOS 18.3, app 0.1.0 / daemon 0.26.1)** via `.mise/tasks/test/live/hickory-dns.sh` (log +
+- **Device-verified (2026-11-14, HAOS 18.4, app 0.3.3 / daemon 0.26.3)** via `.mise/tasks/test/live/hickory-dns.sh` (log +
   dev-host client evidence per repository-root `KNOWLEDGE.md` §"Device SSH: sessions run in the Terminal & SSH app"):
   the launcher's setpriv path ran exactly once per boot (its setgid/setuid/setpcap use is not denied), the daemon logged
   its dropped uid/gid 65534, the :53 binds serve real queries (UDP + TCP from a LAN client, plus the healthcheck's
-  loopback probes), and neither the app log nor the host journal carries an error/denial/AppArmor line. Re-verify on a
-  device after any apk pin bump (app `TODO.md`).
+  loopback probes), and neither the app log nor the host journal carries an error/denial/`apparmor="DENIED"` line. The
+  profile's signal surface is exercised implicitly: the verification's deploy/restart cycles run `docker stop` → SIGTERM
+  to PID 1 and s6's stop signaling. Re-verify on a device after any apk pin bump (app `TODO.md`).
 
 ## Healthcheck
 
