@@ -68,18 +68,25 @@ live_runtime_check() {
   local -r uid_line='now running as uid: 65534, gid: 65534 (euid: 65534, egid: 65534)'
 
   # --- current-boot log segment (all process-level evidence lives here) --------------------------
-  logs=$(ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" "ha apps logs $LIVE_LOCAL_SLUG" 2>/dev/null) || logs=""
+  ## `ha apps logs` is served from the host journal and defaults to the LAST 100 entries (root
+  ## KNOWLEDGE.md §"Supervisor: app and host logs are served from systemd-journald") – a boot's
+  ## early lines fall out of that default within seconds (the launcher line sits ~20 entries into
+  ## a boot, behind ~85 daemon zone-loading lines, and missed the window by one entry on
+  ## 2026-11-14). Scope the fetch to the current HOST boot and widen the window; the awk anchor
+  ## then cuts the accumulated earlier container boots (install, options changes, restore): the
+  ## generator logs its banner at every container boot, cont-init runs once per boot, and s6
+  ## restarting the longrun service appends to the SAME segment (launch-line counting catches it).
+  logs=$(ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
+    "ha apps logs $LIVE_LOCAL_SLUG --boot 0 --lines 1000" 2>/dev/null) || logs=""
   [ "$logs" != "" ] || {
     echo "FAIL: could not read the app log on $LIVE_HOST (has the app ever started?)" >&2
     return 1
   }
-  ## `ha apps logs` accumulates across container boots – anchor on the cont-init banner (hd-idle
-  ## precedent): the last boot's segment only. cont-init runs once per container boot; s6
-  ## restarting the longrun service appends to the SAME segment (launch-line counting catches it).
-  seg=$(awk '/Configuring hickory-dns/{buf=""} {buf = buf $0 "\n"} END {printf "%s", buf}' <<<"$logs")
+  seg=$(awk '/Generating the hickory-dns configuration/{buf=""} {buf = buf $0 "\n"} END {printf "%s", buf}' <<<"$logs")
   [ "$seg" != "" ] || {
-    echo "FAIL: the app log has no 'Configuring hickory-dns...' boot banner (unexpected log shape)" >&2
-    ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" "ha apps logs $LIVE_LOCAL_SLUG" 2>/dev/null \
+    echo "FAIL: the app log has no 'Generating the hickory-dns configuration...' boot banner (unexpected log shape)" >&2
+    ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
+      "ha apps logs $LIVE_LOCAL_SLUG --boot 0 --lines 1000" 2>/dev/null \
       | tail -15 | awk '{print "         " $0}' >&2
     return 1
   }
@@ -203,8 +210,11 @@ live_runtime_check() {
 
   # --- host journal: AppArmor must stay silent ---------------------------------------------------
   echo "-- host journal AppArmor lines"
+  ## Match only the kernel's denial signature: HAOS emits no AppArmor audit lines when all is well
+  ## (skill ha-app-apparmor), while os-agent's benign profile load/unload bookkeeping mentions
+  ## "AppArmor" in the host journal constantly and must not trip this check.
   bad=$(ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
-    "ha host logs 2>/dev/null | grep -i apparmor | tail -5") || bad=""
+    "ha host logs --boot 0 --lines 1000 2>/dev/null | grep -F 'apparmor=\"DENIED\"' | tail -5") || bad=""
   if [ "$bad" = "" ]; then
     echo "   PASS: no AppArmor lines in the host journal (HAOS emits none when all is well)"
   else

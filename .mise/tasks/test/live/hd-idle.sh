@@ -155,13 +155,15 @@ live_runtime_check() {
 
   echo "-- hd-idle live checks (event-based; spindown window ${event_window}s)"
 
-  ## Only the CURRENT boot's log matters: `ha apps logs` accumulates across app restarts, and this
-  ## run restarts the app after applying the test options (a previous boot's "No drives configured"
-  ## lines would defeat the assertions) – cut at the last "Configuring hd-idle..." line (config.sh
-  ## logs it at every boot).
+  ## Only the CURRENT boot's log matters: `ha apps logs` serves the host journal (root KNOWLEDGE.md
+  ## §"Supervisor: app and host logs are served from systemd-journald") and accumulates across app
+  ## restarts within the host boot – this run restarts the app after applying the test options (a
+  ## previous boot's "No drives configured" lines would defeat the assertions). Fetch a generous
+  ## window of the current host boot (the default is the last 100 entries only), then cut at the
+  ## last "Configuring hd-idle..." line (config.sh logs it at every boot).
   while :; do
     logs=$(ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
-      "ha apps logs $LIVE_LOCAL_SLUG" 2>/dev/null) || logs=""
+      "ha apps logs $LIVE_LOCAL_SLUG --boot 0 --lines 400" 2>/dev/null) || logs=""
     tail_log=$(awk '/Configuring hd-idle/{buf=""} {buf = buf $0 "\n"} END {printf "%s", buf}' <<<"$logs")
 
     if [ "$hard_pending" = 1 ]; then

@@ -38,8 +38,12 @@ live_runtime_check() {
   # through to the container-refusing legacy trackers). NOTE: HAOS ships no docker CLI, so
   # container-internal probes are not reachable from here – the journal check is strictly stronger.
   echo "-- checking the client-recovery tracker (host kernel journal)"
+  ## The fetch must be scoped and widened: `ha host logs` serves the host journal and defaults to
+  ## the LAST 100 entries (root KNOWLEDGE.md §"Supervisor: app and host logs are served from
+  ## systemd-journald") – on a busy host journal the app boot's NFSD lines fall out of that
+  ## default within moments, which would degrade this check to "tracker state unknown".
   klog=$(ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
-    "ha host logs 2>/dev/null | grep -E 'NFSD:' | tail -10") || true
+    "ha host logs --boot 0 --lines 1000 2>/dev/null | grep -E 'NFSD:' | tail -10") || true
   if grep -q "Using nfsdcld client tracking operations" <<<"$klog"; then
     echo "   PASS: kernel uses the cld tracker (upcalls answered by nfsdcld)"
   elif grep -q "Unable to initialize client recovery tracking" <<<"$klog"; then
