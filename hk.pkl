@@ -86,7 +86,7 @@ local linters = new Mapping<String, Step> {
   }
   // ryl (Rust yamllint re-implementation, configured in .ryl.toml); --strict on check and fix.
   // check_diff/check_after_diff are cleared on purpose – why: .agents/skills/ha-app-tooling (upstream: root TODO.md).
-  ["ryl"] = (Builtins.ryl) {
+  ["ryl-lint"] = (Builtins.ryl) {
     check_diff = null
     check_after_diff = false
     check_list_files = null
@@ -101,7 +101,7 @@ local linters = new Mapping<String, Step> {
       }
     }
   }
-  // ryl format shares the .ryl.toml selection/exclusions; pre-commit runs it after the ryl fix step
+  // ryl format shares the .ryl.toml selection/exclusions; pre-commit runs it after the ryl-lint step
   // (map order) and the two converge – neither's output needs the other's fixes (probed ryl 0.29.0).
   ["ryl-format"] {
     types = List("yaml")
@@ -122,7 +122,7 @@ local linters = new Mapping<String, Step> {
   }
   // config: .ruff.toml; conventions: .agents/skills/ha-app-tooling
   ["ruff-format"] = Builtins.ruff_format
-  ["ruff"] = Builtins.ruff
+  ["ruff-lint"] = Builtins.ruff
   // ty (Python type checker; config: ty.toml)
   ["ty"] = Builtins.ty
   // Panache owns ALL Markdown formatting (.agents/skills/ha-app-markdown, .panache.toml); explicit
