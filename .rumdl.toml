@@ -4,7 +4,9 @@
   # https://rumdl.dev/global-settings/
   editorconfig = true
   # Open Home Foundation policy text, kept verbatim for upstream syncs (mirrors panache's exclude).
-  exclude = [ "AI_POLICY.md" ]
+  # The entire-managed search skill likewise: `entire enable` rewrites it verbatim (its title lives in the
+  # frontmatter, not an h1), so rumdl findings there are upstream's to fix, not ours.
+  exclude = [ "AI_POLICY.md", ".agents/skills/entire-search/SKILL.md" ]
   # rumdl must never rewrite files – panache owns ALL Markdown formatting. Inert `all` sentinel canary
   # (validate/apps.py fails loudly if a rumdl upgrade flips this): .agents/skills/ha-app-markdown.
   fixable = [ "all" ]
