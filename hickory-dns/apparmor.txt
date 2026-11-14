@@ -6,10 +6,15 @@ profile hickory-dns flags=(attach_disconnected,mediate_deleted) {
   ## Mediation mechanics and gotchas: repository-root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics";
   ## app facts and the full profile surface: hickory-dns/KNOWLEDGE.md §"AppArmor profile surface".
 
-  # Generic file access + signals (s6 supervision, bash job control) - the upstream HA convention; the confinement
-  # value sits in the non-file classes (repository-root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics").
+  # Generic file access (`file,` per the upstream HA convention – the confinement value sits in the non-file classes,
+  # repository-root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics"). No own signal rules: the app runs one
+  # profile label in its own PID namespace (no `host_pid`, no sub-profiles), so every reachable signal target is
+  # same-label, and <abstractions/base> (AppArmor 3.1.7) grants the rest – same-label delivery (`signal
+  # peer=@{profile_name}`: s6-supervise signals the daemon on stop, shell job control), existence probes
+  # (`signal (receive, send) set=("exists")`) and receive from the unconfined host runtime (`signal (receive)
+  # peer=unconfined`: how docker stop/restart reach PID 1). The upstream template's blanket `signal,` adds only
+  # cross-label grants nothing here can exercise.
   file,
-  signal,
 
   # The never-root launcher's grants - which syscall needs which capability, the capable()-hook mediation and the
   # one-capability end state: hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges".

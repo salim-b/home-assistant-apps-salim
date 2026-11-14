@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.3.3
+
+- Internals: no behavior change – the profile's blanket `signal,` rule is gone. Every signal path the app has is already
+  granted by `<abstractions/base>` (AppArmor 3.1.7): same-label delivery (s6-supervise signals the daemon on stop, shell
+  job control), signal-existence probes, and receive from the unconfined host runtime (how `docker stop`/restart reach
+  PID 1). The blanket's extra grants – cross-label send/receive against arbitrary labels – are unexercisable here: the
+  app runs a single profile label in its own PID namespace and sets no `host_pid`. No configuration change.
+
 ## 0.3.2
 
 - Maintainability: no behavior change – the `apparmor.txt` capability comment points at its canonical knowledge sections

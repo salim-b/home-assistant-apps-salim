@@ -216,6 +216,16 @@ Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7. Authoring
   and everything not matched by an allow rule is then denied; `deny network,` denies a class outright. The parser
   (5.0.2) does not support domain/type tuples – write individual rules (`network inet stream`, `network inet dgram`,
   `network inet6 …`, `network netlink raw`, …).
+- **`<abstractions/base>` grants the routine signal surface (AppArmor 3.1.7)**: same-label delivery
+  (`signal peer=@{profile_name}` – s6-supervise signaling its daemon, shell job control), existence probes
+  (`signal (receive, send) set=("exists")`) and receive from the unconfined host runtime
+  (`signal (receive) peer=unconfined` – how `docker stop`/restart reach the app's PID 1; source:
+  `profiles/apparmor.d/abstractions/base` @ tag v3.1.7, gitlab.com/apparmor/apparmor). A top-profile blanket `signal,`
+  therefore adds only cross-label grants: load-bearing only where the container really has a second label (sub-profiles
+  – s6-supervise runs under the top label and signals the daemon) or `host_pid: true` shares the host PID namespace
+  (supervisor `docker/app.py` `pid_mode`). A single-label app without `host_pid` (hickory-dns) needs no own signal rules
+  at all: kill(2) reaches only the own PID namespace and its descendants, so container-internal labels are the only
+  possible send targets.
 - **File-rule tightening is impractical**: without audit logs there is no way to iterate file rules safely, so a `file,`
   blanket is the upstream HA convention (docs template, dnsmasq, this repo's apps). The profile's confinement value sits
   in the non-file classes (network, capability, mount), which Docker's default profile would otherwise grant broadly. A
