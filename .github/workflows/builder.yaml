@@ -6,7 +6,7 @@ env:
   # publishes the tag (version-guard requires one for any device-visible change). .dockerignore (the per-app
   # build-context allow-list) is included like the Dockerfile: a change that breaks the context – e.g. dropping
   # rootfs/ – must fail CI in the PR that introduced it, not at a later release; no-op changes just cache-hit.
-  MONITORED_FILES: "config.json config.yaml config.yml Dockerfile .dockerignore rootfs"
+  MONITORED_FILES: config.json config.yaml config.yml Dockerfile .dockerignore rootfs
 
 on:
   pull_request:
@@ -36,14 +36,14 @@ jobs:
       changed_apps: ${{ steps.filter.outputs.changed_apps }}
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Get changed files
         id: changed_files
-        uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62 # v47
+        uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62  # v47
 
       - name: Find app directories
         id: apps

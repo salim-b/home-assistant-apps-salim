@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.3.4
+
+- Internals: no behavior change – `config.yaml` is reformatted to the repository's uniform `ryl format` style (quote
+  normalization; the parsed configuration is unchanged). No configuration change.
+
 ## 0.3.3
 
 - Internals: no behavior change – the profile's blanket `signal,` rule is gone. Every signal path the app has is already

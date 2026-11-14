@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.7.7
+
+- Internals: no behavior change – `config.yaml` is reformatted to the repository's uniform `ryl format` style (quote
+  normalization; the parsed configuration is unchanged). No configuration change.
+
 ## 0.7.6
 
 - Internals: no behavior change – the four privileged-binary AppArmor sub-profiles (`exportfs`, `nfsd`, `mountd`,

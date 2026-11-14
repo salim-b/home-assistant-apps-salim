@@ -1,11 +1,11 @@
 # https://contributors.home-assistant.io/apps/reference/configuration/
 name: hd-idle
-version: "0.2.1"
+version: 0.2.2
 slug: hd-idle
 description: Spin down idle hard disks (USB, SATA) automatically using hd-idle
 # Generic multi-arch manifest name; per-arch image names are derived by CI – repository README §"CI".
-image: "ghcr.io/salim-b/app-hd-idle"
-url: "https://github.com/salim-b/home-assistant-apps-salim/tree/main/hd-idle"
+image: ghcr.io/salim-b/app-hd-idle
+url: https://github.com/salim-b/home-assistant-apps-salim/tree/main/hd-idle
 panel_icon: mdi:harddisk
 arch:
   - aarch64
@@ -28,16 +28,16 @@ schema:
     # `device` is a supervisor device-type field: a dropdown of block devices with stable by-id paths that ALSO
     # grants the app cgroup access (re-granted on hotplug; system-used devices refused). Select the disk itself,
     # never a partition (a -partN entry grants only the partition node; hd-idle opens the disk node).
-    - device: "device(subsystem=block)"
+    - device: device(subsystem=block)
       # All three spin-down settings are required per drive – there are no global defaults. Idle time in seconds;
       # 0 = never spin down this drive.
-      idle: "int(0,)"
-      command_type: "list(scsi|ata)"
-      power_condition: "int(0,15)"
+      idle: int(0,)
+      command_type: list(scsi|ata)
+      power_condition: int(0,15)
       # Per-drive drive-PM opt-out (bool?), shaped so absent and false mean the same – root KNOWLEDGE.md §"bashio
       # option consumption" carries the shaping rule and the read pattern. absent/false = the treatment applies (the
       # default), true = the drive keeps its own power management. Emitted as the drives file's pm-flag column.
-      keep_drive_pm: "bool?"
-  debug: "bool?"
-  activity_log: "bool?"
-  ignore_spin_down_detection: "bool?"
+      keep_drive_pm: bool?
+  debug: bool?
+  activity_log: bool?
+  ignore_spin_down_detection: bool?

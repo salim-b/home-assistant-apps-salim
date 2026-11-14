@@ -8,7 +8,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: "0 0 * * *"
+    - cron: '0 0 * * *'
 
 permissions:
   # Read-only gate: checkout + the linters; no GITHUB_TOKEN writes needed.
@@ -28,7 +28,7 @@ jobs:
       addons: ${{ steps.addons.outputs.addons_list }}
     steps:
       - name: ⤵️ Check out code from GitHub
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
@@ -46,7 +46,7 @@ jobs:
         path: ${{ fromJson(needs.find.outputs.addons) }}
     steps:
       - name: ⤵️ Check out code from GitHub
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
@@ -54,7 +54,7 @@ jobs:
         # run frenck's app linter natively instead of via its Docker action, whose Docker Hub
         # image builds flake on transient auth.docker.io outages/429 rate limits; Renovate
         # digest-pins this checkout.
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: frenck/action-addon-linter
           ref: v2.21
@@ -70,7 +70,7 @@ jobs:
         # JSON schemas are loaded from absolute paths (the Docker image copied them to /) – provide them.
         env:
           # matrix values are plain strings (no JSON quoting) – safe to pass through env:.
-          INPUT_PATH: "./${{ matrix.path }}"
+          INPUT_PATH: ./${{ matrix.path }}
         run: |
           sudo cp linter/src/config.schema.json linter/src/build.schema.json /
           INPUT_COMMUNITY="false" \
@@ -82,12 +82,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: ⤵️ Check out code from GitHub
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
       - name: ⚙️ Set up mise (installs pinned tools via mise.lock)
-        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b  # v5.2.7
 
       - name: ✅ Run mise tasks (lint + validate)
         # GITHUB_TOKEN enables zizmor's online-only audits (impostor-commit, known-vulnerable-actions,

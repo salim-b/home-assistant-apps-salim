@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.2.2
+
+- Internals: no behavior change – `config.yaml` is reformatted to the repository's uniform `ryl format` style (quote
+  normalization; the parsed configuration is unchanged). No configuration change.
+
 ## 0.2.1
 
 - Internals: the hd-idle daemon's AppArmor sub-profile no longer carries the unscoped `signal (send)` grant. The daemon

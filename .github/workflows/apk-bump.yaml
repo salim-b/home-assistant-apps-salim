@@ -22,11 +22,11 @@ on:
     types:
       - closed
   schedule:
-    - cron: "30 1 * * *"
+    - cron: '30 1 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Log would-be pin findings and rebase comments instead of posting them"
+        description: Log would-be pin findings and rebase comments instead of posting them
         required: false
         type: boolean
         default: false
@@ -191,14 +191,14 @@ jobs:
         # zizmor: ignore[artipacked] – the "Commit and push changelog entries" step below pushes
         # with the persisted GITHUB_TOKEN, so credentials must survive the checkout (docs-only
         # commit; the workflow header records the resulting workflow suppression as intended).
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: main
           fetch-depth: 0
 
       - name: Set up mise
         if: steps.pins.outputs.has_pins == 'true'
-        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b  # v5.2.7
 
       - name: Insert changelog sections
         if: steps.pins.outputs.has_pins == 'true'

@@ -16,7 +16,7 @@ name: Publish reconcile
 
 on:
   schedule:
-    - cron: "15 3 * * *"
+    - cron: '15 3 * * *'
   workflow_dispatch:
 
 permissions:
@@ -37,7 +37,7 @@ jobs:
       addons_list: ${{ steps.addons.outputs.addons_list }}
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
@@ -63,7 +63,7 @@ jobs:
         app: ${{ fromJson(needs.find.outputs.addons_list) }}
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
@@ -71,7 +71,7 @@ jobs:
         id: info
         uses: home-assistant/actions/helpers/info@master
         with:
-          path: "./${{ matrix.app }}"
+          path: ./${{ matrix.app }}
 
       - name: Normalize app information
         id: normalize
