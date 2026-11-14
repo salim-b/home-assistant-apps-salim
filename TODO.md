@@ -30,6 +30,15 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   fix run is self-verifying: exit 0 only when nothing remains to fix or flag); the overrides can be dropped once this
   lands.
 
+- Upstream: file an issue against [owenlamont/ryl](https://github.com/owenlamont/ryl) asking for a way to silence the
+  summary that `ryl format --check`/`--diff` unconditionally end with on stderr (`N files already formatted`; the
+  formatter docs record it as designed). Probed 2026-11-14 on 0.29.0: no CLI flag silences it (`--check` has no
+  `--quiet`; `--output-format` styles findings but the summary ignores the format selection) and `[output]` can route a
+  whole format's rendering elsewhere but not drop the summary. No existing issue found searching `quiet`/`summary` the
+  same day. The tombi/ruff hk builtins pass `--quiet` and are silent; this repo's workaround (hk `ryl-format` step): the
+  check routes its diff preview to stdout via `--config-data 'output = { standard = { path = "-" } }'` and drops stderr,
+  keeping failures verbose. The routing and stderr drop can be replaced by the flag once it lands.
+
 - Upstream: file an hk PR against [jdx/hk](https://github.com/jdx/hk) adding a `panache` builtin
   (`pkl/builtins/panache.pkl`): [panache](https://github.com/jolars/panache) is the Markdown formatter this repo runs as
   a custom hk step (`check = panache format --check {{files}}`, `fix = panache format {{files}}` over
