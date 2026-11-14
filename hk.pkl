@@ -84,6 +84,13 @@ local linters = new Mapping<String, Step> {
     glob = List(".github/renovate.json", ".github/renovate.json5")
     check = "renovate-config-validator --no-global --strict {{files}}"
   }
+  // ryl format (same .ryl.toml selection/exclusions); its fixes supersede the ryl-lint fix step's,
+  // so the two converge in either order (probed ryl 0.29.0).
+  ["ryl-format"] {
+    types = List("yaml")
+    check = "ryl format --check {{files}}"
+    fix = "ryl format {{files}}"
+  }
   // ryl (Rust yamllint re-implementation, configured in .ryl.toml); --strict on check and fix.
   // check_diff/check_after_diff are cleared on purpose – why: .agents/skills/ha-app-tooling (upstream: root TODO.md).
   ["ryl-lint"] = (Builtins.ryl) {
@@ -100,13 +107,6 @@ local linters = new Mapping<String, Step> {
         argv = List("ryl", "check", "--fix", "--strict", "{{files}}")
       }
     }
-  }
-  // ryl format shares the .ryl.toml selection/exclusions; pre-commit runs it after the ryl-lint step
-  // (map order) and the two converge – neither's output needs the other's fixes (probed ryl 0.29.0).
-  ["ryl-format"] {
-    types = List("yaml")
-    check = "ryl format --check {{files}}"
-    fix = "ryl format {{files}}"
   }
   // tombi (TOML linter/formatter): schemas bind per-file via `#:schema` top directives
   // (strict mode – unknown keys are errors).
