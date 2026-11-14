@@ -15,8 +15,8 @@
   output = "keep-order"
 
 [tasks.fmt]
-  description = "Auto-format the repository's Markdown (Panache), TOML (tombi) and Python (ruff)"
-  run = [ "panache format .", "tombi format .", "ruff format ." ]
+  description = "Auto-format the repository's Markdown (Panache), TOML (Tombi), Python (Ruff) and YAML (Ryl)"
+  run = [ "panache format .", "tombi format .", "ruff format .", "ryl format ." ]
 
 [tasks.install-git-hooks]
   description = "Install hk git hooks user-wide via `~/.gitconfig` (needs Git 2.54+)"

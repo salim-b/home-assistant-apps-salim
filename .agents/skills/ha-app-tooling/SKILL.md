@@ -22,8 +22,8 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   `git diff --name-only -z HEAD | hk check --files0-from=-`.
 - Git hooks (enable once per machine: `mise run install-git-hooks`, after `mise install --locked`; needs Git 2.54+,
   installs user-wide, silently no-ops in repos without `hk.pkl`): pre-commit auto-fixes (panache format, tombi format,
-  final newlines, shfmt, shellcheck autofixes) and gates the commit; commit-msg enforces Conventional Commits. Escape
-  hatch: `HK=0 git commit`.
+  ryl format, final newlines, shfmt, shellcheck autofixes) and gates the commit; commit-msg enforces Conventional
+  Commits. Escape hatch: `HK=0 git commit`.
 
 ## mise task authoring
 
@@ -66,6 +66,12 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   or errors – and hk's fix mode skips the fixer when `check_diff` exits `0`, so violating files would pass pre-commit
   untouched. With `check_diff` gone, fix mode runs `fix` (carrying `--strict`) on every staged YAML file and its exit
   code decides: `0` only when nothing remains to fix or flag. (Upstream issue: root `TODO.md`.)
+- YAML is also formatted by `ryl format` (hk `ryl-format` step; `mise run fmt` runs `ryl format .`), sharing the
+  `.ryl.toml` selection and exclusions: double quotes become single where quoting must stay (`'755'`, `'*'`), quotes are
+  dropped when the plain scalar keeps the same YAML 1.2 core type, and trailing comments align two spaces out.
+  Pre-commit runs it after the `ryl` fix step (map order); the two converge – neither's output needs the other's fixes
+  (probed ryl 0.29.0). Reformatting an app's `config.yaml` is device-visible – version bump required (skill
+  ha-app-workflow).
 - `line-length` ignores comments by default (yamllint parity): the 140 limit bites YAML scalars only.
 - `.ryl.toml` has no `extends`, so it inlines the `default` preset (ryl enables no rules by default) with this repo's
   overrides applied. The override whys: `line-length` at 140/warning because app config descriptions/translations use

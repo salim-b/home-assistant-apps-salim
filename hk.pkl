@@ -101,6 +101,13 @@ local linters = new Mapping<String, Step> {
       }
     }
   }
+  // ryl format shares the .ryl.toml selection/exclusions; pre-commit runs it after the ryl fix step
+  // (map order) and the two converge – neither's output needs the other's fixes (probed ryl 0.29.0).
+  ["ryl-format"] {
+    types = List("yaml")
+    check = "ryl format --check {{files}}"
+    fix = "ryl format {{files}}"
+  }
   // tombi (TOML linter/formatter): schemas bind per-file via `#:schema` top directives
   // (strict mode – unknown keys are errors).
   ["tombi-format"] = Builtins.tombi_format
