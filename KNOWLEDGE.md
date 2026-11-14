@@ -124,8 +124,29 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
   invisible – `ps`/`pgrep`/`pidof` list the SSH app's namespace, `/proc/<pid>` of an app daemon is unreachable;
   `netstat`/`/proc/net` reflect the SSH app's network namespace (with default port publishing, not the host's); there is
   no docker CLI. What works: the `ha` CLI (supervisor API), the `/local_apps` mount (app-store writes), `ha apps logs`
-  and `ha host logs`. So: process/socket-level assertions come from the app's own log, network-level ground truth from
-  client probes run on the dev host.
+  and `ha host logs` (§"Supervisor: app and host logs are served from systemd-journald"). So: process/socket-level
+  assertions come from the app's own log, network-level ground truth from client probes run on the dev host.
+
+## Supervisor: app and host logs are served from systemd-journald
+
+- Every `/logs` REST endpoint (`ha apps logs`, `ha host logs`, plugins, core, …) is served from the host's
+  systemd-journald via systemd-journal-gatewayd (supervisor `api/host.py` `advanced_logs`; the switch from docker logs
+  dates to 2024.04, home-assistant/supervisor #4972). Docker's journald driver tags entries `SYSLOG_IDENTIFIER` =
+  container name; the app endpoints query both `app_<slug>` and `addon_<slug>` (dual identifiers across the
+  container-name migration).
+- The default window is the LAST 100 entries (supervisor `api/host.py` `DEFAULT_LINES`). The `ha` CLI widens it with
+  `--lines` (a `Range: entries=:-N:` header) and scopes it with `--boot <offset|id>`, where `0` is the current HOST boot
+  – container restarts do not reset it. `--verbose` renders `identifier[pid]` per entry (the fastest way to see where an
+  entry actually lives).
+- One host boot's app log therefore interleaves every container boot (install, options changes, restarts).
+  Per-container-boot segmentation needs an in-log anchor – the app's own cont-init banner line – and the anchor must
+  track the app's actual logging: an anchor outliving its banner line silently broadens the segment to the whole fetch
+  and corrupts per-boot assertions (launch-line counts, hygiene greps).
+- Boot output before the first service line can be large (hickory-dns 0.26.3 logs ~85 zone-loading lines before binding
+  :53), so small default windows drop early-boot lines even within the current boot.
+- bashio log lines carry raw ANSI color escapes unconditionally (no TTY check) – journal-export binary fields. They pass
+  the supervisor 2026.11.0 pyjournalexport reader (verified on-device 2026-11-14), but log assertions should prefer
+  plain-text daemon output where one exists.
 
 ## Supervisor: health events and the app watchdog
 
