@@ -60,7 +60,3 @@ Open work items only (resolved items live in git history). Underlying technical 
   TCP/UDP socket at all is unverified; the answer decides whether mountd's `net_bind_service` + network grants are live
   surface (scoping/dropping candidates). The `apparmor.txt` comment no longer contradicts this (it defers to the run
   script and points here).
-
-- AppArmor sub-profiles: the unscoped `signal (send)` grants are template-inherited and unused (nothing in the app sends
-  signals; s6-svc talks to s6 over its control fifo, not kill(2)). Scope or drop them – device-verify first (no audit
-  logs on HAOS: skill `ha-app-apparmor`).

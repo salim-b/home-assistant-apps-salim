@@ -4,12 +4,9 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   #include <abstractions/base>
 
   ## Conventions & references (device-enforcement-verified on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7):
-  ## shape modeled on the official dev-docs AppArmor template and the shipped dnsmasq app profile; sub-profile
-  ## signal receive is peer-scoped per the docs template (the unscoped send grants there are template-inherited
-  ## headroom - nothing in them sends signals; nfs-server/TODO.md tracks scoping/dropping them); `file,` blanket per
-  ## upstream convention - HAOS produces
-  ## no AppArmor audit/denial logs, so tightening file rules risks silent breakage (the confinement value sits in
-  ## the non-file classes: mount/capability). Facts:
+  ## shape modeled on the official dev-docs AppArmor template and the shipped dnsmasq app profile; `file,` blanket
+  ## per upstream convention – HAOS produces no AppArmor audit/denial logs, so tightening file rules risks silent
+  ## breakage (the confinement value sits in the non-file classes: mount/capability). Facts:
   ## nfs-server/KNOWLEDGE.md §"AppArmor profile — app-specific grants";
   ## root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics"; procedure: .agents/skills/ha-app-apparmor.
 
@@ -93,7 +90,10 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   ## execute). They still need the procfs/exports access listed above, hence re-granted here.
   ## Official docs template: every sub-profile's signal receive is peer-scoped to the app's own top profile -
   ## the supervisor renames the top profile to the installed slug on the device (e.g. local_nfs-server; the
-  ## *_nfs-server glob covers repo installs too).
+  ## *_nfs-server glob covers repo installs too). No sub-profile carries a `signal (send)` grant: nothing in
+  ## them sends cross-label signals (s6-supervise signals the daemons from the top profile label, matched by
+  ## their receive rules; the nfsd-watch change cycle re-runs the nfsd-start script instead of signaling
+  ## anything) – same-label self-delivery is covered by <abstractions/base>.
 
   # exportfs (nfsd-start: exportfs -a; nfsd-stop: exportfs -au)
   /usr/sbin/exportfs cx -> exportfs,
@@ -102,7 +102,6 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     #include <abstractions/base>
 
     file,
-    signal (send) set=(kill,term,int,hup,cont),
     signal (receive) peer=*_nfs-server,
 
     # inet/inet6 stream+dgram: in case exportfs attempts RPC-based cache flushes toward mountd/rpcbind.
@@ -130,7 +129,6 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     #include <abstractions/nameservice>
 
     file,
-    signal (send) set=(kill,term,int,hup,cont),
     signal (receive) peer=*_nfs-server,
 
     # Inert under the network deny below (no socket can exist to bind; capability mediation is independent of the
@@ -165,7 +163,6 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     #include <abstractions/nameservice>
 
     file,
-    signal (send) set=(kill,term,int,hup,cont),
     signal (receive) peer=*_nfs-server,
 
     capability net_bind_service,
@@ -198,7 +195,6 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     #include <abstractions/base>
 
     file,
-    signal (send) set=(kill,term,int,hup,cont),
     signal (receive) peer=*_nfs-server,
 
     # setpcap: nfsdcld prunes its own capability set at startup (prctl PR_CAPBSET_DROP + a final capset); without

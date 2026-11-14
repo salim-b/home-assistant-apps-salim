@@ -2,6 +2,15 @@
 
 # Changelog
 
+## 0.7.6
+
+- Internals: no behavior change – the four privileged-binary AppArmor sub-profiles (`exportfs`, `nfsd`, `mountd`,
+  `nfsdcld`) no longer carry the unscoped `signal (send)` grant. None of them sends signals to other processes
+  (s6-supervise signals the daemons from the top profile label, which the peer-scoped receive rules already cover, and
+  the nfsd-watch change cycle re-runs the nfsd-start script instead of signaling anything); same-process signal delivery
+  stays covered by each sub-profile's `<abstractions/base>` include. The grants were docs-template headroom only. No
+  configuration change.
+
 ## 0.7.5
 
 - Maintainability: no behavior change – the `config.yaml` image comment matches the repository's one-line pointer style
