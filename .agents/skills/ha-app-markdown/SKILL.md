@@ -26,9 +26,3 @@ description: Markdown formatting conventions for this repository – panache own
 - rumdl never rewrites files: its fix allow-list is pinned to an inert `all` sentinel (canonicalization-preserved,
   verified through rumdl 0.3.1; behavioral canary in `validate/apps.py`). Formatting fixes go through panache
   (`mise run fmt`); non-format rumdl findings are fixed by hand.
-
-## Constructs that break the toolchain – write around them
-
-- Do not let prose wrap so that a line starts with an ordered-list marker (`4)`, `2026.` – a parenthetical ending in
-  digits does this at wrap boundaries): CommonMark renders such a line as prose, panache formats it as a nested list,
-  and the two disagree.
