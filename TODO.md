@@ -84,6 +84,20 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   ephemeral `docker run --rm ghcr.io/home-assistant/base:3.24 apk update` on the device. App-side counterpart:
   `hickory-dns/TODO.md`.
 
+- entire-agent-goose pin bumps: automate the manual commit-pseudo-version bumps the mise.toml pin comment defers to
+  hand-editing plus `mise lock` – Renovate can't own them. Its mise manager resolves `go:`-backend deps against the Go
+  module proxy by package path (verified 2026-11-14 in Renovate's `lib/modules/manager/mise/`: `extract.ts` case `go` →
+  `createGoToolConfig` → `GoDatasource`), and the proxy has no versions for
+  `…/agents/entire-agent-goose/cmd/entire-agent-goose` (main-package path inside a module whose `external-agents`
+  upstream carries no tags/releases), so lookups return nothing and the pin drifts silently. Desired: drift detection
+  plus a bump path. Most in this repo's grain: a `bump-entire-agent-goose` mise task (latest commit touching
+  `agents/entire-agent-goose` via the GitHub API → pseudo-version from the UTC commit time plus 12-char SHA → rewrite
+  the pin, `mise lock`; mirroring `bump-hk`) plus a drift validate task on the daily cron like `validate:apk-pins`
+  (main-pushes-and-cron-only: the upstream publishing state is not the PR's). A Renovate custom datasource fronting the
+  upstream path's commit list would instead fold the dep into the weekly Monday cadence – viable if the endpoint tax is
+  acceptable. If upstream ever tags the module, switch the pin to the real semver (Renovate's go datasource takes over)
+  and drop this item.
+
 - CLAUDE.md shim: remove the repo-root `CLAUDE.md → AGENTS.md` symlink at the end of 2026 – the grace period for Claude
   Code users to update their harness. Decisive fact: Claude Code v2.1.277 (2026-09-18) reads `AGENTS.md` as its project
   instructions natively whenever no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` exists in the working
