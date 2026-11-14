@@ -10,10 +10,8 @@ description: Markdown formatting conventions for this repository – panache own
 
 - panache (`panache.toml`) owns ALL formatting: `mise run fmt` reflows prose to the 120-char width. Never hand-wrap
   prose – write naturally and let `fmt` shape it.
-- The lint gate runs `panache format --check` and `panache lint` over tracked `.md` files (excluding `AI_POLICY.md` –
-  the Open Home Foundation's policy text, kept verbatim for upstream syncs – and `**/LICENSE.md`, mirroring panache's
-  default Markdown exclude). Explicit file paths bypass panache's config excludes, so hk's `mdExcludes` in `hk.pkl`
-  repeats the exclusion for both step invocations. The lint adds semantic checks (references, heading hierarchy, …).
+- The lint gate runs `panache format --check` and `panache lint` over tracked `.md` files – the lint adds semantic
+  checks (references, heading hierarchy, …).
 
 ## rumdl
 
