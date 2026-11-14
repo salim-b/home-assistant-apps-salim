@@ -16,9 +16,9 @@ import "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Builtin
   // The apps' extension-less /usr/bin scripts (bashio shebangs – same typing gap); all three shell steps cover them.
   local appBinGlobs = List("**/rootfs/usr/bin/*")
 local mdGlobs = List("**/*.md", "**/*.markdown")
-// AI_POLICY.md is upstream-verbatim; **/LICENSE.md mirrors panache's default Markdown exclude
+// AI_POLICY.md and .entire/agent-guide.md are upstream-verbatim; **/LICENSE.md mirrors panache's default Markdown exclude
 // (explicit-path bypass: skill ha-app-markdown).
-local mdExcludes = List("AI_POLICY.md", "**/LICENSE.md")
+local mdExcludes = List("AI_POLICY.md", ".entire/agent-guide.md", "**/LICENSE.md")
 
 local linters = new Mapping<String, Step> {
   ["editorconfig-checker"] = (Builtins.editorconfig_checker) {

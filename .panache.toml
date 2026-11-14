@@ -6,8 +6,9 @@
 # Plain GitHub-Flavored Markdown repository.
 flavor = "gfm"
 
-# Open Home Foundation policy text, kept verbatim for upstream syncs – not this repo's prose to style.
-extend-exclude = [ "AI_POLICY.md" ]
+# AI_POLICY.md: Open Home Foundation policy text, kept verbatim for upstream syncs – not this repo's prose to style.
+# .entire/agent-guide.md: `entire`-owned, kept verbatim for upstream syncs
+extend-exclude = [ "AI_POLICY.md", ".entire/agent-guide.md" ]
 
 [format]
   # Match rumdl's enforced MD013 limit so the formatter and the second linter agree on what "fits" means.

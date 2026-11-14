@@ -97,3 +97,8 @@ finishing a change, lab-boot every runtime-affecting change – lives in skill `
 Skill `ha-app-workflow` – load it before making any change. It owns the non-negotiables: `agent-<topic>` branches,
 Conventional Commits with the `Assisted-by` trailer, final newlines, version bump + changelog for device-visible app
 changes, CI-as-source-of-truth, device-SSH access policy, and citations for version-sensitive facts.
+
+<!-- entire-agent:begin -->
+Read .entire/agent-guide.md for this repository's workflow, source inspection, and verification guidance.
+@.entire/agent-guide.md
+<!-- entire-agent:end -->
