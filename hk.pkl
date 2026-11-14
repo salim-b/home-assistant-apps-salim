@@ -85,10 +85,13 @@ local linters = new Mapping<String, Step> {
     check = "renovate-config-validator --no-global --strict {{files}}"
   }
   // ryl format (same .ryl.toml selection/exclusions); its fixes supersede the ryl-lint fix step's,
-  // so the two converge in either order (probed ryl 0.29.0).
+  // so the two converge in either order (probed ryl 0.29.0). The check routes its diff preview to
+  // stdout and drops stderr, which `ryl format --check` ends with unconditionally (no --quiet, unlike
+  // the tombi/ruff builtins); failures still print their findings, successes stay silent.
   ["ryl-format"] {
     types = List("yaml")
-    check = "ryl format --check {{files}}"
+    check =
+      "ryl format --check --config-data 'output = { standard = { path = \"-\" } }' {{files}} 2>/dev/null"
     fix = "ryl format {{files}}"
   }
   // ryl (Rust yamllint re-implementation, configured in .ryl.toml); --strict on check and fix.
