@@ -14,7 +14,7 @@ subdirectory with a `config.yaml`, `Dockerfile`, `.dockerignore`, `rootfs/`, doc
 - `hickory-dns` – a DNS server that forwards to user-configured encrypted upstream resolvers (DoT/DoH/DoQ) with DNSSEC
   validation, wrapping the Alpine `hickory-dns` package (generated `named.toml` configuration).
 
-All apps' architecture and gotchas are non-obvious: consult their runtime skills (index below) before touching their
+All apps' architecture and gotchas are non-obvious: consult their runtime skills (§"Skills") before touching their
 runtime code.
 
 ## Information placement rule
@@ -38,7 +38,7 @@ Never duplicate information across files. Place it where it belongs and referenc
   deleted, not archived: Git history is the record.
 - Code and config comments – reduce to a minimum; purpose plus pointer (`# See <app>/KNOWLEDGE.md §…`,
   `# see .agents/skills/<skill>…`); parsimony rules below.
-- `AGENTS.md` (this file) – agent process, placement rule, and the skill index. No facts, no procedures, no task usage.
+- `AGENTS.md` (this file) – agent process and placement rule. No facts, no procedures, no task usage.
 
 ### Prose parsimony
 
@@ -61,23 +61,11 @@ remain ASCII-only; none so far – Markdown, YAML, and task/service scripts all 
 not the rule: only use them deliberately, where they genuinely add value. Apply this to prose you write or rewrite; do
 not sweep untouched files unprompted.
 
-## Skills index
+## Skills
 
-Load a skill's full text before doing the kind of work it covers:
-
-  | Skill                   | Consult it before/when                                                                       |
-  | ----------------------- | -------------------------------------------------------------------------------------------- |
-  | `ha-app-workflow`       | making any change, commit, or release (branching, commit format, version bumps, CI)          |
-  | `ha-app-tooling`        | touching `hk.pkl`, mise tasks, or lint config; interpreting lint failures                    |
-  | `ha-app-markdown`       | writing or editing any Markdown file                                                         |
-  | `ha-app-apparmor`       | creating or changing an `apparmor.txt`; diagnosing on-device permission denials              |
-  | `ha-app-base-image`     | writing or debugging app shell scripts (procfs writes, s6 wiring, bashio)                    |
-  | `ha-app-lab-testing`    | deploying any runtime-affecting change; adding or changing lab hooks                         |
-  | `ha-app-device-testing` | verifying on a real HAOS device (deploy:local / deploy:registry / apply-options / test:live) |
-  | `ha-app-scaffolding`    | adding or bootstrapping a new app subdirectory                                               |
-  | `nfs-server-runtime`    | touching nfs-server runtime code or s6 services; debugging it on a device                    |
-  | `hd-idle-runtime`       | touching hd-idle runtime code or s6 services; debugging it on a device                       |
-  | `hickory-dns-runtime`   | touching hickory-dns runtime code or s6 services; debugging it on a device                   |
+Load a skill's full text from `.agents/skills/<name>/SKILL.md` before doing the kind of work it covers. Each skill's
+frontmatter `description:` is the single source of truth for what it is and when to consult it – coding agents index
+that directory automatically.
 
 ## Environment setup
 
