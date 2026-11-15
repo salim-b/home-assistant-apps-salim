@@ -7,8 +7,25 @@
 flavor = "gfm"
 
 # AI_POLICY.md: Open Home Foundation policy text, kept verbatim for upstream syncs – not this repo's prose to style.
-# .entire/agent-guide.md: `entire`-owned, kept verbatim for upstream syncs
-extend-exclude = [ "AI_POLICY.md", ".agents/skills/entire-search/SKILL.md", ".entire/agent-guide.md" ]
+# .entire/agent-guide.md: `entire`-owned, kept verbatim for upstream syncs.
+# .agents/skills/<vendored>/: skills vendored from entireio/skills via vendir (vendir.yml) – upstream-verbatim; any
+# local reformat would be reverted by the next sync (churn). hk passes explicit paths that bypass this list, so the
+# gate's own excludes live in hk.pkl (skill ha-app-markdown).
+extend-exclude = [
+  "AI_POLICY.md",
+  ".agents/skills/address-findings/",
+  ".agents/skills/explain/",
+  ".agents/skills/recall/",
+  ".agents/skills/replay/",
+  ".agents/skills/review/",
+  ".agents/skills/session-crosslink/",
+  ".agents/skills/session-handoff/",
+  ".agents/skills/session-to-skill/",
+  ".agents/skills/teach/",
+  ".agents/skills/what-happened/",
+  ".agents/skills/entire-search/SKILL.md",
+  ".entire/agent-guide.md",
+]
 
 [format]
   # Match rumdl's enforced MD013 limit so the formatter and the second linter agree on what "fits" means.

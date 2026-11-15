@@ -1,0 +1,63 @@
+apiVersion: vendir.k14s.io/v1alpha1
+directories:
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
+      sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
+    path: .
+  path: .agents/skills/address-findings
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
+      sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
+    path: .
+  path: .agents/skills/explain
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
+      sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
+    path: .
+  path: .agents/skills/recall
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
+      sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
+    path: .
+  path: .agents/skills/replay
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
+      sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
+    path: .
+  path: .agents/skills/review
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
+      sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
+    path: .
+  path: .agents/skills/session-crosslink
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
+      sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
+    path: .
+  path: .agents/skills/session-handoff
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
+      sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
+    path: .
+  path: .agents/skills/session-to-skill
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
+      sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
+    path: .
+  path: .agents/skills/teach
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
+      sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
+    path: .
+  path: .agents/skills/what-happened
+kind: LockConfig

@@ -71,10 +71,10 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   shellcheck = "0.11.0"
   shellharden = "4.3.2"
   shfmt = "3.14.1"
-  "github:skilld-dev/skilld" = { bin = "skilld", version = "3.6.8" }
   tombi = "1.11.2"
   ty = "0.0.100"
   uv = "0.13.7"
+  vendir = "0.46.3"
   yq = "4.54.3"
   zizmor = "1.32.0"
   # aube policy exemptions for renovate's tool tree (whys: .agents/skills/ha-app-tooling, Renovate section).

@@ -5,7 +5,10 @@
 # applied; the override whys: .agents/skills/ha-app-tooling ("YAML linting: ryl").
 
 exclude = [
+  # Machine-generated (mise lock): vendir.lock.yml likewise – vendir rewrites it on every sync, so any local
+  # formatting would be reverted (churn). hk's ryl steps exclude it for their explicit-path runs as well.
   ".mise/locks/**",
+  "vendir.lock.yml",
 ]
 
 [files]
