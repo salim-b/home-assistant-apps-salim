@@ -1,0 +1,86 @@
+name: Skills update
+
+# Weekly refresh of the vendir-vendored agent skills (vendir.yml): `vendir sync --yes` re-resolves
+# the `ref: main` pins and rewrites vendir.lock.yml plus the vendored copies under .agents/skills/
+# whenever the upstream collection moved. On drift the refreshed tree is pushed to the
+# `vendored-skills-update` branch and a rolling PR is opened or updated – the branch is force-pushed
+# on every refresh, so the PR rolls until merged. No drift means no PR; workflow_dispatch is safe
+# for manual verification runs.
+#
+# Cron offset: Monday 04:30 UTC – away from the daily crons (lint 00:00, apk-bump 01:30,
+# publish-reconcile 03:15).
+
+on:
+  schedule:
+    - cron: '30 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync vendored agent skills
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # Serialize sync runs – schedule and manual dispatch could overlap, and the rolling PR branch
+    # is force-pushed.
+    concurrency:
+      group: skills-update
+      cancel-in-progress: false
+    steps:
+      - name: Check out main
+        # zizmor: ignore[artipacked] – the "Open rolling pull request" step below pushes with the
+        # persisted GITHUB_TOKEN, so credentials must survive the checkout (bot-only rolling PR
+        # branch; the workflow header records the resulting suppression as intended).
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up mise
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b  # v5.2.7
+
+      - name: Sync vendored skills and detect upstream drift
+        id: sync
+        run: |
+          set -euo pipefail
+          vendir sync --yes
+          if git status --porcelain -- vendir.lock.yml .agents/skills/ | grep -q .; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open rolling pull request
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          mise run check
+          sha="$(yq -r '.directories[0].contents[0].git.sha' vendir.lock.yml)"
+          branch="vendored-skills-update"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --create "$branch"
+          git add --all -- vendir.lock.yml .agents/skills/
+          git commit --message "chore: refresh vendored agent skills" \
+            --message "Pins the vendored skills at ${sha}."
+          git push --force origin "$branch"
+          body="Automated weekly vendir sync of the agent skills vendored from
+          [entireio/skills](https://github.com/entireio/skills).
+
+          New pinned commit: [${sha}](https://github.com/entireio/skills/commit/${sha}).
+
+          Merging refreshes the vendored copies under \`.agents/skills/\`. This branch is force-pushed on every
+          refresh; the PR rolls until merged. Facts: root \`KNOWLEDGE.md\` §\"Vendored agent skills\"."
+          pr="$(gh pr list --head "$branch" --state open --json number \
+                --jq '.[0].number // empty' 2>/dev/null || true)"
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --body "$body"
+          else
+            gh pr create --title "chore: refresh vendored agent skills" --body "$body" \
+              --base main --head "$branch"
+          fi
