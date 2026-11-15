@@ -22,8 +22,8 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   `git diff --name-only -z HEAD | hk check --files0-from=-`.
 - Git hooks (enable once per machine: `mise run install-git-hooks`, after `mise install --locked`; needs Git 2.54+,
   installs user-wide, silently no-ops in repos without `hk.pkl`): pre-commit auto-fixes (panache format, tombi format,
-  ryl format, final newlines, shfmt, shellcheck autofixes) and gates the commit; commit-msg enforces Conventional
-  Commits. Escape hatch: `HK=0 git commit`.
+  ryl format, final newlines, shfmt, dockerfmt, shellcheck autofixes) and gates the commit; commit-msg enforces
+  Conventional Commits. Escape hatch: `HK=0 git commit`.
 
 ## mise task authoring
 
@@ -183,7 +183,8 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   project-level skips in `droast.toml` (DF020/DF036 – the HA base image provides the runtime identity and init via
   s6-overlay). Rule IDs are `DF0xx`; a `# hadolint ignore=DLxxx` pragma is dead weight under droast – inline ignores are
   `# droast ignore=DFxxx reason="…"`, and `droast --hadolint-compatible --hadolint-compatibility-report` maps old DL IDs
-  to their DF equivalents.
+  to their DF equivalents. Formatting: dockerfmt (<https://github.com/reteps/dockerfmt>; hk custom step), reading its
+  style from `.editorconfig`.
 - `.github/renovate.json` is validated by the official `renovate-config-validator` via a custom hk step
   (`--no-global --strict`). `--no-global` matters: bare file args are otherwise validated as a GLOBAL self-hosted
   config, which a repo config is not. `--strict` also fails while the installed Renovate flags a pending config
