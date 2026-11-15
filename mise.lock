@@ -223,6 +223,46 @@ checksum = "sha256:d4bf219ddc588e055fcaad10547a967d683fa7536b78cc96cc6e57ea75ff4
 url = "https://github.com/immanuwell/dockerfile-roast/releases/download/1.7.0/droast-windows-x86_64.exe"
 url_api = "https://api.github.com/repos/immanuwell/dockerfile-roast/releases/assets/539932749"
 
+[[tools."github:reteps/dockerfmt"]]
+version = "1.0.0"
+backend = "github:reteps/dockerfmt"
+specifiers = ["1.0.0"]
+
+[tools."github:reteps/dockerfmt"."platforms.linux-arm64"]
+checksum = "sha256:fb361d10597b998766c72db47c4a70350832860571bb772a8b8cfc780377b7c9"
+checksum_source = "mise-versions"
+url = "https://github.com/reteps/dockerfmt/releases/download/v1.0.0/dockerfmt-v1.0.0-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/746326134"
+
+[tools."github:reteps/dockerfmt"."platforms.linux-arm64-musl"]
+checksum = "sha256:cc32df2892228e2ec7411c2a5ac9f580ff698ccc70ed24f7817d8bdf20f1f6b5"
+checksum_source = "mise-versions"
+url = "https://github.com/reteps/dockerfmt/releases/download/v1.0.0/dockerfmt-v1.0.0-linux-arm64-musl.tar.gz"
+url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/746326198"
+
+[tools."github:reteps/dockerfmt"."platforms.linux-x64"]
+checksum = "sha256:da0cd8bbb3f1b6cdbe0bc16d4e762ffb2351a69eb259d84a7ddc35bcf156e1f7"
+url = "https://github.com/reteps/dockerfmt/releases/download/v1.0.0/dockerfmt-v1.0.0-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/746326251"
+
+[tools."github:reteps/dockerfmt"."platforms.linux-x64-musl"]
+checksum = "sha256:4719b615607e36b4eba45c10bae70da43e1f200c59dc02029cdf26269224aea3"
+checksum_source = "mise-versions"
+url = "https://github.com/reteps/dockerfmt/releases/download/v1.0.0/dockerfmt-v1.0.0-linux-amd64-musl.tar.gz"
+url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/746326103"
+
+[tools."github:reteps/dockerfmt"."platforms.macos-arm64"]
+checksum = "sha256:69239cf26188c206def08f2b9867da63af53336224f58faf05eb4df3562e5467"
+checksum_source = "mise-versions"
+url = "https://github.com/reteps/dockerfmt/releases/download/v1.0.0/dockerfmt-v1.0.0-darwin-arm64.tar.gz"
+url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/746326257"
+
+[tools."github:reteps/dockerfmt"."platforms.macos-x64"]
+checksum = "sha256:a0d6dc8d1b9bbb65a54b4070a18c33396896b325639e7a4baf11fb90f2a7d972"
+checksum_source = "mise-versions"
+url = "https://github.com/reteps/dockerfmt/releases/download/v1.0.0/dockerfmt-v1.0.0-darwin-amd64.tar.gz"
+url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/746326023"
+
 [[tools."github:skilld-dev/skilld"]]
 version = "3.6.8"
 backend = "github:skilld-dev/skilld"

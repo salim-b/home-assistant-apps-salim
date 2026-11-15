@@ -42,6 +42,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
 
 [tools]
   "github:immanuwell/dockerfile-roast" = "1.7.0"
+  "github:reteps/dockerfmt" = "1.0.0"
   editorconfig-checker = "4.0.2"
   entireio-cli = "0.13.4"
   # Toolchain for the go:-backend build below (mise builds go: tools with the project's go pin).
