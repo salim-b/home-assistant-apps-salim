@@ -65,6 +65,13 @@ local linters = new Mapping<String, Step> {
   ["jactionlint"] = Builtins.jactionlint
   // droast (Dockerfile linter, hk builtin); project-level skips: droast.toml.
   ["droast"] = Builtins.droast
+  // dockerfmt (Dockerfile formatter; no hk builtin yet – upstream item: root TODO.md); style comes
+  // from .editorconfig (indent, final newline, space_redirects).
+  ["dockerfmt"] {
+    glob = List("**/Dockerfile")
+    check = "dockerfmt --diff {{files}}"
+    fix = "dockerfmt --write {{files}}"
+  }
   // zizmor (GitHub Actions security audit, hk builtin); rule policy: .github/zizmor.yml. Mode/token
   // conventions: .agents/skills/ha-app-tooling.
   ["zizmor"] = (Builtins.zizmor) {
