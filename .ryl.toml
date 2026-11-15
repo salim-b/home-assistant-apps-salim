@@ -5,7 +5,9 @@
 # applied; the override whys: .agents/skills/ha-app-tooling ("YAML linting: ryl").
 
 exclude = [
+  # Lockfiles must be ignored by ryl
   ".mise/locks/**",
+  "vendir.lock.yml",
 ]
 
 [files]

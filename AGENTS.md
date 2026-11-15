@@ -28,6 +28,8 @@ Never duplicate information across files. Place it where it belongs and referenc
 - `.agents/skills/<name>/` – **procedures** for coding agents (how to do things), in the
   [agentskills.io](https://agentskills.io/specification) format (`SKILL.md` with YAML frontmatter; optional `scripts/`,
   `references/`, `assets/`). Skills cite facts from the knowledge files by section (`§"..."`), never restate them.
+  Eleven of these skills are vendored upstream-verbatim and must be treated read-only; refresh mechanics in root
+  `KNOWLEDGE.md` §"Vendored agent skills".
 - `<app>/KNOWLEDGE.md` – app-specific cross-session facts (same discipline as the root file). Write a new entry whenever
   you learn something non-obvious about *this app* that outlives the current change; repository-wide facts go to the
   root `KNOWLEDGE.md` instead.

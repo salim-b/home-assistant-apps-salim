@@ -479,3 +479,30 @@ When a workflow or its embedded scripts gate on or select a GitHub user or bot (
 `login`. Logins are mutable: ordinary usernames can be renamed and are reclaimable afterwards, and bot logins are merely
 `<app-slug>[bot]` – if an app is deleted, its slug can be re-registered and mints a different bot user behind the same
 login string. User ids are never reissued. Comment each hardcoded id with its login (e.g. `29139614 = renovate[bot]`).
+
+## Vendored agent skills
+
+Ten of the skills under `.agents/skills/` (address-findings, explain, recall, replay, review, session-crosslink,
+session-handoff, session-to-skill, teach, what-happened) are vendored from the
+[entireio/skills](https://github.com/entireio/skills) collection via vendir (`vendir.yml` config + `vendir.lock.yml`
+lockfile, tool pinned in mise.toml). Two upstream skills are deliberately not vendored: `using-entire` (maximally broad
+trigger router – would double-load other skills) and `search` (near-duplicate of the repo's own `entire-search` skill).
+
+**Upstream-verbatim policy**: vendored skills are never hand-edited. Every lint step that could touch them excludes
+them, so a local fix can't be reverted by the next sync (churn): hk's panache/editorconfig-checker/final-newline steps
+and `.panache.toml`/`.rumdl.toml` carry per-skill excludes; `vendir.lock.yml` is excluded from ryl (vendir rewrites it
+on every sync). hk passes staged files explicitly, bypassing the tools' own config excludes – hence the duplicate lists
+(skill ha-app-markdown). Repo-owned skills in `.agents/skills/` stay linted.
+
+**Design facts** (vendir 0.46.3; source: [vendir sync docs](https://carvel-dev.github.io/vendir/docs/vendir-sync/),
+vendir.yml `minimumRequiredVersion`):
+
+- One directory entry per skill, each fetching the upstream `skills/<name>` subtree via `newRootPath`: vendir replaces
+  its managed directory wholesale on every sync, so a single entry for all of `.agents/skills/` would wipe the
+  repo-owned sibling skills (probe-verified).
+- `vendir sync` re-resolves the `ref: main` sources and rewrites the lockfile + vendored copies on upstream movement;
+  `vendir sync --locked` replays the pinned commit exactly (fresh clones). Re-syncing at an unchanged upstream commit is
+  byte-identical (idempotent).
+- vendir fetches via the git CLI – no GitHub REST rate limits.
+- The [Skills update workflow](./.github/workflows/skills-update.yaml) re-syncs weekly and opens a rolling PR when
+  upstream moves.
