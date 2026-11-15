@@ -48,6 +48,12 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   `AI_POLICY.md` and `**/LICENSE.md` in `hk.pkl`); decide whether the builtin filters such files itself, documents the
   interaction, or waits for panache to honor excludes on explicit paths.
 
+- Upstream: file an hk PR against [jdx/hk](https://github.com/jdx/hk) adding a `dockerfmt` builtin
+  (`pkl/builtins/dockerfmt.pkl`): [dockerfmt](https://github.com/reteps/dockerfmt) is the Dockerfile formatter this repo
+  runs as a custom hk step (`check = dockerfmt -d {{files}}`, `fix = dockerfmt -w {{files}}` over `**/Dockerfile`), so a
+  builtin would let repos drop the custom step the same way the shfmt/rumdl/ryl builtins do. No hk issue or PR mentions
+  dockerfmt yet (searched 2026-11-15).
+
 - Upstream: investigate whether [shellharden](https://github.com/anordal/shellharden) mangles `for` loops and file an
   issue if none exists (check for existing ones first). Verified with v4.3.2 (2026-10): `--transform`/`--replace` quotes
   command substitutions in the iterable – `for _ in $(seq 1 120)` becomes `for _ in "$(seq 1 120)"` – which kills word
