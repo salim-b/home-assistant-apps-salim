@@ -223,6 +223,53 @@ checksum = "sha256:d4bf219ddc588e055fcaad10547a967d683fa7536b78cc96cc6e57ea75ff4
 url = "https://github.com/immanuwell/dockerfile-roast/releases/download/1.7.0/droast-windows-x86_64.exe"
 url_api = "https://api.github.com/repos/immanuwell/dockerfile-roast/releases/assets/539932749"
 
+[[tools."github:skilld-dev/skilld"]]
+version = "3.6.8"
+backend = "github:skilld-dev/skilld"
+specifiers = ["3.6.8"]
+
+[tools."github:skilld-dev/skilld"."platforms.linux-arm64"]
+checksum = "sha256:6fa1072ca32b8874fc0c737d772dfca871d65dd4b2ab87d60df13e97b19073c0"
+url = "https://github.com/skilld-dev/skilld/releases/download/v3.6.8/skilld-cli-linux-arm64-gnu"
+url_api = "https://api.github.com/repos/skilld-dev/skilld/releases/assets/628000858"
+provenance = "github-attestations"
+
+[tools."github:skilld-dev/skilld"."platforms.linux-arm64-musl"]
+checksum = "sha256:686668acf011a6c3281ae5531fce387236fdc4ad43ed6b5188bf3c4d96d796b6"
+url = "https://github.com/skilld-dev/skilld/releases/download/v3.6.8/skilld-cli-linux-arm64-musl"
+url_api = "https://api.github.com/repos/skilld-dev/skilld/releases/assets/628000856"
+provenance = "github-attestations"
+
+[tools."github:skilld-dev/skilld"."platforms.linux-x64"]
+checksum = "sha256:d4f3a38511f09432bfe4aac10a1081475c863fc0cb916e1e410aa09e174878ba"
+url = "https://github.com/skilld-dev/skilld/releases/download/v3.6.8/skilld-cli-linux-x64-gnu"
+url_api = "https://api.github.com/repos/skilld-dev/skilld/releases/assets/628000894"
+provenance = "github-attestations"
+
+[tools."github:skilld-dev/skilld"."platforms.linux-x64-musl"]
+checksum = "sha256:a59ca612ad2e935f0846b9c13912838027d11f2725374da620f62a0355575bd8"
+url = "https://github.com/skilld-dev/skilld/releases/download/v3.6.8/skilld-cli-linux-x64-musl"
+url_api = "https://api.github.com/repos/skilld-dev/skilld/releases/assets/628000892"
+provenance = "github-attestations"
+
+[tools."github:skilld-dev/skilld"."platforms.macos-arm64"]
+checksum = "sha256:5c694ea238aa864a08429d2550b9af366c02892bbec5d2783d4ce2cbaa497ced"
+url = "https://github.com/skilld-dev/skilld/releases/download/v3.6.8/skilld-cli-darwin-arm64"
+url_api = "https://api.github.com/repos/skilld-dev/skilld/releases/assets/628000883"
+provenance = "github-attestations"
+
+[tools."github:skilld-dev/skilld"."platforms.macos-x64"]
+checksum = "sha256:ee4031b05054e21b5b93cbdd56b2b3215157d785fd176e7428811cf7b0c62e29"
+url = "https://github.com/skilld-dev/skilld/releases/download/v3.6.8/skilld-cli-darwin-x64"
+url_api = "https://api.github.com/repos/skilld-dev/skilld/releases/assets/628000864"
+provenance = "github-attestations"
+
+[tools."github:skilld-dev/skilld"."platforms.windows-x64"]
+checksum = "sha256:894434a288761f8745347a1f8d39d7ba021589f6f81e43dbee6c2c3596e36988"
+url = "https://github.com/skilld-dev/skilld/releases/download/v3.6.8/skilld-cli-win32-x64-msvc.exe"
+url_api = "https://api.github.com/repos/skilld-dev/skilld/releases/assets/628000860"
+provenance = "github-attestations"
+
 [[tools.go]]
 version = "1.26.11"
 backend = "core:go"
