@@ -16,10 +16,10 @@ RUN mkdir -p /var/lib/nfs
 COPY --link rootfs /
 
 LABEL \
-    org.opencontainers.image.title="Home Assistant app: NFS Server" \
-    org.opencontainers.image.description="Network File System (NFS) server for Home Assistant." \
-    org.opencontainers.image.source="https://github.com/salim-b/home-assistant-apps-salim" \
-    org.opencontainers.image.licenses="Apache License 2.0"
+  org.opencontainers.image.title="Home Assistant app: NFS Server" \
+  org.opencontainers.image.description="Network File System (NFS) server for Home Assistant." \
+  org.opencontainers.image.source="https://github.com/salim-b/home-assistant-apps-salim" \
+  org.opencontainers.image.licenses="Apache License 2.0"
 
 # Health check: rpc.nfsd only configures the in-kernel server and then exits, hence probe the kernel's NFS
 # listener on TCP port 2049 (rootfs/usr/bin/nfsd-healthcheck; nfs-server/KNOWLEDGE.md §"`rpc.nfsd` is not a daemon").

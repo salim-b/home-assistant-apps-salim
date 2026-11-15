@@ -7,18 +7,18 @@ FROM ${BUILD_FROM}
 # (util-linux, floats): the never-root launcher needs its uid options - the busybox applet has none; see
 # hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges".
 RUN apk add --no-cache \
-    hickory-dns=0.26.3-r0 \
-    hickory-dns-utils=0.26.3-r0 \
-    ca-certificates-bundle \
-    setpriv
+  hickory-dns=0.26.3-r0 \
+  hickory-dns-utils=0.26.3-r0 \
+  ca-certificates-bundle \
+  setpriv
 
 COPY --link rootfs /
 
 LABEL \
-    org.opencontainers.image.title="Home Assistant app: Hickory DNS" \
-    org.opencontainers.image.description="DNS server resolving via encrypted upstream DNS (DoT/DoH/DoQ) with DNSSEC validation." \
-    org.opencontainers.image.source="https://github.com/salim-b/home-assistant-apps-salim" \
-    org.opencontainers.image.licenses="Apache License 2.0"
+  org.opencontainers.image.title="Home Assistant app: Hickory DNS" \
+  org.opencontainers.image.description="DNS server resolving via encrypted upstream DNS (DoT/DoH/DoQ) with DNSSEC validation." \
+  org.opencontainers.image.source="https://github.com/salim-b/home-assistant-apps-salim" \
+  org.opencontainers.image.licenses="Apache License 2.0"
 
 # Real-query probe (socket + catalog + response, no upstream dependency): hickory-dns/KNOWLEDGE.md §"Healthcheck".
 # Timeout > the probe's client-side query timeout.

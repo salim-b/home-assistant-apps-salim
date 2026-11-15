@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.3.5
+
+- Internals: no behavior change – the `Dockerfile` is reformatted to the repository's uniform `dockerfmt` style
+  (continuation-line indentation; the built image is unchanged). No configuration change.
+
 ## 0.3.4
 
 - Internals: no behavior change – `config.yaml` is reformatted to the repository's uniform `ryl format` style (quote

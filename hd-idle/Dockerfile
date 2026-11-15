@@ -12,10 +12,10 @@ RUN apk add --no-cache \
 COPY --link rootfs /
 
 LABEL \
-    org.opencontainers.image.title="Home Assistant app: hd-idle" \
-    org.opencontainers.image.description="Spin down idle hard disks (USB, SATA) automatically using hd-idle." \
-    org.opencontainers.image.source="https://github.com/salim-b/home-assistant-apps-salim" \
-    org.opencontainers.image.licenses="Apache License 2.0"
+  org.opencontainers.image.title="Home Assistant app: hd-idle" \
+  org.opencontainers.image.description="Spin down idle hard disks (USB, SATA) automatically using hd-idle." \
+  org.opencontainers.image.source="https://github.com/salim-b/home-assistant-apps-salim" \
+  org.opencontainers.image.licenses="Apache License 2.0"
 
 # hd-idle log.Fatals when it loses /proc/diskstats OR cannot open/write its activity log (hdidle.go logToFile): the
 # probe checks the stats file and the daemon process (the process probe covers both crash loops).
