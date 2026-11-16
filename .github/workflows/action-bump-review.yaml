@@ -1,14 +1,8 @@
 name: Action bump security review
 
-# Shadow-phase AI review of the GitHub Actions bumps Renovate proposes: the
-# workflow fetches the upstream diff a digest bump introduces, has a read-only
-# Copilot agent (.github/agents/action-supply-chain-review.md) assess it
-# against a supply-chain threat model, and posts the verdict as a PR comment.
-# During the shadow phase the verdict gates nothing – bump PRs are merged by a
-# human exactly as before; once verdict quality is validated, this job's
-# conclusion becomes the status check Renovate's automerge waits for.
-# The Copilot CLI comes from mise ([tools] copilot, pinned in mise.lock) – the
-# same version-truth path as every other repo tool.
+# AI review of the GitHub Actions bumps Renovate proposes; mechanics and facts:
+# root KNOWLEDGE.md §"CI: AI supply-chain review of action bumps". Shadow phase:
+# the verdict gates nothing yet – bump PRs stay manually merged.
 
 on:
   pull_request:
@@ -46,7 +40,8 @@ jobs:
       copilot-requests: write
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      startsWith(github.event.pull_request.head.ref, 'renovate/')
+      (startsWith(github.event.pull_request.head.ref, 'renovate/') &&
+       !github.event.pull_request.head.repo.fork)
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -76,29 +71,42 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Guard review tooling against automated PRs
+        env:
+          BASE: ${{ steps.target.outputs.base }}
+          HEAD: ${{ steps.target.outputs.head }}
+        run: |
+          set -euo pipefail
+
+          # The job executes repo content from the PR checkout (the verdict
+          # script) and installs the PR's mise toolset, so automated bump PRs
+          # must not touch any of it: such a change is reviewed by a human,
+          # never by itself. This runs before any tool install.
+          if git diff --name-only "$BASE" "$HEAD" -- \
+               .github/agents/ .github/scripts/ mise.toml mise.lock | grep -q .; then
+            echo "::error::Automated PR modifies review tooling or the toolset it runs – human review required"
+            exit 1
+          fi
+
+          # A change to this workflow file in an automated PR is tampering with
+          # what the job executes from the merge ref – reviewed by a human,
+          # never by itself.
+          if git diff --name-only "$BASE" "$HEAD" -- \
+               .github/workflows/action-bump-review.yaml | grep -q .; then
+            echo "::error::Automated PR modifies this review workflow – human review required"
+            exit 1
+          fi
+
       - name: Set up mise (provides the pinned Copilot CLI)
         uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b  # v5.2.7
 
       - name: Collect bumped action references
-        id: refs
         env:
           BASE: ${{ steps.target.outputs.base }}
           HEAD: ${{ steps.target.outputs.head }}
         run: |
           set -euo pipefail
           scratch="$RUNNER_TEMP"
-
-          # Automated bump PRs must not touch the reviewer definition or this
-          # workflow: the PR checkout is what the agent and the job execute
-          # from, so such a change is reviewed by a human, never by itself.
-          if git diff --name-only "$BASE" "$HEAD" -- .github/agents/ | grep -q .; then
-            echo "::error::Automated PR modifies .github/agents/ – human review required"
-            exit 1
-          fi
-          if git diff --name-only "$BASE" "$HEAD" -- .github/workflows/action-bump-review.yaml | grep -q .; then
-            echo "::error::Automated PR modifies this review workflow – human review required"
-            exit 1
-          fi
 
           # Collect owner/repo[/path]@ref entries from every workflow at both
           # revisions. Local self-repository refs ($/...), ./... and docker://
