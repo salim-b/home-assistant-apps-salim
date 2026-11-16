@@ -1,10 +1,7 @@
 ---
 name: entire-address-findings
 description: >
-  Address the review findings posted on an Entire trail: fetch the trail's open
-  findings, fix the code, and resolve them on the trail. Use when the user gives
-  a trail URL or number and asks to address, fix, or resolve its findings or
-  review comments. Not for local diff review — that is the `review` skill.
+  Address the review findings posted on an Entire trail: fetch the trail's open findings, fix the code, and resolve them on the trail. Use when the user gives a trail URL or number and asks to address, fix, or resolve its findings or review comments. Not for local diff review — that is the `review` skill.
 argument-hint: <trail url or number>
 ---
 

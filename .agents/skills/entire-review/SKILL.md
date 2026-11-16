@@ -1,10 +1,7 @@
 ---
 name: entire-review
 description: >
-  Review code changes on the current branch using checkpoint transcript context
-  to understand developer intent before auditing the diff. Use when the user
-  asks for a code review, wants to review branch changes, or asks to audit
-  recent work before merging.
+  Review code changes on the current branch using checkpoint transcript context to understand developer intent before auditing the diff. Use when the user asks for a code review, wants to review branch changes, or asks to audit recent work before merging.
 ---
 
 # Review

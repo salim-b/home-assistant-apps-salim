@@ -1,12 +1,7 @@
 ---
 name: entire-what-happened
 description: >
-  Explain why code looks the way it does by tracing the latest change for a file
-  range or pasted snippet through `git blame` and deduplicated `entire checkpoint explain`
-  lookups. Use when the user asks what happened, says "tell me why" about a code
-  block, is confused about a section of code, asks "wtf is going on", "why is
-  this like this", "why was this changed", or wants provenance for a specific
-  file block.
+  Explain why code looks the way it does by tracing the latest change for a file range or pasted snippet through `git blame` and deduplicated `entire checkpoint explain` lookups. Use when the user asks what happened, says "tell me why" about a code block, is confused about a section of code, asks "wtf is going on", "why is this like this", "why was this changed", or wants provenance for a specific file block.
 ---
 
 # What Happened
