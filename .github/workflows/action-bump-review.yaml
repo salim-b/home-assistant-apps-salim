@@ -105,6 +105,27 @@ jobs:
             exit 1
           fi
 
+      - name: Check out the revision this workflow runs at
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: review-src
+          persist-credentials: false
+
+      - name: Materialize trusted review tooling
+        run: |
+          set -euo pipefail
+
+          # The guard proved the PR did not touch these paths; on dispatch
+          # runs against PRs predating them they may not exist in the PR
+          # checkout at all. Copy them from the revision this workflow runs
+          # at, so the agent definition, the verdict script and the tool pins
+          # always come from the trusted revision.
+          mkdir -p .github/agents .github/scripts
+          cp review-src/.github/agents/action-supply-chain-review.md .github/agents/
+          cp review-src/.github/scripts/review_verdict.py .github/scripts/
+          cp review-src/mise.toml review-src/mise.lock .
+
       - name: Set up mise (provides the pinned Copilot CLI)
         uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b  # v5.2.7
 
