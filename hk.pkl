@@ -20,20 +20,21 @@ local mdGlobs = List("**/*.md", "**/*.markdown")
 // by the next sync (churn), so every linter that could touch them excludes them. hk passes staged files explicitly,
 // bypassing the tools' own config excludes – hence this list (skill ha-app-markdown).
 local vendoredSkills = List(
-  "address-findings",
-  "explain",
-  "recall",
-  "replay",
-  "review",
-  "session-crosslink",
-  "session-handoff",
-  "session-to-skill",
-  "teach",
-  "what-happened",
+  "entire-address-findings",
+  "entire-explain",
+  "entire-recall",
+  "entire-replay",
+  "entire-review",
+  "entire-search",
+  "entire-session-crosslink",
+  "entire-session-handoff",
+  "entire-session-to-skill",
+  "entire-teach",
+  "entire-what-happened",
 )
-local vendoredExcludes = vendoredSkills.map((s) -> ".agents/skills/${s}/**")
+local vendoredExcludes = vendoredSkills.map((s) -> ".agents/skills/\(s)/**")
 // Files kept verbatim for upstream syncs
-local mdExcludes = List("AI_POLICY.md", ".agents/skills/entire-search/SKILL.md", ".entire/agent-guide.md") + vendoredExcludes
+local mdExcludes = List("AI_POLICY.md", ".entire/agent-guide.md") + vendoredExcludes
 
 local linters = new Mapping<String, Step> {
   ["editorconfig-checker"] = (Builtins.editorconfig_checker) {

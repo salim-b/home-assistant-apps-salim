@@ -9,17 +9,17 @@ flavor = "gfm"
 # Files kept verbatim for upstream syncs
 extend-exclude = [
   "AI_POLICY.md",
-  ".agents/skills/address-findings/",
-  ".agents/skills/explain/",
-  ".agents/skills/recall/",
-  ".agents/skills/replay/",
-  ".agents/skills/review/",
-  ".agents/skills/session-crosslink/",
-  ".agents/skills/session-handoff/",
-  ".agents/skills/session-to-skill/",
-  ".agents/skills/teach/",
-  ".agents/skills/what-happened/",
+  ".agents/skills/entire-address-findings/",
+  ".agents/skills/entire-explain/",
+  ".agents/skills/entire-recall/",
+  ".agents/skills/entire-replay/",
+  ".agents/skills/entire-review/",
   ".agents/skills/entire-search/",
+  ".agents/skills/entire-session-crosslink/",
+  ".agents/skills/entire-session-handoff/",
+  ".agents/skills/entire-session-to-skill/",
+  ".agents/skills/entire-teach/",
+  ".agents/skills/entire-what-happened/",
   ".entire/agent-guide.md",
 ]
 

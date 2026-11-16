@@ -20,6 +20,9 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   `mise.toml`).
 - To check an explicit file set, pipe NUL-separated paths to hk:
   `git diff --name-only -z HEAD | hk check --files0-from=-`.
+- Pkl interpolates strings with `\(expr)` – a `${expr}` sequence inside a string is literal text. Globs built by
+  interpolation (e.g. `hk.pkl`'s `vendoredExcludes` map) must use `\(…)`: the `${…}` form silently matches nothing
+  (verified against hk 2.12.0).
 - Git hooks (enable once per machine: `mise run install-git-hooks`, after `mise install --locked`; needs Git 2.54+,
   installs user-wide, silently no-ops in repos without `hk.pkl`): pre-commit auto-fixes (panache format, tombi format,
   ryl format, final newlines, shfmt, dockerfmt, shellcheck autofixes) and gates the commit; commit-msg enforces

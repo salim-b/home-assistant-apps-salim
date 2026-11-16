@@ -482,11 +482,26 @@ login string. User ids are never reissued. Comment each hardcoded id with its lo
 
 ## Vendored agent skills
 
-Ten of the skills under `.agents/skills/` (address-findings, explain, recall, replay, review, session-crosslink,
-session-handoff, session-to-skill, teach, what-happened) are vendored from the
-[entireio/skills](https://github.com/entireio/skills) collection via vendir (`vendir.yml` config + `vendir.lock.yml`
-lockfile, tool pinned in mise.toml). Two upstream skills are deliberately not vendored: `using-entire` (maximally broad
-trigger router – would double-load other skills) and `search` (near-duplicate of the repo's own `entire-search` skill).
+Eleven of the skills under `.agents/skills/` are vendored from the [entireio/skills](https://github.com/entireio/skills)
+collection via vendir (`vendir.yml` config + `vendir.lock.yml` lockfile, tool pinned in mise.toml), one directory entry
+per skill under an `entire-` directory-name prefix (namespacing the vendored set apart from the repo-owned skills; the
+vendored frontmatter `name:` fields keep the upstream names): entire-address-findings, entire-explain, entire-recall,
+entire-replay, entire-review, entire-search, entire-session-crosslink, entire-session-handoff, entire-session-to-skill,
+entire-teach, entire-what-happened. The only upstream skill deliberately not vendored is `using-entire` (maximally broad
+trigger router – would double-load other skills).
+
+The vendored upstream `search` skill lives at `entire-search` – the same path `entire enable --search-skill` writes its
+CLI-managed skill to; don't run that command here (a following `vendir sync` restores the vendored copy).
+
+Sync manually, or replay the pinned commit on a fresh clone:
+
+```sh
+vendir sync --yes      # re-resolve ref: main, refresh vendored copies + lockfile
+vendir sync --locked   # sync from vendir.lock.yml exactly (fresh clones)
+```
+
+The [Skills update workflow](./.github/workflows/skills-update.yaml) runs the sync weekly and opens a rolling PR when
+upstream moves.
 
 **Upstream-verbatim policy**: vendored skills are never hand-edited. Every lint step that could touch them excludes
 them, so a local fix can't be reverted by the next sync (churn): hk's panache/editorconfig-checker/final-newline steps
@@ -500,9 +515,5 @@ vendir.yml `minimumRequiredVersion`):
 - One directory entry per skill, each fetching the upstream `skills/<name>` subtree via `newRootPath`: vendir replaces
   its managed directory wholesale on every sync, so a single entry for all of `.agents/skills/` would wipe the
   repo-owned sibling skills (probe-verified).
-- `vendir sync` re-resolves the `ref: main` sources and rewrites the lockfile + vendored copies on upstream movement;
-  `vendir sync --locked` replays the pinned commit exactly (fresh clones). Re-syncing at an unchanged upstream commit is
-  byte-identical (idempotent).
+- Re-syncing at an unchanged upstream commit is byte-identical (idempotent) – safe to re-run.
 - vendir fetches via the git CLI – no GitHub REST rate limits.
-- The [Skills update workflow](./.github/workflows/skills-update.yaml) re-syncs weekly and opens a rolling PR when
-  upstream moves.

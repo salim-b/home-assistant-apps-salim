@@ -5,59 +5,65 @@ directories:
       commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
       sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
     path: .
-  path: .agents/skills/address-findings
+  path: .agents/skills/entire-address-findings
 - contents:
   - git:
       commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
       sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
     path: .
-  path: .agents/skills/explain
+  path: .agents/skills/entire-explain
 - contents:
   - git:
       commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
       sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
     path: .
-  path: .agents/skills/recall
+  path: .agents/skills/entire-recall
 - contents:
   - git:
       commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
       sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
     path: .
-  path: .agents/skills/replay
+  path: .agents/skills/entire-replay
 - contents:
   - git:
       commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
       sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
     path: .
-  path: .agents/skills/review
+  path: .agents/skills/entire-review
 - contents:
   - git:
       commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
       sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
     path: .
-  path: .agents/skills/session-crosslink
+  path: .agents/skills/entire-search
 - contents:
   - git:
       commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
       sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
     path: .
-  path: .agents/skills/session-handoff
+  path: .agents/skills/entire-session-crosslink
 - contents:
   - git:
       commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
       sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
     path: .
-  path: .agents/skills/session-to-skill
+  path: .agents/skills/entire-session-handoff
 - contents:
   - git:
       commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
       sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
     path: .
-  path: .agents/skills/teach
+  path: .agents/skills/entire-session-to-skill
 - contents:
   - git:
       commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
       sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
     path: .
-  path: .agents/skills/what-happened
+  path: .agents/skills/entire-teach
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #57 from Beehtrix/fix-search-escalation-scope-53...'
+      sha: af6cd3fce1852a7214c43bbf64315900196ad4ee
+    path: .
+  path: .agents/skills/entire-what-happened
 kind: LockConfig

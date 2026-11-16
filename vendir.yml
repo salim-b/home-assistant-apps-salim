@@ -1,60 +1,65 @@
-# Vendored agent skills from the entireio/skills collection, synced into .agents/skills/ – one directory
-# entry per skill, each fetching the upstream skills/<name> subtree via newRootPath (vendir replaces its
-# managed directory wholesale on every sync, so one entry per skill keeps the repo-owned skills that
-# sibling these untouched). The fetched commit is pinned in vendir.lock.yml; plain `vendir sync` re-resolves
-# these refs and rewrites both. Facts: root KNOWLEDGE.md §"Vendored agent skills".
+# Vendored agent skills from the entireio/skills collection, synced into .agents/skills/ under an `entire-`
+# directory-name prefix – one directory entry per skill, each fetching the upstream skills/<name> subtree via
+# newRootPath (vendir replaces its managed directory wholesale on every sync, so one entry per skill keeps the
+# repo-owned skills that sibling these untouched). The fetched commit is pinned in vendir.lock.yml; plain
+# `vendir sync` re-resolves these refs and rewrites both. Facts: root KNOWLEDGE.md §"Vendored agent skills".
 apiVersion: vendir.k14s.io/v1alpha1
 kind: Config
 minimumRequiredVersion: 0.46.3
 directories:
-  - path: .agents/skills/address-findings
+  - path: .agents/skills/entire-address-findings
     contents:
       - path: .
         git: &entireio-skills
           url: https://github.com/entireio/skills
           ref: main
         newRootPath: skills/address-findings
-  - path: .agents/skills/explain
+  - path: .agents/skills/entire-explain
     contents:
       - path: .
         git: *entireio-skills
         newRootPath: skills/explain
-  - path: .agents/skills/recall
+  - path: .agents/skills/entire-recall
     contents:
       - path: .
         git: *entireio-skills
         newRootPath: skills/recall
-  - path: .agents/skills/replay
+  - path: .agents/skills/entire-replay
     contents:
       - path: .
         git: *entireio-skills
         newRootPath: skills/replay
-  - path: .agents/skills/review
+  - path: .agents/skills/entire-review
     contents:
       - path: .
         git: *entireio-skills
         newRootPath: skills/review
-  - path: .agents/skills/session-crosslink
+  - path: .agents/skills/entire-search
+    contents:
+      - path: .
+        git: *entireio-skills
+        newRootPath: skills/search
+  - path: .agents/skills/entire-session-crosslink
     contents:
       - path: .
         git: *entireio-skills
         newRootPath: skills/session-crosslink
-  - path: .agents/skills/session-handoff
+  - path: .agents/skills/entire-session-handoff
     contents:
       - path: .
         git: *entireio-skills
         newRootPath: skills/session-handoff
-  - path: .agents/skills/session-to-skill
+  - path: .agents/skills/entire-session-to-skill
     contents:
       - path: .
         git: *entireio-skills
         newRootPath: skills/session-to-skill
-  - path: .agents/skills/teach
+  - path: .agents/skills/entire-teach
     contents:
       - path: .
         git: *entireio-skills
         newRootPath: skills/teach
-  - path: .agents/skills/what-happened
+  - path: .agents/skills/entire-what-happened
     contents:
       - path: .
         git: *entireio-skills
