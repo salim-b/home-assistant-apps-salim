@@ -194,7 +194,7 @@
       "automergeStrategy": "rebase"
     },
     {
-      "description": "Automerge minor and patch updates of GitHub's own actions; the {/,}** glob covers subpath actions (actions/cache/save and friends) too. The actions org is owned and staff-maintained by GitHub – a verified org (checked via the GitHub API, 2026-11-16) – the lowest-friction trust class this repo pins. That is not per-release auditing: these repositories take community and dependency-bot PRs like anyone else, which is exactly what digest pinning plus the AI supply-chain review keep assessing – with automerge on, the review job's check conclusion is the gate Renovate waits for. Majors keep human review (runtime switches such as node20 → node24 ride major bumps); digest-typed updates (a ref repointed without a release) stay manual for every action.",
+      "description": "Automerge minor and patch updates of GitHub's own actions; the {/,}** glob covers subpath actions (actions/cache/save and friends) too. The actions org is owned and staff-maintained by GitHub – a verified org (checked via the GitHub API, 2026-11-16). Their releases are extremely popular, so instead of an AI supply-chain review these bumps gate on a 3-day minimum release age (a dependency cooldown): the AI verdict would systematically fail closed on their minified dist bundles, whose diffs the compare API does not provide – blocking automerge without adding signal – while not bumping well-maintained popular actions is the higher risk, and the cooldown provides the discovery window that matters at GitHub's scale. The review workflow excludes these slugs from AI review to match. Digest pinning stays; majors keep human review (runtime switches such as node20 → node24 ride major bumps); digest-typed updates (a ref repointed without a release) stay manual for every action.",
       "matchManagers": [
         "github-actions"
       ],
@@ -205,11 +205,12 @@
         "minor",
         "patch"
       ],
+      "minimumReleaseAge": "3 days",
       "automerge": true,
       "automergeStrategy": "rebase"
     },
     {
-      "description": "Automerge minor and patch updates of jdx/mise-action, the one non-GitHub digest-pinned action the PR-path workflows execute (lint, version-guard, apk-bump, action-bump-review): green CI runs these exact action versions, so the bump is exercised before merge. Keep the list in sync when PR-path workflows gain digest-pinned actions outside GitHub's actions org (covered by the namespace rule above); home-assistant/** is absent on purpose – those actions float (see the pinDigests rule) and never produce digest bumps. Digest-typed updates stay manual for every action: they fire when a ref is repointed without a release – precisely the supply-chain signal a human should review. Everything else stays manual too: tj-actions/changed-files (see its rule), and the build-path actions home-assistant/builder and nick-fields/retry – these do run in PR CI whenever a PR touches build files (the full build matrix, minus publishing), but they execute with id-token: write and packages: write on the publish path and every one of their bumps triggers the whole multi-arch build matrix; privilege blast radius plus cost warrant human review.",
+      "description": "Automerge minor and patch updates of jdx/mise-action, the one non-GitHub digest-pinned action the PR-path workflows execute (lint, version-guard, apk-bump, action-bump-review): green CI runs these exact action versions, so the bump is exercised before merge. Like GitHub's own actions (see the namespace rule above), its bumps gate on a 3-day minimum release age instead of AI review – the minified dist bundle is unreviewable in the compare API's diff, and the action's popularity makes the release-age discovery window the stronger protection. Keep the list in sync when PR-path workflows gain digest-pinned actions outside GitHub's actions org; home-assistant/** is absent on purpose – those actions float (see the pinDigests rule) and never produce digest bumps. Digest-typed updates stay manual for every action: they fire when a ref is repointed without a release – precisely the supply-chain signal a human should review. Everything else stays manual too: tj-actions/changed-files (see its rule), and the build-path actions home-assistant/builder and nick-fields/retry – these do run in PR CI whenever a PR touches build files (the full build matrix, minus publishing), but they execute with id-token: write and packages: write on the publish path and every one of their bumps triggers the whole multi-arch build matrix; privilege blast radius plus cost warrant human review.",
       "matchManagers": [
         "github-actions"
       ],
@@ -220,6 +221,7 @@
         "minor",
         "patch"
       ],
+      "minimumReleaseAge": "3 days",
       "automerge": true,
       "automergeStrategy": "rebase"
     },

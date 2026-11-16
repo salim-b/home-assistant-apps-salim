@@ -46,8 +46,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       # gh resolves the repository from the working directory's git remote –
       # but the early steps run before any checkout, on a bare workspace.
-      # Pin the context so `gh pr view` works there (first dispatch run
-      # tripped on this; see run 43893220626).
+      # Pin the context so `gh pr view` works there.
       GH_REPO: ${{ github.repository }}
     steps:
       - name: Resolve review target
@@ -278,6 +277,33 @@ jobs:
               } >> "$GITHUB_STEP_SUMMARY"
               continue
             fi
+
+            # Popular GitHub-owned actions are excluded from AI review by
+            # policy: their bumps gate on Renovate's minimum release age
+            # instead (see .github/renovate.json) – an AI verdict would
+            # systematically fail closed on their minified dist bundles,
+            # whose diffs the compare API does not provide, blocking
+            # automerge without adding signal. Keep the slug list in sync
+            # with .github/renovate.json's release-age rules.
+            case "$slug" in
+              actions/* | jdx/mise-action)
+                {
+                  echo "### $idx. \`$slug\`"
+                  echo
+                  echo "- ℹ️ **Excluded from AI review by policy** – \`${slug}\` bumps gate on Renovate's"
+                  echo "  minimum release age instead (see \`.github/renovate.json\`)."
+                } > "$section"
+                {
+                  cat "$section"
+                  echo
+                } >> "$scratch/comment.md"
+                {
+                  cat "$section"
+                  echo
+                } >> "$GITHUB_STEP_SUMMARY"
+                continue
+                ;;
+            esac
 
             if ((risky_seen)); then
               {
