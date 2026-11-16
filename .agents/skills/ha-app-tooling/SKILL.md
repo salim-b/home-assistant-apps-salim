@@ -27,6 +27,9 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
   installs user-wide, silently no-ops in repos without `hk.pkl`): pre-commit auto-fixes (panache format, tombi format,
   ryl format, final newlines, shfmt, dockerfmt, shellcheck autofixes) and gates the commit; commit-msg enforces
   Conventional Commits. Escape hatch: `HK=0 git commit`.
+- `mise.toml`'s `[[watch_files]]` entry auto-runs `hk fix` on the files you touched whenever a mise-activated shell
+  redisplays its prompt (skipped when git just rewrote them from commits, e.g. checkout/pull). Its `patterns` mirror
+  hk.pkl's fix-step selections – keep the two in sync when changing either side.
 
 ## mise task authoring
 

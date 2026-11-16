@@ -47,6 +47,31 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   run = "hk check --all --no-fail-fast"
   output = "interleave"
 
+# Auto-run `hk fix` on files changed since the last prompt (mise-activated shells only; skipped when git
+# rewrote files from commits). hk's step selection (hk.pkl) decides which fix steps apply to each file –
+# keep the patterns in sync with hk.pkl's fix-step globs (whys: .agents/skills/ha-app-tooling, "Lint gate").
+[[watch_files]]
+  patterns = [
+    "**/*.md",
+    "**/*.markdown",
+    "**/*.toml",
+    "**/*.py",
+    "**/*.yml",
+    "**/*.yaml",
+    "**/*.sh",
+    "**/*.bash",
+    "**/*.mksh",
+    "**/*.bats",
+    "**/*.zsh",
+    "**/Dockerfile",
+    "**/cont-init.d/*",
+    "**/s6-overlay/scripts/*",
+    "**/s6-rc.d/*/run",
+    "**/s6-rc.d/*/finish",
+    "**/rootfs/usr/bin/*",
+  ]
+  run = '[ -n "$MISE_WATCH_FILES_GIT_REWRITTEN" ] || { IFS=:; hk fix $MISE_WATCH_FILES_MODIFIED; }'
+
 [tools]
   "github:immanuwell/dockerfile-roast" = "1.7.0"
   "github:reteps/dockerfmt" = "1.0.0"
