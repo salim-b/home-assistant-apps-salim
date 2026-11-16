@@ -88,11 +88,17 @@ jobs:
             exit 1
           fi
 
-          # A change to this workflow file in an automated PR is tampering with
-          # what the job executes from the merge ref – reviewed by a human,
-          # never by itself.
-          if git diff --name-only "$BASE" "$HEAD" -- \
-               .github/workflows/action-bump-review.yaml | grep -q .; then
+          # A bump of one of the allowlisted PR-path actions necessarily
+          # repoints its digest inside this workflow – precisely the change
+          # the review assesses. Digest-only edits to those pins therefore
+          # don't count as tampering; any other change to the file does. Keep
+          # the slug list in sync with .github/renovate.json's automerge
+          # allowlist.
+          sanitize() {
+            git show "$1:.github/workflows/action-bump-review.yaml" |
+              sed -E 's/(uses: (actions\/checkout|jdx\/mise-action)@)[0-9a-f]{40}/\1@DIGEST/'
+          }
+          if [ "$(sanitize "$BASE")" != "$(sanitize "$HEAD")" ]; then
             echo "::error::Automated PR modifies this review workflow – human review required"
             exit 1
           fi
