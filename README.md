@@ -76,21 +76,6 @@ mise run apply-options hd-idle root@homeassistant.local options.json
 ssh root@homeassistant.local 'ha apps logs --follow local_nfs-server'
 ```
 
-### Vendored agent skills
-
-Ten of the skills under [`.agents/skills/`](./.agents/skills) are vendored from the
-[entireio/skills](https://github.com/entireio/skills) collection via [vendir](https://github.com/carvel-dev/vendir)
-(config: `vendir.yml`, pinned commit: `vendir.lock.yml`) and are upstream-verbatim – never edit them by hand. Sync them
-manually, or replay the pinned commit on a fresh clone:
-
-```sh
-vendir sync --yes      # re-resolve ref: main, refresh vendored copies + lockfile
-vendir sync --locked   # sync from vendir.lock.yml exactly (fresh clones)
-```
-
-The [Skills update](./.github/workflows/skills-update.yaml) workflow runs the sync weekly and opens a rolling PR when
-upstream moves. Design facts: [`KNOWLEDGE.md` §"Vendored agent skills"](KNOWLEDGE.md#vendored-agent-skills).
-
 ### Testing on a device
 
 `mise run test:live` deploys the app to a real HAOS device as a local app (like `deploy:local`, forwarding `--replace`)
