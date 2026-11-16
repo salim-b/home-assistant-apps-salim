@@ -44,6 +44,11 @@ jobs:
        !github.event.pull_request.head.repo.fork)
     env:
       GH_TOKEN: ${{ github.token }}
+      # gh resolves the repository from the working directory's git remote –
+      # but the early steps run before any checkout, on a bare workspace.
+      # Pin the context so `gh pr view` works there (first dispatch run
+      # tripped on this; see run 43893220626).
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Resolve review target
         id: target
