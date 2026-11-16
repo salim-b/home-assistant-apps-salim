@@ -35,7 +35,7 @@ practices](https://contributors.home-assistant.io/apps/) as far as possible.
 
 Non-obvious development knowledge lives in [`KNOWLEDGE.md`](./KNOWLEDGE.md) (repository-wide: supervisor behaviors,
 AppArmor, base-image gotchas, testing) and in each app's own `KNOWLEDGE.md`; step-by-step procedures live in the skills
-under [`.agents/skills/`](./.agents/skills) (index in [`AGENTS.md`](./AGENTS.md)).
+under [`.agents/skills/`](./.agents/skills).
 
 ### Setup
 
