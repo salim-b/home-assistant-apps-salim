@@ -39,7 +39,10 @@ under [`.agents/skills/`](./.agents/skills) (index in [`AGENTS.md`](./AGENTS.md)
 
 ### Setup
 
-We use [mise](https://mise.jdx.dev/) as tool and environment manager and task runner. Bootstrap the pinned toolchain:
+We use [mise](https://mise.jdx.dev/) as tool and environment manager and task runner, and [hk](https://hk.jdx.dev/) as
+the lint gate: the pre-commit hook and the `lint` and `check` tasks run through it (config in `hk.pkl`).
+
+To bootstrap the pinned toolchain:
 
 ```sh
 mise trust               # first use: mise config files are untrusted until then
@@ -47,6 +50,9 @@ mise install --locked    # pinned tools from mise.toml/mise.lock
 ```
 
 `docker` is additionally required for the `build`, `test:lab`, `deploy:local`/`deploy:registry` and `test:live` tasks.
+
+Edited files are auto-formatted between prompts: a `watch_files` hook in `mise.toml` runs `hk fix` on the files you
+touch whenever a mise-activated shell redisplays its prompt, so `mise run fmt` is rarely needed by hand.
 
 ### Common tasks
 
