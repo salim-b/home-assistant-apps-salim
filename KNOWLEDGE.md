@@ -555,5 +555,11 @@ Actions](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/copilot-
 - The compare API omits `files[].patch` for binary or oversized files (source: [compare
   commits](https://docs.github.com/en/rest/commits/compare-two-commits)): the pipeline surfaces such files as explicit
   unreviewable notes and the agent's verdict rules fail closed on them.
-- Diffs beyond the 500000-byte pipeline cap are truncated with an explicit marker, which the agent must treat as
-  unreviewable.
+- The reviewer input file is capped at 500000 bytes (`.github/scripts/review_input.py enrich` assembles it): the diff
+  comes first and one that does not fit is truncated with an explicit marker, which the agent must treat as
+  unreviewable; context sections (upstream commits with authorship and signature state, tag/release context with release
+  notes, BASE-revision workflow files referencing the action, the PR description) are appended in that priority order
+  only while the budget has room – an omitted section leaves a one-line note in the file.
+- Digest-to-tag matching uses `repos/{owner}/{repo}/tags?per_page=100`; its `commit.sha` is the commit the tag points
+  to, so annotated tags match too (verified for both tag styles against jdx/mise-action and git/git v2.44.0, 2026-11-16;
+  source: [list repository tags](https://docs.github.com/en/rest/repos/repos#list-repository-tags)).
