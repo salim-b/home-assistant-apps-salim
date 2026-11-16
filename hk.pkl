@@ -3,18 +3,18 @@
 amends "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Builtins.pkl"
 
-  // hk's shebang-based file typing misses the extensionless s6 scripts and the apps' /usr/bin scripts
-  // (upstream item: root TODO.md). `match_any` REPLACES a step's default selection (frozen by the
-  // pinned package version), so each shell step below repeats the builtin's own selectors plus the
-  // added globs.
-  local s6Globs = List(
-    "**/cont-init.d/*",
-    "**/s6-overlay/scripts/*",
-    "**/s6-rc.d/*/run",
-    "**/s6-rc.d/*/finish",
-  )
-  // The apps' extension-less /usr/bin scripts (bashio shebangs – same typing gap); all three shell steps cover them.
-  local appBinGlobs = List("**/rootfs/usr/bin/*")
+// hk's shebang-based file typing misses the extensionless s6 scripts and the apps' /usr/bin scripts
+// (upstream item: root TODO.md). `match_any` REPLACES a step's default selection (frozen by the
+// pinned package version), so each shell step below repeats the builtin's own selectors plus the
+// added globs.
+local s6Globs = List(
+  "**/cont-init.d/*",
+  "**/s6-overlay/scripts/*",
+  "**/s6-rc.d/*/run",
+  "**/s6-rc.d/*/finish",
+)
+// The apps' extension-less /usr/bin scripts (bashio shebangs – same typing gap); all three shell steps cover them.
+local appBinGlobs = List("**/rootfs/usr/bin/*")
 local mdGlobs = List("**/*.md", "**/*.markdown")
 // Skills vendored from entireio/skills via vendir (vendir.yml) are upstream-verbatim: a local fix would be reverted
 // by the next sync (churn), so every linter that could touch them excludes them. hk passes staged files explicitly,
@@ -114,12 +114,11 @@ local linters = new Mapping<String, Step> {
   // so the two converge in either order (probed ryl 0.29.0). The check routes its diff preview to
   // stdout and drops stderr, which `ryl format --check` ends with unconditionally (no --quiet, unlike
   // the tombi/ruff builtins; upstream ask: root TODO.md); failures still print their findings,
-  // successes stay silent.
+  // successes stay silent; exclude must mirror .ryl.toml's exclusions explicitly because of the
+  // `--config-data` hack
   ["ryl-format"] {
     types = List("yaml")
-    // vendir.lock.yml is rewritten by `vendir sync` on every refresh – any format fix would be reverted (churn);
-    // .ryl.toml excludes it for direct ryl runs too.
-    exclude = List("vendir.lock.yml")
+    exclude = List(".mise/locks/**", "vendir.lock.yml")
     check =
       "ryl format --check --config-data 'output = { standard = { path = \"-\" } }' {{files}} 2>/dev/null"
     fix = "ryl format {{files}}"
@@ -127,8 +126,6 @@ local linters = new Mapping<String, Step> {
   // ryl (Rust yamllint re-implementation, configured in .ryl.toml); --strict on check and fix.
   // check_diff/check_after_diff are cleared on purpose – why: .agents/skills/ha-app-tooling (upstream: root TODO.md).
   ["ryl-lint"] = (Builtins.ryl) {
-    // Why vendir.lock.yml: see ryl-format above.
-    exclude = List("vendir.lock.yml")
     check_diff = null
     check_after_diff = false
     check_list_files = null
