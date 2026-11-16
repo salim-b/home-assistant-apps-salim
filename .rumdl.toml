@@ -3,11 +3,7 @@
 [global]
   # https://rumdl.dev/global-settings/
   editorconfig = true
-  # AI_POLICY.md: Open Home Foundation policy text, kept verbatim for upstream syncs (mirrors panache's exclude).
-  # .agents/skills/entire-search/: `entire enable` rewrites this skill verbatim, so findings there are upstream's to fix.
-  # .agents/skills/<vendored>/: skills vendored from entireio/skills via vendir (vendir.yml) – upstream-verbatim; any
-  # local reformat would be reverted by the next sync (churn). rumdl applies its config excludes even to hk's
-  # explicit file arguments, so this list is the rumdl gate's single source (skill ha-app-markdown).
+  # Files kept verbatim for upstream syncs (mirrors panache's exclude)
   exclude = [
     "AI_POLICY.md",
     ".agents/skills/address-findings/",
@@ -20,10 +16,11 @@
     ".agents/skills/session-to-skill/",
     ".agents/skills/teach/",
     ".agents/skills/what-happened/",
-    ".agents/skills/entire-search/"
+    ".agents/skills/entire-search/",
+    ".entire/agent-guide.md",
   ]
   # rumdl must never rewrite files – panache owns ALL Markdown formatting. Inert `all` sentinel canary
-  # (validate/apps.py fails loudly if a rumdl upgrade flips this): .agents/skills/ha-app-markdown.
+  # (validate/apps.py fails loudly if a rumdl upgrade flips this): .agents/skills/ha-app-markdown
   fixable = [ "all" ]
 
 [per-file-ignores]

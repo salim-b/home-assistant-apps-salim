@@ -32,9 +32,8 @@ local vendoredSkills = List(
   "what-happened",
 )
 local vendoredExcludes = vendoredSkills.map((s) -> ".agents/skills/${s}/**")
-// AI_POLICY.md and .entire/agent-guide.md are upstream-verbatim; **/LICENSE.md mirrors panache's default Markdown exclude
-// (explicit-path bypass: skill ha-app-markdown).
-local mdExcludes = List("AI_POLICY.md", ".agents/skills/entire-search/SKILL.md", ".entire/agent-guide.md", "**/LICENSE.md") + vendoredExcludes
+// Files kept verbatim for upstream syncs
+local mdExcludes = List("AI_POLICY.md", ".agents/skills/entire-search/SKILL.md", ".entire/agent-guide.md") + vendoredExcludes
 
 local linters = new Mapping<String, Step> {
   ["editorconfig-checker"] = (Builtins.editorconfig_checker) {
