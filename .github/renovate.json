@@ -164,6 +164,60 @@
       ],
       "automerge": true,
       "automergeStrategy": "rebase"
+    },
+    {
+      "description": "Automerge minor and patch mise [tools] bumps once CI is green: the PR's check job installs the bumped toolset and runs the lint gate plus validate:apps with it, so green certifies the new tools against the repo exactly as they will run after merge – a release that newly fires rules fails the bump PR's own gate instead of landing, and later PRs run the same gate, so nothing slips through post-merge. Majors keep human review: they can redefine semantics the config was verified against (hk's hk.pkl contract, renovate config flags, runtime majors like node/python/go).",
+      "matchManagers": [
+        "mise"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true,
+      "automergeStrategy": "rebase"
+    },
+    {
+      "description": "Automerge minor and patch hk bumps for the mise-custom pair: Renovate folds mise.toml, mise.lock and hk.pkl into one branch anyway, and the check job runs hk itself – a green PR certifies the bumped hk plus the desync invariant (mise install --locked). Majors keep human review – hk majors may redefine the hk.pkl step contract this repo's lint gate is built on.",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchPackageNames": [
+        "hk",
+        "jdx/hk"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true,
+      "automergeStrategy": "rebase"
+    },
+    {
+      "description": "Automerge minor and patch updates of the actions the PR gate itself executes (lint.yaml uses actions/checkout and jdx/mise-action): green CI runs these exact action versions, so the bump is exercised before merge. Keep the list in sync when PR-path workflows gain actions. Digest-typed updates stay manual for every action: they fire when a ref is repointed without a release – precisely the supply-chain signal a human should review. Actions outside the list stay manual too: tj-actions/changed-files (see its rule) and the main-branch-only build/publish path (home-assistant/builder, nick-fields/retry) never run in PR CI, so a green PR proves nothing about them.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchPackageNames": [
+        "actions/checkout",
+        "jdx/mise-action"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true,
+      "automergeStrategy": "rebase"
+    },
+    {
+      "description": "Never automerge tj-actions/changed-files: its March 2025 tag-repoint compromise (CVE-2025-30066) dumped runner secrets into public workflow logs, and green CI cannot certify a new action version's integrity – the malicious payload executed without failing the run. Digest pinning plus human review of every ref change is the mitigation, and a digest-typed update (a ref repointed with no release) is exactly the event a human should see. Redundant with the allowlist rule above on purpose: it keeps the policy explicit should the allowlist ever broaden.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchPackageNames": [
+        "tj-actions/changed-files"
+      ],
+      "automerge": false
     }
   ]
 }
