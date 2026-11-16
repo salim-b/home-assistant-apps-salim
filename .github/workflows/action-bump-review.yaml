@@ -122,28 +122,72 @@ jobs:
           }
           collect "$BASE" > "$scratch/old-refs.txt"
           collect "$HEAD" > "$scratch/new-refs.txt"
-          to_map() {
-            awk -F'@' '{print $1 "\t" substr($0, length($1) + 2)}' "$1" | sort -u
+          # Aggregate per slug (slugs never contain whitespace): one row per
+          # slug with space-separated refs, so a pin held at multiple digests
+          # yields delta sets below instead of a ref cross-product.
+          by_slug() {
+            awk -F'@' '{
+              refs[$1] = (refs[$1] == "" ? "" : refs[$1] " ") substr($0, length($1) + 2)
+            } END { for (slug in refs) print slug "\t" refs[slug] }' "$1" | sort -t $'\t' -k1,1
           }
-          to_map "$scratch/old-refs.txt" > "$scratch/old.map"
-          to_map "$scratch/new-refs.txt" > "$scratch/new.map"
+          by_slug "$scratch/old-refs.txt" > "$scratch/old.map"
+          by_slug "$scratch/new-refs.txt" > "$scratch/new.map"
 
-          # Per slug: <slug> TAB <old ref, empty if added> TAB <new ref, empty
-          # if removed>. Unchanged slugs drop out in the classification loop.
+          # Per slug: <slug> TAB <old refs, empty if added> TAB <new refs,
+          # empty if removed>.
+          # join emits empty fields for added/removed slugs; read collapses
+          # adjacent IFS-whitespace delimiters, so substitute '-' placeholders
+          # first (normalized back to empty after the read below).
           join -t $'\t' -a 1 -a 2 -o '0,1.2,2.2' \
-            "$scratch/old.map" "$scratch/new.map" > "$scratch/pairs.tsv"
+            "$scratch/old.map" "$scratch/new.map" \
+            | sed -E 's/\t\t/\t-\t/; s/\t$/\t-/' > "$scratch/pairs.tsv"
 
           : > "$scratch/entries.tsv"
-          while IFS=$'\t' read -r slug old new; do
-            [[ "$old" == "$new" ]] && continue
-            if [[ -z "$old" ]]; then
-              printf 'added\t%s\t\t\n' "$slug" >> "$scratch/entries.tsv"
-            elif [[ -z "$new" ]]; then
-              printf 'removed\t%s\t%s\t\n' "$slug" "$old" >> "$scratch/entries.tsv"
-            elif [[ ! "$old" =~ ^[0-9a-f]{40}$ || ! "$new" =~ ^[0-9a-f]{40}$ ]]; then
-              printf 'nondigest\t%s\t%s\t%s\n' "$slug" "$old" "$new" >> "$scratch/entries.tsv"
+          while IFS=$'\t' read -r slug oldrefs newrefs; do
+            # read collapses adjacent IFS-whitespace delimiters, so an empty
+            # field is written as '-' below and normalized here.
+            [[ "$oldrefs" == "-" ]] && oldrefs=""
+            [[ "$newrefs" == "-" ]] && newrefs=""
+            # Delta sets: refs absent from the other revision's set; refs held
+            # in both revisions are unchanged and drop out.
+            # shellcheck disable=SC2206  # refs are space-separated tokens
+            old=($oldrefs)
+            # shellcheck disable=SC2206
+            new=($newrefs)
+            delta_old=()
+            delta_new=()
+            for ref in "${old[@]}"; do
+              if [[ " $newrefs " != *" $ref "* ]]; then
+                delta_old+=("$ref")
+              fi
+            done
+            for ref in "${new[@]}"; do
+              if [[ " $oldrefs " != *" $ref "* ]]; then
+                delta_new+=("$ref")
+              fi
+            done
+            if (( ${#delta_old[@]} == 0 && ${#delta_new[@]} == 0 )); then
+              continue  # unchanged slug
+            fi
+            if (( ${#delta_old[@]} == 0 )); then
+              printf 'added\t%s\t-\t%s\n' "$slug" "${delta_new[*]}" >> "$scratch/entries.tsv"
+            elif (( ${#delta_new[@]} == 0 )); then
+              printf 'removed\t%s\t%s\t-\n' "$slug" "${delta_old[*]}" >> "$scratch/entries.tsv"
+            elif (( ${#delta_old[@]} > 1 && ${#delta_new[@]} > 1 )); then
+              # Replacement pairs cannot be determined unambiguously – fail
+              # closed to a manual-review entry instead of reviewing guessed
+              # ref transitions.
+              printf 'ambiguous\t%s\t%s\t%s\n' "$slug" "${delta_old[*]}" "${delta_new[*]}" >> "$scratch/entries.tsv"
             else
-              printf 'review\t%s\t%s\t%s\n' "$slug" "$old" "$new" >> "$scratch/entries.tsv"
+              for o in "${delta_old[@]}"; do
+                for n in "${delta_new[@]}"; do
+                  if [[ ! "$o" =~ ^[0-9a-f]{40}$ || ! "$n" =~ ^[0-9a-f]{40}$ ]]; then
+                    printf 'nondigest\t%s\t%s\t%s\n' "$slug" "$o" "$n" >> "$scratch/entries.tsv"
+                  else
+                    printf 'review\t%s\t%s\t%s\n' "$slug" "$o" "$n" >> "$scratch/entries.tsv"
+                  fi
+                done
+              done
             fi
           done < "$scratch/pairs.tsv"
 
@@ -184,8 +228,8 @@ jobs:
                   {
                     echo "### $idx. \`$slug\`"
                     echo
-                    echo '- ❗ **Policy: manual review** – an action was *added* in an automated bump PR;'
-                    echo '  Renovate only bumps existing pins, so this is unexpected.'
+                    echo "- ❗ **Policy: manual review** – an action was *added* (\`$new\`) in an automated"
+                    echo '  bump PR; Renovate only bumps existing pins, so this is unexpected.'
                   } > "$section"
                   failed=1
                   ;;
@@ -193,7 +237,7 @@ jobs:
                   {
                     echo "### $idx. \`$slug\`"
                     echo
-                    echo '- ℹ️ Action reference removed; informational only.'
+                    echo "- ℹ️ Action reference removed (\`$old\`); informational only."
                   } > "$section"
                   ;;
                 nondigest)
@@ -202,6 +246,16 @@ jobs:
                     echo
                     echo "- ❗ **Policy: manual review** – reference moved to a non-digest value"
                     echo "  (\`$old\` → \`$new\`); digest review does not apply."
+                  } > "$section"
+                  failed=1
+                  ;;
+                ambiguous)
+                  {
+                    echo "### $idx. \`$slug\`"
+                    echo
+                    echo "- ❗ **Policy: manual review** – the pin moved between multiple digests on both"
+                    echo "  sides (\`$old\` → \`$new\`); the actual replacements cannot be determined"
+                    echo '  unambiguously.'
                   } > "$section"
                   failed=1
                   ;;
