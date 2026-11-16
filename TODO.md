@@ -5,6 +5,14 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
 
 ## Tasks
 
+- Flip the AI supply-chain review from shadow to gating (skill/citation: root `KNOWLEDGE.md` §"CI: AI supply-chain
+  review of action bumps"): once `.github/workflows/action-bump-review.yaml` verdicts have been validated over a few
+  real Renovate action bumps (`.github/renovate.json` package rules), set `automerge: true` (minor/patch, rebase
+  strategy) for `tj-actions/changed-files` and `nick-fields/retry` – the job's check conclusion is already the gate
+  Renovate waits for. Digest-typed updates (a ref repointed without a release) stay manual regardless: release-age gates
+  cannot soak them (github-tags timestamps age against the original release) and they are the highest-signal event for
+  human review.
+
 - Upstream: file an hk issue/PR against [jdx/hk](https://github.com/jdx/hk) – its shebang-based file typing (v2.7.0,
   `src/file_type.rs`) does not recognize `#!/usr/bin/with-contenv bashio` (the Home Assistant base image's interpreter
   for s6-overlay scripts): wrapper interpreter plus unknown `bashio` argument resolve to plain text, so hk's

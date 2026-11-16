@@ -525,3 +525,31 @@ vendir.yml `minimumRequiredVersion`):
 - Re-syncing at an unchanged upstream commit is byte-identical (idempotent); the post-sync `name:` prefix re-applies
   deterministically, so sync + prefix together leave the tree unchanged.
 - vendir fetches via the git CLI – no GitHub REST rate limits.
+
+## CI: AI supply-chain review of action bumps
+
+`.github/workflows/action-bump-review.yaml` has a read-only Copilot agent
+(`.github/agents/action-supply-chain-review.md`, pinned model, strict JSON verdict) assess the upstream diff of every
+digest bump on `renovate/*` PRs and post the verdict as a PR comment; the job's conclusion is the check a later
+automerge policy gates on (shadow phase until then). The Copilot CLI comes from mise (`[tools] copilot`, backend
+`aqua:github/copilot-cli`, pinned in `mise.lock`) – the mise manager bumps it and the minor/patch automerge rule merges
+it like any other repo tool. Facts below verified against Copilot CLI 1.0.112 (2026-11-16); CLI flags: [programmatic
+reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-programmatic-reference), [billing in
+Actions](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/copilot-cli-in-github-actions).
+
+- Auth env precedence is `COPILOT_GITHUB_TOKEN` > `GH_TOKEN` > `GITHUB_TOKEN`
+  > stored login: a `GITHUB_TOKEN` in the environment that lacks the Copilot Requests permission silently shadows an
+  > existing login and fails auth. CI relies on this order – passing the workflow's `GITHUB_TOKEN` bills Copilot CLI
+  > usage to the repository owner's Copilot seat on personally-owned repositories (no PAT needed). - In `-p` runs every
+  > tool request that would prompt is denied. Exception: shell commands the CLI classifies as read-only run *without
+  > asking* – so `--deny-tool shell` (deny rules beat every allow rule and mode) is what actually closes the shell
+  > surface for the reviewer agent, alongside `--deny-tool write`, `--deny-tool memory`, `--disable-builtin-mcps` and
+  > `--disallow-temp-dir`. - `--max-ai-credits` hard-caps a session's spend; its minimum is 30. - `--usage-output-file`
+  > writes final usage JSON (`totalPremiumRequestCost`, `providerModelMetrics[].usage` with token classes) – the
+  > workflow includes it in the PR comment for cost calibration. - Repository-level custom agents
+  > (`.github/agents/<id>.md`, id = file name without extension) are only discovered in prompt mode with
+  > `--trust-folder`. - `--reasoning-effort` accepts none/minimal/low/medium/high/xhigh/max; Claude Sonnet 5.5 accepts
+  > `high` (smoke-verified). - The compare API omits `files[].patch` for binary or oversized files (source: [compare
+  > commits](https://docs.github.com/en/rest/commits/compare-two-commits)): the pipeline surfaces such files as explicit
+  > unreviewable notes and the agent's verdict rules fail closed on them; diffs beyond the 500000-byte pipeline cap are
+  > truncated with an explicit marker, which the agent must treat as unreviewable.
