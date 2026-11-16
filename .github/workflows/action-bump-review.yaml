@@ -202,6 +202,9 @@ jobs:
           scratch="$RUNNER_TEMP"
           entries="$scratch/entries.tsv"
 
+          # The comment and the job summary are built in parallel: each
+          # section lands in both as soon as it exists, so a timed-out or
+          # otherwise aborted run still shows the verdicts completed so far.
           {
             echo '## 🤖 AI supply-chain review (shadow phase)'
             echo
@@ -209,11 +212,22 @@ jobs:
             echo '> before. Once verdict quality is validated, this check becomes the gate that Renovate'
             echo '> automerge waits for.'
             echo
-          } > "$scratch/comment.md"
+          } > "$scratch/banner.md"
+          cp "$scratch/banner.md" "$scratch/comment.md"
+          cat "$scratch/banner.md" >> "$GITHUB_STEP_SUMMARY"
           failed=0
+          risky_seen=0
           idx=0
 
           if [[ ! -s "$entries" ]]; then
+            {
+              echo '> No action reference changes between base and head – nothing to review.'
+              echo
+            } >> "$scratch/comment.md"
+            {
+              echo '> No action reference changes between base and head – nothing to review.'
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
             echo "No action reference changes between base and head – nothing to review."
           fi
 
@@ -260,8 +274,31 @@ jobs:
                   failed=1
                   ;;
               esac
-              cat "$section" >> "$scratch/comment.md"
-              echo >> "$scratch/comment.md"
+              {
+                cat "$section"
+                echo
+              } >> "$scratch/comment.md"
+              {
+                cat "$section"
+                echo
+              } >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            if ((risky_seen)); then
+              {
+                echo "### $idx. \`$slug\`"
+                echo
+                echo '- ⚠️ Not reviewed – an earlier entry was risky or failed closed; address that one first.'
+              } > "$section"
+              {
+                cat "$section"
+                echo
+              } >> "$scratch/comment.md"
+              {
+                cat "$section"
+                echo
+              } >> "$GITHUB_STEP_SUMMARY"
               continue
             fi
 
@@ -344,8 +381,8 @@ jobs:
             verdict=$(jq -r '.verdict' "$scratch/verdict-$idx.json")
             case "$verdict" in
               clean) mark="✅ clean" ;;
-              risky) mark="⚠️ risky"; failed=1 ;;
-              *) mark="❌ $verdict (fail-closed)"; failed=1 ;;
+              risky) mark="⚠️ risky"; failed=1; risky_seen=1 ;;
+              *) mark="❌ $verdict (fail-closed)"; failed=1; risky_seen=1 ;;
             esac
 
             python3 .github/scripts/review_verdict.py render \
@@ -358,8 +395,14 @@ jobs:
                 echo '> (fail-closed already applied where parsing failed).'
               } >> "$section"
             fi
-            cat "$section" >> "$scratch/comment.md"
-            echo >> "$scratch/comment.md"
+            {
+              cat "$section"
+              echo
+            } >> "$scratch/comment.md"
+            {
+              cat "$section"
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
           done < "$entries"
 
           {
@@ -375,9 +418,10 @@ jobs:
             echo '```'
             echo
             echo '</details>'
-          } >> "$scratch/comment.md"
+          } > "$scratch/metadata.md"
+          cat "$scratch/metadata.md" >> "$scratch/comment.md"
+          cat "$scratch/metadata.md" >> "$GITHUB_STEP_SUMMARY"
 
-          cat "$scratch/comment.md" >> "$GITHUB_STEP_SUMMARY"
           if [[ -n "$PR_NUMBER" ]]; then
             gh pr comment "$PR_NUMBER" --body-file "$scratch/comment.md"
           fi
@@ -386,3 +430,24 @@ jobs:
             echo '::error::AI supply-chain review flagged risk or could not complete – see the PR comment'
             exit 1
           fi
+
+      - name: Upload review diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: action-bump-review-diagnostics-${{ github.run_id }}
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/banner.md
+            ${{ runner.temp }}/comment.md
+            ${{ runner.temp }}/metadata.md
+            ${{ runner.temp }}/entries.tsv
+            ${{ runner.temp }}/pairs.tsv
+            ${{ runner.temp }}/patches-*.txt
+            ${{ runner.temp }}/compare-*.json
+            ${{ runner.temp }}/err-*.log
+            ${{ runner.temp }}/raw-*.txt
+            ${{ runner.temp }}/verdict-*.json
+            ${{ runner.temp }}/usage-*.json
+            ${{ runner.temp }}/section-*.md
+            .review-input-*.txt
