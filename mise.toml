@@ -73,11 +73,12 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   run = '[ -n "$MISE_WATCH_FILES_GIT_REWRITTEN" ] || { IFS=:; hk fix $MISE_WATCH_FILES_MODIFIED; }'
 
 [tools]
+  copilot = { version = "1.0.112", lazy = true }
   "github:immanuwell/dockerfile-roast" = "1.7.0"
   "github:reteps/dockerfmt" = "1.0.0"
   editorconfig-checker = "4.0.2"
   entireio-cli = "0.13.4"
-  gh = "latest"
+  gh = "2.104.0"
   # Toolchain for the go:-backend build below (mise builds go: tools with the project's go pin).
   go = "1.26"
   # Built from source; upstream external-agents has no tags/releases, so the pin is a commit pseudo-version.
