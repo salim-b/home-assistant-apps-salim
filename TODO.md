@@ -39,6 +39,20 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   check routes its diff preview to stdout via `--config-data 'output = { standard = { path = "-" } }'` and drops stderr,
   keeping failures verbose. The routing and stderr drop can be replaced by the flag once it lands.
 
+- Upstream: file an issue against [owenlamont/ryl](https://github.com/owenlamont/ryl) asking for a way to exclude
+  lockfiles generically instead of pattern-by-pattern. ryl's file-skipping knobs (`exclude`, `per-file-ignores`,
+  per-rule `ignore`) are all hand-written glob lists: no default ignore list and no lockfile awareness anywhere in the
+  source (code search over `owenlamont/ryl`, 2026-11-16: only its own release tooling mentions lockfiles), and its
+  docs/README demonstrate naming `pnpm-lock.yaml` by hand. The motivating example is vendir's `vendir.lock.yml` (this
+  repo's vendored-skills lockfile, root `KNOWLEDGE.md` §"Vendored agent skills"): machine-regenerated on every
+  `vendir sync`, never hand-edited, and emitted in a style ryl's formatter does not match, so it must be excluded from
+  lint and format alike – listed in `.ryl.toml`'s `exclude` and mirrored in `hk.pkl`'s `ryl-format` step (the mirror
+  exists because that step's check passes `--config-data`, which bypasses file-config discovery). Closest available
+  today is a basename glob (`*.lock.yml` matches at any depth, gitignore-style) – still hand-written and over-broad,
+  since it would also silence human-authored `*.lock.yml` content. Desired: something generic – built-in exclusions for
+  known YAML lockfiles (`pnpm-lock.yaml`, `vendir.lock.yml`, …) or a lockfile toggle. No existing issue found searching
+  `lockfile`/`exclude lock` the same day. The explicit patterns can shrink once it lands.
+
 - Upstream: file an hk PR against [jdx/hk](https://github.com/jdx/hk) adding a `panache` builtin
   (`pkl/builtins/panache.pkl`): [panache](https://github.com/jolars/panache) is the Markdown formatter this repo runs as
   a custom hk step (`check = panache format --check {{files}}`, `fix = panache format {{files}}` over
