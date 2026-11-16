@@ -81,4 +81,5 @@ Your final reply must be exactly one JSON object and nothing else – no prose, 
 }
 ```
 
-`findings` may be empty for a clean verdict. Keep `summary` under 300 characters and quotes in `evidence` short.
+`findings` may be empty for a clean verdict. `confidence` is a number in 0–1. Keep `summary` under 300 characters and
+quotes in `evidence` short.
