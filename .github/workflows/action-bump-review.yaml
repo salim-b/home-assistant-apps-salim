@@ -137,87 +137,38 @@ jobs:
           set -euo pipefail
           scratch="$RUNNER_TEMP"
 
-          # Collect owner/repo[/path]@ref entries from every workflow at both
-          # revisions. Local self-repository refs ($/...), ./... and docker://
-          # sources are not dependency pins; refs without a digest (e.g.
-          # @master) are floating and surface as nondigest anomalies below.
+          # Collect owner/repo[/path]@ref pins with their workflow file from
+          # every workflow at both revisions. Local self-repository refs
+          # ($/...), ./... and docker:// sources are not dependency pins; refs
+          # without a digest (e.g. @master) are floating and surface as
+          # nondigest anomalies.
           collect() {
-            git grep -h -E 'uses:' "$1" -- .github/workflows \
-              | grep -oE 'uses:[[:space:]]*[^#]+' \
-              | sed -E 's/^uses:[[:space:]]*//; s/[[:space:]]+$//; s/^["'"'"']//; s/["'"'"']$//' \
-              | grep -Ev '^(docker://|\./|\$/)' \
-              | grep -E '^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+@' \
-              | sort -u || true
+            git grep -E 'uses:' "$1" -- .github/workflows \
+              | awk -v rev="$1" '{
+                  line = $0
+                  if (substr(line, 1, length(rev) + 1) == rev ":") {
+                    line = substr(line, length(rev) + 2)
+                  }
+                  i = index(line, ":")
+                  file = substr(line, 1, i - 1)
+                  rest = substr(line, i + 1)
+                  if ((j = index(rest, "uses:")) == 0) next
+                  rest = substr(rest, j + 5)
+                  sub(/[[:space:]]*#.*/, "", rest)
+                  gsub(/^[[:space:]"'"'"']+|[[:space:]"'"'"']+$/, "", rest)
+                  if (rest ~ /^(docker:\/\/|\.\/|\$\/)/) next
+                  if (rest !~ /^[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.-]+)+@/) next
+                  slug = rest
+                  sub(/@.*$/, "", slug)
+                  ref = rest
+                  sub(/^[^@]*@/, "", ref)
+                  print file "\t" slug "\t" ref
+                }' || true
           }
-          collect "$BASE" > "$scratch/old-refs.txt"
-          collect "$HEAD" > "$scratch/new-refs.txt"
-          # Aggregate per slug (slugs never contain whitespace): one row per
-          # slug with space-separated refs, so a pin held at multiple digests
-          # yields delta sets below instead of a ref cross-product.
-          by_slug() {
-            awk -F'@' '{
-              refs[$1] = (refs[$1] == "" ? "" : refs[$1] " ") substr($0, length($1) + 2)
-            } END { for (slug in refs) print slug "\t" refs[slug] }' "$1" | sort -t $'\t' -k1,1
-          }
-          by_slug "$scratch/old-refs.txt" > "$scratch/old.map"
-          by_slug "$scratch/new-refs.txt" > "$scratch/new.map"
-
-          # Per slug: <slug> TAB <old refs> TAB <new refs>; '-' marks the
-          # empty side (added/removed). join emits empty fields there and read
-          # collapses adjacent IFS-whitespace delimiters, hence the
-          # placeholder – normalized back to empty after the read below.
-          join -t $'\t' -a 1 -a 2 -o '0,1.2,2.2' \
-            "$scratch/old.map" "$scratch/new.map" \
-            | sed -E 's/\t\t/\t-\t/; s/\t$/\t-/' > "$scratch/pairs.tsv"
-
-          : > "$scratch/entries.tsv"
-          while IFS=$'\t' read -r slug oldrefs newrefs; do
-            # read collapses adjacent IFS-whitespace delimiters, so an empty
-            # field is written as '-' below and normalized here.
-            [[ "$oldrefs" == "-" ]] && oldrefs=""
-            [[ "$newrefs" == "-" ]] && newrefs=""
-            # Delta sets: refs absent from the other revision's set; refs held
-            # in both revisions are unchanged and drop out.
-            # shellcheck disable=SC2206  # refs are space-separated tokens
-            old=($oldrefs)
-            # shellcheck disable=SC2206
-            new=($newrefs)
-            delta_old=()
-            delta_new=()
-            for ref in "${old[@]}"; do
-              if [[ " $newrefs " != *" $ref "* ]]; then
-                delta_old+=("$ref")
-              fi
-            done
-            for ref in "${new[@]}"; do
-              if [[ " $oldrefs " != *" $ref "* ]]; then
-                delta_new+=("$ref")
-              fi
-            done
-            if (( ${#delta_old[@]} == 0 && ${#delta_new[@]} == 0 )); then
-              continue  # unchanged slug
-            fi
-            if (( ${#delta_old[@]} == 0 )); then
-              printf 'added\t%s\t-\t%s\n' "$slug" "${delta_new[*]}" >> "$scratch/entries.tsv"
-            elif (( ${#delta_new[@]} == 0 )); then
-              printf 'removed\t%s\t%s\t-\n' "$slug" "${delta_old[*]}" >> "$scratch/entries.tsv"
-            elif (( ${#delta_old[@]} > 1 && ${#delta_new[@]} > 1 )); then
-              # Replacement pairs cannot be determined unambiguously – fail
-              # closed to a manual-review entry instead of reviewing guessed
-              # ref transitions.
-              printf 'ambiguous\t%s\t%s\t%s\n' "$slug" "${delta_old[*]}" "${delta_new[*]}" >> "$scratch/entries.tsv"
-            else
-              for o in "${delta_old[@]}"; do
-                for n in "${delta_new[@]}"; do
-                  if [[ ! "$o" =~ ^[0-9a-f]{40}$ || ! "$n" =~ ^[0-9a-f]{40}$ ]]; then
-                    printf 'nondigest\t%s\t%s\t%s\n' "$slug" "$o" "$n" >> "$scratch/entries.tsv"
-                  else
-                    printf 'review\t%s\t%s\t%s\n' "$slug" "$o" "$n" >> "$scratch/entries.tsv"
-                  fi
-                done
-              done
-            fi
-          done < "$scratch/pairs.tsv"
+          collect "$BASE" > "$scratch/old-details.tsv"
+          collect "$HEAD" > "$scratch/new-details.tsv"
+          python3 .github/scripts/review_verdict.py classify \
+            "$scratch/old-details.tsv" "$scratch/new-details.tsv" "$scratch/entries.tsv"
 
       - name: Review bumped actions
         id: review

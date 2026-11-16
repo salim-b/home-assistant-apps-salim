@@ -11,10 +11,12 @@ into the Markdown section posted on the pull request.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
 VALID_VERDICTS = ("clean", "risky")
+DIGEST = re.compile(r"^[0-9a-f]{40}$")
 
 
 def extract(raw_path: str, out_path: str) -> None:
@@ -53,6 +55,54 @@ def extract(raw_path: str, out_path: str) -> None:
             "findings": [],
         }
     Path(out_path).write_text(json.dumps(found), encoding="utf-8")
+
+
+def classify(old_path: str, new_path: str, out_path: str) -> None:
+    """Classify action-pin changes between two revisions into entries.
+
+    Reads `file<TAB>slug<TAB>ref` detail lines from both revisions, groups
+    them per workflow file and slug, and emits one `etype<TAB>slug<TAB>old<TAB>new`
+    row per actual transition: `added`/`removed` when a slug appears on one
+    side only, `review`/`nondigest` for a single ref replacement (by digest
+    shape), and `ambiguous` when a file pins a slug at multiple digests on
+    both sides so the pairing cannot be determined. Identical transitions
+    across files are deduplicated – their upstream compare is the same.
+    """
+
+    def load(path: str) -> dict[tuple[str, str], set[str]]:
+        pins: dict[tuple[str, str], set[str]] = {}
+        for line in Path(path).read_text(encoding="utf-8").splitlines():
+            if not line:
+                continue
+            file, slug, ref = line.split("\t", 2)
+            pins.setdefault((file, slug), set()).add(ref)
+        return pins
+
+    old, new = load(old_path), load(new_path)
+    rows: list[tuple[str, str, str, str]] = []
+    for key in sorted(set(old) | set(new)):
+        slug = key[1]
+        o, n = old.get(key, set()), new.get(key, set())
+        if o == n:
+            continue
+        if not o:
+            rows.append(("added", slug, "-", " ".join(sorted(n))))
+        elif not n:
+            rows.append(("removed", slug, " ".join(sorted(o)), "-"))
+        elif len(o) == 1 and len(n) == 1:
+            ov, nv = min(o), min(n)
+            etype = (
+                "review"
+                if DIGEST.fullmatch(ov) and DIGEST.fullmatch(nv)
+                else "nondigest"
+            )
+            rows.append((etype, slug, ov, nv))
+        else:
+            rows.append(("ambiguous", slug, " ".join(sorted(o)), " ".join(sorted(n))))
+    deduped = list(dict.fromkeys(rows))
+    Path(out_path).write_text(
+        "".join("\t".join(row) + "\n" for row in deduped), encoding="utf-8"
+    )
 
 
 def render(
@@ -94,15 +144,17 @@ def render(
 
 
 def main() -> None:
-    """Dispatch on argv[1]: `extract` or `render`."""
+    """Dispatch on argv[1]: `classify`, `extract` or `render`."""
     args = sys.argv[1:]
-    if len(args) == 3 and args[0] == "extract":
+    if len(args) == 4 and args[0] == "classify":
+        classify(args[1], args[2], args[3])
+    elif len(args) == 3 and args[0] == "extract":
         extract(args[1], args[2])
     elif len(args) == 8 and args[0] == "render":
         render(*args[1:])
     else:
         print(
-            "usage: review_verdict.py extract RAW OUT | "
+            "usage: review_verdict.py classify OLD OUT | extract RAW OUT | "
             "render VERDICT IDX SLUG OLD NEW MARK OUT",
             file=sys.stderr,
         )
