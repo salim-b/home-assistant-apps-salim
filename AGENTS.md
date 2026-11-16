@@ -83,6 +83,20 @@ Task usage is not documented here: `mise run <task> --help` is the authoritative
 common ones are in repository [`README.md`](./README.md) §"Development". The discipline – always `mise run check` before
 finishing a change, lab-boot every runtime-affecting change – lives in skill `ha-app-workflow`.
 
+## GitHub access
+
+Use the [`gh` CLI](https://cli.github.com/) for all GitHub interactions – issues, pull requests, checks and workflow
+runs, releases, and raw REST/GraphQL calls via `gh api` – instead of hand-rolled `curl` against api.github.com: `gh`
+sends configured credentials, which carry a far higher rate limit than unauthenticated requests (5,000 requests/hour per
+account vs. 60/hour per IP; [rate
+limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)).
+
+`gh` itself is provisioned via mise ([`mise.toml`](./mise.toml) `[tools]`), so it is available after the environment
+setup above. It needs a token: verify with `gh auth status`; if it is missing or unauthenticated, ask the user to run
+`gh auth login` or to export `GH_TOKEN` – do not attempt an interactive login yourself. Never guess subcommands or
+flags: `gh help` and `gh <command> --help` are authoritative, as is the [command
+manual](https://cli.github.com/manual/).
+
 ## Workflow rules
 
 Skill `ha-app-workflow` – load it before making any change. It owns the non-negotiables: `agent-<topic>` branches,
