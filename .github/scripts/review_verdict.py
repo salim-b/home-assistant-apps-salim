@@ -95,17 +95,18 @@ def render(
 
 def main() -> None:
     """Dispatch on argv[1]: `extract` or `render`."""
-    if len(sys.argv) < 2 or sys.argv[1] not in ("extract", "render"):
+    args = sys.argv[1:]
+    if len(args) == 3 and args[0] == "extract":
+        extract(args[1], args[2])
+    elif len(args) == 8 and args[0] == "render":
+        render(*args[1:])
+    else:
         print(
             "usage: review_verdict.py extract RAW OUT | "
             "render VERDICT IDX SLUG OLD NEW MARK OUT",
             file=sys.stderr,
         )
         sys.exit(2)
-    if sys.argv[1] == "extract":
-        extract(sys.argv[2], sys.argv[3])
-    else:
-        render(*sys.argv[2:8])
 
 
 if __name__ == "__main__":
