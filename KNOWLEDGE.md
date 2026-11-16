@@ -563,3 +563,7 @@ Actions](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/copilot-
 - Digest-to-tag matching uses `repos/{owner}/{repo}/tags?per_page=100`; its `commit.sha` is the commit the tag points
   to, so annotated tags match too (verified for both tag styles against jdx/mise-action and git/git v2.44.0, 2026-11-16;
   source: [list repository tags](https://docs.github.com/en/rest/repos/repos#list-repository-tags)).
+- Renovate's github-actions manager rewrites a digest bump together with the pin's trailing `# vX.Y.Z` version comment
+  and touches nothing else in the file (verified on PR #29's diff, Renovate 44, 2026-11-16). The review workflow's
+  tamper guard normalizes everything after a pin's digest for that reason: digest+comment rewrites of any pin pass, any
+  other edit to the workflow trips.
