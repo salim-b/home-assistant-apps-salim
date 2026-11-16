@@ -502,18 +502,19 @@ vendir sync --locked         # sync from vendir.lock.yml exactly (fresh clones)
 mise run skills:prefix-names # post-sync: prefix the vendored frontmatter `name:` fields (idempotent)
 ```
 
-vendir fetches upstream-verbatim copies whose frontmatter `name:` fields are unprefixed; `skills:prefix-names` rewrites
-them to the `entire-` prefixed form, matching the directory names. In-skill references to sibling skills keep upstream's
-unprefixed spellings. The [Skills update workflow](./.github/workflows/skills-update.yaml) runs the sync weekly and
-opens a rolling PR when upstream moves.
+vendir fetches upstream-verbatim copies whose frontmatter `name:` fields are unprefixed; `skills:prefix-names` (bash +
+yq) rewrites them to the `entire-` prefixed form, matching the directory names. In-skill references to sibling skills
+keep upstream's unprefixed spellings. The [Skills update workflow](./.github/workflows/skills-update.yaml) runs the sync
+weekly and opens a rolling PR when upstream moves.
 
-**Upstream-verbatim policy**: vendored skills are never hand-edited; the only sanctioned deviation from upstream bytes
-is the mechanical post-sync `entire-` prefix on the frontmatter `name:` fields (task `skills:prefix-names`, never a
-manual edit). Every lint step that could touch them excludes them, so a local fix can't be reverted by the next sync
-(churn): hk's panache/editorconfig-checker/final-newline steps and `.panache.toml`/`.rumdl.toml` carry per-skill
-excludes; `vendir.lock.yml` is excluded from ryl (vendir rewrites it on every sync). hk passes staged files explicitly,
-bypassing the tools' own config excludes – hence the duplicate lists (skill ha-app-markdown). Repo-owned skills in
-`.agents/skills/` stay linted.
+**Upstream-verbatim policy**: vendored skills are never hand-edited; the only sanctioned deviations from upstream bytes
+are the mechanical post-sync `entire-` prefix on the frontmatter `name:` fields and yq's re-rendering of a rewritten
+frontmatter, which unfolds multi-line `description: >` scalars to single lines (string values unchanged; task
+`skills:prefix-names`, never a manual edit). Every lint step that could touch them excludes them, so a local fix can't
+be reverted by the next sync (churn): hk's panache/editorconfig-checker/final-newline steps and
+`.panache.toml`/`.rumdl.toml` carry per-skill excludes; `vendir.lock.yml` is excluded from ryl (vendir rewrites it on
+every sync). hk passes staged files explicitly, bypassing the tools' own config excludes – hence the duplicate lists
+(skill ha-app-markdown). Repo-owned skills in `.agents/skills/` stay linted.
 
 **Design facts** (vendir 0.46.3; source: [vendir sync docs](https://carvel-dev.github.io/vendir/docs/vendir-sync/),
 vendir.yml `minimumRequiredVersion`):
