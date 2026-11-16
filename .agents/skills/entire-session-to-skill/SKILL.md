@@ -1,5 +1,5 @@
 ---
-name: session-to-skill
+name: entire-session-to-skill
 description: Use when the user wants to turn one or more Entire-tracked sessions, checkpoints, or repeated agent workflows into a reusable agent skill.
 ---
 

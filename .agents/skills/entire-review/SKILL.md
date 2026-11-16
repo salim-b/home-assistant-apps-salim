@@ -1,5 +1,5 @@
 ---
-name: review
+name: entire-review
 description: >
   Review code changes on the current branch using checkpoint transcript context
   to understand developer intent before auditing the diff. Use when the user

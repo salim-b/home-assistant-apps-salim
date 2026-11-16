@@ -1,5 +1,5 @@
 ---
-name: recall
+name: entire-recall
 description: "Use when the user describes a task and wants to know whether something similar has been done before, then turn the closest prior session into a task playbook. Triggers on phrases like \"have we done this before\", \"recall how we did X\", \"find similar work\", \"any precedent for\", \"has anyone solved\", \"is there a template for\", and \"how did we do this last time\""
 ---
 

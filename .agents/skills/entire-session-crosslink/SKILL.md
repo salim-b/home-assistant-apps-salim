@@ -1,5 +1,5 @@
 ---
-name: session-crosslink
+name: entire-session-crosslink
 description: Use when an agent session ran outside the repo whose commits should record it — e.g. launched from a higher-level folder, a non-Entire repo, or one repo but editing another — to attach the session to each affected Entire-enabled repo's HEAD commit.
 ---
 

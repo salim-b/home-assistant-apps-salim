@@ -1,5 +1,5 @@
 ---
-name: teach
+name: entire-teach
 description: "Use when a developer wants a topic-focused guided lesson built from canonical checkpoints, not a whole-repo overview. Triggers on phrases like \"teach me <topic>\", \"teach me how this repo handles\", \"how does <topic> work in this repo\", \"give me a lesson on\", \"school me on\", and \"I need to learn about\""
 ---
 

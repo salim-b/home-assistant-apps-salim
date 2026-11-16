@@ -1,5 +1,5 @@
 ---
-name: replay
+name: entire-replay
 description: "Use when the user wants to step through a feature's checkpoints chronologically, pausing at each step to ask questions. Triggers on phrases like \"replay <feature>\", \"walk me through how X was built\", \"show me the journey of\", \"step me through how Y was implemented\", and \"replay the last week\""
 ---
 

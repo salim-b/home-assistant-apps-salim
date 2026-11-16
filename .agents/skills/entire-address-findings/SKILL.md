@@ -1,5 +1,5 @@
 ---
-name: address-findings
+name: entire-address-findings
 description: >
   Address the review findings posted on an Entire trail: fetch the trail's open
   findings, fix the code, and resolve them on the trail. Use when the user gives

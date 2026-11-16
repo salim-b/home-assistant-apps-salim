@@ -1,5 +1,5 @@
 ---
-name: search
+name: entire-search
 description: >
   Use when the user asks to research, investigate, look into, dig into, or
   search for anything — a topic, feature, bug, decision, or "what do we know

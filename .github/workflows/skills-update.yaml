@@ -2,7 +2,9 @@ name: Skills update
 
 # Weekly refresh of the vendir-vendored agent skills (vendir.yml): `vendir sync --yes` re-resolves
 # the `ref: main` pins and rewrites vendir.lock.yml plus the vendored copies under .agents/skills/
-# whenever the upstream collection moved. On drift the refreshed tree is pushed to the
+# whenever the upstream collection moved, and the skills:prefix-names task re-applies the `entire-`
+# prefix to the vendored frontmatter `name:` fields (upstream names are unprefixed, so a resync
+# without it would read as drift on every run). On drift the refreshed tree is pushed to the
 # `vendored-skills-update` branch and a rolling PR is opened or updated – the branch is force-pushed
 # on every refresh, so the PR rolls until merged. No drift means no PR; workflow_dispatch is safe
 # for manual verification runs.
@@ -51,6 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           vendir sync --yes
+          mise run skills:prefix-names
           if git status --porcelain -- vendir.lock.yml .agents/skills/ | grep -q .; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
