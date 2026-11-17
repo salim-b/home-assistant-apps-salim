@@ -1,0 +1,58 @@
+I'd like you to switch the recipes of all of the following conda-forge feedstocks (all feedstock repos are cloned in the workdir) from `pkg-config` to `pkgconf`, i.e. simply replace the relevant value under the `requirements` key. 
+
+For each feedstock, do this on a new `agent-pkgconf` branch and
+
+1. run `mise run git:update_default_branch`
+2. commit the change to the `recipe/recipe.yaml` with commit message `` chore: switch from `pkg-config` to `pkgconf` ``
+3. run `conda-smithy rerender --commit=auto`
+4. push the branch
+
+Feedstocks:
+
+- aube
+- cargo-update
+- chunkah
+- fnox
+- gitlogue
+- gurk
+- hk
+- libcap-ng
+- lux-cli
+- mise
+- rqbit
+- simple-http-server
+- spider_cli
+- stakpak
+
+Take a systematic approach an be efficient (i.e. write a small adhoc script).
+
+---
+
+Yes, please open the PRs with the main commit message as title and the following body
+
+```
+cf. https://github.com/conda-forge/conda-forge.github.io/issues/1880#issuecomment-6580599468
+
+Checklist
+* [x] Used a [personal fork of the feedstock to propose changes](https://conda-forge.org/docs/maintainer/updating_pkgs.html#forking-and-pull-requests)
+* [ ] Bumped the build number (if the version is unchanged)
+* [ ] Reset the build number to `0` (if the version changed)
+* [x] [Re-rendered]( https://conda-forge.org/docs/maintainer/updating_pkgs.html#rerendering-feedstocks ) with the latest `conda-smithy` (Use the phrase <code>@<space/>conda-forge-admin, please rerender</code> in a comment in this PR for automated rerendering)
+* [x] Ensured the license file is being packaged.
+```
+
+(In case your `GITHUB_TOKEN` does not allow to open PRs, please stop and report back!)
+
+---
+
+Hm, that's weird – your `GITHUB_TOKEN` already has **Pull requests: Read and write** permission, I just checked. What's missing?
+
+Plus one important correction: You should create the PRs against the upsteam `conda-forge/*-feedstock` repos (not `salim-b/*-feedstock`).
+
+---
+
+Please hand me a Bash script that I can execute to open the PRs (using the `gh` CLI).
+
+---
+
+Good. Now please write me a minimal Bash script to run `mise run git:update_default_branch`, followed by `git brand -D agent-pkgconf` for all 13 feedstock folders (assume I'll run it from your current workdir).
