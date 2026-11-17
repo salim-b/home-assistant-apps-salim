@@ -85,6 +85,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   # Renovate can't bump it (package-path dep of an untagged module) – bump manually, then `mise lock`.
   "go:github.com/entireio/external-agents/agents/entire-agent-goose/cmd/entire-agent-goose" = {
     version = "v0.0.0-20260912195008-9b268b339e17",
+    lazy = true,
     lazy_bins = [ "entire-agent-goose" ]
   }
   jactionlint = { version = "v2.5.0", workflow = "release.yaml" }
