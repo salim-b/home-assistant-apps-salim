@@ -20,18 +20,19 @@ DIGEST = re.compile(r"^[0-9a-f]{40}$")
 
 
 def extract(raw_path: str, out_path: str) -> None:
-    """Recover the first valid verdict JSON object from raw reviewer output.
+    """Recover the verdict JSON object from raw reviewer output.
 
-    Scans the output for a JSON object whose `verdict` field matches the
-    contract; when none is found, writes an `unparsable` verdict instead – the
-    workflow classifies that as risky, so a malformed reviewer reply can never
-    count as a pass.
+    Scans the output for JSON objects whose `verdict` field matches the
+    contract and proceeds only when exactly one is found; anything else – no
+    match, or an echoed verdict object alongside the real one – writes an
+    `unparsable` verdict instead, which the workflow classifies as risky, so
+    a malformed or steered reviewer reply can never count as a pass.
     """
     raw = Path(raw_path).read_text(encoding="utf-8", errors="replace")
     decoder = json.JSONDecoder()
-    found: dict[str, object] | None = None
+    matches: list[dict[str, object]] = []
     start = 0
-    while found is None:
+    while True:
         brace = raw.find("{", start)
         if brace < 0:
             break
@@ -41,17 +42,22 @@ def extract(raw_path: str, out_path: str) -> None:
             start = brace + 1
             continue
         if isinstance(obj, dict) and obj.get("verdict") in VALID_VERDICTS:
-            found = obj
-        else:
-            start = end if end > brace else brace + 1
-    if found is None:
+            matches.append(obj)
+        start = end if end > brace else brace + 1
+    if len(matches) == 1:
+        found: dict[str, object] = matches[0]
+    else:
+        summary = (
+            f"Reviewer output contained {len(matches)} verdict JSON objects (exactly"
+            " one expected) – treated as risky (fail closed)."
+            if matches
+            else "Reviewer output did not parse as the JSON verdict contract "
+            "– treated as risky (fail closed)."
+        )
         found = {
             "verdict": "unparsable",
             "confidence": 0,
-            "summary": (
-                "Reviewer output did not parse as the JSON verdict contract "
-                "– treated as risky (fail closed)."
-            ),
+            "summary": summary,
             "findings": [],
         }
     Path(out_path).write_text(json.dumps(found), encoding="utf-8")
