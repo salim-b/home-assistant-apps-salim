@@ -1,0 +1,7 @@
+I'd like you to review the changes on the current `agent-renovate-automerge` branch (vs. `main`) for correctness, consistency and adherence to our project guidelines.
+
+---
+
+Please fix all issues (choose the more elegant option where you propose multiple fix options).
+
+For `.github/renovate.json` medium finding: scope the certification claim to the eagerly-installed toolset.
