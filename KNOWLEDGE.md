@@ -531,7 +531,7 @@ vendir.yml `minimumRequiredVersion`):
 `.github/workflows/action-bump-review.yaml` has a read-only Copilot agent
 (`.github/agents/action-supply-chain-review.md`, pinned model, strict JSON verdict) assess the upstream diff of every
 digest bump on `renovate/*` PRs – except bumps of the popular actions that gate on Renovate's minimum release age
-instead (`.github/renovate.json`'s release-age rules: GitHub's `actions/*` and `jdx/mise-action`) – and post the verdict
+instead (`.github/renovate.json`'s release-age rule: GitHub's `actions/*` and `jdx/mise-action`) – and post the verdict
 as a PR comment; the job's conclusion is the check a later automerge policy gates on (shadow phase until then). The
 Copilot CLI comes from mise (`[tools] copilot`, backend `aqua:github/copilot-cli`, pinned in `mise.lock`) – the mise
 manager bumps it and the minor/patch automerge rule merges it like any other repo tool. Facts below verified against
