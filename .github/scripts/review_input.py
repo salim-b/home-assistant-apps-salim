@@ -251,8 +251,15 @@ def enrich(args: argparse.Namespace) -> None:
     total = compare.get("total_commits")
     commits = [c for c in (compare.get("commits") or []) if isinstance(c, dict)]
     manifest_names: set[str] = set()
+    reconstructed_names: set[str] = set()
     if args.blob_manifest and Path(args.blob_manifest).is_file():
-        manifest_names = {row[0] for row in _manifest_rows(Path(args.blob_manifest))}
+        rows = _manifest_rows(Path(args.blob_manifest))
+        manifest_names = {row[0] for row in rows}
+        # Note-only rows (map skip, cap reached, removed, fetch failure) carry
+        # a reconstruction status, not blob paths.
+        reconstructed_names = {
+            row[0] for row in rows if not row[3] and (row[1] or row[2])
+        }
 
     header_lines = [
         f"Action repository: {args.repo} (referenced as {args.slug})",
@@ -269,8 +276,12 @@ def enrich(args: argparse.Namespace) -> None:
             "Files whose patch the compare API omitted (binary or oversized):"
         )
         for name in unpatched:
-            if name in manifest_names:
+            if name in reconstructed_names:
                 header_lines.append(f"PATCH OMITTED, reconstructed below: {name}")
+            elif name in manifest_names:
+                header_lines.append(
+                    f"PATCH OMITTED, not reconstructed (see note below): {name}"
+                )
             else:
                 header_lines.append(f"NO PATCH AVAILABLE: {name}")
     header_lines.append(
@@ -280,20 +291,37 @@ def enrich(args: argparse.Namespace) -> None:
 
     parts: list[str] = []
     used = 0
+    # The diff-section end marker is appended after everything the diff phase
+    # emits; reserving its bytes up front keeps the file within the budget
+    # however the diff truncates. Content and notes are accounted against
+    # content_budget; the marker consumes the reserved slack.
+    diff_end = _end("diff")
+    content_budget = args.budget - _enc_len(diff_end)
 
     def take(text: str) -> bool:
         nonlocal used
         cost = _enc_len(text)
-        if cost > args.budget - used:
+        if cost > content_budget - used:
             return False
         parts.append(text)
         used += cost
         return True
 
+    def add_note(text: str) -> None:
+        """Append a trusted one-line note, accounted against the budget."""
+        nonlocal used
+        note = _cut(text, max(0, content_budget - used))
+        if not note:
+            return
+        if not note.endswith("\n"):
+            note += "\n"
+        parts.append(note)
+        used += _enc_len(note)
+
     if not take(fixed):
         # Pathological only (a huge NO-PATCH list); keep the file valid anyway.
-        parts.append(_cut(fixed, args.budget))
-        used = args.budget
+        parts.append(_cut(fixed, content_budget))
+        used = content_budget
 
     diff = "".join(patch + "\n" for patch in patches)
     if not take(diff):
@@ -302,8 +330,10 @@ def enrich(args: argparse.Namespace) -> None:
             f"...TRUNCATED at the {args.budget}-byte input limit – content beyond this point"
             " was NOT analyzed.\n"
         )
-        parts.append(_cut(diff, max(0, args.budget - used - _enc_len(marker))) + marker)
-        used = args.budget
+        parts.append(
+            _cut(diff, max(0, content_budget - used - _enc_len(marker))) + marker
+        )
+        used = content_budget
 
     # Files whose patch the compare API omitted: reconstructed unified diffs
     # from their git blobs (fetched trusted-side), still inside the diff
@@ -311,7 +341,7 @@ def enrich(args: argparse.Namespace) -> None:
     if args.blob_manifest and Path(args.blob_manifest).is_file():
         for name, old_file, new_file, note in _manifest_rows(Path(args.blob_manifest)):
             if note:
-                parts.append(f"(reconstructed diff for {name} – {note})\n")
+                add_note(f"(reconstructed diff for {name} – {note})\n")
                 continue
             old_path = Path(old_file) if old_file else None
             new_path = Path(new_file) if new_file else None
@@ -324,7 +354,7 @@ def enrich(args: argparse.Namespace) -> None:
                 None,
             )
             if missing:
-                parts.append(
+                add_note(
                     f"(reconstructed diff for {name} – {missing} blob snapshot missing)\n"
                 )
                 continue
@@ -337,20 +367,20 @@ def enrich(args: argparse.Namespace) -> None:
                 None,
             )
             if binary:
-                parts.append(
+                add_note(
                     f"(reconstructed diff for {name} – the {binary} blob is binary"
                     " content, not reconstructed)\n"
                 )
                 continue
             status, body = _blob_diff(name, old_path, new_path)
             if status == "same":
-                parts.append(
+                add_note(
                     "(reconstructed diff for "
                     f"{name} – no content difference between the blobs)\n"
                 )
                 continue
             if status == "error":
-                parts.append(
+                add_note(
                     f"(reconstructed diff for {name} – reconstruction failed: {body})\n"
                 )
                 continue
@@ -374,27 +404,25 @@ def enrich(args: argparse.Namespace) -> None:
                 " was NOT analyzed.\n"
             )
             avail = (
-                args.budget
+                content_budget
                 - used
                 - _enc_len(head)
                 - _enc_len(tail)
                 - _enc_len(budget_marker)
             )
             if avail <= 0:
-                parts.append(
+                add_note(
                     f"(reconstructed diff for {name} omitted:"
                     f" {args.budget}-byte input budget exhausted)\n"
                 )
                 continue
             parts.append(head + _cut(body, avail) + budget_marker + tail)
-            used = args.budget
-    parts.append(_end("diff"))
+            used = content_budget
+    parts.append(diff_end)
 
     def add_section(name: str, content: str) -> None:
         if not take(content):
-            parts.append(
-                f"({name} omitted: {args.budget}-byte input budget exhausted)\n"
-            )
+            add_note(f"({name} omitted: {args.budget}-byte input budget exhausted)\n")
 
     add_section("upstream commits", _commit_section(commits, total))
 
@@ -410,7 +438,7 @@ def enrich(args: argparse.Namespace) -> None:
             ),
         )
     else:
-        parts.append(
+        add_note(
             "(tag and release context unavailable: upstream metadata fetch failed)\n"
         )
 
@@ -418,7 +446,7 @@ def enrich(args: argparse.Namespace) -> None:
         raw = Path(args.privileges).read_text(encoding="utf-8", errors="replace")
         add_section("privilege context", _privilege_section(raw, args.slug))
     else:
-        parts.append(
+        add_note(
             f"(privilege context omitted: no BASE workflow references {args.slug})\n"
         )
 
@@ -426,7 +454,7 @@ def enrich(args: argparse.Namespace) -> None:
         body = Path(args.prbody).read_text(encoding="utf-8", errors="replace")
         add_section("pull-request description", _prbody_section(body))
     else:
-        parts.append("(pull-request description unavailable this run)\n")
+        add_note("(pull-request description unavailable this run)\n")
 
     Path(args.out).write_text("".join(parts), encoding="utf-8")
 
