@@ -1,0 +1,39 @@
+I switched from build requirement `pkg-config` to `pkgconf` since the former is deprecated (as per https://github.com/conda-forge/conda-forge.github.io/issues/1880#issuecomment-6580599468).
+
+But the build now fails on the `linux-*` targets, cf. https://github.com/conda-forge/gitlogue-feedstock/actions/runs/44168264689/job/134340065903?pr=9
+
+```
+   cargo:warning=failed to probe system libgit2: 
+   pkg-config exited with status code 1
+   > PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig PKG_CONFIG_ALLOW_SYSTEM_LIBS=1 PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1 pkg-config --libs --cflags libgit2 'libgit2 >= 1.9.3' 'libgit2 < 1.10.0'
+   The system library `libgit2` required by crate `libgit2-sys` was not found.
+   The file `libgit2.pc` needs to be installed and the PKG_CONFIG_PATH environment variable must contain its parent directory.
+   PKG_CONFIG_PATH contains the following:
+       - $PREFIX/lib/pkgconfig
+   HINT: you may need to install a package such as libgit2, libgit2-dev or libgit2-devel.
+   --- stderr
+   thread 'main' (1979) panicked at $BUILD_PREFIX/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libgit2-sys-0.18.4+1.9.3/build.rs:100:13:
+   The environment variable `LIBGIT2_NO_VENDOR` has been set but no compatible system libgit2 could be found.
+   The build is now aborting. To disable, unset the variable or use `LIBGIT2_NO_VENDOR=0`.
+   note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ warning: build failed, waiting for other jobs to finish...
+ error: failed to compile `gitlogue v0.12.2 ($SRC_DIR)`, intermediate artifacts can be found at `$SRC_DIR/target`.
+```
+
+Why is that? (the recipe requires the `libgit2` dependency already for all unix platforms)
+
+---
+
+Please write me a short and precise issue draft (adhering to all upstream issue template/requirements).
+
+---
+
+Can you explain me the following sentence from the issue draft in detail, I don't understand:
+
+> (Fixing #1 would also repair `libssh2.pc`'s `Requires.private: libcrypto,zlib` for downstream users.)
+
+Are you sure you wanted to link to #1 (= https://github.com/conda-forge/libgit2-feedstock/issues/1)?
+
+---
+
+Ok, but shorten your suggested rewording, please.
