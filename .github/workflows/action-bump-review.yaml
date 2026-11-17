@@ -263,9 +263,9 @@ jobs:
                   {
                     echo "### $idx. \`$slug\`"
                     echo
-                    echo "- ❗ **Policy: manual review** – the pin moved between multiple digests on both"
-                    echo "  sides (\`$old\` → \`$new\`); the actual replacements cannot be determined"
-                    echo '  unambiguously.'
+                    echo "- ❗ **Policy: manual review** – the pin holds multiple digests across the two"
+                    echo "  revisions (\`$old\` → \`$new\`); the actual replacements cannot be"
+                    echo '  determined unambiguously.'
                   } > "$section"
                   failed=1
                   ;;
