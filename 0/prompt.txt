@@ -1,0 +1,23 @@
+One more follow-up question:
+
+Our `action-supply-chain-review` agent's verdict systematically fails closed on when an updated action contains minified dist bundles it can't verify ("The compiled dist/index.js and its source map have no patch data, so the code that actually runs, including the bundled packslip 1.11.3, cannot be assessed."). Doesn't that affect virtually any action written in JavaScript/TypeScript incl. `nick-fields/retry` we're eventually trying to gate?
+
+---
+
+One more follow-up question:
+
+Our `action-supply-chain-review` agent's verdict systematically fails closed when an updated action contains minified dist bundles it can't verify ("The compiled dist/index.js and its source map have no patch data, so the code that actually runs, including the bundled packslip 1.11.3, cannot be assessed."). Doesn't that affect virtually any action written in JavaScript/TypeScript incl. `nick-fields/retry` we're eventually trying to gate?
+
+---
+
+One more follow-up question:
+
+Our `action-supply-chain-review` agent's verdict systematically fails closed when an updated action contains minified dist bundles it can't verify ("The compiled dist/index.js and its source map have no patch data, so the code that actually runs, including the bundled <dependency-name>, cannot be assessed."). Doesn't that affect virtually any action written in JavaScript/TypeScript incl. `nick-fields/retry` we're eventually trying to gate?
+
+---
+
+I'd like to go with option 1. Let's make a plan. Also: Could/should we increase the budget to e.g. 1000 KB? About how much additional GitHub AI credits would that burn per run?
+
+---
+
+I'd like to go with option 2 (trusted-side blob-diff fallback). Let's make a plan. Also: Could/should we increase the budget to e.g. 1000 KB? About how much additional GitHub AI credits would that burn per run?
