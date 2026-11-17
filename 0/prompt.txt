@@ -1,0 +1,11 @@
+I'd like you to assess whether the current uncommitted changes in the repo to `mise.toml` (adding `laze = true`) are a good idea. What are possible drawbacks of enabling [lazy](https://mise.jdx.dev/dev-tools/shims.html#lazy-tools) installation for these tools, e.g. with regards to project onboarding or coding agents like you working on the repo?
+
+---
+
+> CI. The skills-update workflow runs vendir sync directly after mise-action (which does a bare mise install). With lazy vendir this works via the bootstrap shim (registry metadata exists for it), but the install now happens inside a cron step — a transient network blip fails the weekly sync at point-of-use instead of failing visibly at setup.
+
+Can mise-action be instructed to `mise install --include-lazy`?
+
+---
+
+Please add `install_args: --include-lazy` to the mise-actions of workflows that use `copilot` or `vendir`.
