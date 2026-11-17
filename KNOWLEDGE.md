@@ -573,5 +573,6 @@ Actions](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/copilot-
   source: [list repository tags](https://docs.github.com/en/rest/repos/repos#list-repository-tags)).
 - Renovate's github-actions manager rewrites a digest bump together with the pin's trailing `# vX.Y.Z` version comment
   and touches nothing else in the file (verified on PR #29's diff, Renovate 44, 2026-11-16). The review workflow's
-  tamper guard normalizes everything after a pin's digest for that reason: digest+comment rewrites of any pin pass, any
-  other edit to the workflow trips.
+  tamper guard normalizes a pin whose ref is exactly a digest followed only by whitespace or the version comment on that
+  basis: digest+comment rewrites of any pin pass, any other edit to the workflow – including a longer or floating ref –
+  trips.
