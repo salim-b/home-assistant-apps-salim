@@ -136,6 +136,8 @@ jobs:
 
       - name: Set up mise (provides the pinned Copilot CLI)
         uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b  # v5.2.7
+        with:
+          install_args: --include-lazy
 
       - name: Collect bumped action references
         env:

@@ -47,6 +47,8 @@ jobs:
 
       - name: Set up mise
         uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b  # v5.2.7
+        with:
+          install_args: --include-lazy
 
       - name: Sync vendored skills and detect upstream drift
         id: sync
