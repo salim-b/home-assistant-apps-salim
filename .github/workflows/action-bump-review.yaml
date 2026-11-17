@@ -95,17 +95,18 @@ jobs:
           # Renovate's github-actions manager rewrites a digest bump together
           # with the pin's trailing version comment (verified on PR #29) and
           # only ever touches `uses:` pin lines – precisely the change the
-          # review assesses. Sanitizing everything from the digest onward
-          # therefore passes digest+comment rewrites of any pin, while any
-          # other change to the file – new steps, changed arguments, a
-          # dropped guard – is tampering. A digest repointed to a non-digest
-          # ref (or a malformed over-long digest) fails to normalize and
+          # review assesses. Normalizing a digest that is followed only by
+          # whitespace (the version comment) or end of line therefore passes
+          # digest+comment rewrites of any pin, while any other change to the
+          # file – new steps, changed arguments, a dropped guard – is
+          # tampering. A digest repointed to a longer ref (hex extension or
+          # non-hex suffix) or to a floating ref fails to normalize and
           # trips, failing closed.
           sanitize() {
             # A revision predating this file (dispatch on an older PR) yields
             # empty output on both sides and passes the comparison.
             git show "$1:.github/workflows/action-bump-review.yaml" 2>/dev/null |
-              sed -E 's/(uses:[[:space:]]*[^@[:space:]]+)@[0-9a-f]{40}([^0-9a-f].*)?$/\1@DIGEST/'
+              sed -E 's/(uses:[[:space:]]*[^@[:space:]]+)@[0-9a-f]{40}([[:space:]].*)?$/\1@DIGEST/'
           }
           if [ "$(sanitize "$BASE")" != "$(sanitize "$HEAD")" ]; then
             echo "::error::Automated PR modifies this review workflow – human review required"
