@@ -351,6 +351,82 @@ jobs:
               continue
             fi
 
+            # The compare API omits per-file patches for oversized files –
+            # for bundle-shipping actions exactly the code that executes (root
+            # KNOWLEDGE.md §"CI: AI supply-chain review of action bumps").
+            # Reconstruct those diffs trusted-side from git blobs:
+            # files[].sha is the new side's blob, one trees call maps the old
+            # side. *.map files are skipped as derivative of the src/ patches
+            # and the file count is capped; the manifest drives
+            # review_input.py's diff-phase reconstructions.
+            blob_manifest="$scratch/blob-manifest-$idx.tsv"
+            : > "$blob_manifest"
+            mapfile -t omitted_files < <(
+              jq -r '.files[]
+                     | select(.patch == null)
+                     | [.filename, (.previous_filename // ""), .status, (.sha // "")]
+                     | @tsv' "$compare" 2>>"$scratch/err-$idx.log" || true
+            )
+            old_tree="$scratch/old-tree-$idx.json"
+            tree_ok=0
+            if (( ${#omitted_files[@]} )); then
+              if gh api "repos/$repo/git/trees/$old?recursive=1" > "$old_tree" 2>>"$scratch/err-$idx.log"; then
+                tree_ok=1
+              fi
+            fi
+            blob_n=0
+            for omitted in "${omitted_files[@]}"; do
+              IFS=$'\t' read -r bfile bprev bstatus bsha <<<"$omitted"
+              if ((blob_n >= 4)); then
+                printf '%s\t\t\treconstruction skipped: cap of 4 files reached\n' "$bfile" >> "$blob_manifest"
+                continue
+              fi
+              case "$bfile" in
+                *.map)
+                  printf '%s\t\t\tskipped: source map (derivative of the src/ patches)\n' "$bfile" >> "$blob_manifest"
+                  continue
+                  ;;
+              esac
+              if [[ "$bstatus" == "removed" ]]; then
+                printf '%s\t\t\tremoved between the pins; content not reconstructed\n' "$bfile" >> "$blob_manifest"
+                continue
+              fi
+              if [[ -z "$bsha" ]]; then
+                printf '%s\t\t\treconstruction unavailable: no blob sha in the compare response\n' "$bfile" >> "$blob_manifest"
+                continue
+              fi
+              blob_old="$scratch/blob-old-$idx-$blob_n"
+              blob_new="$scratch/blob-new-$idx-$blob_n"
+              old_f=""
+              new_f=""
+              if [[ "$bstatus" != "added" ]]; then
+                if (( ! tree_ok )); then
+                  printf '%s\t\t\treconstruction unavailable: the old-revision tree listing failed\n' "$bfile" >> "$blob_manifest"
+                  continue
+                fi
+                old_sha=$(jq -r --arg f "${bprev:-$bfile}" \
+                  '.tree[] | select(.path == $f) | .sha // empty' "$old_tree" 2>>"$scratch/err-$idx.log" || true)
+                if [[ -n "$old_sha" ]] && gh api "repos/$repo/git/blobs/$old_sha" --jq .content \
+                  2>>"$scratch/err-$idx.log" | base64 -d > "$blob_old" 2>>"$scratch/err-$idx.log"; then
+                  old_f="$blob_old"
+                fi
+                if [[ -z "$old_f" ]]; then
+                  printf '%s\t\t\treconstruction unavailable: the old blob could not be fetched\n' "$bfile" >> "$blob_manifest"
+                  continue
+                fi
+              fi
+              if gh api "repos/$repo/git/blobs/$bsha" --jq .content 2>>"$scratch/err-$idx.log" |
+                base64 -d > "$blob_new" 2>>"$scratch/err-$idx.log"; then
+                new_f="$blob_new"
+              fi
+              if [[ -z "$new_f" ]]; then
+                printf '%s\t\t\treconstruction unavailable: the new blob could not be fetched\n' "$bfile" >> "$blob_manifest"
+                continue
+              fi
+              printf '%s\t%s\t%s\t\n' "$bfile" "$old_f" "$new_f" >> "$blob_manifest"
+              blob_n=$((blob_n + 1))
+            done
+
             # Privilege context: the BASE-revision workflows referencing this
             # action – the triggers and permissions the bumped code runs
             # under. Deterministic order; capped per file and in file count.
@@ -385,8 +461,9 @@ jobs:
 
             # The trusted script assembles the input under the 500000-byte
             # budget: the diff first (a truncated diff carries the explicit
-            # unreviewable marker), context sections appended in priority
-            # order while the budget has room.
+            # unreviewable marker; omitted patches arrive as reconstructed
+            # blob diffs via the manifest), context sections appended in
+            # priority order while the budget has room.
             input_file=".review-input-$idx.txt"
             enrich_args=(
               enrich --budget 500000
@@ -401,6 +478,7 @@ jobs:
             if ((rel_ok)); then enrich_args+=(--releases "$scratch/releases-$idx.json"); fi
             if [[ -s "$priv" ]]; then enrich_args+=(--privileges "$priv"); fi
             if [[ -s "$prbody" ]]; then enrich_args+=(--prbody "$prbody"); fi
+            if [[ -s "$blob_manifest" ]]; then enrich_args+=(--blob-manifest "$blob_manifest"); fi
             python3 .github/scripts/review_input.py "${enrich_args[@]}"
 
             prompt='Perform the action-bump security review described in your instructions. The review'
@@ -502,6 +580,10 @@ jobs:
             ${{ runner.temp }}/tags-*.json
             ${{ runner.temp }}/releases-*.json
             ${{ runner.temp }}/priv-*.raw
+            ${{ runner.temp }}/old-tree-*.json
+            ${{ runner.temp }}/blob-manifest-*.tsv
+            ${{ runner.temp }}/blob-old-*
+            ${{ runner.temp }}/blob-new-*
             ${{ runner.temp }}/prbody.md
             ${{ runner.temp }}/err-*.log
             ${{ runner.temp }}/raw-*.txt

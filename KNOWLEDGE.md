@@ -555,13 +555,19 @@ Actions](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/copilot-
 - `--reasoning-effort` accepts none/minimal/low/medium/high/xhigh/max; Claude Sonnet 5.5 accepts `high`
   (smoke-verified).
 - The compare API omits `files[].patch` for binary or oversized files (source: [compare
-  commits](https://docs.github.com/en/rest/commits/compare-two-commits)): the pipeline surfaces such files as explicit
-  unreviewable notes and the agent's verdict rules fail closed on them.
+  commits](https://docs.github.com/en/rest/commits/compare-two-commits)): files without a trusted-side reconstruction
+  are surfaced as explicit unreviewable notes and the agent's verdict rules fail closed on them.
 - The reviewer input file is capped at 500000 bytes (`.github/scripts/review_input.py enrich` assembles it): the diff
   comes first and one that does not fit is truncated with an explicit marker, which the agent must treat as
   unreviewable; context sections (upstream commits with authorship and signature state, tag/release context with release
   notes, BASE-revision workflow files referencing the action, the PR description) are appended in that priority order
   only while the budget has room – an omitted section leaves a one-line note in the file.
+- Files whose patch the compare API omitted get their diffs reconstructed trusted-side: the workflow fetches the old and
+  new git blobs (one `git/trees/{old}?recursive=1` call maps the old-side blob SHAs; `files[].sha` is the new side's)
+  and `review_input.py` inserts capped unified diffs into the diff phase – per-file cap 128 KiB with an explicit
+  truncation marker, NUL-sniff binary detection, `*.map` skipped as derivative of the `src/` patches, at most 4 files.
+  Verified against tj-actions/changed-files v47.0.1→v47.0.2 (the dist bundle reconstructs to ~107 KiB across 97 hunks –
+  fits the budget) and nick-fields/retry v2.9.0→v3.0.0 (~1 MiB – truncates at the cap), 2026-11-17.
 - Digest-to-tag matching uses `repos/{owner}/{repo}/tags?per_page=100`; its `commit.sha` is the commit the tag points
   to, so annotated tags match too (verified for both tag styles against jdx/mise-action and git/git v2.44.0, 2026-11-16;
   source: [list repository tags](https://docs.github.com/en/rest/repos/repos#list-repository-tags)).
