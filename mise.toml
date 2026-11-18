@@ -104,7 +104,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   shfmt = "3.14.1"
   tombi = "1.11.2"
   ty = "0.0.105"
-  uv = "0.13.7"
+  uv = "0.13.9"
   vendir = { version = "0.46.3", lazy = true }
   yq = "4.54.3"
   zizmor = "1.32.0"
