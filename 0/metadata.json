@@ -1,9 +1,9 @@
 {
-  "cli_version": "dev",
+  "cli_version": "0.13.4",
   "checkpoint_id": "01M7QN1WQ77QJ1V0JC0C4Q4SXT",
   "session_id": "20261116_16",
   "strategy": "manual-commit",
-  "created_at": "2026-11-18T15:40:28.9403367Z",
+  "created_at": "2026-11-18T15:50:08.674533772Z",
   "branch": "agent-renovate-automerge",
   "checkpoints_count": 1,
   "files_touched": [
