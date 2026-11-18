@@ -358,22 +358,22 @@ remains the config-independent net. Floating apk packages are skipped (`unspecif
 
 **Release automation (since 2026-10-18)**, chained apk rules in `.github/renovate.json`: pkgrel-only bumps (`1.22-r7` →
 `1.22-r8`, classified `patch`) **automerge once CI is green** (rebase strategy – linear history); pkgver bumps get the
-`needs-review` label and stay manual (CLI semantics may change). `platformAutomerge: false` keeps merges on Renovate's
-own path (branch protection and "Allow auto-merge" are off today; the explicit setting prevents a later repo-toggle
-enablement from merging before CI finishes). Post-merge, the apk-bump workflow's changelog job (a merged `renovate[bot]`
-PR labeled `apk_pin`) inserts the templated `## <version>` section via the shared `changelog:apk-bump` mise task –
-idempotent, a pre-written section is never touched. The same workflow's nudge job (daily 01:30 UTC,
-`workflow_dispatch`-able with a `dry_run` input) comments `@renovate rebase` (capped at 3 per PR) once ALL of the app's
-arch indexes serve the new pin: an early bump PR legitimately stays red until the lagging arch's index catches up, and
-re-running failed check runs can still count as red in Renovate's automerge evaluation. Missed image publishes self-heal
-via the publish-reconcile workflow (daily 03:15 UTC): GHCR version-tag probes for every app (per-arch tags plus the
-multi-arch manifest, via the shared `.github/scripts/probe-ghcr-tag.sh`; not-found-class errors mean a missing tag,
-other failures are retried with backoff then fail red) dispatch `build-app.yaml` (`workflow_dispatch`-able;
-publish=true, ref=main) on a genuine miss – idempotent, a healthy registry is a green no-op. Tag existence only:
-stale-content tags are not detected. Tooling landscape (researched 2026-10-18): no OSS tooling exists for apk-pin
-bumping with arch gates (linuxserver.io's scheduled external-trigger workflows are the closest precedent); Dependabot
-cannot bump apk pins at all (dependabot-core#2129), updatecli has no apk/APKINDEX plugin, and Chainguard's
-`melange bump` rewrites melange build YAML, not Dockerfiles.
+`needs-review` label and stay manual (CLI semantics may change). Merges ride GitHub's native auto-merge, gated on branch
+protection's required checks (platformAutomerge; see §"CI: Branch protection and platform-native automerge") – the
+required `Build gate` context re-gates the multi-arch build at platform level. Post-merge, the apk-bump workflow's
+changelog job (a merged `renovate[bot]` PR labeled `apk_pin`) inserts the templated `## <version>` section via the
+shared `changelog:apk-bump` mise task – idempotent, a pre-written section is never touched. The same workflow's nudge
+job (daily 01:30 UTC, `workflow_dispatch`-able with a `dry_run` input) comments `@renovate rebase` (capped at 3 per PR)
+once ALL of the app's arch indexes serve the new pin: an early bump PR legitimately stays red until the lagging arch's
+index catches up, and re-running failed check runs can still count as red in Renovate's automerge evaluation. Missed
+image publishes self-heal via the publish-reconcile workflow (daily 03:15 UTC): GHCR version-tag probes for every app
+(per-arch tags plus the multi-arch manifest, via the shared `.github/scripts/probe-ghcr-tag.sh`; not-found-class errors
+mean a missing tag, other failures are retried with backoff then fail red) dispatch `build-app.yaml`
+(`workflow_dispatch`-able; publish=true, ref=main) on a genuine miss – idempotent, a healthy registry is a green no-op.
+Tag existence only: stale-content tags are not detected. Tooling landscape (researched 2026-10-18): no OSS tooling
+exists for apk-pin bumping with arch gates (linuxserver.io's scheduled external-trigger workflows are the closest
+precedent); Dependabot cannot bump apk pins at all (dependabot-core#2129), updatecli has no apk/APKINDEX plugin, and
+Chainguard's `melange bump` rewrites melange build YAML, not Dockerfiles.
 
 Version-sensitive gotchas:
 
@@ -525,6 +525,54 @@ vendir.yml `minimumRequiredVersion`):
 - Re-syncing at an unchanged upstream commit is byte-identical (idempotent); the post-sync `name:` prefix re-applies
   deterministically, so sync + prefix together leave the tree unchanged.
 - vendir fetches via the git CLI – no GitHub REST rate limits.
+
+## CI: Branch protection and platform-native automerge
+
+`main` is branch-protected with required status checks (no review requirement, admin bypass on – the owner's and agents'
+direct pushes to `main` keep working). Dependency-bump PRs merge via GitHub's **native auto-merge**:
+`.github/renovate.json` sets `platformAutomerge: true`, the repository setting "Allow auto-merge" is on (both applied
+2026-11-18). Renovate enables auto-merge on the PR and GitHub merges it the moment every required check is green on the
+PR head – independently of the hosted Renovate app's run cadence (observed 2–10 h gaps), which had serialized merges to
+roughly one PR per run whenever `main` moved. The required checks are the *only* merge gate in this configuration – with
+none set, GitHub merges auto-merge PRs without waiting for CI (GitHub docs' own warning) – so the required set below
+must stay in sync with the workflows: renaming a job, adding an app (its `Lint app <name>` leg), or dropping a check
+needs the same change in the protection rule.
+
+Required set (contexts are the job `name:` strings; audited against the check-run surface of PRs #25–#31, 2026-11-18):
+
+- `Find apps`, `Mise check (lint + validate)`, `Device-visible app changes require a version bump`, `Initialize builds`,
+  `Build gate` – unconditional on every PR. `Build gate` (builder.yaml) folds the conditional `Build <app>` matrix into
+  one static context: required checks must report on every PR, the matrix only runs when init finds changed app files,
+  and the multi-arch build is a real gate for apk-pin PRs – the per-arch Alpine index race can fail one arch while the
+  other passes (observed on the hickory-dns 0.26.3-r0 push, 2026-11-11). It passes on `skipped`, fails on any other
+  non-success matrix result.
+- `Lint app hd-idle`, `Lint app hickory-dns`, `Lint app nfs-server` – the find-addons matrix is repo-static (three
+  apps).
+- Deliberately not required: `Action supply-chain review (shadow)` (path-filtered, shadow phase – see §"CI: AI
+  supply-chain review of action bumps"), `Build <app>` (dynamic matrix names; skipped legs never report), the
+  apk-bump/publish-reconcile/skills-update workflows (post-merge or scheduled only).
+
+Protection specifics: `strict: false` – no "require branches up to date". With it on, every merge invalidates every
+other in-flight PR and Renovate rebase-forces each one (the one-merge-per-run serialization this setup replaces);
+without it, a PR's CI certifies its head against the `main` of that moment and the merge lands on a newer tip. Accepted
+trade for dependency bumps: disjoint file sets, sub-minute CI, so re-validating each merge against the latest tip adds
+no signal (renovate.json's rule descriptions carry the per-dep rationale). `required_linear_history: true` keeps the
+`automergeStrategy: rebase` property (one conventional commit per bump, no merge bubbles; GitHub replays the branch's
+single commit onto the tip at merge time). `rebaseWhen: conflicted` stops Renovate force-push-rebasing behind-but-clean
+branches: green check runs stay attached to the unchanged head, so a whole batch opens in one window and drains in
+parallel – the apk-bump nudge's explicit `@renovate rebase` comments still force rebase when the Alpine index race
+requires fresh runs.
+
+Schedules widened from `before 8am on monday` to `after 8pm on sunday` + `before 8am on monday` (12 h strip,
+Europe/Zurich, all managers incl. apk): the hosted app's runs are irregular and `updateNotScheduled` (default `true`)
+suppresses branch/PR creation outside the window, so a missed run pushes a whole week's bumps out by a week. Batch
+intent: PRs open Sunday evening, required checks run in parallel, everything eligible is merged before Monday 8am.
+`automergeSchedule` stays unset ("at any time"): a batch whose CI finishes after 8am should still land instead of
+waiting a week. Rollout order was deliberate: protection and "Allow auto-merge" were applied *before*
+`platformAutomerge: true` landed – the config flipped first would open a window in which GitHub merges
+auto-merge-enabled PRs while the required contexts don't exist yet; conversely, heads that predate the new contexts can
+never report `Build gate` and cannot merge after rollout (the five PRs open at rollout, #27–#31, were merged manually
+while CI was still the only gate).
 
 ## CI: AI supply-chain review of action bumps
 
