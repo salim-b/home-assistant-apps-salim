@@ -96,3 +96,25 @@ jobs:
       app: ${{ matrix.app }}
       publish: ${{ github.event_name == 'push' }}
       # No secrets block: GITHUB_TOKEN is automatically available in the called workflow.
+
+  build-gate:
+    # Branch protection requires a static check name (see repository-root KNOWLEDGE.md §"CI:
+    # Branch protection and platform-native automerge"), but the build matrix only exists when init
+    # finds changed app files. This job folds the matrix result into one always-present context:
+    # a skipped matrix (no monitored files changed) passes by design, every other non-success
+    # result fails the gate. It also re-gates the multi-arch build for apk-pin PRs at platform
+    # level: the per-arch Alpine index race can fail one arch while the other passes.
+    name: Build gate
+    needs: [init, build-app]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NEEDS_INIT: ${{ needs.init.result }}
+      NEEDS_BUILD: ${{ needs.build-app.result }}
+    steps:
+      - name: Fold the conditional build matrix into a static check
+        run: |
+          set -euo pipefail
+          echo "Initialize builds: ${NEEDS_INIT}, build matrix: ${NEEDS_BUILD}"
+          [[ "${NEEDS_BUILD}" == 'success' || "${NEEDS_BUILD}" == 'skipped' ]]
