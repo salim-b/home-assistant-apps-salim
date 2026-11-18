@@ -530,21 +530,19 @@ vendir.yml `minimumRequiredVersion`):
 
 `main` is branch-protected with required status checks (no review requirement, admin bypass on). Dependency-bump PRs
 merge via GitHub's **native auto-merge**: `.github/renovate.json` sets `platformAutomerge: true`, the repository setting
-"Allow auto-merge" is on (both applied 2026-11-18). Renovate enables auto-merge on the PR and GitHub merges it the
-moment every required check is green on the PR head – independently of the hosted Renovate app's run cadence (observed
-2–10 h gaps), which had serialized merges to roughly one PR per run whenever `main` moved. The required checks are the
+"Allow auto-merge" is on. Renovate enables auto-merge on the PR and GitHub merges it the moment every required check is
+green on the PR head – merging does not wait for the hosted Renovate app's run cadence. The required checks are the
 *only* merge gate in this configuration – with none set, GitHub merges auto-merge PRs without waiting for CI (GitHub
 docs' own warning) – so the required set below must stay in sync with the workflows: renaming a job, adding an app (its
 `Lint app <name>` leg), or dropping a check needs the same change in the protection rule.
 
-Required set (contexts are the job `name:` strings; audited against the check-run surface of PRs #25–#31, 2026-11-18):
+Required set (contexts are the job `name:` strings):
 
 - `Find apps`, `Mise check (lint + validate)`, `Device-visible app changes require a version bump`, `Initialize builds`,
   `Build gate` – unconditional on every PR. `Build gate` (builder.yaml) folds the conditional `Build <app>` matrix into
   one static context: required checks must report on every PR, the matrix only runs when init finds changed app files,
   and the multi-arch build is a real gate for apk-pin PRs – the per-arch Alpine index race can fail one arch while the
-  other passes (observed on the hickory-dns 0.26.3-r0 push, 2026-11-11). It passes on `skipped`, fails on any other
-  non-success matrix result.
+  other passes (§"apk package version policy"). It passes on `skipped`, fails on any other non-success matrix result.
 - `Lint app hd-idle`, `Lint app hickory-dns`, `Lint app nfs-server` – the find-addons matrix is repo-static (three
   apps).
 - Deliberately not required: `Action supply-chain review (shadow)` (path-filtered, shadow phase – see §"CI: AI
@@ -552,28 +550,23 @@ Required set (contexts are the job `name:` strings; audited against the check-ru
   apk-bump/publish-reconcile/skills-update workflows (post-merge or scheduled only).
 
 Protection specifics: `strict: false` – no "require branches up to date". With it on, every merge invalidates every
-other in-flight PR and Renovate rebase-forces each one (the one-merge-per-run serialization this setup replaces);
-without it, a PR's CI certifies its head against the `main` of that moment and the merge lands on a newer tip. Accepted
-trade for dependency bumps: disjoint file sets, sub-minute CI, so re-validating each merge against the latest tip adds
-no signal (renovate.json's rule descriptions carry the per-dep rationale). `required_linear_history: true` keeps the
-`automergeStrategy: rebase` property (one conventional commit per bump, no merge bubbles; GitHub replays the branch's
-single commit onto the tip at merge time). `rebaseWhen: conflicted` stops Renovate force-push-rebasing behind-but-clean
-branches: green check runs stay attached to the unchanged head, so a whole batch opens in one window and drains in
-parallel – the apk-bump nudge's explicit `@renovate rebase` comments still force rebase when the Alpine index race
-requires fresh runs.
+other in-flight PR, and each invalidation becomes a rebase plus a fresh CI cycle; without it, a PR's CI certifies its
+head against the `main` of that moment and the merge lands on a newer tip. Accepted trade for dependency bumps:
+file-disjoint updates re-validated against a slightly newer tip add no signal (per-dep rationale in renovate.json's rule
+descriptions). `required_linear_history: true` keeps the `automergeStrategy: rebase` property (one conventional commit
+per bump, no merge bubbles; GitHub replays the branch's single commit onto the tip at merge time).
+`rebaseWhen: conflicted` keeps Renovate from force-push-rebasing behind-but-clean branches: green check runs stay
+attached to the unchanged head, so a batch opens in one window and drains in parallel – the apk-bump nudge's explicit
+`@renovate rebase` comments still force rebase when the Alpine index race requires fresh runs.
 
-Schedules widened from `before 8am on monday` to `after 8pm on sunday` + `before 8am on monday` (12 h strip,
-Europe/Zurich, all managers incl. apk): the hosted app's runs are irregular and `updateNotScheduled` (default `true`)
-suppresses branch/PR creation outside the window, so a missed run pushes a whole week's bumps out by a week. Batch
-intent: PRs open Sunday evening, required checks run in parallel, everything eligible is merged before Monday 8am.
-`automergeSchedule` stays unset ("at any time"): a batch whose CI finishes after 8am should still land instead of
-waiting a week. Rollout order was deliberate: protection and "Allow auto-merge" were applied *before*
-`platformAutomerge: true` landed – the config flipped first would open a window in which GitHub merges
-auto-merge-enabled PRs while the required contexts don't exist yet; conversely, heads that predate the new contexts can
-never report `Build gate` and cannot merge after rollout (the five PRs open at rollout, #27–#31, were merged manually
-while CI was still the only gate).
-
-while CI was still the only gate).
+Schedules: `after 8pm on sunday` + `before 8am on monday` (12 h strip, Europe/Zurich, all managers incl. apk). The
+hosted app's runs are irregular and `updateNotScheduled` (default `true`) suppresses branch/PR creation outside the
+window, so a missed run pushes a whole week's bumps out by a week. Batch intent: PRs open Sunday evening, required
+checks run in parallel, everything eligible is merged before Monday 8am. `automergeSchedule` stays unset ("at any
+time"): a batch whose CI finishes after 8am should still land instead of waiting a week. When changing this setup, apply
+the protection rule (and "Allow auto-merge") *before* flipping `platformAutomerge` on: with the config live first,
+GitHub merges auto-merge-enabled PRs while the required contexts don't exist yet, and heads that predate a newly
+required context can never report it – they must be merged or rebased before the rule applies.
 
 ## CI: AI supply-chain review of action bumps
 
