@@ -528,15 +528,16 @@ vendir.yml `minimumRequiredVersion`):
 
 ## CI: Branch protection and platform-native automerge
 
-`main` is branch-protected with required status checks (no review requirement, admin bypass on – the owner's and agents'
-direct pushes to `main` keep working). Dependency-bump PRs merge via GitHub's **native auto-merge**:
-`.github/renovate.json` sets `platformAutomerge: true`, the repository setting "Allow auto-merge" is on (both applied
-2026-11-18). Renovate enables auto-merge on the PR and GitHub merges it the moment every required check is green on the
-PR head – independently of the hosted Renovate app's run cadence (observed 2–10 h gaps), which had serialized merges to
-roughly one PR per run whenever `main` moved. The required checks are the *only* merge gate in this configuration – with
-none set, GitHub merges auto-merge PRs without waiting for CI (GitHub docs' own warning) – so the required set below
-must stay in sync with the workflows: renaming a job, adding an app (its `Lint app <name>` leg), or dropping a check
-needs the same change in the protection rule.
+`main` is branch-protected with required status checks (no review requirement; admin bypass on – the repository has no
+non-admin collaborators, and local coding agents authenticate under the owner's account via git config identity plus
+`GITHUB_TOKEN`, so GitHub sees no separate agent principal and their direct pushes to `main` are the owner's pushes).
+Dependency-bump PRs merge via GitHub's **native auto-merge**: `.github/renovate.json` sets `platformAutomerge: true`,
+the repository setting "Allow auto-merge" is on (both applied 2026-11-18). Renovate enables auto-merge on the PR and
+GitHub merges it the moment every required check is green on the PR head – independently of the hosted Renovate app's
+run cadence (observed 2–10 h gaps), which had serialized merges to roughly one PR per run whenever `main` moved. The
+required checks are the *only* merge gate in this configuration – with none set, GitHub merges auto-merge PRs without
+waiting for CI (GitHub docs' own warning) – so the required set below must stay in sync with the workflows: renaming a
+job, adding an app (its `Lint app <name>` leg), or dropping a check needs the same change in the protection rule.
 
 Required set (contexts are the job `name:` strings; audited against the check-run surface of PRs #25–#31, 2026-11-18):
 
@@ -573,6 +574,14 @@ waiting a week. Rollout order was deliberate: protection and "Allow auto-merge" 
 auto-merge-enabled PRs while the required contexts don't exist yet; conversely, heads that predate the new contexts can
 never report `Build gate` and cannot merge after rollout (the five PRs open at rollout, #27–#31, were merged manually
 while CI was still the only gate).
+
+while CI was still the only gate).
+
+Identity vs. credential (verified 2026-11-18): the account is shared with local agents, but the exported `GITHUB_TOKEN`
+is a fine-grained PAT with `Contents`/`Workflows` write only – it can push branches yet cannot merge pull requests or
+change repository settings/protection (both fail with 403). Merging and the protection API therefore need the owner's
+interactive login or a token with `Pull requests: write` plus `Administration: write`. If that token is ever re-scoped,
+re-verify this paragraph (and the rollout expectations that lean on it).
 
 ## CI: AI supply-chain review of action bumps
 
