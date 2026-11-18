@@ -1,5 +1,5 @@
 {
-  "cli_version": "dev",
+  "cli_version": "0.13.4",
   "checkpoint_id": "01M7QM09ZD9CEA75PGA58M7W1A",
   "strategy": "manual-commit",
   "branch": "agent-renovate-automerge",
