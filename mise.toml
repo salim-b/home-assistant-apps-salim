@@ -88,7 +88,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
     lazy = true,
     lazy_bins = [ "entire-agent-goose" ]
   }
-  jactionlint = { version = "v2.5.0", workflow = "release.yaml" }
+  jactionlint = { version = "v2.6.0", workflow = "release.yaml" }
   jq = "1.8.2"
   # hk's binary pin and the hk@X.Y.Z package imported by hk.pkl move together (skill ha-app-tooling, Renovate section).
   hk = { version = "2.12.0", workflow = "release.yml" }
