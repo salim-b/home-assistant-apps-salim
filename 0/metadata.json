@@ -1,0 +1,60 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "01M7Q47Z0WV5QVWAR16QPCRYFN",
+  "session_id": "20261116_16",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-18T10:46:46.057629943Z",
+  "branch": "agent-renovate-automerge",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/builder.yaml"
+  ],
+  "agent": "Goose",
+  "model": "z-ai/glm-5.3-flash",
+  "turn_id": "47110619dd20",
+  "checkpoint_transcript_start": 620,
+  "transcript_lines_at_start": 620,
+  "compact_transcript_start": 351,
+  "redaction": {
+    "replacements": 6,
+    "layers": {
+      "betterleaks": 4,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 2,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-goose-compact-2026-11-17T22:40:54Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "compact"
+      },
+      "source": {
+        "agent": "goose",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "47110619dd20",
+      "timestamp": "2026-11-17T22:40:54Z",
+      "native": {
+        "command": "/compact"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/compact",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 3
+  }
+}
