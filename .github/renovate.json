@@ -12,7 +12,8 @@
     "mise",
     "custom.regex"
   ],
-  "platformAutomerge": false,
+  "platformAutomerge": true,
+  "rebaseWhen": "conflicted",
   "labels": [
     "dependencies"
   ],
@@ -73,7 +74,7 @@
       ]
     },
     {
-      "description": "Automerge pkgrel-only apk pin bumps (the apk datasource's versioning classifies 1.22-r7 -> 1.22-r8 as patch): an Alpine rebuild of the same upstream release – the CLI is unchanged by definition, so no human review is needed (pkgver bumps are minor/major and stay manual via the next rule). Grouped into one branch (groupName): split packages built from one APKBUILD share pkgver and pkgrel and drift together, so per-package PRs would leave the sibling pin stale in each PR's own tree – the build's apk add cannot resolve it and the automerge deadlocks against the sibling PR; one grouped PR per upstream event carries every drifted pin and stays self-consistent. The changelog entry is added post-merge by the apk-bump workflow. automergeStrategy rebase: linear history without merge bubbles (conflicts block the automerge until resolved – same rationale as the supervisor-pin rule); applies on both merge paths (Renovate's own merge today – no branch protection, platformAutomerge: false – and platform-native automerge if branch protection ever arrives).",
+      "description": "Automerge pkgrel-only apk pin bumps (the apk datasource's versioning classifies 1.22-r7 -> 1.22-r8 as patch): an Alpine rebuild of the same upstream release – the CLI is unchanged by definition, so no human review is needed (pkgver bumps are minor/major and stay manual via the next rule). Grouped into one branch (groupName): split packages built from one APKBUILD share pkgver and pkgrel and drift together, so per-package PRs would leave the sibling pin stale in each PR's own tree – the build's apk add cannot resolve it and the automerge deadlocks against the sibling PR; one grouped PR per upstream event carries every drifted pin and stays self-consistent. The changelog entry is added post-merge by the apk-bump workflow. Weekly batch cadence (same schedule strip as the tool/action rules) – pkgrel rebuilds lag at most one batch. Merged by GitHub's native auto-merge once branch protection's required checks are green (platformAutomerge; see repository-root KNOWLEDGE.md §\"CI: Branch protection and platform-native automerge\") – the merge is no longer serialized behind the hosted Renovate app's run cadence. automergeStrategy rebase: linear history, one conventional commit per bump (GitHub replays the branch's single commit onto the tip at merge time); conflicts block the merge until Renovate rebases (same rationale as the supervisor-pin rule).",
       "matchDatasources": [
         "apk"
       ],
@@ -82,6 +83,10 @@
       ],
       "groupName": "apk pkgrel pin bumps",
       "groupSlug": "apk-pkgrel",
+      "schedule": [
+        "after 8pm on sunday",
+        "before 8am on monday"
+      ],
       "automerge": true,
       "automergeStrategy": "rebase"
     },
@@ -96,6 +101,10 @@
       ],
       "groupName": "apk pkgver pin bumps",
       "groupSlug": "apk-pkgver",
+      "schedule": [
+        "after 8pm on sunday",
+        "before 8am on monday"
+      ],
       "addLabels": [
         "needs-review"
       ]
@@ -109,6 +118,7 @@
         "github_actions"
       ],
       "schedule": [
+        "after 8pm on sunday",
         "before 8am on monday"
       ]
     },
@@ -132,6 +142,7 @@
         "mise_tools"
       ],
       "schedule": [
+        "after 8pm on sunday",
         "before 8am on monday"
       ]
     },
@@ -148,11 +159,12 @@
         "mise_tools"
       ],
       "schedule": [
+        "after 8pm on sunday",
         "before 8am on monday"
       ]
     },
     {
-      "description": "Supervisor schema pin: weekly, same cadence as the actions manager; automerges once the CI check job (mise run validate:apps against the new ref) is green. The Renovate PR body lists the upstream changelog for an audit trail. automergeStrategy rebase: linear history without merge bubbles (GitHub rebase-merge; conflicts block the automerge until resolved – same as manual). Applies on both merge paths (Renovate's own merge today, platform-native automerge if branch protection ever arrives).",
+      "description": "Supervisor schema pin: weekly batch cadence (same schedule strip as the tool/action rules), so the whole dependency batch opens Sunday evening and is merged before Monday 8am. The Renovate PR body lists the upstream changelog for an audit trail. Merged by GitHub's native auto-merge once branch protection's required checks are green (platformAutomerge; see repository-root KNOWLEDGE.md §\"CI: Branch protection and platform-native automerge\"). automergeStrategy rebase: linear history, one conventional commit per bump (GitHub replays the branch's single commit onto the tip at merge time); conflicts block the merge until Renovate rebases – same as manual.",
       "matchManagers": [
         "custom.regex"
       ],
@@ -160,6 +172,7 @@
         "supervisor_pin"
       ],
       "schedule": [
+        "after 8pm on sunday",
         "before 8am on monday"
       ],
       "automerge": true,
