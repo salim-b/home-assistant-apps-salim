@@ -73,7 +73,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   run = '[ -n "$MISE_WATCH_FILES_GIT_REWRITTEN" ] || { IFS=:; hk fix $MISE_WATCH_FILES_MODIFIED; }'
 
 [tools]
-  copilot = { version = "1.0.112", lazy = true }
+  copilot = { version = "v1.0.114", lazy = true }
   "github:immanuwell/dockerfile-roast" = "1.7.0"
   "github:reteps/dockerfmt" = "1.0.0"
   editorconfig-checker = "4.0.2"
