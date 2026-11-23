@@ -1,0 +1,14 @@
+/compact
+
+---
+
+Now I'd like you to plan another clean-up round with focus on correctness and consistency. Ensure our information placement and prose parsimony rules as well as other authoring guidelines are fully respected (within reason).
+
+---
+
+Answers:
+
+1. Keep stacking onto `agent-doc-cleanup`.
+2. Yes, include track 2 now.
+3. Fix prose dashes too.
+4. Which pending device verification?
