@@ -110,7 +110,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   zizmor = "1.32.0"
   # aube policy exemptions for renovate's tool tree (whys: .agents/skills/ha-app-tooling, Renovate section).
   "npm:renovate" = {
-    version = "44.252.2",
+    version = "44.258.2",
     trust_policy_excludes = [ "@yarnpkg/libzip@3.2.2" ],
     allow_builds = [ "re2" ]
   }
