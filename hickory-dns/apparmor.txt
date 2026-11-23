@@ -16,14 +16,14 @@ profile hickory-dns flags=(attach_disconnected,mediate_deleted) {
   # cross-label grants nothing here can exercise.
   file,
 
-  # The never-root launcher's grants - which syscall needs which capability, the capable()-hook mediation and the
+  # The never-root launcher's grants – which syscall needs which capability, the capable()-hook mediation and the
   # one-capability end state: hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges".
   capability net_bind_service,
   capability setgid,
   capability setuid,
   capability setpcap,
 
-  # DNS both ways (:53 listeners v4/v6, encrypted upstream connections) and bashio's supervisor-API HTTP -
+  # DNS both ways (:53 listeners v4/v6, encrypted upstream connections) and bashio's supervisor-API HTTP –
   # enumerated surface: hickory-dns/KNOWLEDGE.md §"AppArmor profile surface".
   network inet stream,
   network inet dgram,

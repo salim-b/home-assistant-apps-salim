@@ -4,7 +4,7 @@ configuration:
     description: >-
       Recursive DNS resolvers that queries are forwarded to, queried in the
       given order. Each entry is one resolver with its own fields below.
-      IP-address entries with a pinned TLS name are recommended - they need no
+      IP-address entries with a pinned TLS name are recommended – they need no
       name resolution at app start.
     fields:
       protocol:
@@ -12,7 +12,7 @@ configuration:
         description: >-
           How the app talks to this resolver: `tls` (DNS-over-TLS), `quic`
           (DNS-over-QUIC) or `https` (DNS-over-HTTPS). Every upstream connection
-          is encrypted - plaintext DNS is not supported.
+          is encrypted – plaintext DNS is not supported.
       host:
         name: Host
         description: >-
@@ -25,7 +25,7 @@ configuration:
         description: >-
           The IPv4 or IPv6 address to connect to, e.g. `9.9.9.9`. Leave empty
           to resolve the host at app start instead; IP-address upstreams are
-          recommended - they need no name resolution at all.
+          recommended – they need no name resolution at all.
       port:
         name: Port
         description: >-
@@ -42,14 +42,14 @@ configuration:
       Client access list: only queries from these networks (CIDR notation, e.g.
       `192.168.0.0/16`) are answered, everything else is refused. The defaults
       cover loopback and the private LAN ranges; loopback is always served so
-      the app's own health probe works - missing entries are appended at
-      startup. Clearing the list entirely allows every client - not recommended
+      the app's own health probe works – missing entries are appended at
+      startup. Clearing the list entirely allows every client – not recommended
       on a network-exposed host.
   dnssec:
     name: DNSSEC validation
     description: >-
       Cryptographically validate upstream answers against the DNSSEC root
-      trust anchors (the root KSKs are embedded in the hickory-dns binary -
+      trust anchors (the root KSKs are embedded in the hickory-dns binary –
       nothing to configure). Bogus answers are rejected. Leave this enabled
       unless a resolver interoperability problem forces you off.
   static_entries:
@@ -57,7 +57,7 @@ configuration:
     description: >-
       Local hostname-to-IP answers (hosts.txt-style) served directly by this
       app, never forwarded to an upstream resolver. Each entry becomes its own
-      authoritative zone, so it wins over any public record - useful for
+      authoritative zone, so it wins over any public record – useful for
       reaching self-hosted services by name from every LAN device. A/AAAA
       (address) lookups of the exact hostname are answered, and each entry
       automatically also serves the matching PTR record from its own reverse
@@ -68,7 +68,7 @@ configuration:
         description: >-
           The fully qualified domain name to answer locally, e.g.
           `nas.lan.example.org`. A bare name like `nas` is treated as the
-          top-level name `nas.` and will only match queries for exactly that -
+          top-level name `nas.` and will only match queries for exactly that –
           enter the full name your devices actually look up.
       ip:
         name: IP address
@@ -78,5 +78,5 @@ configuration:
     name: Debug mode
     description: >-
       Verbose hickory-dns logging (every query and its handling). Useful for
-      diagnosing blocked queries or upstream failures - and noisy under normal
+      diagnosing blocked queries or upstream failures – and noisy under normal
       LAN traffic.

@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.3.6
+
+- Internals: no behavior change – dash punctuation in comments, log messages and option field descriptions is normalized
+  to the repository's spaced en dash. No configuration change.
+
 ## 0.3.5
 
 - Internals: no behavior change – the `Dockerfile` is reformatted to the repository's uniform `dockerfmt` style

@@ -4,7 +4,7 @@ FROM ${BUILD_FROM}
 # apk pins: repository-root KNOWLEDGE.md §"apk package version policy" (updates become deliberate app releases);
 # facts: hickory-dns/KNOWLEDGE.md §"apk package pins and CA trust". ca-certificates-bundle: the rustls-platform-verifier
 # trust store (floating). setpriv
-# (util-linux, floats): the never-root launcher needs its uid options - the busybox applet has none; see
+# (util-linux, floats): the never-root launcher needs its uid options – the busybox applet has none; see
 # hickory-dns/KNOWLEDGE.md §"Port 53 binding and privileges".
 RUN apk add --no-cache \
   hickory-dns=0.26.3-r0 \

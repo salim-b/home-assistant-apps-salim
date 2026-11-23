@@ -15,7 +15,7 @@ STATIC_DIR=/etc/hickory-dns/zones/static
 CACHE=/data/hickory-dns.upstreams.cache
 
 ## Zone files of the shipped default zones, relative to ${ZONES_DIR} (directory key), as "zone=file"
-## entries - the single source of truth for the default-zone set. The empty zones all share one
+## entries – the single source of truth for the default-zone set. The empty zones all share one
 ## origin-relative template file (empty.zone); zone identity comes from the named.toml `zone` key.
 DEFAULT_ZONE_FILES=(
   "localhost=default/localhost.zone"
@@ -52,7 +52,7 @@ for mapping in "${DEFAULT_ZONE_FILES[@]}"; do
   DEFAULT_ZONES+=("${mapping%%=*}")
 done
 
-## Fixed forward-store options - per-option rationale: hickory-dns/KNOWLEDGE.md §"Generated named.toml".
+## Fixed forward-store options – per-option rationale: hickory-dns/KNOWLEDGE.md §"Generated named.toml".
 OPTIONS_BLOCK='timeout = 5
 attempts = 2
 num_concurrent_reqs = 1
@@ -75,7 +75,7 @@ toml_str() {
 }
 
 ## A decimal 0-255 octet/prefix without leading zeros: bash arithmetic reads leading zeros as octal,
-## and the daemon's address/CIDR parsers reject them - reject here so the option error, not a raw
+## and the daemon's address/CIDR parsers reject them – reject here so the option error, not a raw
 ## --validate parse error, reports the problem.
 is_dec_octet() {
   [[ "${1}" =~ ^[0-9]{1,3}$ ]] || return 1
@@ -91,7 +91,7 @@ is_ipv4() {
   done
 }
 
-## Structural check only - the authoritative IP parse is the generated config's TOML IpAddr deserialization,
+## Structural check only – the authoritative IP parse is the generated config's TOML IpAddr deserialization,
 ## exercised by the --validate gate below.
 is_ipv6() {
   [[ "${1}" =~ ^[0-9a-fA-F:.]+$ && "${1}" == *:* ]]
@@ -124,7 +124,7 @@ ipv4_embedded_groups() {
   for o in "$o1" "$o2" "$o3" "$o4"; do
     is_dec_octet "$o" || return 1
   done
-  ## High byte first: each group is just its two octets in hex. No packing arithmetic - shellharden's
+  ## High byte first: each group is just its two octets in hex. No packing arithmetic – shellharden's
   ## parser desyncs on nested parentheses in arithmetic and mangles the rest of the file (root TODO.md).
   printf '%s %s' "$(printf '%02x%02x' "$o1" "$o2")" "$(printf '%02x%02x' "$o3" "$o4")"
 }
@@ -135,9 +135,9 @@ ipv4_embedded_groups() {
 ipv6_reverse_name() {
   local addr="${1}" head="" tail="" group
   [[ "$addr" != *::*::* ]] || return 1 # more than one "::"
-  [[ "$addr" != *:::* ]] || return 1   # ":::" - overlapping colons are not a "::" elision
+  [[ "$addr" != *:::* ]] || return 1   # ":::" – overlapping colons are not a "::" elision
   case "$addr" in
-    :[!:]* | *[!:]: | :) return 1 ;; # a lone ":" at either edge - "::" edges are the elision
+    :[!:]* | *[!:]: | :) return 1 ;; # a lone ":" at either edge – "::" edges are the elision
   esac
   if [[ "$addr" == *"::"* ]]; then
     head="${addr%%::*}"
@@ -148,7 +148,7 @@ ipv6_reverse_name() {
   local -a head_raw=() tail_raw=()
   [ "$head" = "" ] || mapfile -t head_raw < <(tr ':' '\n' <<<"$head")
   [ "$tail" = "" ] || mapfile -t tail_raw < <(tr ':' '\n' <<<"$tail")
-  ## An embedded IPv4 dotted quad is valid only as the address's FINAL group (::ffff:1.2.3.4) - it
+  ## An embedded IPv4 dotted quad is valid only as the address's FINAL group (::ffff:1.2.3.4) – it
   ## replaces the last two 16-bit groups; anywhere else ("1.2.3.4:5", "1.2.3.4::5") the input is not
   ## a valid IPv6 address.
   local -a head_groups=() tail_groups=()
@@ -217,7 +217,7 @@ ipv6_reverse_name() {
 resolve_host() {
   local name="${1}" out ip type
   for type in A AAAA; do
-    ## Bounded lookup: the CLI has no timeout of its own - a wedged system resolver must not stall the boot.
+    ## Bounded lookup: the CLI has no timeout of its own – a wedged system resolver must not stall the boot.
     if out=$(/usr/bin/timeout 10 /usr/bin/resolve --system -t "$type" "$name" 2>/dev/null); then
       ## Answer lines are "\t<name> <ttl> <class> <type> <rdata>"; pick the first record of the wanted type
       ## (skips CNAME chains) and print its rdata (last field). The f flag is reset on every other section
@@ -234,7 +234,7 @@ resolve_host() {
   if [ -r "$CACHE" ]; then
     local c_name c_ip
     while read -r c_name c_ip; do
-      ## Trust a cache line only when its address field parses - garbage would fail the --validate gate with a
+      ## Trust a cache line only when its address field parses – garbage would fail the --validate gate with a
       ## confusing error.
       if [ "$c_name" = "$name" ] && { is_ipv4 "$c_ip" || is_ipv6 "$c_ip"; }; then
         printf '%s' "$c_ip"
@@ -266,14 +266,14 @@ mkdir -p "$STATIC_DIR"
 rm -f "$STATIC_DIR"/*.zone
 
 ## TOML ordering rule (hickory-dns/KNOWLEDGE.md §"Generated named.toml"): top-level keys first, then the zone
-## headers, then the forward zone's stores sub-tables - the assembly below mirrors that order.
+## headers, then the forward zone's stores sub-tables – the assembly below mirrors that order.
 CONFIG_BODY="listen_addrs_ipv4 = [\"0.0.0.0\"]
 listen_addrs_ipv6 = [\"::0\"]
 listen_port = 53
 directory = \"${ZONES_DIR}\"
 "
 
-## Client ACL - semantics (empty list = serve everyone, loopback append for the healthcheck):
+## Client ACL – semantics (empty list = serve everyone, loopback append for the healthcheck):
 ## hickory-dns/KNOWLEDGE.md §"Generated named.toml".
 NETS=""
 V4_LOOPBACK=0
@@ -295,14 +295,14 @@ done < <(printf '%s\n' "$NETS_RAW")
 
 if [ "$NETS" != "" ]; then
   if [ "$V4_LOOPBACK" = 0 ] || [ "$V6_LOOPBACK" = 0 ]; then
-    bashio::log.warning "Allowed networks does not cover loopback - missing entries appended (the app's own healthcheck probes from 127.0.0.1; loopback clients are always served)."
+    bashio::log.warning "Allowed networks does not cover loopback – missing entries appended (the app's own healthcheck probes from 127.0.0.1; loopback clients are always served)."
     [ "$V4_LOOPBACK" = 1 ] || NETS+=", $(toml_str "127.0.0.0/8")"
     [ "$V6_LOOPBACK" = 1 ] || NETS+=", $(toml_str "::1/128")"
   fi
   CONFIG_BODY+="allow_networks = [${NETS}]
 "
 else
-  bashio::log.warning "Allowed networks is empty - every client is served."
+  bashio::log.warning "Allowed networks is empty – every client is served."
   CONFIG_BODY+="allow_networks = []
 "
 fi
@@ -357,10 +357,10 @@ while IFS= read -r entry; do
       || bashio::exit.nok "Static entry '${host}' conflicts with the shipped default zone of the same name."
   done
   [[ -z "${SEEN_ZONES[${host}]+x}" ]] \
-    || bashio::exit.nok "Static entry '${host}' is configured more than once - remove the redundant entry."
+    || bashio::exit.nok "Static entry '${host}' is configured more than once – remove the redundant entry."
   SEEN_ZONES["${host}"]=1
   [[ "$host" == *.* ]] \
-    || bashio::log.warning "Static entry '${host}' is a single-label name - only queries for exactly '${host}.' match it; enter a fully qualified name (e.g. nas.lan.example.org)."
+    || bashio::log.warning "Static entry '${host}' is a single-label name – only queries for exactly '${host}.' match it; enter a fully qualified name (e.g. nas.lan.example.org)."
 
   N_STATIC=$((N_STATIC + 1))
   slug=$(printf '%s' "$host" | tr -c 'a-zA-Z0-9' '_')
@@ -383,7 +383,7 @@ file = $(toml_str "static/${file}")
   ## Reverse leaf zone: the matching PTR record, answered locally like the forward record. Entries
   ## sharing one address share one reverse zone holding one PTR per name.
   ## A reverse zone name may repeat only when entries share one address (grouped below); any other
-  ## collision - e.g. with another entry's forward hostname - is a hard duplicate-zone error.
+  ## collision – e.g. with another entry's forward hostname – is a hard duplicate-zone error.
   if [[ -z "${SEEN_REVERSE[${rev_zone}]+x}" ]]; then
     [[ -z "${SEEN_ZONES[${rev_zone}]+x}" ]] \
       || bashio::exit.nok "Static entry '${host}': its reverse zone '${rev_zone}' collides with another static entry's zone."
@@ -431,7 +431,7 @@ while IFS= read -r entry; do
   [ "$proto" != "" ] \
     || bashio::exit.nok "Upstream '${entry}': protocol is required (tls, quic or https)."
   if [ "$proto" = "h3" ]; then
-    bashio::exit.nok "Upstream protocol 'h3': DoH3 is not supported by the packaged hickory-dns yet (the bin h3 features are not in any tagged release) - use https (HTTP/2) for now."
+    bashio::exit.nok "Upstream protocol 'h3': DoH3 is not supported by the packaged hickory-dns yet (the bin h3 features are not in any tagged release) – use https (HTTP/2) for now."
   fi
   case "$proto" in
     tls | quic | https) ;;
@@ -441,13 +441,13 @@ while IFS= read -r entry; do
     [[ "$port" =~ ^[0-9]{1,5}$ ]] \
       || bashio::exit.nok "Invalid upstream port '${port}': not a port number."
     ## Normalize to base 10 before the range check: bash arithmetic reads a leading zero as octal (and the
-    ## normalized decimal is also what gets emitted into the TOML - TOML rejects leading zeros).
+    ## normalized decimal is also what gets emitted into the TOML – TOML rejects leading zeros).
     port=$((10#$port))
     ((port >= 1 && port <= 65535)) \
       || bashio::exit.nok "Invalid upstream port ${port}: out of range (1-65535)."
   fi
 
-  ## path is https-only (no serde field on the other protocols - a stray value would be a silent
+  ## path is https-only (no serde field on the other protocols – a stray value would be a silent
   ## misconfiguration), defaults to /dns-query (no serde default) and carries a leading slash.
   case "$proto" in
     https)
@@ -485,7 +485,7 @@ while IFS= read -r entry; do
       record_cache "$host" "$resolved"
       ip="$resolved"
     else
-      bashio::exit.nok "Upstream host '${host}' could not be resolved (and no cached address exists) - configure the ip directly (e.g. 9.9.9.9)."
+      bashio::exit.nok "Upstream host '${host}' could not be resolved (and no cached address exists) – configure the ip directly (e.g. 9.9.9.9)."
     fi
   fi
 
