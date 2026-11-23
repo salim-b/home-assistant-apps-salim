@@ -223,7 +223,9 @@ always served.
   clients' positive answers to authoritative-zone names (localhost, static zones) – benign, not a hygiene failure;
   forwarded (external-zone) answers never take that path. Upstream status (verified 2026-10-24): introduced in the
   0.26.0 cycle (commit e7fed0e, 2025-10-30), present unchanged in 0.26.0/0.26.1/0.26.3 and main (c6b2e6d, 2026-10-22);
-  no duplicate on the tracker – the skip is the normal path (RFC 4035 §3.1.3), so the WARN is spurious.
+  no duplicate on the tracker – [PR #4128](https://github.com/hickory-dns/hickory-dns/pull/4128) ("Catalog: eliminate
+  spurious warnings", merged 2026-10-29, unreleased) eliminates two of the three paths reaching the warned arm – recheck
+  at the next release. The skip is the normal path (RFC 4035 §3.1.3), so the WARN is spurious.
 
 ## apk package pins and CA trust
 

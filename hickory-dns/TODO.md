@@ -13,9 +13,9 @@ procedures in the skill `hickory-dns-runtime`.
   [#4063](https://github.com/hickory-dns/hickory-dns/issues/4063)) and `wiki.mint-system.ch` (wildcard-expanded CNAME in
   a signed NSEC zone – the recursor attaches only the wildcard's NSEC and the whole answer is rejected, CD=1 does not
   help; [#4047](https://github.com/hickory-dns/hickory-dns/issues/4047),
-  [#3888](https://github.com/hickory-dns/hickory-dns/issues/3888)). No released version fixes these (0.26.3 included) -
-  so wait for an upstream release that carries them (interim for affected sites: browser DoH, or the `dnssec` option
-  off).
+  [#3888](https://github.com/hickory-dns/hickory-dns/issues/3888)). No released version fixes these (0.26.3 included) –
+  so wait for an upstream release that carries them; #4047 was closed as completed 2026-11-06 without a cross-referenced
+  fix PR – recheck at the next release (interim for affected sites: browser DoH, or the `dnssec` option off).
 
 - Once hickory-dns 0.26.4+ is released shipping <https://github.com/hickory-dns/hickory-dns/pull/4128>, query an `A`
   instead of `SOA` record in `hickory-dns-healthcheck`.
