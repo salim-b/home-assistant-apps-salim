@@ -105,7 +105,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   tombi = "1.11.3"
   ty = "0.0.105"
   uv = "0.13.9"
-  vendir = { version = "0.46.3", lazy = true }
+  vendir = { version = "0.47.0", lazy = true }
   yq = "4.54.3"
   zizmor = "1.32.0"
   # aube policy exemptions for renovate's tool tree (whys: .agents/skills/ha-app-tooling, Renovate section).
