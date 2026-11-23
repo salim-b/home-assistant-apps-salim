@@ -74,7 +74,7 @@ toml_str() {
   printf '"%s"' "$s"
 }
 
-## A decimal 0-255 octet/prefix without leading zeros: bash arithmetic reads leading zeros as octal,
+## A decimal 0–255 octet/prefix without leading zeros: bash arithmetic reads leading zeros as octal,
 ## and the daemon's address/CIDR parsers reject them – reject here so the option error, not a raw
 ## --validate parse error, reports the problem.
 is_dec_octet() {
@@ -444,7 +444,7 @@ while IFS= read -r entry; do
     ## normalized decimal is also what gets emitted into the TOML – TOML rejects leading zeros).
     port=$((10#$port))
     ((port >= 1 && port <= 65535)) \
-      || bashio::exit.nok "Invalid upstream port ${port}: out of range (1-65535)."
+      || bashio::exit.nok "Invalid upstream port ${port}: out of range (1–65535)."
   fi
 
   ## path is https-only (no serde field on the other protocols – a stray value would be a silent
