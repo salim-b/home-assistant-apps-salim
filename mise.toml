@@ -93,7 +93,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   # hk's binary pin and the hk@X.Y.Z package imported by hk.pkl move together (skill ha-app-tooling, Renovate section).
   hk = { version = "2.12.0", workflow = "release.yml" }
   node = "26.13.1"
-  "aqua:jolars/panache" = "3.18.0"
+  "aqua:jolars/panache" = "3.19.0"
   python = "3.15.2"
   ripgrep = "15.2.0"
   ruff = "0.17.6"
