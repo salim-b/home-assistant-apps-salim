@@ -53,7 +53,7 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   keeping failures verbose. The routing and stderr drop can be replaced by the flag once it lands.
 
 - Upstream: file an issue against [owenlamont/ryl](https://github.com/owenlamont/ryl) asking for a way to exclude
-  lockfiles generically instead of pattern-by-pattern. ryl's file-skipping knobs (`exclude`, `per-file-ignores`,
+  lockfiles generically instead of pattern-by-pattern. ryl's file-skipping knobs (`exclude`, `exclude-from-file`,
   per-rule `ignore`) are all hand-written glob lists: no default ignore list and no lockfile awareness anywhere in the
   source (code search over `owenlamont/ryl`, 2026-11-16: only its own release tooling mentions lockfiles), and its
   docs/README demonstrate naming `pnpm-lock.yaml` by hand. The motivating example is vendir's `vendir.lock.yml` (this
