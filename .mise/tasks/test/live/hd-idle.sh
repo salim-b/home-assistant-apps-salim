@@ -28,8 +28,9 @@
 #   (hd-idle/KNOWLEDGE.md §"hd-idle-watch design"): regeneration, hd-idle service restart, the drive
 #   re-resolved under its NEW kernel name, the hd-idle-pmfix decision on the changed drives-file line,
 #   and a daemon-issued spindown under the new name – the supervisor's hotplug re-grant keeps the
-#   device-access chain (cgroup rules + AppArmor) open without an app restart. Moving the drive
-#   detaches it from every consumer (NFS exports, mounts) – move a drive whose downtime is acceptable.
+#   device-access chain (cgroup rules + AppArmor) open without an app restart. Device-verified 2026-11-24
+#   (WD USB drive moved across ports, all assertions passed). Moving the drive detaches it from every
+#   consumer (NFS exports, mounts) – move a drive whose downtime is acceptable.
 #   Without the variable, the repo's test options file (a safe no-op: no drives) is applied unchanged. A
 #   match-everything glob includes every labeled disk – choose it deliberately.
 # - LIVE_HDIDLE_DISKS_JSON (set by live_prepare): JSON object mapping the disks' kernel names to

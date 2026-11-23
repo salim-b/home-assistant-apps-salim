@@ -134,8 +134,8 @@ per the version-sensitive-facts rule before relying on them for new work).
 
 - Access is granted **exclusively via device-typed option fields**: `disks[].device` (`device(subsystem=block)`) –
   cgroup rules per configured drive, UI dropdown of stable by-id paths, hotplug re-grant via udev links (no restart
-  needed on re-plug), system-disk refusal (exclusion layer 1). Hence every managed drive must be listed; unlisted drives
-  are pinned to never spin down instead of being attempted.
+  needed on re-plug – device-verified 2026-11-24, §"hd-idle-watch design"), system-disk refusal (exclusion layer 1).
+  Hence every managed drive must be listed; unlisted drives are pinned to never spin down instead of being attempted.
 - Saving options while a drive is detached fails, and so does every start: device existence is validated on EVERY start
   (root `KNOWLEDGE.md` §"Supervisor: device access").
 - Plain Docker (the lab) exposes no `/dev/disk` udev symlink trees; the lab hook mirrors them (skill
@@ -250,6 +250,13 @@ N)". The message filter is essential: rc=4 (FAILSMART) also covers the APM-filte
   next tick re-syncs. Unchanged ticks log nothing; the new command line is logged by the hd-idle run script after each
   restart. Polling instead of udev events: mapping the host's `/run/udev` socket (`with_udev`) into an Alpine-based
   container is version-fragile for zero gain – 30 s worst-case latency is fine for a maintenance action.
+- **Device-verified end to end** (2026-11-24, the live hook's port-move scenario, `.mise/tasks/test/live/hd-idle.sh`
+  with `LIVE_HDIDLE_RENAME_DISK`): a drive re-attached at another USB port was regenerated and the hd-idle service
+  restarted ≤30 s after the replug, managing the drive under its new kernel name only; hd-idle-pmfix re-applied the
+  changed drives-file line's decision while `--since` skipped the unchanged drives; and the renamed drive issued a
+  daemon spindown – the supervisor's hotplug re-grant keeps the device-access chain (cgroup rules, AppArmor SG_IO
+  mediation) open across a rename without an app restart. The drive's stable ata-\* by-id path needed no configuration
+  change; a same-boot re-enumeration that also moved unconfigured drives' names was absorbed the same way.
 - **Quiet mode and the baseline replay**: `--quiet` (the watcher's per-tick mode) suppresses narrative/info output and
   the expected-transient warnings (detached drive, non-sd\* entry) – both surface once per boot from the non-quiet
   cont-init run, and options cannot change mid-run (repository-root `KNOWLEDGE.md` §"Supervisor: option schema quirks");

@@ -95,9 +95,3 @@ Open work items only (resolved items live in git history). Underlying technical 
   file → treat all (pmfix logs every decision). A regression (e.g. in the line match) would silently re-treat asleep
   drives on every change tick – the wear-generating failure mode (`KNOWLEDGE.md` §"USB-bridge behaviors"). Mirror the
   genargs `--check` matrix in `.mise/tasks/test/lab/hd-idle.sh`.
-
-- Device-side verification with real drives attached (the lab can cover neither half: it cannot simulate kernel renames
-  – `.mise/tasks/test/lab/hd-idle.sh` – and has no drives): (a) extend `.mise/tasks/test/live/hd-idle.yaml` with
-  device-specific drives and run the live hook through a short idle soak; (b) verify the watcher's core promise
-  end-to-end – a drive moved to another port (kernel rename) is re-granted (cgroup rules), re-resolved (by-id) and the
-  daemon restarted under the new name (DOCS.md's "drives moved between ports are picked up automatically").
