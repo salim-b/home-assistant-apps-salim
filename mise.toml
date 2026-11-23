@@ -78,7 +78,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
   "github:reteps/dockerfmt" = "1.0.0"
   editorconfig-checker = "4.0.2"
   entireio-cli = "0.13.4"
-  gh = "2.104.0"
+  gh = "2.105.0"
   # Toolchain for the go:-backend build below (mise builds go: tools with the project's go pin).
   go = { version = "1.26", lazy = true }
   # Built from source; upstream external-agents has no tags/releases, so the pin is a commit pseudo-version.
