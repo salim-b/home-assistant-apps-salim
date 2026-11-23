@@ -137,10 +137,7 @@ per the version-sensitive-facts rule before relying on them for new work).
   needed on re-plug), system-disk refusal (exclusion layer 1). Hence every managed drive must be listed; unlisted drives
   are pinned to never spin down instead of being attempted.
 - Saving options while a drive is detached fails, and so does every start: device existence is validated on EVERY start
-  (`write_options()` runs `schema.validate` unsuppressed; a failure aborts the start, and at boot the supervisor records
-  a boot-failed issue with `EXECUTE_START`/`DISABLE_BOOT` suggestions – supervisor `apps/app.py`/`apps/manager.py`,
-  verified at ref 2026.11.0). The supervisor's suppressed options validation (`App.devices`) only feeds the cgroup-rule
-  computation.
+  (root `KNOWLEDGE.md` §"Supervisor: device access").
 - Plain Docker (the lab) exposes no `/dev/disk` udev symlink trees (HAOS binds the host `/dev` read-only into app
   containers); the lab hook mirrors them with `-v /dev/disk:/dev/disk:ro` so by-id resolution and inventory behave as on
   a device.

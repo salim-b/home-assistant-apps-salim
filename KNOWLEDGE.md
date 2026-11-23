@@ -111,10 +111,12 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
 - **System-disk rail**: `hardware/policy.py::allowed_for_access` refuses devices where
   `sys_hardware.disk.is_used_by_system(device)` – at container start and in the hotplug listener alike. Devices the
   system uses cannot be granted to an app, period.
-- Validation timing: the `device` type validates existence **at options save time** (`write_options` → `get_by_path`) –
-  saving a config while the device is detached fails with a clear message. At app **startup** the validation result is
-  suppressed (`App.devices` does `with suppress(vol.Invalid)`); a detached device at boot does not prevent the app from
-  starting.
+- Validation timing: the `device` type validates existence on every options validation – saving a config while the
+  device is detached fails with a clear message, and so does every start: `write_options()` runs `schema.validate`
+  unsuppressed (call site in `start()`), a failure aborts the start, and at boot the supervisor records a boot-failed
+  issue with `EXECUTE_START`/`DISABLE_BOOT` suggestions (`supervisor/apps/app.py`/`apps/manager.py`, verified at ref
+  2026.11.0). The suppressed read (`App.devices` does `with suppress(vol.Invalid)`) only feeds the cgroup-rule
+  computation.
 
 ## Device SSH: sessions run in the Terminal & SSH app
 
