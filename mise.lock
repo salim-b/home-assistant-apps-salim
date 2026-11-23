@@ -1019,51 +1019,51 @@ url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/758513940"
 provenance = "github-attestations"
 
 [[tools.vendir]]
-version = "0.46.3"
+version = "0.47.0"
 backend = "aqua:carvel-dev/vendir"
-specifiers = ["0.46.3"]
+specifiers = ["0.47.0"]
 
 [tools.vendir."platforms.linux-arm64"]
-checksum = "sha256:821a9da837a017270743597a2e9b796d2d256385ad85450d6c5d89f05dd5aac9"
+checksum = "sha256:60b5331f0f68e374df3e283744ca7b28b69015d388c432a4dbd14d3202ec6fce"
 checksum_source = "mise-versions"
-url = "https://github.com/carvel-dev/vendir/releases/download/v0.46.3/vendir-linux-arm64"
-url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/655447804"
+url = "https://github.com/carvel-dev/vendir/releases/download/v0.47.0/vendir-linux-arm64"
+url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/754191088"
 
 [tools.vendir."platforms.linux-arm64-musl"]
-checksum = "sha256:821a9da837a017270743597a2e9b796d2d256385ad85450d6c5d89f05dd5aac9"
+checksum = "sha256:60b5331f0f68e374df3e283744ca7b28b69015d388c432a4dbd14d3202ec6fce"
 checksum_source = "mise-versions"
-url = "https://github.com/carvel-dev/vendir/releases/download/v0.46.3/vendir-linux-arm64"
-url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/655447804"
+url = "https://github.com/carvel-dev/vendir/releases/download/v0.47.0/vendir-linux-arm64"
+url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/754191088"
 
 [tools.vendir."platforms.linux-x64"]
-checksum = "sha256:5af8823ecc67b3ce2359bb0b70e72a5dbd765135722ca0ff42c16bc4d7409847"
+checksum = "sha256:9d1099f48f04882a716934178bb9ba8f2373c96b0bea536540106757bc4081e3"
 checksum_source = "mise-versions"
-url = "https://github.com/carvel-dev/vendir/releases/download/v0.46.3/vendir-linux-amd64"
-url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/655447795"
+url = "https://github.com/carvel-dev/vendir/releases/download/v0.47.0/vendir-linux-amd64"
+url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/754191176"
 
 [tools.vendir."platforms.linux-x64-musl"]
-checksum = "sha256:5af8823ecc67b3ce2359bb0b70e72a5dbd765135722ca0ff42c16bc4d7409847"
+checksum = "sha256:9d1099f48f04882a716934178bb9ba8f2373c96b0bea536540106757bc4081e3"
 checksum_source = "mise-versions"
-url = "https://github.com/carvel-dev/vendir/releases/download/v0.46.3/vendir-linux-amd64"
-url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/655447795"
+url = "https://github.com/carvel-dev/vendir/releases/download/v0.47.0/vendir-linux-amd64"
+url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/754191176"
 
 [tools.vendir."platforms.macos-arm64"]
-checksum = "sha256:52b3c224329c11f7189847fc9687a7e9f319626f893dd9a8bcc3704dbc89cc25"
+checksum = "sha256:08749252b25280e4fce50d23036caf562ac7c3cfa600eed7c134f4762a6b5cde"
 checksum_source = "mise-versions"
-url = "https://github.com/carvel-dev/vendir/releases/download/v0.46.3/vendir-darwin-arm64"
-url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/655447796"
+url = "https://github.com/carvel-dev/vendir/releases/download/v0.47.0/vendir-darwin-arm64"
+url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/754191092"
 
 [tools.vendir."platforms.macos-x64"]
-checksum = "sha256:39b1025eb03142790d5b8d262edd1c9dd5987ae97a81d0c5c4affb13850caccb"
+checksum = "sha256:01d5009eef5ccd074b29acaf4d6037ac8e02849f55fc409e7e020cb75da60eec"
 checksum_source = "mise-versions"
-url = "https://github.com/carvel-dev/vendir/releases/download/v0.46.3/vendir-darwin-amd64"
-url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/655447790"
+url = "https://github.com/carvel-dev/vendir/releases/download/v0.47.0/vendir-darwin-amd64"
+url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/754191091"
 
 [tools.vendir."platforms.windows-x64"]
-checksum = "sha256:68aa4fb1ff9ce66510dc9a77477d3ba0e304eb0770b478cd59eb8d1a0d8cfa5a"
+checksum = "sha256:08544ac06810c4a5e2ad67e86e1a7a32a1775caf198fb34136d1ef96bc450935"
 checksum_source = "mise-versions"
-url = "https://github.com/carvel-dev/vendir/releases/download/v0.46.3/vendir-windows-amd64.exe"
-url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/655447917"
+url = "https://github.com/carvel-dev/vendir/releases/download/v0.47.0/vendir-windows-amd64.exe"
+url_api = "https://api.github.com/repos/carvel-dev/vendir/releases/assets/754191093"
 
 [[tools.yq]]
 version = "4.54.3"
