@@ -10,10 +10,11 @@
 #
 # Hook-local contract:
 # - LIVE_HDIDLE_LABEL_GLOB (env, optional, read by live_prepare under --test-options): a test TARGET
-#   selector over filesystem labels. A disk is included only if ALL its labeled partitions match the
-#   glob; disks hosting other labeled partitions are excluded explicitly; non-sd* disks are skipped
-#   (hd-idle only monitors sd*); the supervisor's device validation is the final layer refusing
-#   system-used devices. Each included disk maps to its preferred /dev/disk/by-id path (ata-* > usb-*
+#   selector over filesystem labels – space-separated glob PATTERNS (bash case alternation does not work
+#   through a variable); a label matches when it matches any pattern. A disk is included only if ALL its
+#   labeled partitions match; disks hosting other labeled partitions are excluded explicitly; non-sd*
+#   disks are skipped (hd-idle only monitors sd*); the supervisor's device validation is the final layer
+#   refusing system-used devices. Each included disk maps to its preferred /dev/disk/by-id path (ata-* > usb-*
 #   > wwn-*) and gets a 30 s idle so the daemon exercises its natural spindown path within the check
 #   window; the FIRST discovered drive additionally opts out of the drive-PM treatment
 #   (keep_drive_pm=true), exercised end to end (asserted in live_runtime_check).
@@ -45,7 +46,8 @@ live_prepare() {
   [ "${LIVE_HDIDLE_LABEL_GLOB:-}" != "" ] || return 0
   local glob="$LIVE_HDIDLE_LABEL_GLOB" raw kind name disk rank lb byid
   local -A disk_labels=() disk_byid=() byid_rank=()
-  local included=() included_sorted=() labels=() ok
+  local included=() included_sorted=() labels=() ok matched pat
+  local -a glob_patterns=()
   local disks_json="[]" disks_map="{}" tmpfile pm_optout_disk
 
   echo "-- discovering drives on the device (label glob: $glob)"
@@ -106,15 +108,22 @@ live_prepare() {
     esac
     ok=1
     read -ra labels <<<"${disk_labels[$disk]}"
+    read -ra glob_patterns <<<"$glob"
     for lb in "${labels[@]}"; do
-      # shellcheck disable=SC2254  # the pattern is intentionally the unquoted glob
-      case "$lb" in
-        $glob) ;;
-        *)
-          echo "   (excluding $disk: hosts the non-matching label '$lb')"
-          ok=0
-          ;;
-      esac
+      matched=0
+      for pat in "${glob_patterns[@]}"; do
+        # shellcheck disable=SC2254  # the pattern is intentionally the unquoted glob
+        case "$lb" in
+          $pat)
+            matched=1
+            break
+            ;;
+        esac
+      done
+      if [ "$matched" != "1" ]; then
+        echo "   (excluding $disk: hosts the non-matching label '$lb')"
+        ok=0
+      fi
     done
     if [ "$ok" = 1 ]; then included+=("$disk"); fi
   done
