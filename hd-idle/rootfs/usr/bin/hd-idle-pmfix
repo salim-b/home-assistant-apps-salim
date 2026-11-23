@@ -27,7 +27,7 @@ case "${2:-}" in
 esac
 
 [ -r "$DRIVES_FILE" ] || {
-  bashio::log.warning "hd-idle-pmfix: no drives file (${DRIVES_FILE}) - nothing to treat"
+  bashio::log.warning "hd-idle-pmfix: no drives file (${DRIVES_FILE}) – nothing to treat"
   exit 0
 }
 
@@ -71,14 +71,14 @@ while read -r name idle ctype pmflag; do
   [[ "$name" =~ ^sd[a-z]+$ ]] || continue
   if is_treated_before "${name} ${idle} ${ctype} ${pmflag}"; then
     if [ "$pmflag" = "1" ]; then
-      bashio::log.info "Drive ${name}: power management already disabled (unchanged configuration) - skipping."
+      bashio::log.info "Drive ${name}: power management already disabled (unchanged configuration) – skipping."
     else
-      bashio::log.info "Drive ${name}: drive-PM treatment disabled for this drive (configuration unchanged) - skipping."
+      bashio::log.info "Drive ${name}: drive-PM treatment disabled for this drive (configuration unchanged) – skipping."
     fi
     continue
   fi
   if [ "$pmflag" != "1" ]; then
-    bashio::log.info "Drive ${name}: drive-PM treatment disabled for this drive - its own power management stays as is."
+    bashio::log.info "Drive ${name}: drive-PM treatment disabled for this drive – its own power management stays as is."
     continue
   fi
   TREATED=$((TREATED + 1))
@@ -94,6 +94,6 @@ for ((i = 1; i <= TREATED; i++)); do
   if [ -s "${RESULT_DIR}/${i}" ]; then
     bashio::log.info "$(cat "${RESULT_DIR}/${i}")"
   else
-    bashio::log.warning "Treatment result ${i} missing - its concurrent job failed to record it."
+    bashio::log.warning "Treatment result ${i} missing – its concurrent job failed to record it."
   fi
 done

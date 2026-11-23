@@ -13,7 +13,7 @@ set -euo pipefail
 INTERVAL="${HD_IDLE_WATCH_INTERVAL:-30}"
 case "$INTERVAL" in
   '' | *[!0-9]*)
-    bashio::log.warning "Invalid HD_IDLE_WATCH_INTERVAL '${INTERVAL}' - using the 30 s default."
+    bashio::log.warning "Invalid HD_IDLE_WATCH_INTERVAL '${INTERVAL}' – using the 30 s default."
     INTERVAL=30
     ;;
 esac
@@ -39,13 +39,13 @@ while true; do
     continue
   fi
   if [ "$RC" != 3 ]; then
-    bashio::log.warning "Checking the hd-idle configuration failed - keeping the current configuration."
+    bashio::log.warning "Checking the hd-idle configuration failed – keeping the current configuration."
     continue
   fi
 
   ## Regenerate from current options + current device resolution.
   if ! /usr/bin/hd-idle-genargs --quiet "$CAND_FILE"; then
-    bashio::log.warning "hd-idle configuration regeneration failed - keeping the current configuration."
+    bashio::log.warning "hd-idle configuration regeneration failed – keeping the current configuration."
     continue
   fi
 
@@ -60,7 +60,7 @@ while true; do
   fi
 
   ## The new command line is logged by the hd-idle run script after the restart; unchanged ticks log nothing.
-  bashio::log.info "Drive device paths changed - updating the hd-idle configuration and restarting hd-idle"
+  bashio::log.info "Drive device paths changed – updating the hd-idle configuration and restarting hd-idle"
   ## Keep the previous drives file for hd-idle-pmfix (--since): only NEW or CHANGED drives get the (possibly
   ## wake-causing) treatment re-applied.
   cp "$DRIVES_FILE" "${DRIVES_FILE}.prev" 2>/dev/null || true
@@ -71,8 +71,8 @@ while true; do
   mv -f "$CAND_STATE_FILE" "$STATE_FILE"
   ## Unconditional: the pm-flag column carries the effective per-drive decision; pmfix skips pm-flag-0 drives.
   /usr/bin/hd-idle-pmfix "$DRIVES_FILE" --since "${DRIVES_FILE}.prev" \
-    || bashio::log.warning "hd-idle-pmfix failed - the drives' power management stays as is."
+    || bashio::log.warning "hd-idle-pmfix failed – the drives' power management stays as is."
   if ! s6-svc -r /run/service/hd-idle; then
-    bashio::log.warning "Restarting the hd-idle service failed - it will pick up the new configuration on its next restart."
+    bashio::log.warning "Restarting the hd-idle service failed – it will pick up the new configuration on its next restart."
   fi
 done

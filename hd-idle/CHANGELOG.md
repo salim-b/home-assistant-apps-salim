@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.2.4
+
+- Internals: no behavior change – dash punctuation in log messages is normalized to the repository's spaced en dash (the
+  power-condition range in the missing-field error now reads `0–15`). No configuration change.
+
 ## 0.2.3
 
 - Internals: no behavior change – the `Dockerfile` is reformatted to the repository's uniform `dockerfmt` style
