@@ -13,10 +13,22 @@
 #   selector over filesystem labels. A disk is included only if ALL its labeled partitions match the
 #   glob; disks hosting other labeled partitions are excluded explicitly; non-sd* disks are skipped
 #   (hd-idle only monitors sd*); the supervisor's device validation is the final layer refusing
-#   system-used devices. Each included disk maps to its preferred /dev/disk/by-id path (usb-* > ata-*
-#   > wwn-*) and gets a 30 s idle (as in the lab fixture) so the daemon exercises its natural spindown
-#   path within the check window; the FIRST discovered drive additionally opts out of the drive-PM
-#   treatment (keep_drive_pm=true), exercised end to end (asserted in live_runtime_check).
+#   system-used devices. Each included disk maps to its preferred /dev/disk/by-id path (ata-* > usb-*
+#   > wwn-*) and gets a 30 s idle so the daemon exercises its natural spindown path within the check
+#   window; the FIRST discovered drive additionally opts out of the drive-PM treatment
+#   (keep_drive_pm=true), exercised end to end (asserted in live_runtime_check).
+# - LIVE_HDIDLE_COMMAND_TYPE (env, optional): the per-drive command type for the generated test options
+#   (default scsi, as in the lab fixture; set ata on devices whose production drives use the ata path –
+#   some WD bridges silently no-op scsi commands: hd-idle/KNOWLEDGE.md §"USB-bridge behaviors").
+# - LIVE_HDIDLE_RENAME_DISK (env, optional, read by live_rename_check after the soak): the port-move
+#   scenario. Value: a managed kernel name or the filesystem label of exactly one included drive.
+#   Waits (operator-paced, up to LIVE_HDIDLE_RENAME_TIMEOUT seconds, default 1800) for the drive to be
+#   unplugged and re-attached to a DIFFERENT port, then asserts the watcher's end-to-end promise
+#   (hd-idle/KNOWLEDGE.md §"hd-idle-watch design"): regeneration, hd-idle service restart, the drive
+#   re-resolved under its NEW kernel name, the hd-idle-pmfix decision on the changed drives-file line,
+#   and a daemon-issued spindown under the new name – the supervisor's hotplug re-grant keeps the
+#   device-access chain (cgroup rules + AppArmor) open without an app restart. Moving the drive
+#   detaches it from every consumer (NFS exports, mounts) – move a drive whose downtime is acceptable.
 #   Without the variable, the repo's test options file (a safe no-op: no drives) is applied unchanged. A
 #   match-everything glob includes every labeled disk – choose it deliberately.
 # - LIVE_HDIDLE_DISKS_JSON (set by live_prepare): JSON object mapping the disks' kernel names to
@@ -65,11 +77,13 @@ live_prepare() {
     case "$kind" in
       label) disk_labels[$disk]+="${name} " ;;
       byid)
-        ## Preference: usb-* (the semantically clearest entry for USB drives), then ata-*, wwn-*, then
-        ## anything else; ties go to the lexicographically first name (stable across runs).
+        ## Preference: ata-* (the drive-physical link: its name derives from model + serial only and is
+        ## stable across ports, hosts and boots – the production options reference ata-* paths), then
+        ## usb-* (bridge/enclosure identity, carries an interface-instance suffix), wwn-*, then anything
+        ## else; ties go to the lexicographically first name (stable across runs).
         case "$name" in
-          usb-*) rank=0 ;;
-          ata-*) rank=1 ;;
+          ata-*) rank=0 ;;
+          usb-*) rank=1 ;;
           wwn-*) rank=2 ;;
           *) rank=3 ;;
         esac
@@ -86,7 +100,7 @@ live_prepare() {
     case "$disk" in
       sd*) ;;
       *)
-        echo "   (excluding $disk: not an sd* disk - hd-idle only monitors sd*)"
+        echo "   (excluding $disk: not an sd* disk – hd-idle only monitors sd*)"
         continue
         ;;
     esac
@@ -114,11 +128,11 @@ live_prepare() {
   for disk in "${included_sorted[@]}"; do
     byid=${disk_byid[$disk]:-}
     if [ "$byid" = "" ]; then
-      echo "ERROR: no /dev/disk/by-id link for $disk - it cannot be configured via the device option" >&2
+      echo "ERROR: no /dev/disk/by-id link for $disk – it cannot be configured via the device option" >&2
       return 1
     fi
-    disks_json=$(jq -c --arg dev "/dev/disk/by-id/$byid" \
-      '. + [{device: $dev, idle: 30, command_type: "scsi", power_condition: 0}]' <<<"$disks_json")
+    disks_json=$(jq -c --arg dev "/dev/disk/by-id/$byid" --arg ct "${LIVE_HDIDLE_COMMAND_TYPE:-scsi}" \
+      '. + [{device: $dev, idle: 30, command_type: $ct, power_condition: 0}]' <<<"$disks_json")
     disks_map=$(jq -c --arg d "$disk" --arg l "${disk_labels[$disk]%% *}" \
       --arg dev "/dev/disk/by-id/$byid" \
       '. + {($d): {label: $l, device: $dev}}' <<<"$disks_map")
@@ -134,7 +148,7 @@ live_prepare() {
 
   tmpfile=$(mktemp "${TMPDIR:-/tmp}/hd-idle-live-options.XXXXXX")
   jq -n --argjson disks "$disks_json" '{disks: $disks}' >"$tmpfile"
-  echo "-- generated test options (30s idle, scsi):"
+  echo "-- generated test options (30s idle, ${LIVE_HDIDLE_COMMAND_TYPE:-scsi}):"
   jq -r 'to_entries[] | "   \(.value.device) (\(.key), label \(.value.label)\(if .value.pm_optout == true then ", keep drive power management: on" else "" end))"' <<<"$disks_map"
 
   ## Must outlive the run: restore_options() re-reads it from the EXIT trap for its backup sanity check.
@@ -168,7 +182,7 @@ live_runtime_check() {
 
     if [ "$hard_pending" = 1 ]; then
       if ! grep -q "symlinkPolicy=" <<<"$tail_log"; then
-        : # daemon config dump not there yet - keep waiting
+        : # daemon config dump not there yet – keep waiting
       elif ! grep -q "hd-idle configuration completed" <<<"$tail_log"; then
         echo "   FAIL: the hd-idle configuration did not complete (invalid configuration?); app log tail:" >&2
         tail -15 <<<"$tail_log" | sed 's/^/         /' >&2
@@ -205,7 +219,7 @@ live_runtime_check() {
         expected_sorted=$(printf '%s\n' "${expected_arr[@]}" | sort)
         if [ "$managed_sorted" != "$expected_sorted" ]; then
           echo "   FAIL: hd-idle manages unexpected disks (managed: ${managed_arr[*]:-none};" >&2
-          echo "         expected: ${expected_arr[*]:-none}) - refusing to continue" >&2
+          echo "         expected: ${expected_arr[*]:-none}) – refusing to continue" >&2
           return 1
         fi
         while IFS= read -r disk; do
@@ -263,7 +277,7 @@ live_runtime_check() {
           fi
         else
           if grep -q "No drives configured" <<<"$tail_log"; then
-            echo "   PASS: no drives configured - hd-idle touches nothing (safe no-op options)"
+            echo "   PASS: no drives configured – hd-idle touches nothing (safe no-op options)"
           fi
         fi
       fi
@@ -319,5 +333,170 @@ live_runtime_check() {
     fi
     echo "   PASS: $spin_events/$drive_count configured drive(s) issued spindown events"
   fi
+
+  ## Port-move rename scenario (optional knob): runs after the soak while the test options are still
+  ## active – it needs the drive configured and the daemon managing it. Operator-paced: the hook waits
+  ## for the physical port move (live_rename_check prints the instruction and polls).
+  if [ "${LIVE_HDIDLE_RENAME_DISK:-}" != "" ]; then
+    live_rename_check || return 1
+  fi
+  return 0
+}
+
+live_rename_check() { # the port-move scenario (knob LIVE_HDIDLE_RENAME_DISK): the watcher's end-to-end promise.
+  # Operator-paced: waits for the physical unplug + re-attach to a DIFFERENT port, then asserts – from the app
+  # log alone (no docker CLI on the device: hook header) – the regeneration, the hd-idle service restart with
+  # the drive re-resolved under its new kernel name, the hd-idle-pmfix decision on the changed drives-file
+  # line, and a daemon-issued spindown under the new name (the device-access proof: the supervisor's hotplug
+  # re-grant keeps the cgroup rules open for the renamed node without an app restart). The configured by-id
+  # path (ata-* preferred: live_prepare) is stable across ports, so the drive keeps its configured identity;
+  # only its kernel name changes. Moving the drive detaches it from every consumer – operator's choice.
+  local disks_json="${LIVE_HDIDLE_DISKS_JSON:-}"
+  if [ "$disks_json" = "" ]; then
+    echo "-- rename scenario skipped: no managed drives in this run (set LIVE_HDIDLE_LABEL_GLOB so live_prepare includes drives)"
+    return 0
+  fi
+  local selector="${LIVE_HDIDLE_RENAME_DISK:-}" rename_disk rename_label rename_dev rename_byid old_name new_name
+  local logs after_change final_segment cmd_line expected pm_pattern pattern disk link_target
+  local detected=0 found=0 spun_seen=0 wait_start rename_delay
+  local -a argv=() managed_arr=()
+  local -r poll=15
+  local -r rename_timeout="${LIVE_HDIDLE_RENAME_TIMEOUT:-1800}"
+  local -r restart_window=180 event_window=420
+  local detect_deadline=$((SECONDS + rename_timeout)) restart_deadline event_deadline
+
+  ## Selector: a kernel name from the discovered map, or the filesystem label of exactly one included drive.
+  rename_disk=$(jq -r --arg s "$selector" 'if has($s) then $s else empty end' <<<"$disks_json")
+  if [ "$rename_disk" = "" ] \
+    && [ "$(jq --arg s "$selector" '[to_entries[] | select(.value.label == $s)] | length' <<<"$disks_json")" = "1" ]; then
+    rename_disk=$(jq -r --arg s "$selector" 'to_entries[] | select(.value.label == $s) | .key' <<<"$disks_json")
+  fi
+  if [ "$rename_disk" = "" ]; then
+    echo "   FAIL: rename target '$selector' is neither a managed kernel name nor the label of exactly one included drive" >&2
+    return 1
+  fi
+  rename_dev=$(jq -r --arg d "$rename_disk" '.[$d].device' <<<"$disks_json")
+  rename_byid=${rename_dev#/dev/disk/by-id/}
+  rename_label=$(jq -r --arg d "$rename_disk" '.[$d].label' <<<"$disks_json")
+  old_name=$rename_disk
+
+  echo "-- port-move scenario: the watcher's end-to-end promise (hd-idle/KNOWLEDGE.md §\"hd-idle-watch design\")"
+  echo "   >>> MOVE THE DRIVE NOW: unplug '$old_name' (label '$rename_label', $rename_dev) and attach it to a"
+  echo "   >>> DIFFERENT port on the device. Waiting up to ${rename_timeout}s."
+  echo "   (the watcher picks the change up on its next tick, <=30 s after the re-attach)"
+
+  ## Rename detection via the configured by-id link: udev removes it while the drive is detached and re-creates
+  ## it with the new target when the drive comes back; a link still naming the old kernel name keeps waiting.
+  while [ "$SECONDS" -lt "$detect_deadline" ]; do
+    link_target=$(ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
+      "readlink '/dev/disk/by-id/$rename_byid' 2>/dev/null") || link_target=""
+    link_target=${link_target##*/}
+    if [ "$link_target" != "" ] && [ "$link_target" != "$old_name" ]; then
+      new_name=$link_target
+      detected=1
+      wait_start=$SECONDS
+      break
+    fi
+    sleep "$poll"
+  done
+  if [ "$detected" != 1 ]; then
+    echo "   FAIL: no port move observed within ${rename_timeout}s (by-id link now: ${link_target:-absent})" >&2
+    return 1
+  fi
+  echo "   rename detected: $old_name -> $new_name"
+
+  ## Expected post-restart managed set: every managed drive under its current kernel name (the moved drive
+  ## under its NEW one) – equality with this set also proves the stale name is no longer managed.
+  expected=$(jq -cr --arg old "$old_name" --arg new "$new_name" \
+    'keys | map(if . == $old then $new else . end) | sort | join(" ")' <<<"$disks_json")
+
+  ## Wait for the watcher's regeneration and restart. The region is cut at the LAST "Drive device paths
+  ## changed" line (the watcher logs it right before installing the candidates and restarting the hd-idle
+  ## service); a service restart runs no cont-init, so the run script's "Starting hd-idle:" line – not
+  ## "Configuring hd-idle..." – is the boot anchor, and it carries the full new command line.
+  restart_deadline=$((wait_start + restart_window))
+  while [ "$SECONDS" -lt "$restart_deadline" ]; do
+    logs=$(ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
+      "ha apps logs $LIVE_LOCAL_SLUG --boot 0 --lines 400" 2>/dev/null) || logs=""
+    after_change=$(awk '/Drive device paths changed/{buf=""} {buf = buf $0 "\n"} END {printf "%s", buf}' <<<"$logs")
+    final_segment=$(awk '/Starting hd-idle:/{buf=""} {buf = buf $0 "\n"} END {printf "%s", buf}' <<<"$after_change")
+    if [ "$after_change" != "$logs" ] && grep -q "symlinkPolicy=" <<<"$final_segment"; then
+      cmd_line=$(grep -m1 "Starting hd-idle:" <<<"$final_segment" | sed 's|^.*Starting hd-idle: /usr/sbin/hd-idle ||')
+      read -ra argv <<<"$cmd_line"
+      managed_arr=()
+      for i in "${!argv[@]}"; do
+        [ "${argv[$i]}" = "-a" ] || continue
+        managed_arr+=("${argv[$((i + 1))]}")
+      done
+      if [ "$(printf '%s\n' "${managed_arr[@]}" | sort | paste -sd' ' -)" = "$expected" ]; then
+        found=1
+        rename_delay=$((SECONDS - wait_start))
+        break
+      fi
+    fi
+    sleep "$poll"
+  done
+  if [ "$found" != 1 ]; then
+    echo "   FAIL: no hd-idle restart with the new configuration within ${restart_window}s after the rename" >&2
+    echo "         (the watcher did not pick up the changed resolution?); app log tail:" >&2
+    tail -15 <<<"${final_segment:-$logs}" | sed 's/^/         /' >&2
+    return 1
+  fi
+  echo "   PASS: hd-idle restarted with the new configuration (${rename_delay}s after the rename was detected –"
+  echo "         the watcher's <=30 s tick plus regeneration) and manages exactly: $expected"
+
+  ## hd-idle-pmfix on the changed drives-file line: the renamed drive's row is NEW for --since (the unplug
+  ## cycle recorded its by-id passthrough row), so its decision re-applies exactly as at boot; every
+  ## unchanged drive must be skipped by the --since diff (the redundant-treatment guard). Dash-free patterns
+  ## – the log strings' dash normalization must not couple the assertions to one app version.
+  if [ "$(jq -r --arg d "$rename_disk" '.[$d].pm_optout // false' <<<"$disks_json")" = "true" ]; then
+    pm_pattern="Drive ${new_name}: drive-PM treatment disabled for this drive"
+  else
+    pm_pattern="Drive ${new_name}: APM disable"
+  fi
+  if ! grep -qF "$pm_pattern" <<<"$after_change"; then
+    echo "   FAIL: no hd-idle-pmfix decision logged for the renamed drive ('$pm_pattern ...')" >&2
+    tail -10 <<<"$after_change" | sed 's/^/         /' >&2
+    return 1
+  fi
+  echo "   PASS: hd-idle-pmfix re-evaluated the changed drives-file line ('$pm_pattern ...')"
+  while IFS= read -r disk; do
+    [ "$disk" != "" ] || continue
+    [ "$disk" = "$old_name" ] && continue
+    if [ "$(jq -r --arg d "$disk" '.[$d].pm_optout // false' <<<"$disks_json")" = "true" ]; then
+      pattern="Drive ${disk}: drive-PM treatment disabled for this drive (configuration unchanged)"
+    else
+      pattern="Drive ${disk}: power management already disabled (unchanged configuration)"
+    fi
+    if ! grep -qF "$pattern" <<<"$after_change"; then
+      echo "   FAIL: no --since skip line for the unchanged drive ${disk} ('$pattern ...')" >&2
+      echo "         (it must NOT be re-treated on a mere rename of another drive)" >&2
+      return 1
+    fi
+  done < <(jq -r 'keys[]' <<<"$disks_json")
+  echo "   PASS: --since skipped every unchanged drive (no redundant re-treatment)"
+
+  ## The crown assertion: a daemon-issued spindown under the NEW kernel name proves the whole device-access
+  ## chain (cgroup rules re-granted on hotplug, AppArmor SG_IO mediation, the node inside the container)
+  ## kept working across the port move without an app restart.
+  event_deadline=$((SECONDS + event_window))
+  echo "-- waiting for a daemon-issued spindown of $new_name (idle 30 s, window ${event_window}s)"
+  while [ "$SECONDS" -lt "$event_deadline" ]; do
+    logs=$(ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
+      "ha apps logs $LIVE_LOCAL_SLUG --boot 0 --lines 400" 2>/dev/null) || logs=""
+    after_change=$(awk '/Drive device paths changed/{buf=""} {buf = buf $0 "\n"} END {printf "%s", buf}' <<<"$logs")
+    if grep -q "${new_name} spindown" <<<"$after_change"; then
+      spun_seen=1
+      break
+    fi
+    sleep "$poll"
+  done
+  if [ "$spun_seen" != 1 ]; then
+    echo "   FAIL: no spindown event for $new_name within ${event_window}s of the rename pickup" >&2
+    echo "         (device access not re-granted on hotplug? drive busy/no idle time?)" >&2
+    return 1
+  fi
+  echo "   PASS: spindown event under the new kernel name – the device-access chain (cgroup rules plus"
+  echo "         AppArmor) kept working across the port move without an app restart"
   return 0
 }
