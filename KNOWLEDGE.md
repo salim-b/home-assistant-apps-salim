@@ -587,14 +587,6 @@ re-verified against 1.0.114 (2026-11-23); CLI flags: [programmatic
 reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-programmatic-reference), [billing in
 Actions](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/copilot-cli-in-github-actions).
 
-Every `home-assistant/**` action ref in `.github/workflows/` is a digest pin of a release-tag commit with the tag as the
-trailing comment (upstream pinned the `lint.yaml`/`builder.yaml`/`build-app.yaml` refs in #145; this fork completed the
-two refs `publish-reconcile.yaml` still floated). Tag refs fall outside `.github/renovate.json`'s float rule (its
-`pinDigests: false` matches only `dev`/`main`/`master` refs), so Renovate opens digest bump PRs for these helpers at
-every new upstream tag and they flow through this review like any other action – none is in the release-age except rule
-above. With nothing floating, the float rule matches no ref in this fork (upstream keeps it for template users); pulling
-future upstream `publish-reconcile.yaml` changes may conflict trivially on the ref lines.
-
 - Auth env precedence is `COPILOT_GITHUB_TOKEN` > `GH_TOKEN` > `GITHUB_TOKEN` > stored login: a `GITHUB_TOKEN` in the
   environment that lacks the Copilot Requests permission silently shadows an existing login and fails auth. CI relies on
   this order – passing the workflow's `GITHUB_TOKEN` bills Copilot CLI usage to the repository owner's Copilot seat on
