@@ -1,0 +1,11 @@
+I'd like you to make a plan for a documentation clean-up of the repository. E.g. commit `78c6864328ad291730785b07a9979d2540676c44` is not/wrongly reflected in our KNOWLEDGE, I think. There are likely more opportunities for corrections and improvements.
+
+---
+
+Decisions:
+
+1. a) (pin the refs; we want to pin all refs)
+2. No need to record the plan in TODO.md.
+3. Full verification now.
+
+Please proceed.
