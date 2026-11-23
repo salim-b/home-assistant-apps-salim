@@ -51,8 +51,9 @@ mise install --locked    # pinned tools from mise.toml/mise.lock
 
 `docker` is additionally required for the `build`, `test:lab`, `deploy:local`/`deploy:registry` and `test:live` tasks.
 
-Edited files are auto-formatted between prompts: a `watch_files` hook in `mise.toml` runs `hk fix` on the files you
-touch whenever a mise-activated shell redisplays its prompt, so `mise run fmt` is rarely needed by hand.
+Edited files are auto-formatted between prompts: a [`watch_files`
+hook](https://mise.jdx.dev/hooks.html#watch-files-hook) runs `hk fix` on the files you touch whenever a mise-activated
+shell redisplays its prompt, so `mise run fmt` is rarely needed by hand.
 
 ### Common tasks
 
