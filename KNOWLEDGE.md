@@ -7,7 +7,7 @@ in `TODO.md`.
 
 Facts about version-sensitive components (supervisor, AppArmor, HAOS kernels) cite their source (URL plus ref) and must
 be re-verified before relying on them for new work (skill `ha-app-workflow`). Supervisor facts below were verified at
-refs 2026.09.3–2026.10.2 (Renovate keeps the `mise.toml` `supervisor_ref` pin fresh – re-check against the current pin
+refs 2026.09.3–2026.11.0 (Renovate keeps the `mise.toml` `supervisor_ref` pin fresh – re-check against the current pin
 when relying on them), some at specific refs as noted.
 
 ## Supervisor: app security rating
@@ -23,9 +23,9 @@ when relying on them), some at specific refs as noted.
   `NET_ADMIN`, `NET_RAW`, `PERFMON`, `SYS_ADMIN`, `SYS_MODULE`, `SYS_PTRACE`, `SYS_RAWIO` – or `kernel_modules: true`
 - `hassio_role` manager/admin −1/−2
 - host networks −1 (net) / −2 (pid) / −1 (uts + `SYS_ADMIN`)
-- docker-API access or `full_access` → **forced to 1** – and `full_access` (with docker API / host PID / host UTS)
-  requires protection mode to be disabled by the user, which the `privileged` capability list does not (only those keys
-  are gated by protection mode; supervisor `docker/app.py`).
+- docker-API access or `full_access` → **forced to 1** – and `full_access` (with docker API / host PID) requires
+  protection mode to be disabled by the user, which the `privileged` capability list does not (only those keys are gated
+  by protection mode; host UTS is granted regardless; supervisor `docker/app.py`).
 
 Store listing vs. installed app can differ by the AppArmor +1 – expected, not a device quirk: `AppModel.apparmor`
 (supervisor `apps/model.py`) returns `SECURITY_PROFILE` only when a profile *for this app is already installed on the
@@ -43,10 +43,12 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
 
 ## Supervisor: option schema quirks
 
-- `match(...)` regexes in `config.yaml` schema fields use voluptuous `Match` (*search* semantics, not fullmatch) –
-  always anchor with explicit `^…$`.
-- The supervisor's schema-element parser breaks on literal `\t`/`\n` inside YAML double-quoted scalars (they become real
-  control characters) – express whitespace classes as `\\s` instead.
+- `match(...)` regexes in `config.yaml` schema fields use voluptuous `Match` (*start-anchored `re.match` semantics, not
+  fullmatch*) – an unanchored pattern still matches any string with a matching prefix; always anchor with explicit
+  `^…$`.
+- The supervisor's schema-element parser breaks the parse on a literal `\n` inside YAML double-quoted scalars (it
+  becomes a real control character the regex element cannot represent) and silently injects a real tab on a literal `\t`
+  (a semantic trap) – express whitespace classes as `\\s` instead.
 - The options DSL (`supervisor/apps/options.py` `RE_SCHEMA_ELEMENT`) has **no uniqueness construct** – list-of-objects
   options are validated entry by entry, cross-entry constraints cannot be expressed (the supervisor itself uses
   `vol.Unique()`, but only in its *own* config schemas). Cross-entry guards therefore belong in the app's runtime
@@ -172,9 +174,9 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
 ## Deploy tasks: local builds and store-copy conflicts
 
 With a top-level `image:` key set, the supervisor **pulls that image from GHCR** instead of building the app folder
-locally – an image-based app never rebuilds from source (see the [dev docs on remote
-development](https://contributors.home-assistant.io/apps/guides/testing/#remote-development)). The repo's device deploy
-tasks (`deploy:local`, and `test:live` through it) therefore comment the key out in the *device-side* copy of the app's
+locally – an image-based app never rebuilds from source (see the [dev docs on testing on a
+device](https://contributors.home-assistant.io/apps/guides/testing/#a-real-device)). The repo's device deploy tasks
+(`deploy:local`, and `test:live` through it) therefore comment the key out in the *device-side* copy of the app's
 `config.yaml`.
 
 Two installations of the same app cannot coexist on one device – they conflict on the app's published ports. A
@@ -214,8 +216,8 @@ standard installs) is fatal: CoreDNS's loop probe detects the self-loop and the 
 watchdog does not reliably revive the dead container – observed on-device 2026-11-12, where it stayed dead across two
 network reconfigurations until `ha dns restart`. Since `locals` always mirrors the host's NetworkManager nameservers,
 the CoreDNS plugin can therefore never be the host's own resolver. Recovery order after such an outage: restore the host
-DNS servers (`ha network update <iface> --ipv4-method auto --ipv4-nameserver <ip>…`; omitting `--ipv4-method` makes the
-supervisor reject the update with `method 'manual' requires at least an address`), then `ha dns restart`.
+DNS servers (`ha network update <iface> --ipv4-method auto --ipv4-nameserver <ip>…`; omitting `--ipv4-method` defaults
+the update to static method `manual`, which NetworkManager rejects for an address-less profile), then `ha dns restart`.
 
 The same mirroring also blocks on-device image builds (`deploy:local`) on devices whose only working plaintext resolver
 is the device itself: the buildkit CLI container resolves the registry through a copy of the host's `resolv.conf`, and a
@@ -260,11 +262,12 @@ Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7. Authoring
   `options=(bind)` instead. Mount sources are matched as passed: busybox passes the device string for pseudo-filesystems
   (e.g. `nfsd`, `sunrpc`, not a path).
 - **Ioctls**: AppArmor mediates ioctls only via the file's r/w permission. Per-command ioctl mediation does not exist in
-  any released AppArmor (re-verified 2026-10 against the AppArmor 4.0 release notes and the 6.17-era upstream pulls: new
-  mediation covers POSIX mqueue, user namespaces, io_uring and AF_UNIX; fine-grained inet/inet6 is still
-  work-in-progress) – e.g. `SG_IO` on disk nodes is covered by `/dev/sd* rwk`-style file rules, and no capability rules
-  are needed for the ioctl itself (kernel-side `capable()` checks inside command paths are a separate gate –
-  capabilities are mediated, see above).
+  any released AppArmor (re-verified 2026-11 against the AppArmor 4.0 release notes and the current upstream pulls: new
+  mediation covers POSIX mqueue, user namespaces, io_uring and AF_UNIX; fine-grained inet/inet6 landed in the kernel's
+  master branch (`security/apparmor/af_inet.c`, 2026-06/2026-10 commits) but is in no released kernel yet (≤ 6.18 – HAOS
+  unaffected)) – e.g. `SG_IO` on disk nodes is covered by `/dev/sd* rwk`-style file rules, and no capability rules are
+  needed for the ioctl itself (kernel-side `capable()` checks inside command paths are a separate gate – capabilities
+  are mediated, see above).
 - **Network mediation is opt-in per class**: a profile without any `network` rules has networking *entirely unmediated*
   (everything allowed) – "no rules" is not "no networking". Adding any network rule (allow or deny) enables mediation,
   and everything not matched by an allow rule is then denied; `deny network,` denies a class outright. The parser
@@ -303,11 +306,10 @@ Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7. Authoring
 
 ## apk package version policy
 
-**Official apps' practice** (home-assistant/addons, verified 2026-10): apk packages **float** (`dnsmasq`, `samba`,
-`mariadb`, `vlc`: bare `apk add --no-cache <pkg>`), while version-sensitive *cores* are pinned explicitly via
-`build.yaml` ARGs (mosquitto, letsencrypt's certbot/cryptography stack, whisper's pip stack). Floating apk packages
-means released images get newer package content on rebuilds without a version bump; existing installs keep the old
-digest until the next versioned release.
+**Official apps' practice** (home-assistant/app-\* repos, verified 2026-11): apk packages **float** (`app-dnsmasq`,
+`app-vlc`: bare `apk add --no-cache <pkg>`), while version-sensitive *cores* are pinned explicitly via Dockerfile ARGs
+(`app-mosquitto`, `app-whisper`). Floating apk packages means released images get newer package content on rebuilds
+without a version bump; existing installs keep the old digest until the next versioned release.
 
 **Our policy** splits by coupling:
 
@@ -349,12 +351,13 @@ carries every drifted pin and stays self-consistent (all updates sharing a `grou
 docs, configuration-options: groupName/rebaseWhen, verified 2026-11-12). Residual edge: independent packages pinned in
 one Dockerfile can drift with different update types – the two group branches then both touch that Dockerfile and the
 automerging pkgrel PR stays red until the pkgver PR merges (its build needs the newer sibling pin); the pkgrel group
-then rebases when behind base (rebaseWhen auto: behind-base-branch for automerging branches) and automerges, so the
-delay is bounded by the pkgver review. The version-guard workflow still passes on the Renovate PR as opened.
-`postUpgradeTasks` need `allowedPostUpgradeCommands` – a self-hosted-only option – so the changelog entry is filled
-post-merge by the CI changelog job instead. The rule's registryUrls branch value must be updated together with the
-Dockerfile's `BUILD_FROM` default on a base-image bump; the validate:apk-pins task derives the branch dynamically and
-remains the config-independent net. Floating apk packages are skipped (`unspecified-version`), as intended.
+then automerges once the pkgver PR lands and the branch conflicts with base (`rebaseWhen: conflicted` – repo-level, no
+behind-base rebasing), so the delay is bounded by the pkgver review. The version-guard workflow still passes on the
+Renovate PR as opened. `postUpgradeTasks` need `allowedPostUpgradeCommands` – a self-hosted-only option – so the
+changelog entry is filled post-merge by the CI changelog job instead. The rule's registryUrls branch value must be
+updated together with the Dockerfile's `BUILD_FROM` default on a base-image bump; the validate:apk-pins task derives the
+branch dynamically and remains the config-independent net. Floating apk packages are skipped (`unspecified-version`), as
+intended.
 
 **Release automation (since 2026-10-18)**, chained apk rules in `.github/renovate.json`: pkgrel-only bumps (`1.22-r7` →
 `1.22-r8`, classified `patch`) **automerge once CI is green** (rebase strategy – linear history); pkgver bumps get the
@@ -397,9 +400,11 @@ bashio stubbing): skill `ha-app-base-image`.
 - **`echo`/`printf` emit a single `writev(2)`**: the base image's bash (5.3.9) implements the output of its `echo` and
   `printf` builtins as one `writev(2)` call, with the text and the trailing newline as separate iovecs. Kernel files
   that only implement the old-style single-buffer `.write` and no `.write_iter` (many procfs/sysfs transaction files,
-  e.g. `/proc/fs/nfsd/*`) reject `writev(2)` with `EINVAL` – producing a misleading `write error: Invalid argument` that
-  is about the syscall *shape*, not the written content. Callers that do a single `write(2)` (busybox `echo`, `cat`,
-  many C daemons' own writes) succeed. (Which files this bites in a given app: the app's `KNOWLEDGE.md`.)
+  e.g. `/proc/fs/nfsd/*`) accept the `writev(2)` itself – `vfs_writev` falls back to looping `.write` per iovec
+  (fs/read_write.c) – but the loop hands the handler a stray final write carrying only the newline, which transaction
+  parsers reject (`EINVAL`; `EBUSY` for one-write-per-open guards): same misleading `write error: Invalid argument`,
+  content-driven. Callers that do a single `write(2)` (busybox `echo`, `cat`, many C daemons' own writes) succeed.
+  (Which files this bites in a given app: the app's `KNOWLEDGE.md`.)
 - **Failed redirections bypass the command's `2>/dev/null`**: a failed redirection is diagnosed by the shell itself,
   *before* the command's own redirections are in effect.
 - **`with-contenv` wipes the inherited environment unless `S6_KEEP_ENV=1`**: the s6-overlay shebang helper runs
@@ -516,8 +521,8 @@ be reverted by the next sync (churn): hk's panache/editorconfig-checker/final-ne
 every sync). hk passes staged files explicitly, bypassing the tools' own config excludes – hence the duplicate lists
 (skill ha-app-markdown). Repo-owned skills in `.agents/skills/` stay linted.
 
-**Design facts** (vendir 0.46.3; source: [vendir sync docs](https://carvel-dev.github.io/vendir/docs/vendir-sync/),
-vendir.yml `minimumRequiredVersion`):
+**Design facts** (vendir 0.46.3; source: [vendir sync docs](https://carvel.dev/vendir/docs/latest/sync/), vendir.yml
+`minimumRequiredVersion`):
 
 - One directory entry per skill, each fetching the upstream `skills/<name>` subtree via `newRootPath`: vendir replaces
   its managed directory wholesale on every sync, so a single entry for all of `.agents/skills/` would wipe the
@@ -577,13 +582,14 @@ instead (`.github/renovate.json`'s release-age rule: GitHub's `actions/*` and `j
 as a PR comment; the job's conclusion is the check a later automerge policy gates on (shadow phase until then). The
 Copilot CLI comes from mise (`[tools] copilot`, backend `aqua:github/copilot-cli`, pinned in `mise.lock`) – the mise
 manager bumps it and the minor/patch automerge rule merges it like any other repo tool. Facts below verified against
-Copilot CLI 1.0.112 (2026-11-16); CLI flags: [programmatic
+Copilot CLI 1.0.112 (2026-11-16), CLI-surface facts (flags, `--reasoning-effort` values, the `--max-ai-credits` minimum)
+re-verified against 1.0.114 (2026-11-23); CLI flags: [programmatic
 reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-programmatic-reference), [billing in
 Actions](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/copilot-cli-in-github-actions).
 
-Every `home-assistant/**` action ref in `.github/workflows/` is a digest pin of a release-tag commit with the tag as
-the trailing comment (upstream pinned the `lint.yaml`/`builder.yaml`/`build-app.yaml` refs in #145; this fork completed
-the two refs `publish-reconcile.yaml` still floated). Tag refs fall outside `.github/renovate.json`'s float rule (its
+Every `home-assistant/**` action ref in `.github/workflows/` is a digest pin of a release-tag commit with the tag as the
+trailing comment (upstream pinned the `lint.yaml`/`builder.yaml`/`build-app.yaml` refs in #145; this fork completed the
+two refs `publish-reconcile.yaml` still floated). Tag refs fall outside `.github/renovate.json`'s float rule (its
 `pinDigests: false` matches only `dev`/`main`/`master` refs), so Renovate opens digest bump PRs for these helpers at
 every new upstream tag and they flow through this review like any other action – none is in the release-age except rule
 above. With nothing floating, the float rule matches no ref in this fork (upstream keeps it for template users); pulling
@@ -605,8 +611,8 @@ future upstream `publish-reconcile.yaml` changes may conflict trivially on the r
 - `--reasoning-effort` accepts none/minimal/low/medium/high/xhigh/max; Claude Sonnet 5.5 accepts `high`
   (smoke-verified).
 - The compare API omits `files[].patch` for binary or oversized files (source: [compare
-  commits](https://docs.github.com/en/rest/commits/compare-two-commits)): files without a trusted-side reconstruction
-  are surfaced as explicit unreviewable notes and the agent's verdict rules fail closed on them.
+  commits](https://docs.github.com/en/rest/commits/commits#compare-two-commits)): files without a trusted-side
+  reconstruction are surfaced as explicit unreviewable notes and the agent's verdict rules fail closed on them.
 - The reviewer input file is capped at 500000 bytes (`.github/scripts/review_input.py enrich` assembles it): the diff
   comes first and one that does not fit is truncated with an explicit marker, which the agent must treat as
   unreviewable; context sections (upstream commits with authorship and signature state, tag/release context with release
