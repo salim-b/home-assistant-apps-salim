@@ -53,6 +53,7 @@ provenance = "github-attestations"
 version = "0.29.0"
 backend = "aqua:owenlamont/ryl"
 specifiers = ["0.29.0"]
+unsupported_platforms = ["macos-x64"]
 
 [tools."aqua:owenlamont/ryl"."platforms.linux-arm64"]
 checksum = "sha256:46ec5176e24ddcfca8583daef642f5c22fddc93919dce63e59883941e4e72974"
@@ -321,6 +322,7 @@ url_api = "https://api.github.com/repos/immanuwell/dockerfile-roast/releases/ass
 version = "1.0.0"
 backend = "github:reteps/dockerfmt"
 specifiers = ["1.0.0"]
+unsupported_platforms = ["windows-x64"]
 
 [tools."github:reteps/dockerfmt"."platforms.linux-arm64"]
 checksum = "sha256:fb361d10597b998766c72db47c4a70350832860571bb772a8b8cfc780377b7c9"
@@ -399,6 +401,7 @@ specifiers = ["v0.0.0-20260912195008-9b268b339e17"]
 version = "2.12.0"
 backend = "packslip:github.com/jdx/hk"
 specifiers = ["2.12.0"]
+unsupported_platforms = ["macos-x64"]
 
 [tools.hk."platforms.linux-arm64"]
 checksum = "sha256:0f4e44802c3fcf98461b6608281353ae1944b82fd12f4a683f8e2e6683e562f3"
