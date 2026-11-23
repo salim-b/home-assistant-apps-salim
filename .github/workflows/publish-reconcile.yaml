@@ -100,7 +100,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Verdicts come from the shared probe script (.github/scripts/probe-ghcr-tag.sh) -
+          # Verdicts come from the shared probe script (.github/scripts/probe-ghcr-tag.sh) –
           # classification, backoff and the buildx mechanics live there. RECONCILE_RETRIES
           # overrides the retry count (testing/ops knob).
           retries="${RECONCILE_RETRIES:-3}"

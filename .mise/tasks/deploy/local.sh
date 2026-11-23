@@ -61,23 +61,23 @@ if [ "$repo_installs" != "" ] && [ "$repo_installs" != "[]" ]; then
           echo "   WARNING: the device itself resolves through the hickory-dns app being uninstalled below (its"
           echo "            configured DNS servers include the device's own IP). Without it the device has no DNS"
           echo "            left: the store reload and the local install's on-device image build will fail, and the"
-          echo "            device - plus any LAN client using it as a resolver - ends up with broken DNS. Re-point"
+          echo "            device – plus any LAN client using it as a resolver – ends up with broken DNS. Re-point"
           echo "            the device's DNS servers first (router DHCP or the HA network settings)."
           printf '   Are you sure you want to continue? (yes/no) '
           if ! read -r reply </dev/tty; then
             echo >&2
-            echo "ERROR: aborted (no answer read) - nothing was changed on the device." >&2
+            echo "ERROR: aborted (no answer read) – nothing was changed on the device." >&2
             exit 1
           fi
           case "${reply,,}" in
             yes | y) ;;
             *)
-              echo "-- aborted - nothing was changed on the device."
+              echo "-- aborted – nothing was changed on the device."
               exit 1
               ;;
           esac
           ;;
-        2) echo "-- (could not determine the device's DNS servers - skipping the DNS-outage check)" ;;
+        2) echo "-- (could not determine the device's DNS servers – skipping the DNS-outage check)" ;;
       esac
     fi
     for repo_slug in "${repo_slugs[@]}"; do
@@ -166,7 +166,7 @@ if [ "$CONFIG_MODE" = "migrate" ] && [ "${MIGRATE_OPTIONS:-}" != "" ]; then
     echo "-- options migrated"
     ha_retry 120 ssh "${SSH_OPTS[@]}" "$host" "ha apps restart $local_slug"
   else
-    echo "-- (no options left after filtering - nothing to migrate)"
+    echo "-- (no options left after filtering – nothing to migrate)"
   fi
 fi
 

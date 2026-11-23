@@ -134,13 +134,13 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
 - Upstream: file an issue (and potentially a PR) against
   [entireio/external-agents](https://github.com/entireio/external-agents) for goose subagent checkpoint support (adapter
   `agents/entire-agent-goose`). Goose natively emits `SubagentStart`/`SubagentStop` and keeps subagent sessions as
-  separate `sessions.db` rows (`session_type='subagent'`) — capture-verified in the adapter's own research (its
+  separate `sessions.db` rows (`session_type='subagent'`) – capture-verified in the adapter's own research (its
   AGENT.md, against goose 1.37.0; goose's published hooks page does not list the two events, so re-verify against the
-  goose version in use) — but the adapter declares `subagent_aware_extractor: false` ("defer") and the installed project
+  goose version in use) – but the adapter declares `subagent_aware_extractor: false` ("defer") and the installed project
   plugin (`.agents/plugins/entire/hooks/hooks.json`) registers only the four session/turn events, so goose subagent work
   yields no task records and no subagent transcript: subagent edits surface only implicitly, via git state at the next
   main-session checkpoint. The external-agent protocol already carries `SubagentStart`/`SubagentEnd` (`tool_use_id`,
-  `subagent_id`, `subagent_type`, `task_description` — `entireio/cli` `docs/architecture/external-agent-protocol.md`)
+  `subagent_id`, `subagent_type`, `task_description` – `entireio/cli` `docs/architecture/external-agent-protocol.md`)
   and the CLI parses them for every built-in agent (Claude Code, Codex, Cursor, OpenCode, Copilot CLI, Factory), so the
   ask is scoped: register the two Subagent hooks in the goose plugin and implement subagent-aware extraction, in-session
   task records first (entire's changelog, PR #1958, records even Codex's subagent support as in-session-only). Their

@@ -102,7 +102,7 @@ skill: `hickory-dns-runtime` §"Offline regression sandbox"; the stubs replicate
 
 ## Static entries (no hosts-file store upstream)
 
-The server binary has NO hosts-file store (store types: file/in_memory/sqlite/forwarder/recursor/blocklist -
+The server binary has NO hosts-file store (store types: file/in_memory/sqlite/forwarder/recursor/blocklist –
 `crates/server/src/store/mod.rs`; the resolver-library hosts support is not exposed by the binary, and the blocklist's
 hosts-format support is 0.0.0.0-sinkhole-only). Each static entry therefore becomes its own authoritative **Primary leaf
 zone** (SOA + NS + A/AAAA at the apex, `$ORIGIN <name>.`, TTL 300) written to
@@ -110,7 +110,7 @@ zone** (SOA + NS + A/AAAA at the apex, `$ORIGIN <name>.`, TTL 300) written to
 leaf zone (`NN_<slug>.ptr.zone`, SOA + NS + PTR to the hostname at the apex) named after the address – reversed octets
 for IPv4, the full 32-nibble name for IPv6 (IPv4-embedded tail groups supported). Entries sharing one address share one
 reverse zone with one PTR per name, and a reverse zone name colliding with another static zone is a boot-time rejection.
-The catalog answers the most specific zone first, so leaf zones win over the `.` forward zone – including public names -
+The catalog answers the most specific zone first, so leaf zones win over the `.` forward zone – including public names –
 and a reverse leaf zone wins over its RFC 6303 parent empty zone. Generator-side validation: lowercase + trailing-dot
 normalization, LDH hostname check, IP check, duplicate (case-insensitive) and default-zone-shadow rejection,
 single-label warning. Caveats: unconfigured query types get authoritative NODATA/NXDOMAIN, and local answers carry no AD
@@ -179,7 +179,7 @@ Verified against v0.26.3 source; revisit when a tagged release + the apk carry t
   util-linux `setpriv` (`/bin/setpriv`, apk `setpriv` – floats per the apk policy; the busybox applet has no `--reuid`
   and is replaced by the package):
   `--no-new-privs --reuid 65534 --regid 65534 --clear-groups --inh-caps=+net_bind_service --ambient-caps=+net_bind_service`.
-  The daemon's credential set is exactly ONE capability – ambient `CAP_NET_BIND_SERVICE` for the :53 bind -
+  The daemon's credential set is exactly ONE capability – ambient `CAP_NET_BIND_SERVICE` for the :53 bind –
   lab-verified: `Uid`/`Gid` all 65534, `CapEff`/`CapPrm`/`CapAmb` = `0000000000000400`, and the bind works even with
   `NoNewPrivs: 1`. Ambient capabilities are runtime prctl state (kernel >= 4.3), not exec-acquired, so they survive
   `no_new_privs`, which the launcher also sets. The daemon never runs as root and never holds a privilege-change
