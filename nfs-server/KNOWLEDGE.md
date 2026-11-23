@@ -18,9 +18,8 @@ A root container whose only high-risk capability is `SYS_ADMIN`, needed solely t
 the app's own procfs/network namespace – the nfsd kernel module is loaded by the kernel's mount-time autoload, outside
 the app and its AppArmor label (root `KNOWLEDGE.md` §"AppArmor: mediation and profile mechanics"). A custom AppArmor
 profile (`apparmor.txt`) enforces the mounts and the binary capabilities – no blanket `capability,` grant (§"AppArmor
-profile – app-specific grants"). No `full_access`/`docker_api`/`host_pid`, so protection mode can stay enabled: the
-`privileged` capability list applies regardless of protection mode, only those three keys are gated by it (supervisor
-`docker/app.py`).
+profile – app-specific grants"). No `full_access`/`docker_api`/`host_pid`, so protection mode can stay enabled (the
+gating mechanics: root `KNOWLEDGE.md` §"Supervisor: app security rating").
 
 Why dropping `SYS_ADMIN` needs upstream work: the nfsd filesystem is instantiated per network namespace, so a
 bridge-network app must mount it inside its own netns – a HAOS-side automount bind-mounted in would carry the host-netns
@@ -235,8 +234,8 @@ mechanics"; authoring procedure: skill `ha-app-apparmor`. Device-verified on HAO
 - The nfsdcld sub-profile carries `capability setpcap,` – the daemon prunes its whole bounding set at startup
   (`prctl(PR_CAPBSET_DROP)` plus a final capset zeroing all sets; the generic self-capability subtlety is in root
   `KNOWLEDGE.md` §"AppArmor: mediation and profile mechanics"). Without the rule it exits in a restart loop ("Unable to
-  prune capability 0 from bounding set: Operation not permitted"); the lab cannot catch this (no enforcement there). The
-  grant only enables the self-pruning – the daemon ends up with zero capabilities anyway.
+  prune capability 0 from bounding set: Operation not permitted"); the lab cannot catch this (skill
+  `ha-app-lab-testing`). The grant only enables the self-pruning – the daemon ends up with zero capabilities anyway.
 - The nfsd sub-profile's `capability net_bind_service,` is inert by construction – its `deny network,` means no socket
   can exist to bind (capability mediation is independent of the network class). It is kept deliberately: relaxing the
   network deny later must force a fresh decision on privileged-port binding rather than silently inheriting the grant

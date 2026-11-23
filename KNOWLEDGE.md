@@ -210,6 +210,8 @@ nests them under `state`/`config` instead). If the device's DNS servers include 
 through whatever app serves :53 on it – uninstalling that app (e.g. a locally installed hickory-dns) cuts the
 supervisor's own DNS off mid-task, so subsequent registry downloads fail.
 
+The HAOS host itself binds nothing on :53 (systemd-resolved runs with `DNSStubListener=no`).
+
 Setting a host DNS server equal to the CoreDNS plugin's own address (`GET /dns/info` `data.host`, `172.30.32.3` on
 standard installs) is fatal: CoreDNS's loop probe detects the self-loop and the container exits (CoreDNS log
 `plugin/loop: Loop` → exit 1). The supervisor raises the `dns_loop` issue and rewrites the config dropping both

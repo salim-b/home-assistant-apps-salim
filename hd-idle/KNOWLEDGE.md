@@ -118,14 +118,14 @@ Without (2) every ata-path command failed with EPERM despite the container capab
 
 **Why the capability cannot be tightened**: AppArmor capability rules enumerate whole capabilities (they mediate the
 kernel's boolean `capable()` check – apparmor.d(5)), so a fraction of `CAP_SYS_RAWIO` is not expressible; per-command
-ioctl mediation does not exist upstream; HAOS ships AppArmor 3.1.7. **Both grant sites are needed**: the daemon
-sub-profile (ata spindowns) and the top profile (pmfix's smartctl ATA SET FEATURES is the same non-read-safe class;
-`hd-idle -t` runs in the top profile, e.g. the lab's `docker exec`). What the capability additionally unlocks in this
-container (capabilities(7)): `/proc/kcore` reads (kernel-gated on capable(CAP_SYS_RAWIO), file side allowed by the
-`file,` blanket – genuinely reachable for a compromised process; the accepted residual risk of the ata path) and
-`ioperm`/`iopl` (x86/amd64). Closed surfaces: `/dev/mem`, `/dev/kmem`, `/dev/port`, `/dev/cpu/*/msr` (outside the
-supervisor's device-cgroup allowlist); `mmap_min_addr` (moot: `/proc/sys` mounted read-only); SCSI commands to other
-nodes (device cgroup); seccomp could trim further but the supervisor exposes no per-app seccomp customization.
+ioctl mediation does not exist upstream (root `KNOWLEDGE.md` §"AppArmor: mediation and profile mechanics"). **Both grant
+sites are needed**: the daemon sub-profile (ata spindowns) and the top profile (pmfix's smartctl ATA SET FEATURES is the
+same non-read-safe class; `hd-idle -t` runs in the top profile, e.g. the lab's `docker exec`). What the capability
+additionally unlocks in this container (capabilities(7)): `/proc/kcore` reads (kernel-gated on capable(CAP_SYS_RAWIO),
+file side allowed by the `file,` blanket – genuinely reachable for a compromised process; the accepted residual risk of
+the ata path) and `ioperm`/`iopl` (x86/amd64). Closed surfaces: `/dev/mem`, `/dev/kmem`, `/dev/port`, `/dev/cpu/*/msr`
+(outside the supervisor's device-cgroup allowlist); `mmap_min_addr` (moot: `/proc/sys` mounted read-only); SCSI commands
+to other nodes (device cgroup); seccomp could trim further but the supervisor exposes no per-app seccomp customization.
 
 ## Device access in this app
 
@@ -138,9 +138,8 @@ per the version-sensitive-facts rule before relying on them for new work).
   are pinned to never spin down instead of being attempted.
 - Saving options while a drive is detached fails, and so does every start: device existence is validated on EVERY start
   (root `KNOWLEDGE.md` §"Supervisor: device access").
-- Plain Docker (the lab) exposes no `/dev/disk` udev symlink trees (HAOS binds the host `/dev` read-only into app
-  containers); the lab hook mirrors them with `-v /dev/disk:/dev/disk:ro` so by-id resolution and inventory behave as on
-  a device.
+- Plain Docker (the lab) exposes no `/dev/disk` udev symlink trees; the lab hook mirrors them (skill
+  `ha-app-lab-testing`) so by-id resolution and inventory behave as on a device.
 
 ## Security rating ceiling
 

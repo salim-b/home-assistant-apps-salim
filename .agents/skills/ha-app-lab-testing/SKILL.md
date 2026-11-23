@@ -54,3 +54,5 @@ The lab boots app containers `--privileged` on the lab host, so host-side hardwa
   drives; `smartctl -n standby` is designed not to). Device/bridge-specific findings live in the apps' `KNOWLEDGE.md`.
 - Plain Docker exposes no `/dev/disk` udev symlink trees: when an app's behavior depends on them, mirror it in the hook
   (`-v /dev/disk:/dev/disk:ro`). Facts: root `KNOWLEDGE.md` §"Supervisor: device access".
+- The lab applies no AppArmor enforcement: capability, mount and network denials cannot be observed there – anything
+  AppArmor-load-bearing is device-verified. Facts: root `KNOWLEDGE.md` §"AppArmor: mediation and profile mechanics".

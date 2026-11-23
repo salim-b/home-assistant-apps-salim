@@ -168,8 +168,8 @@ Verified against v0.26.3 source; revisit when a tagged release + the apk carry t
 ## Port 53 binding and privileges
 
 - **Host network + port 53**: the daemon binds DNS port 53 in the HOST network namespace (`host_network: true` – the
-  AdGuard Home/Pi-hole precedent). The HAOS host itself binds nothing on 53 (systemd-resolved runs with
-  DNSStubListener=no). No `privileged:` entry is needed: the launcher's capabilities come from the Docker default set,
+  AdGuard Home/Pi-hole precedent). The HAOS host binds nothing on 53 (root `KNOWLEDGE.md` §"Supervisor: DNS resolution
+  chain (CoreDNS)"). No `privileged:` entry is needed: the launcher's capabilities come from the Docker default set,
   none is on the supervisor's high-risk rating list, and none is in `REDUCED_CAPABILITIES_DROP` (repository-root
   KNOWLEDGE.md §"Supervisor: app security rating").
 - **Source IPs stay intact** under `host_network`: LAN clients connect to the host's :53 directly, so the ACL sees the
@@ -256,6 +256,6 @@ mechanics"), `capability net_bind_service` + `setgid` + `setuid` + `setpcap`, ne
 hd-idle profile, and documented (blanket-covered) rules for the app's config surface (`/etc/hickory-dns/{,**}`), the s6
 service command line (`/etc/hickory-dns.args`), the privilege-drop lookups (`/etc/passwd`, `/etc/group`),
 `/etc/resolv.conf` (hostname upstreams), and `/etc/ssl/certs/{,**}` (rustls-platform-verifier trust store). No
-sub-profile: the daemon needs network in the same profile. The lab has no AppArmor enforcement – the capability rules
-(`net_bind_service` for the bind, `setgid`/`setuid`/`setpcap` for the drop) are device-verified (2026-10-24 – §"Port 53
-binding and privileges").
+sub-profile: the daemon needs network in the same profile. The capability rules (`net_bind_service` for the bind,
+`setgid`/`setuid`/`setpcap` for the drop) are device-verified (2026-10-24 – §"Port 53 binding and privileges"; the lab
+cannot verify them – skill `ha-app-lab-testing`).

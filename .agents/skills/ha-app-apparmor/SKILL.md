@@ -27,10 +27,10 @@ mediation, ioctl mediation, mount-rule grammar, kernel-context module autoload. 
 
 ## Iterating on denials (no audit logs on HAOS)
 
-HAOS produces no AppArmor audit messages in the host journal, so complain-mode iteration is impossible. Diagnose from
-the signal catalogue in root `KNOWLEDGE.md` §"AppArmor: mediation and profile mechanics" (busybox `mount` errno text;
-`/proc/self/attr/current`; `CapEff`). The lab has NO AppArmor enforcement – it cannot catch capability or mount denials;
-only device testing can.
+HAOS produces no AppArmor audit messages in the host journal (root `KNOWLEDGE.md` §"AppArmor: mediation and profile
+mechanics"), so complain-mode iteration is impossible. Diagnose from the signal catalogue (busybox `mount` errno text;
+`/proc/self/attr/current`; `CapEff`). The lab has NO AppArmor enforcement (skill `ha-app-lab-testing`) – it cannot catch
+capability or mount denials; only device testing can.
 
 ## Shipping profile changes
 
