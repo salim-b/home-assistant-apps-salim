@@ -5,12 +5,12 @@ Open work items only (resolved items live in git history). Underlying technical 
 
 ## Tasks
 
-- Monitor hd-idle upstream: v1.22 has no GitHub release (Alpine tracks the tag); Alpine-side package updates are caught
-  automatically by the apk drift check (`validate:apk-pins`, daily CI cron) and released per the repository-root
-  KNOWLEDGE.md §`apk package version policy` (release discipline: skill `ha-app-workflow`). Upstream *behavior* changes
-  (new flags etc.) are read and adapted when such a release is made; a future version adding per-device `-I` or a config
-  file would also relax the option schema. Worth filing upstream: per-device `-I` would make the global-only limitation
-  moot for mixed setups.
+- Monitor hd-idle upstream: v1.22 has no stable release (only a prerelease; Alpine tracks the tag); Alpine-side package
+  updates are caught automatically by the apk drift check (`validate:apk-pins`, daily CI cron) and released per the
+  repository-root KNOWLEDGE.md §`apk package version policy` (release discipline: skill `ha-app-workflow`). Upstream
+  *behavior* changes (new flags etc.) are read and adapted when such a release is made; a future version adding
+  per-device `-I` or a config file would also relax the option schema. Worth filing upstream: per-device `-I` would make
+  the global-only limitation moot for mixed setups.
 
 - Currently, hd-idle's `-s 1` re-resolves only *unresolved* device entries and never re-verifies already-resolved ones
   (`resolveSymlinks()` skips entries with a populated `Name`). A [PR](https://github.com/adelolmo/hd-idle/pull/141) has

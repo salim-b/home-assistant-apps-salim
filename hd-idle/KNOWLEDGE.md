@@ -11,8 +11,9 @@ hd-idle's `main.go` (v1.22) parses `os.Args` and nothing else; the only environm
 [main.go](https://github.com/adelolmo/hd-idle/blob/v1.22/main.go),
 [debian/hd-idle.service](https://github.com/adelolmo/hd-idle/blob/v1.22/debian/hd-idle.service), [v3.24
 APKBUILD](https://gitlab.alpinelinux.org/alpine/aports/-/blob/3.24-stable/community/hd-idle/APKBUILD). Alpine v3.24
-ships `hd-idle 1.22-r8` (`/usr/sbin/hd-idle`, no runtime deps; v1.22 is a GitHub tag without a release; pkgrel bumps so
-far are toolchain rebuilds with an unchanged CLI).
+ships `hd-idle 1.22-r8` (`/usr/sbin/hd-idle`, no runtime deps; v1.22 has no stable release – only a prerelease tagged
+"1.22 ONLY FOR TESTING" (2026-01, Alpine tracks the tag); pkgrel bumps so far are toolchain rebuilds with an unchanged
+CLI).
 
 ## bashio option parsing (list-of-object options)
 
@@ -57,9 +58,11 @@ disk); anything else (`nvme*`, `mmcblk*`, `loop*`, `ram*`) is never touched – 
 hd-idle's reach (third exclusion layer), and NVMe drives cannot be managed at all. The upstream PARTITION matching
 (`sd[a-z]+[0-9]+$`) is commented out in v1.22 – partitions are invisible to the daemon; per-partition activity still
 wakes the configured disk only because the kernel accumulates partition I/O into the disk's own counters. dm attribution
-picks a single holder – upstream reads `/sys/class/block/<dm>/holders/` via `os.ReadDir` (lexicographic order,
-deterministic; the app's own attribution is likewise single-holder): a multi-holder dm device (multi-PV LVM) cannot be
-managed correctly; the common dm-crypt case (one holder) is exact. Source:
+picks a single underlying disk – upstream iterates `/proc/diskstats` disks and reads each disk's
+`/sys/class/block/<disk>/holders/` via `os.ReadDir` (lexicographic order, deterministic; the app's own attribution is
+likewise single-holder), attributing a dm device to the disk it is built on (last matching disk in `/proc/diskstats`
+order wins): a dm built on multiple disks (multi-PV LVM) is attributed to only one of them and cannot be managed
+correctly; the common dm-crypt case (one disk) is exact. Source:
 [snapshot.go](https://github.com/adelolmo/hd-idle/blob/v1.22/diskstats/snapshot.go).
 
 ## Drive inventory
@@ -111,7 +114,7 @@ Two independent AppArmor gates, both must be open: (1) the SG_IO ioctl is mediat
 mechanics") – `/dev/sd* rwk,` plus the `file,` blanket covers it; (2) the kernel's `capable(CAP_SYS_RAWIO)` check inside
 `scsi_cmd_allowed()` is mediated by AppArmor itself (same root section) – both profiles need `capability sys_rawio,`.
 Without (2) every ata-path command failed with EPERM despite the container capability: capable() returned false and
-`scsi_cmd_allowed()` fell through to `return open_for_write` (the EPERM source for O_RDONLY fds).
+`scsi_cmd_allowed()` fell through to `default: return false` (the EPERM source for O_RDONLY fds).
 
 **Why the capability cannot be tightened**: AppArmor capability rules enumerate whole capabilities (they mediate the
 kernel's boolean `capable()` check – apparmor.d(5)), so a fraction of `CAP_SYS_RAWIO` is not expressible; per-command
@@ -126,16 +129,18 @@ nodes (device cgroup); seccomp could trim further but the supervisor exposes no 
 
 ## Device access in this app
 
-Mechanics: repository-root `KNOWLEDGE.md` §"Supervisor: device access" (verified at supervisor ref 2026.10.1 – re-verify
+Mechanics: repository-root `KNOWLEDGE.md` §"Supervisor: device access" (verified at supervisor ref 2026.11.0 – re-verify
 per the version-sensitive-facts rule before relying on them for new work).
 
 - Access is granted **exclusively via device-typed option fields**: `disks[].device` (`device(subsystem=block)`) –
   cgroup rules per configured drive, UI dropdown of stable by-id paths, hotplug re-grant via udev links (no restart
   needed on re-plug), system-disk refusal (exclusion layer 1). Hence every managed drive must be listed; unlisted drives
   are pinned to never spin down instead of being attempted.
-- Saving options while a drive is detached fails (device existence is validated at save time); at boot the validation is
-  suppressed – a detached drive does not prevent the app from starting (config.sh passes it through for hd-idle's
-  runtime resolution).
+- Saving options while a drive is detached fails, and so does every start: device existence is validated on EVERY start
+  (`write_options()` runs `schema.validate` unsuppressed; a failure aborts the start, and at boot the supervisor records
+  a boot-failed issue with `EXECUTE_START`/`DISABLE_BOOT` suggestions – supervisor `apps/app.py`/`apps/manager.py`,
+  verified at ref 2026.11.0). The supervisor's suppressed options validation (`App.devices`) only feeds the cgroup-rule
+  computation.
 - Plain Docker (the lab) exposes no `/dev/disk` udev symlink trees (HAOS binds the host `/dev` read-only into app
   containers); the lab hook mirrors them with `-v /dev/disk:/dev/disk:ro` so by-id resolution and inventory behave as on
   a device.
