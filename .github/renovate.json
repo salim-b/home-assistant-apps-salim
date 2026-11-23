@@ -13,6 +13,8 @@
     "custom.regex"
   ],
   "platformAutomerge": true,
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 50,
   "rebaseWhen": "conflicted",
   "labels": [
     "dependencies"
