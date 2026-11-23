@@ -1,0 +1,22 @@
+I want to tweak our Renovate config: Currently, Renovate opens at max 2 PRs per hour (and thus also at max 2 PRs *per run*), I think – with the consequence that only a subset of all pending updates are submitted within our `"after 8pm on sunday"`, `"before 8am on monday"` 12h-window. See our current [Dependency Dashboard](https://github.com/salim-b/home-assistant-apps-salim/issues/22) which lists 10 pending updates as "rate-limited" (4 updates got merged during the last 12h-window, the rest stayed pending).
+
+I think we need to change Renovate's [`prHourlyLimit`](https://docs.renovatebot.com/configuration-options/#prhourlylimit) setting which defaults to `2` – we could simply disable that limit (`0`) unless there are compelling reasons not to.
+
+Additionally, I think we should also increase [`prConcurrentLimit`](https://docs.renovatebot.com/configuration-options/#prconcurrentlimit) which defaults to `10` – I think 30 would be fine.
+
+Please critically assess the situation and my proposal and then report back.
+
+---
+
+<turn-context>
+<current-time>2026-11-23 10:41:00 +01:00</current-time>
+<working-directory>/var/home/salim/Code/own/salim-b/home-assistant-apps-salim</working-directory>
+
+Current tasks and notes:
+(none)
+
+</turn-context>
+
+---
+
+Yes, please apply the changes – but set `prConcurrentLimit` to `50` to give even more headroom.
