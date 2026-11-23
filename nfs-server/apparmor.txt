@@ -7,7 +7,7 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   ## shape modeled on the official dev-docs AppArmor template and the shipped dnsmasq app profile; `file,` blanket
   ## per upstream convention – HAOS produces no AppArmor audit/denial logs, so tightening file rules risks silent
   ## breakage (the confinement value sits in the non-file classes: mount/capability). Facts:
-  ## nfs-server/KNOWLEDGE.md §"AppArmor profile — app-specific grants";
+  ## nfs-server/KNOWLEDGE.md §"AppArmor profile – app-specific grants";
   ## root KNOWLEDGE.md §"AppArmor: mediation and profile mechanics"; procedure: .agents/skills/ha-app-apparmor.
 
   # Generic file access, signals (s6 supervision, bash job control). Bare `signal,` matches the upstream dnsmasq
@@ -17,7 +17,7 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   signal,
 
   # Network mediation is enabled by the PRESENCE of any network rule; once enabled, anything not explicitly
-  # allowed is denied - a close allowlist: inet/inet6 stream+dgram (bashio supervisor API, DNS, the Docker
+  # allowed is denied – a close allowlist: inet/inet6 stream+dgram (bashio supervisor API, DNS, the Docker
   # HEALTHCHECK's /dev/tcp probe) and netlink raw (busybox `ip` address detection in nfsd-start/nfsd-healthcheck).
   network inet stream,
   network inet dgram,
@@ -49,12 +49,12 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
   /sbin/ip rix,
   /bin/busybox ix,
 
-  # Mount the nfsd filesystem (SYS_ADMIN) - the app's core operation. busybox mount passes the device string
-  # ("nfsd"/"sunrpc") as the mount source, so sources cannot be constrained to a path - scope by filesystem type
+  # Mount the nfsd filesystem (SYS_ADMIN) – the app's core operation. busybox mount passes the device string
+  # ("nfsd"/"sunrpc") as the mount source, so sources cannot be constrained to a path – scope by filesystem type
   # instead. The per-share mirrors are mount --bind (fstype = the underlying fs), umounted again by the down
   # script. AppArmor also mediates capable(CAP_SYS_ADMIN) during mount(2) even when the `mount` rule itself
   # grants it (plain Docker containers carry a blanket `capability,` and do not hit this). Mounting the nfsd fs
-  # triggers the kernel's module autoload (kernel context, outside this label) - no sys_module/modprobe access
+  # triggers the kernel's module autoload (kernel context, outside this label) – no sys_module/modprobe access
   # needed here.
   capability sys_admin,
   # fstype matching applies to new mounts only.
@@ -88,7 +88,7 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
   ## Sub-profiles: the privileged NFS binaries run under their own tighter profiles (cx = change profile on
   ## execute). They still need the procfs/exports access listed above, hence re-granted here.
-  ## Official docs template: every sub-profile's signal receive is peer-scoped to the app's own top profile -
+  ## Official docs template: every sub-profile's signal receive is peer-scoped to the app's own top profile –
   ## the supervisor renames the top profile to the installed slug on the device (e.g. local_nfs-server; the
   ## *_nfs-server glob covers repo installs too). No sub-profile carries a `signal (send)` grant: nothing in
   ## them sends cross-label signals (s6-supervise signals the daemons from the top profile label, matched by
@@ -132,14 +132,14 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     signal (receive) peer=*_nfs-server,
 
     # Inert under the network deny below (no socket can exist to bind; capability mediation is independent of the
-    # network class) - kept deliberately: relaxing the deny must force a fresh privileged-port decision. Facts:
-    # nfs-server/KNOWLEDGE.md §"AppArmor profile — app-specific grants".
+    # network class) – kept deliberately: relaxing the deny must force a fresh privileged-port decision. Facts:
+    # nfs-server/KNOWLEDGE.md §"AppArmor profile – app-specific grants".
     capability net_bind_service,
     capability setgid,
     capability setuid,
     capability dac_override,
 
-    # Network: rpc.nfsd creates NO sockets itself - it configures the kernel server via /proc/fs/nfsd/* (the
+    # Network: rpc.nfsd creates NO sockets itself – it configures the kernel server via /proc/fs/nfsd/* (the
     # kernel threads own the actual NFS listeners); explicitly deny all networking (a deny-only class denies
     # everything in it; an empty class would be entirely unmediated).
     deny network,
@@ -170,9 +170,9 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
     capability setuid,
     capability dac_override,
 
-    # inet/inet6 stream+dgram: mountd binds no ports (-F -N 2 -N 3 - it services the kernel's export-cache upcalls,
+    # inet/inet6 stream+dgram: mountd binds no ports (-F -N 2 -N 3 – it services the kernel's export-cache upcalls,
     # see the mountd run script); whether it touches TCP/UDP sockets at all is an open question (device strace:
-    # nfs-server/TODO.md) - the rules stay until the grants' live surface is known.
+    # nfs-server/TODO.md) – the rules stay until the grants' live surface is known.
     network inet stream,
     network inet dgram,
     network inet6 stream,
@@ -199,10 +199,10 @@ profile nfs-server flags=(attach_disconnected,mediate_deleted) {
 
     # setpcap: nfsdcld prunes its own capability set at startup (prctl PR_CAPBSET_DROP + a final capset); without
     # this rule the daemon exits in a restart loop ("Unable to prune capability 0 from bounding set: Operation
-    # not permitted", device-enforcement-verified; the lab cannot catch this - no AppArmor enforcement there).
+    # not permitted", device-enforcement-verified; the lab cannot catch this – no AppArmor enforcement there).
     # The grant only enables the self-pruning; the daemon ends up with zero capabilities anyway.
     capability setpcap,
-    # Network: none at all - the daemon only talks to the kernel over the rpc_pipefs pipe (inotify + file I/O).
+    # Network: none at all – the daemon only talks to the kernel over the rpc_pipefs pipe (inotify + file I/O).
     deny network,
 
     /usr/sbin/nfsdcld rm,

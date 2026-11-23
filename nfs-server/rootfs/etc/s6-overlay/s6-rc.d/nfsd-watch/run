@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ## Share-mount watcher (longrun): a drive's unplug/replug changes the mount object backing the configured share paths
-## while the pseudo file system root's mirrors are private bind clones outside that propagation chain - they keep
+## while the pseudo file system root's mirrors are private bind clones outside that propagation chain – they keep
 ## serving a detached superblock clone until they are rebound and the kernel server is restarted. This watcher detects
 ## the change (nfsd-apply --check) and cycles the kernel server, no manual app restart needed.
 ## Facts: nfs-server/KNOWLEDGE.md §"Automatic mirror refresh (nfsd-watch)".
@@ -13,7 +13,7 @@ set -euo pipefail
 INTERVAL="${NFSD_WATCH_INTERVAL:-30}"
 case "$INTERVAL" in
   '' | *[!0-9]*)
-    bashio::log.warning "Invalid NFSD_WATCH_INTERVAL '${INTERVAL}' - using the 30 s default."
+    bashio::log.warning "Invalid NFSD_WATCH_INTERVAL '${INTERVAL}' – using the 30 s default."
     INTERVAL=30
     ;;
 esac
@@ -29,36 +29,36 @@ while true; do
   /usr/bin/nfsd-apply --quiet --check || RC=$?
 
   if [ "$RC" = 1 ] && [ ! -e "$PENDING_FILE" ]; then
-    bashio::log.warning "Checking the NFS share configuration failed - keeping the current configuration."
+    bashio::log.warning "Checking the NFS share configuration failed – keeping the current configuration."
     continue
   fi
   if [ "$RC" = 0 ] && [ ! -e "$PENDING_FILE" ]; then
     continue
   fi
 
-  ## Change detected: cycle the kernel server in the proven nfsd-stop order - rpc.nfsd 0 FIRST (it releases the
+  ## Change detected: cycle the kernel server in the proven nfsd-stop order – rpc.nfsd 0 FIRST (it releases the
   ## kernel's pins on the mirrors' old superblocks, so the apply's umounts succeed), minus the down script's mirror
   ## teardown: the apply below recreates the mirrors and nfsd-start re-exports. Deliberately NOT an s6-rc restart
   ## (not reentrant from inside a service): nfs-server/KNOWLEDGE.md §"Automatic mirror refresh (nfsd-watch)".
   if [ "$RC" = 3 ]; then
-    bashio::log.info "Share mount state changed - re-applying the NFS configuration and restarting the NFS server"
+    bashio::log.info "Share mount state changed – re-applying the NFS configuration and restarting the NFS server"
     ## Mark the cycle pending BEFORE tearing the server down: every subsequent tick must keep trying to get the
     ## server back up, even when the by-then-clean detection state would otherwise skip the restart.
     touch "$PENDING_FILE"
     rpc.nfsd 0 || true
     exportfs -au || true
     if ! /usr/bin/nfsd-apply --quiet; then
-      bashio::log.warning "Re-applying the NFS configuration failed - retrying on the next tick."
+      bashio::log.warning "Re-applying the NFS configuration failed – retrying on the next tick."
       continue
     fi
   fi
 
-  ## (Re)start the kernel server - also the retry path for a cycle that failed after the marker was set (the marker
+  ## (Re)start the kernel server – also the retry path for a cycle that failed after the marker was set (the marker
   ## makes the retry survive the by-then-clean detection state; a failed check with a pending marker falls through).
   if /etc/s6-overlay/scripts/nfsd-start; then
     rm -f "$PENDING_FILE"
   else
     touch "$PENDING_FILE"
-    bashio::log.warning "Restarting the NFS server failed - retrying on the next tick."
+    bashio::log.warning "Restarting the NFS server failed – retrying on the next tick."
   fi
 done

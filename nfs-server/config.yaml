@@ -1,6 +1,6 @@
 # https://contributors.home-assistant.io/apps/reference/configuration/
 name: NFS Server
-version: 0.7.8
+version: 0.7.9
 slug: nfs-server
 description: Network File System (NFS) server for Home Assistant
 # Generic multi-arch manifest name; per-arch image names are derived by CI – repository README §"CI".
@@ -18,8 +18,8 @@ init: false
 privileged:
   - SYS_ADMIN
 # AppArmor: the apparmor.txt custom profile is loaded because the file exists
-# (device-enforcement-verified); `apparmor` itself defaults to true — grants:
-# nfs-server/KNOWLEDGE.md §"AppArmor profile — app-specific grants"
+# (device-enforcement-verified); `apparmor` itself defaults to true – grants:
+# nfs-server/KNOWLEDGE.md §"AppArmor profile – app-specific grants"
 map:
   - media:rw
   - share:rw
@@ -38,7 +38,7 @@ options:
 schema:
   shares:
     # Schema-level defense in depth (the scripts re-validate the runtime semantics): what each field regex blocks
-    # and why - nfs-server/KNOWLEDGE.md §"Export-cache and fsid semantics"; path prefixes and empty components: DOCS.md.
+    # and why – nfs-server/KNOWLEDGE.md §"Export-cache and fsid semantics"; path prefixes: DOCS.md.
     - path: "match(^/(share|media)(/[^\\s/\\\\]+)*$)"
       network: "match(^[^\\s()\\\\]+$)"
       options: "match(^[^\\s(),\\\\]+(,[^\\s(),\\\\]+)*$)"

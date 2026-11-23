@@ -1,6 +1,6 @@
 #!/bin/bash
 # Docker HEALTHCHECK probe: rpc.nfsd only configures the in-kernel server and exits, so there is no daemon process to
-# check - probe the kernel's NFS listener on TCP 2049 at the app IP the last nfsd-apply run recorded (it is the
+# check – probe the kernel's NFS listener on TCP 2049 at the app IP the last nfsd-apply run recorded (it is the
 # address the server actually bound; facts: nfs-server/KNOWLEDGE.md §"Automatic mirror refresh (nfsd-watch)").
 set -euo pipefail
 

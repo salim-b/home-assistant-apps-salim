@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.7.9
+
+- Internals: no behavior change – dash punctuation in comments, log messages and `config.yaml` is normalized to the
+  repository's spaced en dash, and the `apparmor.txt`/`config.yaml` §-citations name the real section (en dash, not em
+  dash). No configuration change.
+
 ## 0.7.8
 
 - Internals: no behavior change – the `Dockerfile` is reformatted to the repository's uniform `dockerfmt` style

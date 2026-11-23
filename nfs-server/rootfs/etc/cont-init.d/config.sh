@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ## Log a failed command's captured stderr as FATAL lines, one per stderr line
-## (an empty capture is logged explicitly - a silent failure is itself diagnostic).
+## (an empty capture is logged explicitly – a silent failure is itself diagnostic).
 log_captured_stderr() {
   if [ -s "$1" ]; then
     while IFS= read -r line; do
@@ -15,7 +15,7 @@ log_captured_stderr() {
 }
 
 ## Mount the kernel's nfsd control filesystem at /proc/fs/nfsd (the control files exist only once it is mounted; the
-## mount also autoloads the nfsd kernel module in kernel context - no modprobe/SYS_MODULE needed).
+## mount also autoloads the nfsd kernel module in kernel context – no modprobe/SYS_MODULE needed).
 if [ ! -e /proc/fs/nfsd/versions ]; then
   bashio::log.info "Mounting nfsd filesystem..."
   ERRFILE="$(mktemp)"
@@ -62,6 +62,6 @@ mkdir -p /data/nfsdcld
 ## container's overlayfs root is not NFS-exportable): nfs-server/KNOWLEDGE.md §"mountd and the pseudo file system root".
 bashio::log.info "Configuring NFS shares..."
 if ! /usr/bin/nfsd-apply --boot; then
-  bashio::exit.nok "Applying the NFS share configuration failed - see the log messages above."
+  bashio::exit.nok "Applying the NFS share configuration failed – see the log messages above."
 fi
 bashio::log.info "Configuring NFS shares completed"

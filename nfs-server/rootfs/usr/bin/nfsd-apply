@@ -9,9 +9,9 @@ set -euo pipefail
 ## Facts: nfs-server/KNOWLEDGE.md §"Automatic mirror refresh (nfsd-watch)".
 ##
 ## Usage: nfsd-apply [--boot] [--check] [--quiet]
-##   --boot   create missing share directories (with the configured uid/gid/permissions) - boot-time only
+##   --boot   create missing share directories (with the configured uid/gid/permissions) – boot-time only
 ##   --check  read-only: replay the recorded baseline against current reality without touching anything
-##            (exit 3 = changed); no option reads - see the detection comment below
+##            (exit 3 = changed); no option reads – see the detection comment below
 ##   --quiet  no narrative/info logs and no expected-transient warnings (per-tick silence); errors always log
 ## Exit codes: 0 = success (mirror state unchanged), 3 = mirror state (would) change (with --check), 1 = failure.
 
@@ -34,7 +34,7 @@ qlog_info() { [ "$QUIET" = 1 ] || bashio::log.info "$@"; }
 qlog_warning() { [ "$QUIET" = 1 ] || bashio::log.warning "$@"; }
 
 ## Log a failed command's captured stderr as FATAL lines, one per stderr line
-## (an empty capture is logged explicitly - a silent failure is itself diagnostic).
+## (an empty capture is logged explicitly – a silent failure is itself diagnostic).
 log_captured_stderr() {
   if [ -s "$1" ]; then
     while IFS= read -r line; do
@@ -60,9 +60,9 @@ dir_key() {
   printf '%s' "$key"
 }
 
-## Mount ID of the deepest mountinfo mount covering $1; ties at one path go to the HIGHEST ID - the topmost mount is
+## Mount ID of the deepest mountinfo mount covering $1; ties at one path go to the HIGHEST ID – the topmost mount is
 ## always the newest (mount IDs are allocated monotonically), and that is the object stat(2) reports (mountinfo file
-## order is a kernel-internal detail, deliberately not relied on). A re-mounted drive always gets a new ID - that
+## order is a kernel-internal detail, deliberately not relied on). A re-mounted drive always gets a new ID – that
 ## catches an unplug/replug the dev:ino key cannot see. Reads the MOUNTINFO snapshot, not the file directly.
 covering_mount_id() {
   awk -v p="$1" '
@@ -84,7 +84,7 @@ is_mounted() { grep -qF " on $1 " /proc/mounts; }
 MOUNTINFO="$(</proc/self/mountinfo)"
 
 ## Detection (--check) replays the baseline state file against current reality and does NOT read the options (they
-## cannot change while the app runs - root KNOWLEDGE.md §"Supervisor: option schema quirks"), so a tick skips all
+## cannot change while the app runs – root KNOWLEDGE.md §"Supervisor: option schema quirks"), so a tick skips all
 ## config reads and jq parsing. A missing or empty state file is treated as "changed" so the next cycle's full
 ## apply re-establishes it.
 if [ "$CHECK" = 1 ]; then
@@ -101,7 +101,7 @@ if [ "$CHECK" = 1 ]; then
         continue
       fi
     elif ! is_mounted "$MIRROR"; then
-      ## Source absent and mirror unmounted: the cycle's umount phase applies that state - keep the server down.
+      ## Source absent and mirror unmounted: the cycle's umount phase applies that state – keep the server down.
       continue
     fi
     exit 3
@@ -109,7 +109,7 @@ if [ "$CHECK" = 1 ]; then
   exit 0
 fi
 
-## Apply path (boot and watcher cycles): derive the configuration from the options (they cannot change mid-run -
+## Apply path (boot and watcher cycles): derive the configuration from the options (they cannot change mid-run –
 ## root KNOWLEDGE.md §"Supervisor: option schema quirks").
 DEFAULT_UID=$(bashio::config 'default_uid')
 DEFAULT_GID=$(bashio::config 'default_gid')
@@ -118,7 +118,7 @@ SHARES=$(bashio::config 'shares')
 if bashio::var.is_empty "$SHARES"; then
   bashio::exit.nok "No NFS shares configured. Please add shares in the app's configuration."
 fi
-## Parse all shares in ONE jq pass (TSV rows: path, network, options) instead of one bashio::jq spawn per field - the
+## Parse all shares in ONE jq pass (TSV rows: path, network, options) instead of one bashio::jq spawn per field – the
 ## watcher re-runs this on every poll tick. bashio::config hands out an array option as one JSON document per element,
 ## so the filter projects per share object (no .[]). @tsv escapes control characters and the validation below rejects
 ## backslashes, so a malformed (hand-edited) value can neither survive as raw control characters nor shift the columns.
@@ -178,7 +178,7 @@ while IFS=$'\t' read -r path network options; do
     if [ "${SEEN_SHARES[${share_key}]}" = "$options" ]; then
       bashio::log.fatal "Share ${path} for ${network} is configured more than once with identical settings: remove the redundant duplicate entry."
     else
-      bashio::log.fatal "Share ${path} for ${network} is configured more than once with conflicting options ('${SEEN_SHARES[${share_key}]}' vs '${options}'): only one option set applies per path and network - keep a single entry (separate entries are only needed for different networks)."
+      bashio::log.fatal "Share ${path} for ${network} is configured more than once with conflicting options ('${SEEN_SHARES[${share_key}]}' vs '${options}'): only one option set applies per path and network – keep a single entry (separate entries are only needed for different networks)."
     fi
     bashio::exit.nok
   fi
@@ -211,7 +211,7 @@ while IFS=$'\t' read -r path network options; do
         }
       bashio::log.info "Created ${path} with UID:${DEFAULT_UID} GID:${DEFAULT_GID} Permissions:${DEFAULT_PERMS}"
     else
-      qlog_warning "Share path ${path} does not exist (e.g. its drive is detached) - exporting an empty directory until it reappears."
+      qlog_warning "Share path ${path} does not exist (e.g. its drive is detached) – exporting an empty directory until it reappears."
     fi
   fi
 
@@ -236,7 +236,7 @@ while IFS=$'\t' read -r path network options; do
   fi
 
   if [ "$CLEAN" = 0 ]; then
-    ## Rebind needed: the stale mirror may serve a detached superblock clone (unplug/replug). NOT done inline - the
+    ## Rebind needed: the stale mirror may serve a detached superblock clone (unplug/replug). NOT done inline – the
     ## umounts/binds run in the dedicated phases below (mirrors may nest; the watcher runs them with the kernel
     ## server down, pins released). Dedup: one mirror path can back several shares (same path, different networks);
     ## an absent source keeps the mirror as the plain exportable fallback directory.
@@ -255,7 +255,7 @@ while IFS=$'\t' read -r path network options; do
 done <<<"$SHARE_ROWS"
 
 ## Export the pseudo file system root itself: read-only walk access for all client networks (the per-share entries
-## control the share contents). No crossmnt needed - NFSv4 clients switch exports at mountpoint crossings
+## control the share contents). No crossmnt needed – NFSv4 clients switch exports at mountpoint crossings
 ## (nfs-server/KNOWLEDGE.md §"mountd and the pseudo file system root").
 for network in "${!ROOT_NETWORKS[@]}"; do
   EXPORT_LINES+=("${PSEUDO_ROOT} ${network}(fsid=0,ro,no_subtree_check)")
@@ -268,7 +268,7 @@ if [ "${#REBIND_MIRRORS[@]}" -gt 0 ]; then
   mapfile -t SORTED_MIRRORS < <(printf '%s\n' "${REBIND_MIRRORS[@]}" | awk '{print length, $0}' | sort -n | cut -d' ' -f2-)
 fi
 
-## Rebind phase 1 (umount): drop every stale mirror, deepest paths first - unmounting a parent mirror with a child
+## Rebind phase 1 (umount): drop every stale mirror, deepest paths first – unmounting a parent mirror with a child
 ## still mounted inside fails with EBUSY; skips mirrors that are already unmounted (idempotent after partial failure).
 for ((i = ${#SORTED_MIRRORS[@]} - 1; i >= 0; i--)); do
   mirror="${SORTED_MIRRORS[i]}"
@@ -303,7 +303,7 @@ for mirror in "${SORTED_MIRRORS[@]}"; do
   rm -f "$ERRFILE"
 done
 
-## /etc/exports (atomic; skipped when the content is unchanged - clean watcher ticks write nothing).
+## /etc/exports (atomic; skipped when the content is unchanged – clean watcher ticks write nothing).
 printf '%s\n' "${EXPORT_LINES[@]}" >"${EXPORTS}.tmp" \
   || {
     bashio::log.fatal "Unable to write the exports table."
@@ -319,7 +319,7 @@ else
     }
 fi
 
-## Record the per-share source identity as the next detection baseline (only written when something changed - clean
+## Record the per-share source identity as the next detection baseline (only written when something changed – clean
 ## ticks leave the snapshot as is).
 if [ "$CHANGED" = 1 ]; then
   if ! { printf '%s\n' "${STATE_LINES[@]}" >"${STATE_FILE}.tmp" && mv -f "${STATE_FILE}.tmp" "$STATE_FILE"; }; then

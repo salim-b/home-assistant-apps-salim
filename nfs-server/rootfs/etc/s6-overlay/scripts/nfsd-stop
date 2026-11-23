@@ -9,7 +9,7 @@ rpc.nfsd 0 || true
 bashio::log.info "Unexporting NFS shares..."
 exportfs -au || true
 
-## Tear down the pseudo file system root bind mounts (per-share mirrors; deepest paths first - mirrors may nest)
+## Tear down the pseudo file system root bind mounts (per-share mirrors; deepest paths first – mirrors may nest)
 PSEUDO_ROOT="/data/pseudo_root"
 bashio::log.info "Unmounting the share mirrors under the pseudo file system root..."
 SHARES=$(bashio::config 'shares' || true)
