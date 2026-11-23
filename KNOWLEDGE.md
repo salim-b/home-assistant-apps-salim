@@ -285,10 +285,10 @@ Device-verified 2026-10 on HAOS 18.3 / OS Agent 1.14 / AppArmor 3.1.7. Authoring
   more than strace shows (directory reads behind globs, mmap exec bits, locks, disconnected/deleted-file mediation).
   Revisit only if HAOS ever ships usable AppArmor audit plumbing.
 - **Supervisor profile mechanics**: the profile is installed from the app folder's `apparmor.txt` on install/update and
-  **renamed to the installed slug** (§"Supervisor: store slugs") – the declared profile name is otherwise arbitrary.
-  Requirements: exactly one top-level (non-indented) `profile` declaration (the supervisor's profile-name regex rejects
-  more than one); nested sub-profiles must be indented so `^profile` doesn't match them. Sources: supervisor
-  `utils/apparmor.py`, `apps/app.py`.
+  **renamed to the installed slug** (§"Supervisor: store slugs (in-app documentation links)") – the declared profile
+  name is otherwise arbitrary. Requirements: exactly one top-level (non-indented) `profile` declaration (the
+  supervisor's profile-name regex rejects more than one); nested sub-profiles must be indented so `^profile` doesn't
+  match them. Sources: supervisor `utils/apparmor.py`, `apps/app.py`.
 - **Profile changes need a `config.yaml` version bump**: the supervisor re-installs (and reloads) profiles on app
   *update*, but `App.rebuild()` does **not** call `install_apparmor()` – a no-bump change of `apparmor.txt` is silently
   not applied on the device.
