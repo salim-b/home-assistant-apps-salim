@@ -93,9 +93,10 @@ jobs:
           fi
 
           # Renovate's github-actions manager rewrites a digest bump together
-          # with the pin's trailing version comment (verified on PR #29) and
-          # only ever touches `uses:` pin lines – precisely the change the
-          # review assesses. Normalizing a digest that is followed only by
+          # with the pin's trailing version comment and only ever touches
+          # `uses:` pin lines – precisely the change the review assesses
+          # (facts: root `KNOWLEDGE.md` §"CI: AI supply-chain review of action bumps").
+          # Normalizing a digest that is followed only by
           # whitespace (the version comment) or end of line therefore passes
           # digest+comment rewrites of any pin, while any other change to the
           # file – new steps, changed arguments, a dropped guard – is

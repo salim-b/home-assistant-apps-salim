@@ -72,9 +72,9 @@ that directory automatically.
 
 ## Environment setup
 
-Same as for human developers – repository [`README.md`](./README.md) §"Development": `mise trust`, then
-`mise install --locked`; `docker` for the build/lab/device tasks. For interactive supervisor-integrated testing use the
-devcontainer (`.devcontainer.json`), not the lab.
+Same as for human developers – repository [`README.md`](./README.md) §"Development"; `docker` is additionally needed for
+the build/lab/device tasks. For interactive supervisor-integrated testing use the devcontainer (`.devcontainer.json`),
+not the lab.
 
 ## Commands
 
@@ -87,8 +87,7 @@ finishing a change, lab-boot every runtime-affecting change – lives in skill `
 
 Use the [`gh` CLI](https://cli.github.com/) for all GitHub interactions – issues, pull requests, checks and workflow
 runs, releases, and raw REST/GraphQL calls via `gh api` – instead of hand-rolled `curl` against api.github.com: `gh`
-sends configured credentials, which carry a far higher rate limit than unauthenticated requests (5,000 requests/hour per
-account vs. 60/hour per IP; [rate
+sends configured credentials, which carry a far higher rate limit than unauthenticated requests ([rate
 limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)).
 
 `gh` itself is provisioned via mise ([`mise.toml`](./mise.toml) `[tools]`), so it is available after the environment

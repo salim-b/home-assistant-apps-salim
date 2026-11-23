@@ -7,7 +7,7 @@ Open work items only (resolved items live in git history). Underlying technical 
 
 - Monitor hd-idle upstream: v1.22 has no stable release (only a prerelease; Alpine tracks the tag); Alpine-side package
   updates are caught automatically by the apk drift check (`validate:apk-pins`, daily CI cron) and released per the
-  repository-root KNOWLEDGE.md §`apk package version policy` (release discipline: skill `ha-app-workflow`). Upstream
+  repository-root KNOWLEDGE.md §"apk package version policy" (release discipline: skill `ha-app-workflow`). Upstream
   *behavior* changes (new flags etc.) are read and adapted when such a release is made; a future version adding
   per-device `-I` or a config file would also relax the option schema. Worth filing upstream: per-device `-I` would make
   the global-only limitation moot for mixed setups.
@@ -17,7 +17,7 @@ Open work items only (resolved items live in git history). Underlying technical 
   been submitted upstream to re-verify resolved symlinks each cycle and update entries whose resolution changed. Once
   this is merged and released, we can remove the app's `hd-idle-watch` service (see `KNOWLEDGE.md`).
 
-- Drive-PM treatment blind spot (see `KNOWLEDGE.md` §`Drive-PM treatment`): a drive that reconnects under the SAME
+- Drive-PM treatment blind spot (see `KNOWLEDGE.md` §"Drive-PM treatment"): a drive that reconnects under the SAME
   kernel name (its bridge power-cycled it) is invisible to hd-idle-pmfix's `--since` diff and stays untreated until the
   next app restart. Find a detection mechanism that respects the redundant-treatment risk (device-verified motor starts,
   see `KNOWLEDGE.md`).
@@ -56,7 +56,7 @@ Open work items only (resolved items live in git history). Underlying technical 
     (but per-drive configs resolve by kernel name once at startup, so a drive re-appearing under a NEW name drops to the
     defaults – including drives explicitly excluded with idle 0, a worse failure mode than hd-idle's stale-name behavior
     for our exclusion semantics); no `-I` equivalent at all (hd-idle's re-assertion flag is a wear generator on bridges
-    where redundant STOP commands half-start the motor, per `KNOWLEDGE.md` §`Drive-PM treatment`, so its absence is no
+    where redundant STOP commands half-start the motor, per `KNOWLEDGE.md` §"Drive-PM treatment", so its absence is no
     loss); genuinely tiny (2 dependency crates, zero-allocation steady state, ~71 kB binary with nightly build-std per
     upstream claim vs the ~1.6 MB stripped Go binary – against the already-reviewed long-running footprint (the resident
     set is the watcher bash and the upstream Go daemon; RAM peaks are transient) this amounts to a small RSS saving at
@@ -70,7 +70,7 @@ Open work items only (resolved items live in git history). Underlying technical 
     fares"; contrast: hd-idle upstream is active, last commit 2026-06), with README-vs-code drift (the "monitors
     partitions" feature line is stale since the 2024-09-08 "track disks, not partitions" commit switched to disk-level
     counters); its SCSI-only path is exactly the one our testing found to be a silent no-op on some WD USB bridges
-    (`KNOWLEDGE.md` §`Drive-PM treatment`) while hd-idle's `ata` path worked there – on this app's primary target
+    (`KNOWLEDGE.md` §"Drive-PM treatment") while hd-idle's `ata` path worked there – on this app's primary target
     hardware rust-idle cannot spin the drives down at all; fixed power condition 0 (real SCSI/SAS disks need 2 or 3, see
     the hd-idle README); no activity logfile with running/stopped statistics and no single-shot mode (the lab smoke test
     and manual diagnostics use both); disk-level activity counters – the opposite of hd-idle's partition/dm attribution,

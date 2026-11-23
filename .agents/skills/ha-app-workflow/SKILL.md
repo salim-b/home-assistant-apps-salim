@@ -34,8 +34,8 @@ Run `mise run check` – lint plus validate; it is the same gate CI runs. Lint-s
   patch by semantic versioning): the branch ships one version, not one per commit, and continuously expands that
   version's `CHANGELOG.md` entry until it lands on `main`.
 - Transitory extra versions within the branch are fine where testing demands one (AppArmor profile changes are only
-  re-applied on app *update*, never on rebuild) – squash them back into the single version (config plus one merged
-  changelog entry) before merging.
+  re-applied on app *update*, never on rebuild; root `KNOWLEDGE.md` §"AppArmor: mediation and profile mechanics") –
+  squash them back into the single version (config plus one merged changelog entry) before merging.
 - CI enforces the rule: `.github/workflows/version-guard.yaml` fails when device-visible app files (`rootfs/`,
   `Dockerfile`, `config.yaml`, `apparmor.txt`, `translations/`) changed without a version bump – the Supervisor's update
   model makes a no-bump change a silent no-op that only repoints an already-published version tag. Exception: if the
@@ -65,7 +65,8 @@ run. On-device procedures: skill `ha-app-device-testing`.
 
 Supervisor schemas, s6-overlay layout, HAOS kernel configs and HA docs change frequently. Wherever such facts are
 written down (`KNOWLEDGE.md`, comments, skills), cite the source (URL plus version/ref). Before relying on them for new
-work, re-verify against the latest docs/source.
+work, re-verify against the latest docs/source. Source reads are stamped `verified at <ref> (<date>)`, on-device checks
+`device-verified <date>`.
 
 ## Design change proposals
 

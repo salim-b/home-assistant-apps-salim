@@ -19,10 +19,7 @@ Open work items only (resolved items live in git history). Underlying technical 
   - Submit it (fork → push branch → PR against `dev`, referencing the discussion) once maintainers signal approval
     there, or if there is no reaction within 30 days (by 2026-11-28). Per the upstream AI policy (`AI_POLICY.md`), a
     human must review and own everything posted – no autonomous submission.
-  - Raspberry Pi 3/4/5 and Yellow already ship `nfsd.ko`: the upstream `bcm2711`/`bcm2712` defconfigs pinned by HAOS set
-    `CONFIG_NFSD=m` and no HAOS fragment disables it – support there rests on upstream defconfig contents, not on an
-    explicit HAOS choice. Boards actually missing the module: generic-aarch64, generic-x86_64, ova, odroid-c2/c4/n2,
-    khadas-vim3.
+  - Board support facts: nfs-server `KNOWLEDGE.md` §"Host kernel nfsd availability per HAOS board".
 
 - Upstream: host-side nfsd mount + supervisor bind-mount *(exploratory)*
 

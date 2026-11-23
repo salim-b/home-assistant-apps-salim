@@ -3,9 +3,9 @@
 amends "package://github.com/jdx/hk/releases/download/v2.13.0/hk@2.13.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v2.13.0/hk@2.13.0#/Builtins.pkl"
 
-// hk's shebang-based file typing misses the extensionless s6 scripts and the apps' /usr/bin scripts
-// (upstream item: root TODO.md). `match_any` REPLACES a step's default selection (frozen by the
-// pinned package version), so each shell step below repeats the builtin's own selectors plus the
+// hk's shebang-based file typing misses the extensionless s6/s6-rc.d and the apps' /usr/bin scripts
+// (skill ha-app-tooling §"bashio shebang note"; upstream item: root TODO.md). `match_any` REPLACES
+// a step's default selection, so each shell step below repeats the builtin's own selectors plus the
 // added globs.
 local s6Globs = List(
   "**/cont-init.d/*",
@@ -16,9 +16,9 @@ local s6Globs = List(
 // The apps' extension-less /usr/bin scripts (bashio shebangs – same typing gap); all three shell steps cover them.
 local appBinGlobs = List("**/rootfs/usr/bin/*")
 local mdGlobs = List("**/*.md", "**/*.markdown")
-// Skills vendored from entireio/skills via vendir (vendir.yml) are upstream-verbatim: a local fix would be reverted
-// by the next sync (churn), so every linter that could touch them excludes them. hk passes staged files explicitly,
-// bypassing the tools' own config excludes – hence this list (skill ha-app-markdown).
+// The entire-* skills are vendored upstream-verbatim (root `KNOWLEDGE.md` §"Vendored agent skills"), so every
+// linter that could touch them excludes them. hk passes staged files explicitly, bypassing the tools' own
+// config excludes – hence this list (skill ha-app-markdown).
 local vendoredSkills = List(
   "entire-address-findings",
   "entire-explain",

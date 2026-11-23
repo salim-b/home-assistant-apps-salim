@@ -27,8 +27,8 @@ Spin down idle USB and SATA hard disk drives automatically.
 - **Only `sd*` disks are monitored**: NVMe, SD/eMMC and loop devices are never touched (details in the
   [documentation](/config/app/f8b2d53d_hd-idle/documentation)).
 - **Do not run other disk-monitoring tools alongside**: SMART polling keeps waking the drives.
-- **Spin-up wear**: Shorter idle times result in more drive spin-ups, which eventually wear out the spindle motor and
-  bearings; keep it at 3–5 minutes minimum (hd-idle's default is 10 minutes).
+- **Spin-up wear**: shorter idle times mean more spin-ups and more wear on the spindle motor and bearings – idle-time
+  guidance in the [documentation](/config/app/f8b2d53d_hd-idle/documentation).
 
 ## Documentation
 
