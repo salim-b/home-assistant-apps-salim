@@ -132,10 +132,9 @@ installing such apps outright (`UnsupportedReason.APPARMOR`).
 ## Supervisor: app and host logs are served from systemd-journald
 
 - Every `/logs` REST endpoint (`ha apps logs`, `ha host logs`, plugins, core, …) is served from the host's
-  systemd-journald via systemd-journal-gatewayd (supervisor `api/host.py` `advanced_logs`; the switch from docker logs
-  dates to 2024.04, home-assistant/supervisor #4972). Docker's journald driver tags entries `SYSLOG_IDENTIFIER` =
-  container name; the app endpoints query both `app_<slug>` and `addon_<slug>` (dual identifiers across the
-  container-name migration).
+  systemd-journald via systemd-journal-gatewayd (supervisor `api/host.py` `advanced_logs`; home-assistant/supervisor
+  #4972). Docker's journald driver tags entries `SYSLOG_IDENTIFIER` = container name; the app endpoints query both
+  `app_<slug>` and `addon_<slug>` (dual identifiers across the container-name migration).
 - The default window is the LAST 100 entries (supervisor `api/host.py` `DEFAULT_LINES`). The `ha` CLI widens it with
   `--lines` (a `Range: entries=:-N:` header) and scopes it with `--boot <offset|id>`, where `0` is the current HOST boot
   – container restarts do not reset it. `--verbose` renders `identifier[pid]` per entry (the fastest way to see where an
@@ -359,8 +358,8 @@ updated together with the Dockerfile's `BUILD_FROM` default on a base-image bump
 branch dynamically and remains the config-independent net. Floating apk packages are skipped (`unspecified-version`), as
 intended.
 
-**Release automation (since 2026-10-18)**, chained apk rules in `.github/renovate.json`: pkgrel-only bumps (`1.22-r7` →
-`1.22-r8`, classified `patch`) **automerge once CI is green** (rebase strategy – linear history); pkgver bumps get the
+**Release automation**, chained apk rules in `.github/renovate.json`: pkgrel-only bumps (`1.22-r7` → `1.22-r8`,
+classified `patch`) **automerge once CI is green** (rebase strategy – linear history); pkgver bumps get the
 `needs-review` label and stay manual (CLI semantics may change). Merges ride GitHub's native auto-merge, gated on branch
 protection's required checks (platformAutomerge; see §"CI: Branch protection and platform-native automerge") – the
 required `Build gate` context re-gates the multi-arch build at platform level. Post-merge, the apk-bump workflow's

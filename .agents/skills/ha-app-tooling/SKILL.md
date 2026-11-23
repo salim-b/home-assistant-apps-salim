@@ -154,12 +154,12 @@ task (args, flags, choices). This skill covers only the conventions and gotchas 
 - shellharden quotes command substitutions even where word splitting is required (for-loop iterables) – write such loops
   as brace expansion (`for _ in {1..N}`) or arrays (`read -r -a` / `mapfile`) instead. It also quotes command-string
   executions (`if "$NFSD_CMD"`) where quoting changes what is *executed*: the whole string becomes one literal command
-  name (`command not found` – this broke nfs-server 0.6.1 on-device). Build such commands as arrays
-  (`NFSD_CMD=(...); "${NFSD_CMD[@]}"`) so quoting is stable either way. Its parser also loses sync on nested parentheses
-  inside arithmetic expansion (`"$(( (a << 8) | b ))"` reports "the parser got lost" on a syntactically complete file
-  and mangles everything after it – spurious `""` prefixes, quotes inserted into single-quoted strings); keep arithmetic
-  flat, flat `$(( 10#$a ))` is fine – and even flat, avoid `<<` in arithmetic (lexed as a heredoc delimiter, same loss
-  of sync; write it out: `$((5 * 2 ** attempt))`). (Upstream items: root `TODO.md`.)
+  name (`command not found`). Build such commands as arrays (`NFSD_CMD=(...); "${NFSD_CMD[@]}"`) so quoting is stable
+  either way. Its parser also loses sync on nested parentheses inside arithmetic expansion (`"$(( (a << 8) | b ))"`
+  reports "the parser got lost" on a syntactically complete file and mangles everything after it – spurious `""`
+  prefixes, quotes inserted into single-quoted strings); keep arithmetic flat, flat `$(( 10#$a ))` is fine – and even
+  flat, avoid `<<` in arithmetic (lexed as a heredoc delimiter, same loss of sync; write it out:
+  `$((5 * 2 ** attempt))`). (Upstream items: root `TODO.md`.)
 
 ## Workflow, Dockerfile and Renovate config linting
 
