@@ -51,10 +51,10 @@ analysis – not verified on a device; the user-facing docs state plain support.
 Runtime semantics of the generated `/etc/exports` content (schema-side constraints are repository-wide: root
 `KNOWLEDGE.md` §"Supervisor: option schema quirks"):
 
-- The kernel keeps a single export cache entry per (path, client); duplicate lines resolve by *last line wins* –
-  identical duplicates are noise, conflicting options silently apply whichever line is last (order-dependent). Hence
-  duplicate (path, network) share entries are rejected: one option set applies per pair (the same path with different
-  networks is legitimate).
+- The kernel keeps a single export cache entry per (path, client); duplicate lines resolve by *first line wins* – later
+  duplicates are logged ("duplicated export entries", incompatible ones flagged `[IGNORED]`) and ignored by `exportfs`
+  and mountd (`support/export/export.c` `export_read`/`warn_duplicated_exports`). Hence duplicate (path, network) share
+  entries are rejected: one option set applies per pair (the same path with different networks is legitimate).
 - The per-share `fsid=` is assigned by config order (a counter): editing the share list renumbers the followers – NFSv4
   filehandles embed the fsid, so a renumber makes clients' old handles stale, including their recovery records after a
   share edit + app restart. An existing wart that only matters across share-list edits.
@@ -83,8 +83,9 @@ Runtime semantics of the generated `/etc/exports` content (schema-side constrain
   filesystem's UUID, and filehandles keyed by that UUID are ambiguous once multiple exports share one filesystem (binds
   of the same fs) – they resolve back to the wrong export (mounts land on the read-only pseudo root → `EROFS` on write).
 - The pseudo root needs no `crossmnt` (an NFSv3-era flag for seeing mounts beneath an export point): NFSv4 clients
-  switch the export at mountpoint crossings regardless (`nfsd_cross_mnt` consults the export cache for any v4 client),
-  and the pseudo entries mountd synthesizes carry `crossmnt` anyway.
+  switch the export at mountpoint crossings regardless (`nfsd_cross_mnt` consults the export cache for any v4 client;
+  the V4ROOT pseudo entries mountd synthesizes carry only `READONLY|NOSUBTREECHECK|FSID|V4ROOT|INSECURE_PORT` – no
+  `crossmnt`, `support/export/v4root.c`).
 
 ## Grace period
 
@@ -94,8 +95,9 @@ fails with `EINTR` (busybox ash: `can't create …: Interrupted system call`). W
 grace is only paid when client records exist: fresh boots skip it via the kernel's fast path (needs
 `track_reclaim_completes`, set by the cld-v2 tracker init – `nfs4_state_start_net`'s skip path), and the grace ends
 early once all recorded clients have reclaimed. The app's `--grace-time` default matches the lease time. Writes to
-`/proc/fs/nfsd/v4_end_grace` end the grace regardless of any tracker (v6.18: the only guard is a running server, else
-`EBUSY`) – but that would deny late reclaimers their window, so it is not a useful lever for a server that wants clients
+`/proc/fs/nfsd/v4_end_grace` end the grace regardless of any tracker (v6.18: the guard is an initialized client tracker,
+not the server's run state – `EBUSY` when no tracker is initialized, e.g. the degraded mode, or after the grace already
+ended) – but that would deny late reclaimers their window, so it is not a useful lever for a server that wants clients
 to recover.
 
 ## NFSv4 client state recovery (nfsdcld + per-netns rpc_pipefs)
@@ -127,7 +129,7 @@ already installs; the daemon needs no capability grants – it prunes its own ca
   period instead of skipping it, the client reclaims, the flock survives, the grace ends early once the reclaiming
   client is back; the store lives on `/data`, untouched by watcher cycles or app restarts.
 - Residual unknown, NFSv4.0 early grace: the "all clients done reclaiming" printk only fires via RECLAIM_COMPLETE (the
-  Linux client sends it only for v4.1, `fs/nfs/nfs4proc.c` `nfs40_reboot_recovery_ops`), and the laundromat cannot fire
+  Linux client sends it only for v4.1, `fs/nfs/nfs40proc.c` `nfs40_reboot_recovery_ops`), and the laundromat cannot fire
   before the configured grace on its own – yet the observed grace end always followed the reclaim promptly; most
   plausible: reclaim events plus immediate laundromat kicks ending the grace once nobody is still reclaiming
   (`clients_still_reclaiming`). Only re-verify if this ever looks wrong.
