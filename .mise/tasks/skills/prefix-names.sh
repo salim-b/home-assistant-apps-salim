@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Prefix vendored agent skills' frontmatter name: fields with entire- (post-sync step)"
+#MISE description="Prefix vendored agent skills' frontmatter name: fields with `entire-` (post-sync step)"
 
 set -euo pipefail
 
