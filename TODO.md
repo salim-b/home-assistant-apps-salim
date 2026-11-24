@@ -157,10 +157,10 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   worker-config isolation opt-out, and (b) default-allow-list `CODEX_HOME`/`CODEX_SQLITE_HOME` (config and state
   locations, not credentials) and pass through provider `env_key`s – codex reads auth from `$CODEX_HOME` even under the
   flag, so the location vars are the safe half; per-project opt-backs cannot fix the watch daemon anyway, since
-  `internal/cli/setup.go` `daemonEnv` gives its unit only the plugin dirs and `PATH`. Worked around box-locally until
-  then: a PATH shim stripping the flag from `codex exec` invocations (not in this repo) plus
-  `ENTIRE_PLUGIN_ENV = "CODEX_HOME,CODEX_SQLITE_HOME,OPENROUTER_API_KEY"` in `mise.toml` `[env]`. Drop this item once
-  both upstream changes land and the workaround can go.
+  `internal/cli/setup.go` `daemonEnv` gives its unit only the plugin dirs and `PATH`. Worked around until then: a
+  repo-local PATH shim (`.mise/shims/codex`, first on PATH via `mise.toml` `[env]` `_.path`) stripping the flag from
+  `codex exec` invocations plus `ENTIRE_PLUGIN_ENV = "CODEX_HOME,CODEX_SQLITE_HOME,OPENROUTER_API_KEY"` in `mise.toml`
+  `[env]`. Drop this item – and the shim with it – once both upstream changes land.
 
 - CLAUDE.md shim: remove the repo-root `CLAUDE.md → AGENTS.md` symlink at the end of 2026 – the grace period for Claude
   Code users to update their harness. Decisive fact: Claude Code v2.1.277 (2026-09-18) reads `AGENTS.md` as its project
