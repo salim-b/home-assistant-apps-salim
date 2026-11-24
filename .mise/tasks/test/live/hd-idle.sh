@@ -43,6 +43,25 @@
 # shellcheck disable=SC2029  # remote commands intentionally embed client-side values
 # shellcheck disable=SC2034  # LIVE_* are the harness contract variables
 
+## Log region after the LAST line containing <pat> (the whole log when it never matches – callers detect
+## that by inequality). Literal-string anchors only: the awk uses index(), not a regex.
+after_last_match() { # <pat> <log>
+  awk -v pat="$1" 'index($0, pat) { buf = "" } { buf = buf $0 "\n" } END { printf "%s", buf }' <<<"$2"
+}
+
+## The -a entries of an hd-idle command line (genargs emits `-a NAME -i IDLE ...` per entry): one
+## "<name> <idle>" line per entry – managed drives and idle-0 system-disk exclusions alike; the
+## consumers classify by the idle value.
+cmdline_a_entries() { # <cmdline>
+  local -a argv=()
+  local i
+  read -ra argv <<<"$1"
+  for i in "${!argv[@]}"; do
+    [ "${argv[$i]}" = "-a" ] || continue
+    printf '%s %s\n' "${argv[$((i + 1))]}" "${argv[$((i + 3))]:-}"
+  done
+}
+
 live_prepare() {
   [ "${LIVE_HDIDLE_LABEL_GLOB:-}" != "" ] || return 0
   local glob="$LIVE_HDIDLE_LABEL_GLOB" raw kind name disk rank lb byid
@@ -170,12 +189,13 @@ live_prepare() {
 
 live_runtime_check() {
   local disks_json="${LIVE_HDIDLE_DISKS_JSON:-}" logs tail_log disk label device byid inv_line
+  local entry_name entry_idle
   local -A spun=() labels_by_disk=()
   local -r poll=15 hard_window=90 event_window=300
   local hard_pending=1 hard_deadline=$((SECONDS + hard_window))
   local deadline=$((SECONDS + event_window))
   local cmdline declared_managed declared_excluded expected drive_count spin_events=0
-  local argv=() managed_arr=() expected_arr=() i
+  local managed_arr=() expected_arr=() managed_sorted expected_sorted
 
   echo "-- hd-idle live checks (event-based; spindown window ${event_window}s)"
 
@@ -188,7 +208,7 @@ live_runtime_check() {
   while :; do
     logs=$(ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
       "ha apps logs $LIVE_LOCAL_SLUG --boot 0 --lines 400" 2>/dev/null) || logs=""
-    tail_log=$(awk '/Configuring hd-idle/{buf=""} {buf = buf $0 "\n"} END {printf "%s", buf}' <<<"$logs")
+    tail_log=$(after_last_match "Configuring hd-idle" "$logs")
 
     if [ "$hard_pending" = 1 ]; then
       if ! grep -q "symlinkPolicy=" <<<"$tail_log"; then
@@ -208,15 +228,13 @@ live_runtime_check() {
         fi
         declared_managed=""
         declared_excluded=""
-        read -ra argv <<<"$cmdline"
-        for i in "${!argv[@]}"; do
-          [ "${argv[$i]}" = "-a" ] || continue
-          if [ "${argv[$((i + 2))]:-}" = "-i" ] && [ "${argv[$((i + 3))]:-}" = "0" ]; then
-            declared_excluded+="${argv[$((i + 1))]} "
+        while read -r entry_name entry_idle; do
+          if [ "$entry_idle" = "0" ]; then
+            declared_excluded+="$entry_name "
           else
-            declared_managed+="${argv[$((i + 1))]} "
+            declared_managed+="$entry_name "
           fi
-        done
+        done < <(cmdline_a_entries "$cmdline")
         read -ra managed_arr <<<"$declared_managed"
         expected=""
         if [ "$disks_json" != "" ]; then
@@ -368,8 +386,8 @@ live_rename_check() { # the port-move scenario (knob LIVE_HDIDLE_RENAME_DISK): t
   fi
   local selector="${LIVE_HDIDLE_RENAME_DISK:-}" rename_disk rename_label rename_dev rename_byid old_name new_name
   local logs after_change final_segment cmd_line expected pm_pattern pattern disk link_target
-  local detected=0 found=0 spun_seen=0 wait_start rename_delay
-  local -a argv=() managed_arr=()
+  local detected=0 found=0 spun_seen=0 wait_start rename_delay entry_name entry_idle
+  local -a managed_arr=()
   local -r poll=15
   local -r rename_timeout="${LIVE_HDIDLE_RENAME_TIMEOUT:-1800}"
   local -r restart_window=180 event_window=420
@@ -428,16 +446,15 @@ live_rename_check() { # the port-move scenario (knob LIVE_HDIDLE_RENAME_DISK): t
   while [ "$SECONDS" -lt "$restart_deadline" ]; do
     logs=$(ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
       "ha apps logs $LIVE_LOCAL_SLUG --boot 0 --lines 400" 2>/dev/null) || logs=""
-    after_change=$(awk '/Drive device paths changed/{buf=""} {buf = buf $0 "\n"} END {printf "%s", buf}' <<<"$logs")
-    final_segment=$(awk '/Starting hd-idle:/{buf=""} {buf = buf $0 "\n"} END {printf "%s", buf}' <<<"$after_change")
+    after_change=$(after_last_match "Drive device paths changed" "$logs")
+    final_segment=$(after_last_match "Starting hd-idle:" "$after_change")
     if [ "$after_change" != "$logs" ] && grep -q "symlinkPolicy=" <<<"$final_segment"; then
       cmd_line=$(grep -m1 "Starting hd-idle:" <<<"$final_segment" | sed 's|^.*Starting hd-idle: /usr/sbin/hd-idle ||')
-      read -ra argv <<<"$cmd_line"
       managed_arr=()
-      for i in "${!argv[@]}"; do
-        [ "${argv[$i]}" = "-a" ] || continue
-        managed_arr+=("${argv[$((i + 1))]}")
-      done
+      ## idle-0 entries are the system-disk exclusions (genargs), not managed drives.
+      while read -r entry_name entry_idle; do
+        [ "$entry_idle" = "0" ] || managed_arr+=("$entry_name")
+      done < <(cmdline_a_entries "$cmd_line")
       if [ "$(printf '%s\n' "${managed_arr[@]}" | sort | paste -sd' ' -)" = "$expected" ]; then
         found=1
         rename_delay=$((SECONDS - wait_start))
@@ -494,7 +511,7 @@ live_rename_check() { # the port-move scenario (knob LIVE_HDIDLE_RENAME_DISK): t
   while [ "$SECONDS" -lt "$event_deadline" ]; do
     logs=$(ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
       "ha apps logs $LIVE_LOCAL_SLUG --boot 0 --lines 400" 2>/dev/null) || logs=""
-    after_change=$(awk '/Drive device paths changed/{buf=""} {buf = buf $0 "\n"} END {printf "%s", buf}' <<<"$logs")
+    after_change=$(after_last_match "Drive device paths changed" "$logs")
     if grep -q "${new_name} spindown" <<<"$after_change"; then
       spun_seen=1
       break
