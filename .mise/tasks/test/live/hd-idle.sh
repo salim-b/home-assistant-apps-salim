@@ -202,7 +202,7 @@ live_runtime_check() {
   ## Only the CURRENT boot's log matters: `ha apps logs` serves the host journal (root KNOWLEDGE.md
   ## §"Supervisor: app and host logs are served from systemd-journald") and accumulates across app
   ## restarts within the host boot – this run restarts the app after applying the test options (a
-  ## previous boot's "No drives configured" lines would defeat the assertions). Fetch a generous
+  ## previous boot's "No drives are listed" lines would defeat the assertions). Fetch a generous
   ## window of the current host boot (the default is the last 100 entries only), then cut at the
   ## last "Configuring hd-idle..." line (config.sh logs it at every boot).
   while :; do
@@ -304,7 +304,7 @@ live_runtime_check() {
             echo "   PASS: per-drive keep-drive-PM opt-out (hd-idle-pmfix skipped ${pm_optout_disk} only)"
           fi
         else
-          if grep -q "No drives configured" <<<"$tail_log"; then
+          if grep -q "No drives are listed" <<<"$tail_log"; then
             echo "   PASS: no drives configured – hd-idle touches nothing (safe no-op options)"
           fi
         fi
@@ -348,7 +348,7 @@ live_runtime_check() {
       [ "$disk" != "" ] || continue
       label=${labels_by_disk[$disk]:-?}
       if [ "${spun[$disk]:-}" != "" ]; then
-        echo "   PASS: $disk ($label) spundown event seen"
+        echo "   PASS: $disk ($label) spindown event seen"
         spin_events=$((spin_events + 1))
       else
         echo "   WARN: $disk ($label) no spindown event within ${event_window}s (drive busy/mounted? IO keeping it awake?)"
