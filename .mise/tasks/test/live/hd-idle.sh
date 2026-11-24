@@ -11,7 +11,8 @@
 # Hook-local contract:
 # - LIVE_HDIDLE_LABEL_GLOB (env, optional, read by live_prepare under --test-options): a test TARGET
 #   selector over filesystem labels – space-separated glob PATTERNS (bash case alternation does not work
-#   through a variable); a label matches when it matches any pattern. A disk is included only if ALL its
+#   through a variable); a label matches when it matches any pattern, in its udev-decoded form (a pattern
+#   cannot contain a space itself – use ? or * for embedded spaces). A disk is included only if ALL its
 #   labeled partitions match; disks hosting other labeled partitions are excluded explicitly; non-sd*
 #   disks are skipped (hd-idle only monitors sd*); the supervisor's device validation is the final layer
 #   refusing system-used devices. Each included disk maps to its preferred /dev/disk/by-id path (ata-* > usb-*
@@ -66,7 +67,7 @@ cmdline_a_entries() { # <cmdline>
 
 live_prepare() {
   [ "${LIVE_HDIDLE_LABEL_GLOB:-}" != "" ] || return 0
-  local glob="$LIVE_HDIDLE_LABEL_GLOB" raw kind name disk rank lb byid
+  local glob="$LIVE_HDIDLE_LABEL_GLOB" raw kind name disk rank lb lb_raw byid
   local -A disk_labels=() disk_byid=() byid_rank=()
   local included=() included_sorted=() labels=() ok matched pat
   local -a glob_patterns=()
@@ -99,7 +100,7 @@ live_prepare() {
   while IFS='|' read -r kind name disk; do
     [ "$kind" != "" ] || continue
     case "$kind" in
-      label) disk_labels[$disk]+="${name} " ;;
+      label) disk_labels[$disk]+="$name"$'\n' ;;
       byid)
         ## Preference: ata-* (the drive-physical link: its name derives from model + serial only and is
         ## stable across ports, hosts and boots – the production options reference ata-* paths), then
@@ -120,6 +121,7 @@ live_prepare() {
     esac
   done <<<"$raw"
 
+  read -ra glob_patterns <<<"$glob"
   for disk in "${!disk_labels[@]}"; do
     case "$disk" in
       sd*) ;;
@@ -129,9 +131,12 @@ live_prepare() {
         ;;
     esac
     ok=1
-    read -ra labels <<<"${disk_labels[$disk]}"
-    read -ra glob_patterns <<<"$glob"
-    for lb in "${labels[@]}"; do
+    mapfile -t labels < <(printf '%s' "${disk_labels[$disk]}")
+    for lb_raw in "${labels[@]}"; do
+      [ "$lb_raw" != "" ] || continue
+      ## udev escapes bytes outside its safe set in the by-label link names (\x20 for a space): match
+      ## against the decoded form, the form the operator types and the boot inventory displays.
+      lb=$(printf '%b' "$lb_raw")
       matched=0
       for pat in "${glob_patterns[@]}"; do
         # shellcheck disable=SC2254  # the pattern is intentionally the unquoted glob
@@ -164,7 +169,7 @@ live_prepare() {
     fi
     disks_json=$(jq -c --arg dev "/dev/disk/by-id/$byid" --arg ct "${LIVE_HDIDLE_COMMAND_TYPE:-scsi}" \
       '. + [{device: $dev, idle: 30, command_type: $ct, power_condition: 0}]' <<<"$disks_json")
-    disks_map=$(jq -c --arg d "$disk" --arg l "${disk_labels[$disk]%% *}" \
+    disks_map=$(jq -c --arg d "$disk" --arg l "$(printf '%b' "${disk_labels[$disk]%%$'\n'*}")" \
       --arg dev "/dev/disk/by-id/$byid" \
       '. + {($d): {label: $l, device: $dev}}' <<<"$disks_map")
   done
