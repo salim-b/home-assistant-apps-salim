@@ -37,7 +37,7 @@
 #   Without the variable, the repo's test options file (a safe no-op: no drives) is applied unchanged. A
 #   match-everything glob includes every labeled disk – choose it deliberately.
 # - LIVE_HDIDLE_DISKS_JSON (set by live_prepare): JSON object mapping the disks' kernel names to
-#   {label, device}; drives the per-drive assertions in live_runtime_check().
+#   {label, device, pm_optout}; drives the per-drive assertions in live_runtime_check().
 #
 # The label walk only sees labeled filesystems: the glob is a test TARGET selector, not a safety
 # boundary by itself (a disk whose partitions are all unlabeled is invisible). Never run with a loose
@@ -71,7 +71,9 @@ live_prepare() {
   local -A disk_labels=() disk_byid=() byid_rank=()
   local included=() included_sorted=() labels=() ok matched pat
   local -a glob_patterns=()
-  local disks_json="[]" disks_map="{}" tmpfile pm_optout_disk
+  ## disks_opts = the option objects for the generated file; disks_map = the kernel-name-keyed map the
+  ## assertions read (exported as LIVE_HDIDLE_DISKS_JSON).
+  local disks_opts="[]" disks_map="{}" tmpfile pm_optout_disk
 
   echo "-- discovering drives on the device (label glob: $glob)"
   ## Partition -> parent disk via sysfs; by-id links -> kernel names.
@@ -167,8 +169,8 @@ live_prepare() {
       echo "ERROR: no /dev/disk/by-id link for $disk – it cannot be configured via the device option" >&2
       return 1
     fi
-    disks_json=$(jq -c --arg dev "/dev/disk/by-id/$byid" --arg ct "${LIVE_HDIDLE_COMMAND_TYPE:-scsi}" \
-      '. + [{device: $dev, idle: 30, command_type: $ct, power_condition: 0}]' <<<"$disks_json")
+    disks_opts=$(jq -c --arg dev "/dev/disk/by-id/$byid" --arg ct "${LIVE_HDIDLE_COMMAND_TYPE:-scsi}" \
+      '. + [{device: $dev, idle: 30, command_type: $ct, power_condition: 0}]' <<<"$disks_opts")
     disks_map=$(jq -c --arg d "$disk" --arg l "$(printf '%b' "${disk_labels[$disk]%%$'\n'*}")" \
       --arg dev "/dev/disk/by-id/$byid" \
       '. + {($d): {label: $l, device: $dev}}' <<<"$disks_map")
@@ -179,11 +181,11 @@ live_prepare() {
   ## live_runtime_check; the drives file is not reachable over SSH, HAOS ships no docker CLI).
   ## keys[0] == the first inserted (sorted) drive.
   pm_optout_disk=$(jq -r 'keys[0]' <<<"$disks_map")
-  disks_json=$(jq -c '.[0].keep_drive_pm = true' <<<"$disks_json")
+  disks_opts=$(jq -c '.[0].keep_drive_pm = true' <<<"$disks_opts")
   disks_map=$(jq -c --arg d "$pm_optout_disk" '.[$d].pm_optout = true' <<<"$disks_map")
 
   tmpfile=$(mktemp "${TMPDIR:-/tmp}/hd-idle-live-options.XXXXXX")
-  jq -n --argjson disks "$disks_json" '{disks: $disks}' >"$tmpfile"
+  jq -n --argjson disks "$disks_opts" '{disks: $disks}' >"$tmpfile"
   echo "-- generated test options (30s idle, ${LIVE_HDIDLE_COMMAND_TYPE:-scsi}):"
   jq -r 'to_entries[] | "   \(.value.device) (\(.key), label \(.value.label)\(if .value.pm_optout == true then ", keep drive power management: on" else "" end))"' <<<"$disks_map"
 
