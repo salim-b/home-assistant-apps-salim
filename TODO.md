@@ -142,6 +142,26 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   `docs/architecture/agent-integration-checklist.md` (plus `.claude/skills/agent-integration/researcher.md`) define the
   bar an adapter PR must meet. Drop once the goose plugin declares the hooks and subagent work appears in checkpoints.
 
+- Upstream: file an issue against [entireio/entire-brain](https://github.com/entireio/entire-brain) (and likely a second
+  one against [entireio/cli](https://github.com/entireio/cli)) – together they pin `entire brain distill --agent codex`
+  to the built-in OpenAI provider for anyone whose codex uses a custom `model_provider`. The brain hardcodes
+  `--ignore-user-config` into both of its `codex exec` argv builders (distill:
+  `internal/cli/internal/base/agent_args.go`, seed: `internal/cli/seed.go`; code-read 2026-11-24 at `efa192e10186`), so
+  the worker never loads the user-level `config.toml` (`model_provider`/`model_providers`, model and effort defaults)
+  and silently falls back to the built-in OpenAI provider (401 without OpenAI auth) – deliberate isolation of workers
+  from personal config, with the provider half as a side effect. Compounding it, the CLI filters the plugin child
+  environment to an allowlist whose design intent is that credential-like names require an explicit opt-in
+  (`cmd/entire/cli/plugin_env.go`; code-read 2026-11-24 at `c5f58fc0a945`, behavior live on the `entireio-cli` 0.13.4
+  mise pin): `CODEX_HOME`, `CODEX_SQLITE_HOME`, `OPENROUTER_API_KEY` and any other provider `env_key` never reach the
+  worker, so a custom provider could not resolve even with the flag gone. Desired: (a) drop the flag or make the
+  worker-config isolation opt-out, and (b) default-allow-list `CODEX_HOME`/`CODEX_SQLITE_HOME` (config and state
+  locations, not credentials) and pass through provider `env_key`s – codex reads auth from `$CODEX_HOME` even under the
+  flag, so the location vars are the safe half; per-project opt-backs cannot fix the watch daemon anyway, since
+  `internal/cli/setup.go` `daemonEnv` gives its unit only the plugin dirs and `PATH`. Worked around box-locally until
+  then: a PATH shim stripping the flag from `codex exec` invocations (not in this repo) plus
+  `ENTIRE_PLUGIN_ENV = "CODEX_HOME,CODEX_SQLITE_HOME,OPENROUTER_API_KEY"` in `mise.toml` `[env]`. Drop this item once
+  both upstream changes land and the workaround can go.
+
 - CLAUDE.md shim: remove the repo-root `CLAUDE.md → AGENTS.md` symlink at the end of 2026 – the grace period for Claude
   Code users to update their harness. Decisive fact: Claude Code v2.1.277 (2026-09-18) reads `AGENTS.md` as its project
   instructions natively whenever no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` exists in the working
