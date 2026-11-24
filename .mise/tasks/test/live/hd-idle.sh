@@ -24,7 +24,9 @@
 # - LIVE_HDIDLE_RENAME_DISK (env, optional, read by live_rename_check after the soak): the port-move
 #   scenario. Value: a managed kernel name or the filesystem label of exactly one included drive.
 #   Waits (operator-paced, up to LIVE_HDIDLE_RENAME_TIMEOUT seconds, default 1800) for the drive to be
-#   unplugged and re-attached to a DIFFERENT port, then asserts the watcher's end-to-end promise
+#   unplugged and re-attached to a DIFFERENT port yielding a NEW kernel name (the kernel reuses free
+#   names: a re-plug can return the drive under its old name – the watcher rightly does nothing then,
+#   and the hook notes it and keeps waiting), then asserts the watcher's end-to-end promise
 #   (hd-idle/KNOWLEDGE.md §"hd-idle-watch design"): regeneration, hd-idle service restart, the drive
 #   re-resolved under its NEW kernel name, the hd-idle-pmfix decision on the changed drives-file line,
 #   and a daemon-issued spindown under the new name – the supervisor's hotplug re-grant keeps the
@@ -387,6 +389,7 @@ live_rename_check() { # the port-move scenario (knob LIVE_HDIDLE_RENAME_DISK): t
   local selector="${LIVE_HDIDLE_RENAME_DISK:-}" rename_disk rename_label rename_dev rename_byid old_name new_name
   local logs after_change final_segment cmd_line expected pm_pattern pattern disk link_target
   local detected=0 found=0 spun_seen=0 wait_start rename_delay entry_name entry_idle
+  local link_was_absent=0 same_name_noted=0
   local -a managed_arr=()
   local -r poll=15
   local -r rename_timeout="${LIVE_HDIDLE_RENAME_TIMEOUT:-1800}"
@@ -414,21 +417,34 @@ live_rename_check() { # the port-move scenario (knob LIVE_HDIDLE_RENAME_DISK): t
   echo "   (the watcher picks the change up on its next tick, <=30 s after the re-attach)"
 
   ## Rename detection via the configured by-id link: udev removes it while the drive is detached and re-creates
-  ## it with the new target when the drive comes back; a link still naming the old kernel name keeps waiting.
+  ## it with the new target when the drive comes back; a link still naming the old kernel name keeps waiting
+  ## (the kernel reuses free names: a re-plug can return the drive under its old name – the watcher rightly
+  ## does nothing then; noted once per detachment so the operator knows a different port is needed).
   while [ "$SECONDS" -lt "$detect_deadline" ]; do
     link_target=$(ssh -n "${LIVE_SSH_OPTS[@]}" "$LIVE_HOST" \
       "readlink '/dev/disk/by-id/$rename_byid' 2>/dev/null") || link_target=""
     link_target=${link_target##*/}
-    if [ "$link_target" != "" ] && [ "$link_target" != "$old_name" ]; then
+    if [ "$link_target" = "" ]; then
+      link_was_absent=1
+      same_name_noted=0
+    elif [ "$link_target" != "$old_name" ]; then
       new_name=$link_target
       detected=1
       wait_start=$SECONDS
       break
+    elif [ "$link_was_absent" = 1 ] && [ "$same_name_noted" != 1 ]; then
+      echo "   (the drive is back under its old kernel name $old_name – the watcher rightly does nothing then;"
+      echo "    for this scenario it must come back under a DIFFERENT name: move it to another port)"
+      same_name_noted=1
     fi
     sleep "$poll"
   done
   if [ "$detected" != 1 ]; then
     echo "   FAIL: no port move observed within ${rename_timeout}s (by-id link now: ${link_target:-absent})" >&2
+    if [ "$link_target" = "$old_name" ]; then
+      echo "         (the drive is present under its old kernel name $old_name – the scenario needs a port" >&2
+      echo "          move that yields a different kernel name)" >&2
+    fi
     return 1
   fi
   echo "   rename detected: $old_name -> $new_name"
