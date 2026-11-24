@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# codex shim for entire-brain's distill workers – the why and the upstream ask: root TODO.md.
+# entire brain deliberately isolates its `codex exec` workers from the user's config.toml
+# (`--ignore-user-config`), which also hides user-level model providers (e.g. OpenRouter) and
+# makes every call fall back to the built-in OpenAI provider; this shim drops that one flag from
+# `codex exec` runs only. mise.toml's [env] puts this dir first on PATH while this repo is
+# active; everything else passes through untouched (manual use, `--version` detection probes).
+set -euo pipefail
+
+# The real codex is the first PATH entry that is not this shim – the shim shadows codex by
+# design, so a plain lookup would find itself; matching by inode survives symlinks.
+self="$(readlink -f -- "$0" 2>/dev/null)" || self=$0
+mapfile -t candidates < <(type -ap codex || true)
+real=""
+for candidate in "${candidates[@]}"; do
+  if [[ ! "$candidate" -ef "$self" ]]; then
+    real=$candidate
+    break
+  fi
+done
+if [[ -z "$real" ]]; then
+  echo "codex shim: no real codex found on PATH" >&2
+  exit 127
+fi
+
+if [[ "${1:-}" == "exec" ]]; then
+  args=()
+  for arg in "$@"; do
+    [[ "$arg" == "--ignore-user-config" ]] || args+=("$arg")
+  done
+  exec "$real" "${args[@]}"
+fi
+
+exec "$real" "$@"

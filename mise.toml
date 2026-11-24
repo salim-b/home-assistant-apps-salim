@@ -12,6 +12,11 @@
   # so `entire brain distill --agent codex` runs against the user-level codex provider config
   # instead of silently falling back to the built-in OpenAI provider.
   ENTIRE_PLUGIN_ENV = "CODEX_HOME,CODEX_SQLITE_HOME,OPENROUTER_API_KEY"
+  # Puts the repo-local codex shim (.mise/shims) first on PATH while this repo is active – it
+  # drops `--ignore-user-config` from `codex exec` (entire-brain's worker-config isolation also
+  # hides user-level model providers; upstream ask: TODO.md), so distill workers reach the
+  # user's provider instead of the built-in OpenAI fallback.
+  _.path = [ ".mise/shims" ]
 
 # Task docs: https://mise.jdx.dev/tasks/ – file tasks live in `.mise/tasks/`
 [tasks.check]
@@ -68,6 +73,7 @@ f="${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
     "**/*.mksh",
     "**/*.bats",
     "**/*.zsh",
+    "**/shims/*",
     "**/Dockerfile",
     "**/cont-init.d/*",
     "**/s6-overlay/scripts/*",
