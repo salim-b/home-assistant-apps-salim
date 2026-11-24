@@ -298,11 +298,11 @@ live_runtime_check() {
               echo "   FAIL: the opt-out drive ${pm_optout_disk} received the drive-PM treatment despite keep_drive_pm=true" >&2
               return 1
             fi
-            pm_skip_count=$(grep -cF "drive-PM treatment disabled for this drive" <<<"$tail_log" || true)
-            if [ "$pm_skip_count" != "1" ]; then
-              echo "   FAIL: expected exactly one hd-idle-pmfix skip line (the opt-out drive), got ${pm_skip_count}" >&2
-              return 1
-            fi
+            ## No exact skip-line count: a watcher cycle within the boot segment legitimately re-runs pmfix
+            ## (a service restart runs no cont-init cut). "Skipped exactly the opt-out drive" stays asserted
+            ## by the three checks here; a stray skip line is either that cycle or a pm-flag-0 generation
+            ## bug, which the treatment assertions catch.
+
             for disk in "${!labels_by_disk[@]}"; do
               if [ "$disk" = "$pm_optout_disk" ]; then continue; fi
               if ! grep -qF "Drive ${disk}: APM disable" <<<"$tail_log"; then
