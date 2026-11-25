@@ -31,10 +31,15 @@ import apk_pins  # noqa: E402
 TASK = ROOT / ".mise" / "tasks" / "validate" / "apk-pins.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "apk-bump.yaml"
 LIB = ROOT / ".github" / "scripts" / "apk_pins.py"
+GH_LIB = ROOT / ".github" / "scripts" / "gh_api.py"
 
 # Distinctive fragment of PIN_RE – triplication canary: after the dedupe it must exist only in
 # the module (this file carries it too, but is not scanned).
 PIN_REGEX_FRAGMENT = r"[\w.+-]"
+
+# Distinctive fragment of the GitHub API plumbing – dedupe canary: it lives only in gh_api.py and
+# both jobs import the client from there (this file carries it too, but is not scanned).
+GH_API_FRAGMENT = "def api_list"
 
 _CASES: list[tuple[str, Callable[[], None]]] = []
 
@@ -240,10 +245,19 @@ def _merge_apkindexes() -> None:
     }
 
 
-@_case("wiring: every consumer imports apk_pins; the pin regex lives only there")
+@_case("wiring: consumers import the shared modules; duplicates live only there")
 def _wiring() -> None:
-    """Triplication canary: the pin regex appears in no consumer; every consumer imports it."""
-    task, workflow, lib = TASK.read_text(), WORKFLOW.read_text(), LIB.read_text()
+    """Triplication canary: nothing duplicated survives outside the shared modules.
+
+    The pin regex appears in no consumer and every consumer imports apk_pins; the GitHub API
+    plumbing lives only in gh_api.py and both jobs import GhApi from there.
+    """
+    task, workflow, lib, gh_lib = (
+        TASK.read_text(),
+        WORKFLOW.read_text(),
+        LIB.read_text(),
+        GH_LIB.read_text(),
+    )
     assert PIN_REGEX_FRAGMENT not in task, "inline pin regex in the apk-pins task"
     assert PIN_REGEX_FRAGMENT not in workflow, (
         "inline pin regex in the apk-bump workflow"
@@ -252,6 +266,13 @@ def _wiring() -> None:
     assert "import apk_pins" in task, "apk-pins task does not import apk_pins"
     assert workflow.count("import apk_pins") >= 2, (
         "an apk-bump job does not import apk_pins"
+    )
+    assert GH_API_FRAGMENT not in workflow, (
+        "inline GitHub API helpers in the apk-bump workflow"
+    )
+    assert GH_API_FRAGMENT in gh_lib, "GitHub API plumbing missing from gh_api.py"
+    assert workflow.count("from gh_api import GhApi") >= 2, (
+        "an apk-bump job does not use the shared GitHub API client"
     )
 
 

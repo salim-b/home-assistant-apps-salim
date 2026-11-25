@@ -75,51 +75,21 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           python3 <<'PY'
-          import base64
           import json
           import os
           import re
           import sys
-          import urllib.parse
-          import urllib.request
 
-          # The shared pin parser (.github/scripts/apk_pins.py) – single source of the pin regex
-          # and the apk-add state machine (canary fixtures: mise run validate:apk-pin-parser).
+          # The shared modules under .github/scripts: apk_pins is the single pin parser (canary
+          # fixtures: mise run validate:apk-pin-parser), gh_api the single GitHub REST client.
           sys.path.insert(0, ".github/scripts")
           import apk_pins
+          from gh_api import GhApi
 
-          API = "https://api.github.com"
-          TOKEN = os.environ["GH_TOKEN"]
-          REPO = os.environ["GITHUB_REPOSITORY"]
+          gh = GhApi("apk-bump-changelog")
           PR = int(os.environ["PR_NUMBER"])
           BASE_SHA = os.environ["PR_BASE_SHA"]
           HEAD_SHA = os.environ["PR_HEAD_SHA"]
-          HDRS = {
-              "Authorization": f"Bearer {TOKEN}",
-              "Accept": "application/vnd.github+json",
-              "User-Agent": "apk-bump-changelog",
-          }
-
-          def api(path, params=None):
-              url = f"{API}/repos/{REPO}/{path}"
-              if params:
-                  url += "?" + urllib.parse.urlencode(params)
-              req = urllib.request.Request(url, headers=HDRS)
-              with urllib.request.urlopen(req, timeout=60) as resp:
-                  return json.load(resp)
-
-          def api_list(path, params):
-              out, page = [], 1
-              while True:
-                  batch = api(path, {**params, "per_page": 100, "page": page})
-                  out.extend(batch)
-                  if len(batch) < 100:
-                      return out
-                  page += 1
-
-          def contents(path, ref):
-              data = api(f"contents/{path}", {"ref": ref})
-              return base64.b64decode(data["content"]).decode()
 
           def parse_version(patch):
               """The app version bumpVersions wrote in the same PR (added
@@ -131,13 +101,13 @@ jobs:
               return bare[-1] if bare else None
 
           result, versions = [], {}
-          for entry in api_list(f"pulls/{PR}/files", {}):
+          for entry in gh.api_list(f"pulls/{PR}/files", {}):
               path = entry["filename"]
               patch = entry.get("patch") or ""
               if path.endswith("/Dockerfile"):
                   app = path.removesuffix("/Dockerfile")
                   changes = apk_pins.pin_changes(
-                      contents(path, BASE_SHA), contents(path, HEAD_SHA)
+                      gh.contents(path, BASE_SHA), gh.contents(path, HEAD_SHA)
                   )
                   for pkg, pair in changes.items():
                       new, old = pair.get("new"), pair.get("old")
@@ -276,60 +246,28 @@ jobs:
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           python3 <<'PY'
-          import base64
           import http.client
-          import json
           import os
           import sys
-          import urllib.parse
-          import urllib.request
 
-          # The shared pin parser (.github/scripts/apk_pins.py) – single source of the pin regex,
-          # the apk-add state machine and the index/arch helpers (canary fixtures: mise run
-          # validate:apk-pin-parser).
+          # The shared modules under .github/scripts: apk_pins is the single pin parser (canary
+          # fixtures: mise run validate:apk-pin-parser), gh_api the single GitHub REST client.
           sys.path.insert(0, ".github/scripts")
           import apk_pins
+          from gh_api import GhApi
 
-          API = "https://api.github.com"
-          TOKEN = os.environ["GH_TOKEN"]
-          REPO = os.environ["GITHUB_REPOSITORY"]
+          gh = GhApi("apk-bump-nudge")
           DRY_RUN = os.environ.get("DRY_RUN", "").lower() in ("1", "true")
           MAX_NUDGES_PER_PR = 3  # cap github-actions[bot] rebase comments per PR
           RENOVATE_BOT_USER_ID = 29139614  # renovate[bot]
           ACTIONS_BOT_USER_ID = 41898282  # github-actions[bot]
-          HDRS = {
-              "Authorization": f"Bearer {TOKEN}",
-              "Accept": "application/vnd.github+json",
-              "User-Agent": "apk-bump-nudge",
-          }
           INDEX_CACHE: dict = {}
-
-          def api(path, params=None):
-              url = f"{API}/repos/{REPO}/{path}"
-              if params:
-                  url += "?" + urllib.parse.urlencode(params)
-              req = urllib.request.Request(url, headers=HDRS)
-              with urllib.request.urlopen(req, timeout=60) as resp:
-                  return json.load(resp)
-
-          def api_list(path, params):
-              out, page = [], 1
-              while True:
-                  batch = api(path, {**params, "per_page": 100, "page": page})
-                  out.extend(batch)
-                  if len(batch) < 100:
-                      return out
-                  page += 1
-
-          def contents(path, ref):
-              data = api(f"contents/{path}", {"ref": ref})
-              return base64.b64decode(data["content"]).decode()
 
           def config_text(app, ref):
               """config.yaml or config.yml – both spellings exist in the wild."""
               for name in ("config.yaml", "config.yml"):
                   try:
-                      return contents(f"{app}/{name}", ref)
+                      return gh.contents(f"{app}/{name}", ref)
                   except OSError:
                       continue
               return ""
@@ -354,7 +292,7 @@ jobs:
           notes: list = []
           candidates = [
               pr
-              for pr in api_list("pulls", {"state": "open"})
+              for pr in gh.api_list("pulls", {"state": "open"})
               if pr["user"]["id"] == RENOVATE_BOT_USER_ID
               and any(label["name"] == "apk_pin" for label in pr["labels"])
           ]
@@ -365,14 +303,14 @@ jobs:
               base, head = pr["base"]["sha"], pr["head"]["sha"]
               dockerfiles = [
                   entry["filename"]
-                  for entry in api_list(f"pulls/{number}/files", {})
+                  for entry in gh.api_list(f"pulls/{number}/files", {})
                   if entry["filename"].endswith("/Dockerfile")
               ]
               pins = []
               for path in dockerfiles:
                   app = path.removesuffix("/Dockerfile")
                   for pkg, pair in apk_pins.pin_changes(
-                      contents(path, base), contents(path, head)
+                      gh.contents(path, base), gh.contents(path, head)
                   ).items():
                       if pair.get("new"):
                           pins.append((app, pkg, pair["new"]))
@@ -383,7 +321,7 @@ jobs:
               ready, lagging = True, []
               try:
                   for app in sorted({pin[0] for pin in pins}):
-                      branch = apk_pins.build_branch(contents(f"{app}/Dockerfile", head))
+                      branch = apk_pins.build_branch(gh.contents(f"{app}/Dockerfile", head))
                       arches = apk_pins.app_arches(config_text(app, head))
                       if not branch or not arches:
                           ready = False
@@ -411,7 +349,7 @@ jobs:
 
               prior = sum(
                   1
-                  for comment in api_list(f"issues/{number}/comments", {})
+                  for comment in gh.api_list(f"issues/{number}/comments", {})
                   if comment["user"]["id"] == ACTIONS_BOT_USER_ID
               )
               if prior >= MAX_NUDGES_PER_PR:
@@ -422,14 +360,7 @@ jobs:
               if DRY_RUN:
                   notes.append(f"PR #{number}: DRY-RUN would comment '@renovate rebase' (prior nudges: {prior}/{MAX_NUDGES_PER_PR})")
                   continue
-              req = urllib.request.Request(
-                  f"{API}/repos/{REPO}/issues/{number}/comments",
-                  data=json.dumps({"body": "@renovate rebase"}).encode(),
-                  headers={**HDRS, "Content-Type": "application/json"},
-                  method="POST",
-              )
-              with urllib.request.urlopen(req, timeout=60) as resp:
-                  resp.read()
+              gh.post(f"issues/{number}/comments", {"body": "@renovate rebase"})
               notes.append(f"PR #{number}: posted '@renovate rebase' (prior nudges: {prior}/{MAX_NUDGES_PER_PR})")
 
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
