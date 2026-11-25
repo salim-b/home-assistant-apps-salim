@@ -56,6 +56,8 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Check out main
+        # Runs first and unconditionally: the parse step below imports the shared pin parser
+        # (.github/scripts/apk_pins.py) from this checkout.
         # zizmor: ignore[artipacked] – the "Commit and push changelog entries" step below pushes
         # with the persisted GITHUB_TOKEN, so credentials must survive the checkout (docs-only
         # commit; the workflow header records the resulting workflow suppression as intended).
