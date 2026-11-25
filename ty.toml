@@ -2,3 +2,9 @@
 
 # Python type checker for the .mise/tasks scripts (hk ty builtin, `ty check` over **/*.py + **/*.pyi).
 # Conventions: .agents/skills/ha-app-tooling.
+
+[environment]
+  # First-party module search paths beyond the project root: the shared apk pin parser
+  # (.github/scripts/apk_pins.py) is imported via a runtime sys.path insert (the apk-pins validate
+  # task, the apk-bump workflow jobs) – without it ty cannot resolve that import.
+  extra-paths = [ ".github/scripts" ]

@@ -55,6 +55,15 @@ jobs:
       group: apk-bump-changelog
       cancel-in-progress: false
     steps:
+      - name: Check out main
+        # zizmor: ignore[artipacked] – the "Commit and push changelog entries" step below pushes
+        # with the persisted GITHUB_TOKEN, so credentials must survive the checkout (docs-only
+        # commit; the workflow header records the resulting workflow suppression as intended).
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
       - name: Parse apk pins and version bump from the merged PR
         id: pins
         env:
@@ -64,12 +73,18 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           python3 <<'PY'
-          import json
           import base64
+          import json
           import os
           import re
+          import sys
           import urllib.parse
           import urllib.request
+
+          # The shared pin parser (.github/scripts/apk_pins.py) – single source of the pin regex
+          # and the apk-add state machine (canary fixtures: mise run validate:apk-pin-parser).
+          sys.path.insert(0, ".github/scripts")
+          import apk_pins
 
           API = "https://api.github.com"
           TOKEN = os.environ["GH_TOKEN"]
@@ -82,8 +97,6 @@ jobs:
               "Accept": "application/vnd.github+json",
               "User-Agent": "apk-bump-changelog",
           }
-          # same pin shape as the validate:apk-pins task (.mise/tasks/validate/apk-pins.py)
-          PIN_RE = re.compile(r"([A-Za-z0-9][\w.+-]*)=(\d[\w.:]+(?:-r\d+)?)")
 
           def api(path, params=None):
               url = f"{API}/repos/{REPO}/{path}"
@@ -101,37 +114,6 @@ jobs:
                   if len(batch) < 100:
                       return out
                   page += 1
-
-          def parse_pins(text):
-              """All pins from a full Dockerfile text: {pkg: pin} – same state
-              machine as the apk-pins task (apk add block tracked across
-              backslash continuations)."""
-              pins: dict = {}
-              in_apk = False
-              for line in text.splitlines():
-                  if in_apk:
-                      if not line.rstrip().endswith("\\"):
-                          in_apk = False
-                  elif "apk add" in line:
-                      in_apk = line.rstrip().endswith("\\")
-                  else:
-                      continue
-                  for pkg, pin in PIN_RE.findall(line):
-                      pins[pkg] = pin
-              return pins
-
-          def pin_changes(base_text, head_text):
-              """Changed pins between two file versions:
-              {pkg: {"old": ..., "new": ...}} – diffing the pin sets parsed
-              from the full Dockerfiles at the PR's base and head SHAs; a long
-              apk add block cannot be truncated by patch hunk boundaries."""
-              base_pins, head_pins = parse_pins(base_text), parse_pins(head_text)
-              changes: dict = {}
-              for pkg in set(base_pins) | set(head_pins):
-                  old, new = base_pins.get(pkg), head_pins.get(pkg)
-                  if old != new:
-                      changes[pkg] = {"old": old, "new": new}
-              return changes
 
           def contents(path, ref):
               data = api(f"contents/{path}", {"ref": ref})
@@ -152,7 +134,9 @@ jobs:
               patch = entry.get("patch") or ""
               if path.endswith("/Dockerfile"):
                   app = path.removesuffix("/Dockerfile")
-                  changes = pin_changes(contents(path, BASE_SHA), contents(path, HEAD_SHA))
+                  changes = apk_pins.pin_changes(
+                      contents(path, BASE_SHA), contents(path, HEAD_SHA)
+                  )
                   for pkg, pair in changes.items():
                       new, old = pair.get("new"), pair.get("old")
                       if not old or not new or old == new:
@@ -185,16 +169,6 @@ jobs:
       - name: Stop when the PR has no apk pin changes
         if: steps.pins.outputs.has_pins != 'true'
         run: echo "No apk pin changes in the merged PR – green no-op."
-
-      - name: Check out main
-        if: steps.pins.outputs.has_pins == 'true'
-        # zizmor: ignore[artipacked] – the "Commit and push changelog entries" step below pushes
-        # with the persisted GITHUB_TOKEN, so credentials must survive the checkout (docs-only
-        # commit; the workflow header records the resulting workflow suppression as intended).
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          ref: main
-          fetch-depth: 0
 
       - name: Set up mise
         if: steps.pins.outputs.has_pins == 'true'
@@ -289,6 +263,11 @@ jobs:
       group: apk-bump-nudge
       cancel-in-progress: false
     steps:
+      - name: Check out the repository (the step below imports the shared pin parser from it)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Rebase apk pin PRs once all arch indexes serve the new pin
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -296,13 +275,17 @@ jobs:
         run: |
           python3 <<'PY'
           import base64
-          import io
           import json
           import os
-          import re
-          import tarfile
+          import sys
           import urllib.parse
           import urllib.request
+
+          # The shared pin parser (.github/scripts/apk_pins.py) – single source of the pin regex,
+          # the apk-add state machine and the index/arch helpers (canary fixtures: mise run
+          # validate:apk-pin-parser).
+          sys.path.insert(0, ".github/scripts")
+          import apk_pins
 
           API = "https://api.github.com"
           TOKEN = os.environ["GH_TOKEN"]
@@ -316,10 +299,6 @@ jobs:
               "Accept": "application/vnd.github+json",
               "User-Agent": "apk-bump-nudge",
           }
-          # same pin shape as the validate:apk-pins task (.mise/tasks/validate/apk-pins.py)
-          PIN_RE = re.compile(r"([A-Za-z0-9][\w.+-]*)=(\d[\w.:]+(?:-r\d+)?)")
-          # HA arch names -> Alpine arch names (others map 1:1)
-          ALPINE_ARCH = {"amd64": "x86_64", "i386": "x86"}
           INDEX_CACHE: dict = {}
 
           def api(path, params=None):
@@ -339,37 +318,6 @@ jobs:
                       return out
                   page += 1
 
-          def parse_pins(text):
-              """All pins from a full Dockerfile text: {pkg: pin} – same state
-              machine as the apk-pins task (apk add block tracked across
-              backslash continuations)."""
-              pins: dict = {}
-              in_apk = False
-              for line in text.splitlines():
-                  if in_apk:
-                      if not line.rstrip().endswith("\\"):
-                          in_apk = False
-                  elif "apk add" in line:
-                      in_apk = line.rstrip().endswith("\\")
-                  else:
-                      continue
-                  for pkg, pin in PIN_RE.findall(line):
-                      pins[pkg] = pin
-              return pins
-
-          def pin_changes(base_text, head_text):
-              """Changed pins between two file versions:
-              {pkg: {"old": ..., "new": ...}} – diffing the pin sets parsed
-              from the full Dockerfiles at the PR's base and head SHAs; a long
-              apk add block cannot be truncated by patch hunk boundaries."""
-              base_pins, head_pins = parse_pins(base_text), parse_pins(head_text)
-              changes: dict = {}
-              for pkg in set(base_pins) | set(head_pins):
-                  old, new = base_pins.get(pkg), head_pins.get(pkg)
-                  if old != new:
-                      changes[pkg] = {"old": old, "new": new}
-              return changes
-
           def contents(path, ref):
               data = api(f"contents/{path}", {"ref": ref})
               return base64.b64decode(data["content"]).decode()
@@ -383,47 +331,20 @@ jobs:
                       continue
               return ""
 
-          def build_branch(dockerfile_text):
-              """Alpine branch from the Dockerfile's BUILD_FROM default (same
-              derivation as the apk-pins task)."""
-              match = re.search(r"(?m)^ARG BUILD_FROM=(\S+)", dockerfile_text)
-              if not match:
-                  return None
-              return match.group(1).rsplit(":", 1)[-1].lstrip("v")
-
-          def app_arches(config_text):
-              """arch list from config.yaml (block or flow form)."""
-              match = re.search(r"(?m)^arch:\s*$\n((?:[ \t]+-[ \t]*\S.*\n)+)", config_text)
-              if match:
-                  return re.findall(r"[ \t]+-[ \t]*(\S+)", match.group(1))
-              match = re.search(r"(?m)^arch:\s*\[([^\]]+)\]", config_text)
-              if match:
-                  return [a.strip().strip("\"'") for a in match.group(1).split(",") if a.strip()]
-              return []
-
           def index_map(branch, alpine_arch):
-              """pkg -> version from the Alpine binary indexes (dl-cdn
-              APKINDEX, main + community merged with main winning – NOT the same
-              index semantics as the apk-pins task's _apkindex_versions, which consults
-              one repo per arch (community preferred); alignment tracked in root
-              TODO.md – the APKBUILD source branch can outrun the index either way)."""
+              """pkg -> version from the Alpine binary indexes (dl-cdn APKINDEX, both repos merged
+              with main winning – the shared apk_pins semantics, same as the validate:apk-pins
+              task; the APKBUILD source branch can outrun the index either way)."""
               key = (branch, alpine_arch)
               if key in INDEX_CACHE:
                   return INDEX_CACHE[key]
-              merged: dict = {}
-              for repo in ("main", "community"):
-                  url = f"https://dl-cdn.alpinelinux.org/alpine/v{branch}/{repo}/{alpine_arch}/APKINDEX.tar.gz"
-                  raw = urllib.request.urlopen(url, timeout=60).read()
-                  with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tar:
-                      text = tar.extractfile("APKINDEX").read().decode()
-                  for block in text.split("\n\n"):
-                      fields = {}
-                      for line in block.splitlines():
-                          if ":" in line:
-                              k, _, v = line.partition(":")
-                              fields[k] = v
-                      if fields.get("P"):
-                          merged.setdefault(fields["P"], fields.get("V", ""))
+              maps = []
+              for repo in apk_pins.APK_REPOS:
+                  raw = urllib.request.urlopen(
+                      apk_pins.apkindex_url(branch, repo, alpine_arch), timeout=60
+                  ).read()
+                  maps.append(apk_pins.parse_apkindex(apk_pins.apkindex_text(raw)))
+              merged = apk_pins.merge_apkindexes(*maps)
               INDEX_CACHE[key] = merged
               return merged
 
@@ -447,7 +368,9 @@ jobs:
               pins = []
               for path in dockerfiles:
                   app = path.removesuffix("/Dockerfile")
-                  for pkg, pair in pin_changes(contents(path, base), contents(path, head)).items():
+                  for pkg, pair in apk_pins.pin_changes(
+                      contents(path, base), contents(path, head)
+                  ).items():
                       if pair.get("new"):
                           pins.append((app, pkg, pair["new"]))
               if not pins:
@@ -457,19 +380,20 @@ jobs:
               ready, lagging = True, []
               try:
                   for app in sorted({pin[0] for pin in pins}):
-                      branch = build_branch(contents(f"{app}/Dockerfile", head))
-                      arches = app_arches(config_text(app, head))
+                      branch = apk_pins.build_branch(contents(f"{app}/Dockerfile", head))
+                      arches = apk_pins.app_arches(config_text(app, head))
                       if not branch or not arches:
                           ready = False
                           lagging.append(f"{app}: cannot derive branch/arch from PR head")
                           continue
                       for pkg, new in sorted({(pin[1], pin[2]) for pin in pins if pin[0] == app}):
                           for arch in arches:
-                              served = index_map(branch, ALPINE_ARCH.get(arch, arch)).get(pkg)
+                              alpine = apk_pins.alpine_arch(arch)
+                              served = index_map(branch, alpine).get(pkg)
                               if served != new:
                                   ready = False
                                   lagging.append(
-                                      f"{app}: Alpine v{branch} {ALPINE_ARCH.get(arch, arch)} serves {pkg}="
+                                      f"{app}: Alpine v{branch} {alpine} serves {pkg}="
                                       f"{served or '(absent)'} (PR pins {new})"
                                   )
               except OSError as err:

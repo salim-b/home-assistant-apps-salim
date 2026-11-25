@@ -12,16 +12,18 @@ this task only on main pushes and the daily cron, never in the PR gate.
 
 from __future__ import annotations
 
-import io
 import os
 import pathlib
-import re
 import sys
-import tarfile
 import time
 import urllib.request
 
 ROOT = pathlib.Path(os.environ.get("MISE_PROJECT_ROOT", "."))
+
+# The shared pin parser (.github/scripts/apk_pins.py) – single source of the pin regex, the
+# apk-add state machine and the index helpers (canary fixtures: mise run validate:apk-pin-parser).
+sys.path.insert(0, str(ROOT / ".github" / "scripts"))
+import apk_pins  # noqa: E402
 
 CACHE = (
     pathlib.Path(os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache"))
@@ -72,38 +74,26 @@ def _apkindex_versions(branch: str, package: str) -> dict[str, str]:
         dest = CACHE / f"apkindex-v{branch}-{arch}"
         if not dest.is_file() or time.time() - dest.stat().st_mtime > APKINDEX_TTL:
             for repo in ("community", "main"):
-                url = (
-                    f"https://dl-cdn.alpinelinux.org/alpine/v{branch}"
-                    f"/{repo}/{arch}/APKINDEX.tar.gz"
-                )
                 try:
-                    raw = urllib.request.urlopen(url).read()
+                    raw = urllib.request.urlopen(  # noqa: S310 – apkindex_url is the fixed https dl-cdn URL
+                        apk_pins.apkindex_url(branch, repo, arch), timeout=60
+                    ).read()
                     break
                 except OSError:
                     raw = b""
             if not raw:
                 fail("apk-pins", f"cannot fetch any APKINDEX for v{branch}/{arch}")
                 continue
+            try:
+                index_text = apk_pins.apkindex_text(raw)
+            except ValueError:
+                fail("apk-pins", f"APKINDEX missing from tarball (v{branch}/{arch})")
+                continue
             dest.parent.mkdir(parents=True, exist_ok=True)
-            with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tar:
-                member = tar.extractfile("APKINDEX")
-                if member is None:
-                    fail(
-                        "apk-pins", f"APKINDEX missing from tarball (v{branch}/{arch})"
-                    )
-                    continue
-                index = member.read().decode()
-            dest.write_text(index)
-        text = dest.read_text()
-        for block in text.split("\n\n"):
-            fields = {
-                line.split(":", 1)[0]: line.split(":", 1)[1]
-                for line in block.splitlines()
-                if ":" in line
-            }
-            if fields.get("P") == package:
-                versions[arch] = fields.get("V", "")
-                break
+            dest.write_text(index_text)
+        ver = apk_pins.parse_apkindex(dest.read_text()).get(package)
+        if ver is not None:
+            versions[arch] = ver
     return versions
 
 
@@ -114,26 +104,15 @@ def main() -> int:
         if not dockerfile.is_file():
             continue
         text = dockerfile.read_text()
-        base = re.search(r"^ARG BUILD_FROM=([^\n]+)$", text, re.MULTILINE)
-        if not base:
+        branch = apk_pins.build_branch(text)
+        if not branch:
             continue
-        branch = base.group(1).strip().rsplit(":", 1)[-1].lstrip("v")
 
-        pins: list[tuple[str, str]] = []
-        in_apk = False
-        for raw in text.splitlines():
-            found = re.findall(r"([A-Za-z0-9][\w.+-]*)=(\d[\w.:]+(?:-r\d+)?)", raw)
-            if in_apk:
-                pins.extend(found)
-                if not raw.rstrip().endswith("\\"):
-                    in_apk = False
-            elif "apk add" in raw:
-                pins.extend(found)
-                in_apk = raw.rstrip().endswith("\\")
+        pins = apk_pins.parse_pins(text)
         if not pins:
             continue
 
-        for pkg, pin in pins:
+        for pkg, pin in pins.items():
             versions = _apkindex_versions(branch, pkg)
             if not versions:
                 continue
