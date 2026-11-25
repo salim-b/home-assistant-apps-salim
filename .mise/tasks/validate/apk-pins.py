@@ -36,7 +36,7 @@ APKINDEX_TTL = (
 )  # the daily CI cron should see Alpine-side repoints within a day
 
 problems: list[str] = []
-_INDEX_MAPS: dict[tuple[str, str], dict[str, str]] = {}
+_INDEX_MAPS: dict[tuple[str, str], dict[str, str] | None] = {}
 
 
 def fail(app: str, msg: str) -> None:
@@ -63,20 +63,23 @@ def find_apps() -> list[str]:
     )
 
 
-def _apkindex_maps(branch: str, arch: str) -> dict[str, str]:
+def _apkindex_maps(branch: str, arch: str) -> dict[str, str] | None:
     """Merged {pkg: version} for one Alpine branch/arch: both repos, main winning.
 
     The BINARY index (dl-cdn APKINDEX) is what `apk add` resolves, not the aports APKBUILD source
     branch (a pkgrel commit can outrun the published packages; policy: root KNOWLEDGE.md §apk
-    package version policy). Both repos are consulted – unlike one index per arch, this sees a
-    package that lives only in main; on the rare both-repos overlap main wins (the base images'
-    repositories order). Disk-cached per (branch, repo, arch) for APKINDEX_TTL so local runs stay
-    snappy while the daily cron sees fresh data.
+    package version policy). Both repos are consulted, so a package that lives only in main is
+    checked too; on the rare both-repos overlap main wins (the base images' repositories order).
+    Any single-repo fetch/tarball failure records a problem and yields None – the caller skips
+    that branch/arch's comparisons instead of comparing against a partial merge. Disk-cached per
+    (branch, repo, arch) for APKINDEX_TTL so local runs stay snappy while the daily cron sees
+    fresh data.
     """
     key = (branch, arch)
     if key in _INDEX_MAPS:
         return _INDEX_MAPS[key]
     maps: list[dict[str, str]] = []
+    failed = False
     for repo in apk_pins.APK_REPOS:
         dest = CACHE / f"apkindex-v{branch}-{repo}-{arch}"
         if not dest.is_file() or time.time() - dest.stat().st_mtime > APKINDEX_TTL:
@@ -88,18 +91,23 @@ def _apkindex_maps(branch: str, arch: str) -> dict[str, str]:
                 raw = b""
             if not raw:
                 fail("apk-pins", f"cannot fetch APKINDEX for v{branch}/{repo}/{arch}")
+                failed = True
                 continue
             try:
                 index_text = apk_pins.apkindex_text(raw)
-            except ValueError:
+            except ValueError as err:
                 fail(
                     "apk-pins",
-                    f"APKINDEX missing from tarball (v{branch}/{repo}/{arch})",
+                    f"unusable APKINDEX tarball (v{branch}/{repo}/{arch}): {err}",
                 )
+                failed = True
                 continue
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(index_text)
         maps.append(apk_pins.parse_apkindex(dest.read_text()))
+    if failed:
+        _INDEX_MAPS[key] = None
+        return None
     merged = apk_pins.merge_apkindexes(*maps)
     _INDEX_MAPS[key] = merged
     return merged
@@ -136,7 +144,10 @@ def main() -> int:
         for pkg, pin in pins.items():
             for ha_arch in ha_arches:
                 arch = apk_pins.alpine_arch(ha_arch)
-                ver = _apkindex_maps(branch, arch).get(pkg)
+                index = _apkindex_maps(branch, arch)
+                if index is None:
+                    continue
+                ver = index.get(pkg)
                 if ver is not None and ver != pin:
                     fail(
                         app,

@@ -396,7 +396,7 @@ jobs:
                                       f"{app}: Alpine v{branch} {alpine} serves {pkg}="
                                       f"{served or '(absent)'} (PR pins {new})"
                                   )
-              except OSError as err:
+              except (OSError, ValueError) as err:
                   ready = False
                   lagging.append(f"fetch error: {err}")
 
