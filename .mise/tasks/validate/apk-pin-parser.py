@@ -173,13 +173,21 @@ def _build_branch() -> None:
 
 @_case("arches: block and flow forms, trailing newline optional, absent list")
 def _app_arches() -> None:
-    """Block `- item` lists and flow `[a, b]` lists parse, trailing newline or not."""
+    """Block `- item` lists and flow `[a, b]` lists parse, trailing newline or not.
+
+    Item quotes are stripped in both forms.
+    """
     assert apk_pins.app_arches("arch:\n  - aarch64\n  - amd64\n") == [
         "aarch64",
         "amd64",
     ]
     assert apk_pins.app_arches("arch:\n  - aarch64\n  - amd64") == ["aarch64", "amd64"]
+    assert apk_pins.app_arches('arch:\n  - "amd64"\n  - aarch64\n') == [
+        "amd64",
+        "aarch64",
+    ]
     assert apk_pins.app_arches("arch: [aarch64, amd64]\n") == ["aarch64", "amd64"]
+    assert apk_pins.app_arches('arch: ["amd64", aarch64]\n') == ["amd64", "aarch64"]
     assert apk_pins.app_arches("name: x\n") == []
 
 

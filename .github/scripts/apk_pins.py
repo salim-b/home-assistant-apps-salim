@@ -76,13 +76,17 @@ def build_branch(dockerfile_text: str) -> str | None:
 def app_arches(config_text: str) -> list[str]:
     """HA arch list from a config.yaml text (block or flow form), [] when absent or unreadable.
 
-    A missing trailing newline is normalized so the last block item still parses.
+    A missing trailing newline is normalized so the last block item still parses; item quotes are
+    stripped in both forms.
     """
     if not config_text.endswith("\n"):
         config_text += "\n"
     match = re.search(r"(?m)^arch:\s*$\n((?:[ \t]+-[ \t]*\S.*\n)+)", config_text)
     if match:
-        return re.findall(r"[ \t]+-[ \t]*(\S+)", match.group(1))
+        return [
+            a.strip().strip("\"'")
+            for a in re.findall(r"[ \t]+-[ \t]*(\S+)", match.group(1))
+        ]
     match = re.search(r"(?m)^arch:\s*\[([^\]]+)\]", config_text)
     if match:
         return [a.strip().strip("\"'") for a in match.group(1).split(",") if a.strip()]
