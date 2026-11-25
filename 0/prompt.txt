@@ -1,0 +1,42 @@
+/compact
+
+---
+
+> ## Q4 – the pending device verification
+> 
+> It's the existing hd-idle TODO item *"Device-side verification with real drives attached"*, which says the lab can cover neither half:
+> 
+> - (a) run the live hook through a short idle soak with device-specific drives, and
+> - (b) **verify the watcher's core promise end-to-end** – a drive moved to another port (kernel rename) is re-granted (cgroup rules), re-resolved (by-id), and the daemon restarted under the new name.
+> 
+> The tension: `DOCS.md` §"Hotplug behavior" asserts that promise as working fact (*"including when re-attached later, without an app restart… restarted automatically with the updated configuration (within about half a minute)"*), and `en.yaml`/README echo it. I left the wording untouched this round – the behavior is implemented design and the verification is tracked in TODO, so no doc lie is being introduced. If you want it closed properly, it needs device access (per the device policy, on your explicit request) and I'd extend `mise run test:live/hd-idle` with the rename scenario. Just say the word – otherwise the DOCS wording stands.
+
+
+Please extend `mise run test:live/hd-idle` with the rename scenario and run the verification on my device (192.168.1.11).
+
+---
+
+1. Ok, `salimlossless` is fine.
+2. I'll be here to do the physical unplug/replug when you give me the signal.
+
+---
+
+Ok, I've replugged `salimlossless`.
+
+---
+
+/compact
+
+---
+
+Now please review the last 3 commits for correctness and hunt for possible bugs. Simplify/optimize code where sensible.
+
+---
+
+Please continue.
+
+---
+
+> Say the word and I'll make it presence-only.
+
+Do that if it makes sense.
