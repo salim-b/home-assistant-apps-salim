@@ -1,0 +1,13 @@
+/compact
+
+---
+
+Please review the current branch's changes for possible bugs, correctness and consistency and ensure our docs authoring rules are fully respected (within reason).
+
+---
+
+Yes, please go ahead and create a fix plan for all the issues incl. the Lows.
+
+---
+
+Looks good. You can do the fixes in follow-up commits.
