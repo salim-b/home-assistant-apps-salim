@@ -26,6 +26,11 @@
   "summary_generation": {
     "provider": "codex"
   },
+  "strategy_options": {
+    "summarize": {
+      "enabled": true
+    }
+  },
   "checkpoints": {
     "primary": {
       "type": "git-refs"
