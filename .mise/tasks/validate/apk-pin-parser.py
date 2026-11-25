@@ -152,25 +152,31 @@ def _pin_changes() -> None:
         "b": {"old": "2.0-r0", "new": None},
         "c": {"old": None, "new": "3.0-r0"},
     }
+    assert apk_pins.pin_changes(base, base) == {}
 
 
-@_case("branch: BUILD_FROM default tag after the last colon")
+@_case("branch: BUILD_FROM default tag after the last colon, optional v prefix")
 def _build_branch() -> None:
-    """`ghcr.io/home-assistant/base:3.24` yields `3.24`; no ARG yields None."""
+    """`ghcr.io/home-assistant/base:3.24` yields `3.24`, `:v3.19` yields `3.19`; no ARG yields None."""
     assert (
         apk_pins.build_branch("ARG BUILD_FROM=ghcr.io/home-assistant/base:3.24\n")
         == "3.24"
     )
+    assert (
+        apk_pins.build_branch("ARG BUILD_FROM=ghcr.io/home-assistant/base:v3.19\n")
+        == "3.19"
+    )
     assert apk_pins.build_branch("FROM alpine:3.20\n") is None
 
 
-@_case("arches: block and flow forms, absent list")
+@_case("arches: block and flow forms, trailing newline optional, absent list")
 def _app_arches() -> None:
-    """Block `- item` lists and flow `[a, b]` lists parse; a missing arch yields []."""
+    """Block `- item` lists and flow `[a, b]` lists parse, trailing newline or not."""
     assert apk_pins.app_arches("arch:\n  - aarch64\n  - amd64\n") == [
         "aarch64",
         "amd64",
     ]
+    assert apk_pins.app_arches("arch:\n  - aarch64\n  - amd64") == ["aarch64", "amd64"]
     assert apk_pins.app_arches("arch: [aarch64, amd64]\n") == ["aarch64", "amd64"]
     assert apk_pins.app_arches("name: x\n") == []
 
