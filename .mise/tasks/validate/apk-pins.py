@@ -7,7 +7,8 @@
 """validate:apk-pins: compare pinned apk package versions in app Dockerfiles against the Alpine binary indexes.
 
 Drift = guided release (policy + why: root KNOWLEDGE.md §"apk package version policy"); CI runs
-this task only on main pushes and the daily cron, never in the PR gate.
+this task only on main pushes and the daily cron, never in the PR gate. Parsing and index/arch
+semantics are the shared apk_pins module (canary fixtures: mise run validate:apk-pin-parser).
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ APKINDEX_TTL = (
 )  # the daily CI cron should see Alpine-side repoints within a day
 
 problems: list[str] = []
+_INDEX_MAPS: dict[tuple[str, str], dict[str, str]] = {}
 
 
 def fail(app: str, msg: str) -> None:
@@ -61,40 +63,46 @@ def find_apps() -> list[str]:
     )
 
 
-def _apkindex_versions(branch: str, package: str) -> dict[str, str]:
-    """Version of <package> in the Alpine v<branch> binary indexes, per arch.
+def _apkindex_maps(branch: str, arch: str) -> dict[str, str]:
+    """Merged {pkg: version} for one Alpine branch/arch: both repos, main winning.
 
     The BINARY index (dl-cdn APKINDEX) is what `apk add` resolves, not the aports APKBUILD source
     branch (a pkgrel commit can outrun the published packages; policy: root KNOWLEDGE.md §apk
-    package version policy). Cached for APKINDEX_TTL so local runs stay snappy while the daily
-    cron sees fresh data.
+    package version policy). Both repos are consulted – unlike one index per arch, this sees a
+    package that lives only in main; on the rare both-repos overlap main wins (the base images'
+    repositories order). Disk-cached per (branch, repo, arch) for APKINDEX_TTL so local runs stay
+    snappy while the daily cron sees fresh data.
     """
-    versions: dict[str, str] = {}
-    for arch in ("x86_64", "aarch64"):
-        dest = CACHE / f"apkindex-v{branch}-{arch}"
+    key = (branch, arch)
+    if key in _INDEX_MAPS:
+        return _INDEX_MAPS[key]
+    maps: list[dict[str, str]] = []
+    for repo in apk_pins.APK_REPOS:
+        dest = CACHE / f"apkindex-v{branch}-{repo}-{arch}"
         if not dest.is_file() or time.time() - dest.stat().st_mtime > APKINDEX_TTL:
-            for repo in ("community", "main"):
-                try:
-                    raw = urllib.request.urlopen(  # noqa: S310 – apkindex_url is the fixed https dl-cdn URL
-                        apk_pins.apkindex_url(branch, repo, arch), timeout=60
-                    ).read()
-                    break
-                except OSError:
-                    raw = b""
+            try:
+                raw = urllib.request.urlopen(  # noqa: S310 – apkindex_url is the fixed https dl-cdn URL
+                    apk_pins.apkindex_url(branch, repo, arch), timeout=60
+                ).read()
+            except OSError:
+                raw = b""
             if not raw:
-                fail("apk-pins", f"cannot fetch any APKINDEX for v{branch}/{arch}")
+                fail("apk-pins", f"cannot fetch APKINDEX for v{branch}/{repo}/{arch}")
                 continue
             try:
                 index_text = apk_pins.apkindex_text(raw)
             except ValueError:
-                fail("apk-pins", f"APKINDEX missing from tarball (v{branch}/{arch})")
+                fail(
+                    "apk-pins",
+                    f"APKINDEX missing from tarball (v{branch}/{repo}/{arch})",
+                )
                 continue
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(index_text)
-        ver = apk_pins.parse_apkindex(dest.read_text()).get(package)
-        if ver is not None:
-            versions[arch] = ver
-    return versions
+        maps.append(apk_pins.parse_apkindex(dest.read_text()))
+    merged = apk_pins.merge_apkindexes(*maps)
+    _INDEX_MAPS[key] = merged
+    return merged
 
 
 def main() -> int:
@@ -107,17 +115,29 @@ def main() -> int:
         branch = apk_pins.build_branch(text)
         if not branch:
             continue
-
+        config = ROOT / app / "config.yaml"
+        if not config.is_file():
+            config = ROOT / app / "config.yml"
+        ha_arches = apk_pins.app_arches(config.read_text()) if config.is_file() else []
+        if not ha_arches:
+            # `arch:` is required by the supervisor app schema (validate:apps gates it) – a
+            # missing list means a malformed config, so fail loudly instead of silently
+            # skipping the app's pins.
+            fail(
+                app,
+                "cannot derive the arch list from config.yaml/yml – unknown which "
+                "Alpine indexes to compare",
+            )
+            continue
         pins = apk_pins.parse_pins(text)
         if not pins:
             continue
 
         for pkg, pin in pins.items():
-            versions = _apkindex_versions(branch, pkg)
-            if not versions:
-                continue
-            for arch, ver in versions.items():
-                if ver != pin:
+            for ha_arch in ha_arches:
+                arch = apk_pins.alpine_arch(ha_arch)
+                ver = _apkindex_maps(branch, arch).get(pkg)
+                if ver is not None and ver != pin:
                     fail(
                         app,
                         f"pinned apk {pkg}={pin} differs from the Alpine "
