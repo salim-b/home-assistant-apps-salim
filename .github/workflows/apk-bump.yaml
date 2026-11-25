@@ -277,6 +277,7 @@ jobs:
         run: |
           python3 <<'PY'
           import base64
+          import http.client
           import json
           import os
           import sys
@@ -398,7 +399,7 @@ jobs:
                                       f"{app}: Alpine v{branch} {alpine} serves {pkg}="
                                       f"{served or '(absent)'} (PR pins {new})"
                                   )
-              except (OSError, ValueError) as err:
+              except (OSError, ValueError, http.client.HTTPException) as err:
                   ready = False
                   lagging.append(f"fetch error: {err}")
 

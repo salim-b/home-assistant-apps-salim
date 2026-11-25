@@ -13,6 +13,7 @@ semantics are the shared apk_pins module (canary fixtures: mise run validate:apk
 
 from __future__ import annotations
 
+import http.client
 import os
 import pathlib
 import sys
@@ -87,14 +88,14 @@ def _apkindex_maps(branch: str, arch: str) -> dict[str, str] | None:
                 raw = urllib.request.urlopen(  # noqa: S310 – apkindex_url is the fixed https dl-cdn URL
                     apk_pins.apkindex_url(branch, repo, arch), timeout=60
                 ).read()
-            except OSError:
-                raw = b""
-            if not raw:
-                fail("apk-pins", f"cannot fetch APKINDEX for v{branch}/{repo}/{arch}")
+                index_text = apk_pins.apkindex_text(raw)
+            except (OSError, http.client.HTTPException) as err:
+                fail(
+                    "apk-pins",
+                    f"cannot fetch APKINDEX for v{branch}/{repo}/{arch}: {err}",
+                )
                 failed = True
                 continue
-            try:
-                index_text = apk_pins.apkindex_text(raw)
             except ValueError as err:
                 fail(
                     "apk-pins",
