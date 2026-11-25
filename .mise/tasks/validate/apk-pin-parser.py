@@ -12,9 +12,11 @@ these fixtures lock its behavior so a parser change cannot silently diverge the 
 
 from __future__ import annotations
 
+import io
 import os
 import pathlib
 import sys
+import tarfile
 from collections.abc import Callable
 
 ROOT = pathlib.Path(os.environ.get("MISE_PROJECT_ROOT", "."))
@@ -197,6 +199,25 @@ def _parse_apkindex() -> None:
         "hd-idle": "1.22-r8",
         "e2fsprogs": "1.47.1-r0",
     }
+
+
+@_case("index tarball: truncated gzip stream raises ValueError")
+def _apkindex_truncated() -> None:
+    """A gzip stream truncated mid-body normalizes to the contract's single error type."""
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        data = b"P:pkg\nV:1.0-r0\n"
+        info = tarfile.TarInfo("APKINDEX")
+        info.size = len(data)
+        tar.addfile(info, io.BytesIO(data))
+    raw = buf.getvalue()
+    for cut in (len(raw) // 2, 4):
+        try:
+            apk_pins.apkindex_text(raw[:cut])
+        except ValueError:
+            continue
+        msg = f"truncated tarball ({cut} of {len(raw)} bytes) did not raise ValueError"
+        raise AssertionError(msg)
 
 
 @_case("repo merge: main wins, community fills the gaps")

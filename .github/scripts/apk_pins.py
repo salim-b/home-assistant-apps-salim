@@ -104,14 +104,15 @@ def apkindex_url(branch: str, repo: str, arch: str) -> str:
 def apkindex_text(tarball: bytes) -> str:
     """The APKINDEX member text of a dl-cdn index tarball.
 
-    Raises ValueError for an unusable tarball – not a gzip/tar stream (tarfile.TarError
-    normalized) or no APKINDEX member – the single error type consumers must handle.
+    Raises ValueError for an unusable tarball – not a gzip/tar stream or truncated mid-stream
+    (tarfile.TarError and EOFError normalized) or no APKINDEX member – the single error type
+    consumers must handle.
     """
     try:
         with tarfile.open(fileobj=io.BytesIO(tarball), mode="r:gz") as tar:
             member = tar.extractfile("APKINDEX")
             data = member.read() if member is not None else None
-    except tarfile.TarError as err:
+    except (tarfile.TarError, EOFError) as err:
         msg = f"unreadable APKINDEX tarball: {err}"
         raise ValueError(msg) from err
     if data is None:
