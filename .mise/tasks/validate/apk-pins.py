@@ -142,12 +142,12 @@ def main() -> int:
         if not pins:
             continue
 
-        for pkg, pin in pins.items():
-            for ha_arch in ha_arches:
-                arch = apk_pins.alpine_arch(ha_arch)
-                index = _apkindex_maps(branch, arch)
-                if index is None:
-                    continue
+        for ha_arch in ha_arches:
+            arch = apk_pins.alpine_arch(ha_arch)
+            index = _apkindex_maps(branch, arch)
+            if index is None:
+                continue
+            for pkg, pin in pins.items():
                 ver = index.get(pkg)
                 if ver is not None and ver != pin:
                     fail(
