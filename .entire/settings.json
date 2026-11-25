@@ -1,10 +1,31 @@
 {
-  "enabled": true,
-  "telemetry": false,
-  "commit_linking": "always",
   "checkpoints": {
     "primary": {
       "type": "git-refs"
     }
-  }
+  },
+  "commit_linking": "always",
+  "enabled": true,
+  "review_default_profile": "general",
+  "review_profiles": {
+    "general": {
+      "task": "Review this change for correctness, regressions, API design, missing tests, maintainability, and user-facing behavior changes. Return only real, actionable defects with concrete evidence and an exact code pointer. No praise, summaries, speculation, style preferences, or nice-to-have refactors.",
+      "agents": {
+        "codex": {
+          "agent": "codex",
+          "prompt": "Review the change according to the profile task."
+        }
+      }
+    },
+    "security": {
+      "task": "Review this change for security vulnerabilities: authentication and authorization bugs, injection risks, secrets exposure, unsafe dependency or deserialization behavior, privilege-boundary mistakes, insecure defaults, and data leakage. Return only exploitable or clearly risky defects with concrete evidence and an exact code pointer. No praise, summaries, speculation, or hardening wishlists.",
+      "agents": {
+        "codex": {
+          "agent": "codex",
+          "prompt": "Review the change according to the profile task. Focus specifically on security issues."
+        }
+      }
+    }
+  },
+  "telemetry": false
 }
