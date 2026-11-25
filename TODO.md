@@ -97,12 +97,6 @@ facts live in the repository-root `KNOWLEDGE.md`; procedures in the skills under
   The one repo site was rewritten arithmetic-free (`printf '%02x%02x'`; workaround rule in skill `ha-app-tooling`). If
   upstream is unresponsive, reconsider whether shellharden should stay a fix step here (vs check-only or dropped).
 
-- apk-pin checker: deduplicate the triplicated pin parser – the `pkg=version` regex plus the backslash-continuation
-  state machine over `apk add` blocks exists three times (`.mise/tasks/validate/apk-pins.py`, and the changelog + nudge
-  jobs of `.github/workflows/apk-bump.yaml`; the trigger is the literal substring `apk add` in a line) with no canary
-  fixture locking their behavior together – and align the index/arch semantics between the task and the nudge job
-  (facts: root `KNOWLEDGE.md` §"apk package version policy").
-
 - deploy:local pre-flight: give `.mise/tasks/deploy/local.sh` a pre-install probe of the build containers' DNS path (the
   Supervisor's on-device `docker buildx` RUN steps run on the default bridge, whose `resolv.conf` is a verbatim copy of
   the host's) that fails early with an actionable message instead of the Supervisor's cryptic "An unknown error occurred

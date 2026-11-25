@@ -330,14 +330,16 @@ and the apk pins from each app's Dockerfile and compares them against the Alpine
 cached 24 h). It runs only on main pushes and the CI lint workflow's daily cron – never in the PR gate: the indexes
 reflect Alpine's current publishing state, not a PR's changes, so a repoint would redden every open PR including the
 bump PRs meant to resolve the drift; a PR's own pin correctness is enforced by its build instead, where
-`apk add pkg=pin` resolves or fails. A red main-push or cron run is the drift alarm. The comparison is per-arch against
-ONE index per arch – x86_64 and aarch64 are hardcoded (not derived from the apps' `arch:` lists) and community is
-fetched with main only as a fetch fallback, so a package that lives only in main, or whose main version diverges from
-community's, is validated against community's version or silently skipped. The apk-bump workflow's nudge job merges
-main+community instead (main wins) and derives the arch list from each app's `config.yaml` – task and nudge can disagree
-in principle (alignment + parser dedupe: `TODO.md`). The index serves only the current pkgrel (old ones disappear), so
-the next build would break anyway – the alarm turns an Alpine-side repoint into a guided release instead of silent image
-drift.
+`apk add pkg=pin` resolves or fails. A red main-push or cron run is the drift alarm. The pin parser (the `pkg=version`
+regex plus the `apk add` backslash-continuation state machine) and the index/arch semantics are one shared module,
+`.github/scripts/apk_pins.py`, consumed by this task and both apk-bump workflow jobs alike, with its behavior locked by
+canary fixtures (`mise run validate:apk-pin-parser`, part of `mise run check`). The comparison is per-arch, with the
+arch list derived from each app's `config.yaml` (HA names mapped to Alpine's: amd64→x86_64, i386→x86) and against BOTH
+Alpine repos merged with main winning – the deterministic tie-break mirroring the base images' repositories order (main
+before community; apk's own solver prefers the highest version, so the brief window while a package moves between repos
+can disagree), so a package that lives only in main is checked. The index serves only the current pkgrel (old ones
+disappear), so the next build would break anyway – the alarm turns an Alpine-side repoint into a guided release instead
+of silent image drift.
 
 **Renovate opens the update PRs, grouped by update type, including the `config.yaml` version bumps**: the Dockerfile
 manager extracts `apk add pkg=version` pins into the `apk` datasource, and the apk packageRule in
