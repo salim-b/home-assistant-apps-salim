@@ -1,0 +1,13 @@
+Now please do a final review of the branch's changes with focus on opportunities for code simplifications and logical improvements.
+
+---
+
+/compact
+
+---
+
+Now please do a final review of the branch's changes with focus on opportunities for code simplifications and logical improvements.
+
+---
+
+Yes, please implement all of them as follow-up commits.
