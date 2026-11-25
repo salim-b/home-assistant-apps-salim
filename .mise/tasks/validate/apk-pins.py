@@ -106,12 +106,9 @@ def _apkindex_maps(branch: str, arch: str) -> dict[str, str] | None:
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(index_text)
         maps.append(apk_pins.parse_apkindex(dest.read_text()))
-    if failed:
-        _INDEX_MAPS[key] = None
-        return None
-    merged = apk_pins.merge_apkindexes(*maps)
-    _INDEX_MAPS[key] = merged
-    return merged
+    result = None if failed else apk_pins.merge_apkindexes(*maps)
+    _INDEX_MAPS[key] = result
+    return result
 
 
 def main() -> int:
