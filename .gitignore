@@ -2,6 +2,10 @@
 mise.local.toml
 mise.*.local.toml
 
+# Python bytecode – importing the shared apk pin parser (.github/scripts/apk_pins.py) at task
+# runtime writes a cache next to the module
+__pycache__/
+
 # Local-only notes (per-machine drive inventory; never committed)
 hd-idle/.drives.md
 

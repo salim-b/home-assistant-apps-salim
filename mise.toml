@@ -21,7 +21,7 @@
 # Task docs: https://mise.jdx.dev/tasks/ – file tasks live in `.mise/tasks/`
 [tasks.check]
   description = "Run all pre-commit checks (lint + validate)"
-  depends = [ "lint", "validate:apps" ]
+  depends = [ "lint", "validate:apps", "validate:apk-pin-parser" ]
   output = "keep-order"
 
 [tasks.fmt]
