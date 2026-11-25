@@ -289,7 +289,7 @@ jobs:
               INDEX_CACHE[key] = merged
               return merged
 
-          notes: list = []
+          notes: list[str] = []
           candidates = [
               pr
               for pr in gh.api_list("pulls", {"state": "open"})
@@ -360,7 +360,11 @@ jobs:
               if DRY_RUN:
                   notes.append(f"PR #{number}: DRY-RUN would comment '@renovate rebase' (prior nudges: {prior}/{MAX_NUDGES_PER_PR})")
                   continue
-              gh.post(f"issues/{number}/comments", {"body": "@renovate rebase"})
+              try:
+                  gh.post(f"issues/{number}/comments", {"body": "@renovate rebase"})
+              except (OSError, http.client.HTTPException) as err:
+                  notes.append(f"PR #{number}: rebase comment failed: {err}")
+                  continue
               notes.append(f"PR #{number}: posted '@renovate rebase' (prior nudges: {prior}/{MAX_NUDGES_PER_PR})")
 
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
