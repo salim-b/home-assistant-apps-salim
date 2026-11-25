@@ -22,7 +22,6 @@
     }
   },
   "review_default_profile": "general",
-  "commit_linking": "always",
   "summary_generation": {
     "provider": "codex"
   },
