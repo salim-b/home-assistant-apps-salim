@@ -1,0 +1,9 @@
+I'd like you to tackle to the following `TODO.md` item:
+
+```
+- apk-pin checker: deduplicate the triplicated pin parser – the `pkg=version` regex plus the backslash-continuation
+  state machine over `apk add` blocks exists three times (`.mise/tasks/validate/apk-pins.py`, and the changelog + nudge
+  jobs of `.github/workflows/apk-bump.yaml`; the trigger is the literal substring `apk add` in a line) with no canary
+  fixture locking their behavior together – and align the index/arch semantics between the task and the nudge job
+  (facts: root `KNOWLEDGE.md` §"apk package version policy").
+```
