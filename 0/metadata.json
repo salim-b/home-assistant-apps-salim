@@ -1,0 +1,91 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "01M8AAYB2522DWYCGE5YQA4R88",
+  "session_id": "20261125_5",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-25T21:49:18.350865987Z",
+  "branch": "agent-apk-pin-parser-dedupe",
+  "checkpoints_count": 2,
+  "files_touched": [
+    ".github/scripts/gh_api.py",
+    ".github/workflows/apk-bump.yaml",
+    ".mise/tasks/validate/apk-pin-parser.py"
+  ],
+  "agent": "Goose",
+  "model": "z-ai/glm-5.3-flash",
+  "turn_id": "13f056a075f2",
+  "checkpoint_transcript_start": 423,
+  "transcript_lines_at_start": 423,
+  "compact_transcript_start": 162,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 156
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-goose-compact-2026-11-25T19:05:15Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "compact"
+      },
+      "source": {
+        "agent": "goose",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "2b7bf958473e",
+      "timestamp": "2026-11-25T19:05:15Z",
+      "native": {
+        "command": "/compact"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/compact",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "prompt-skill-goose-compact-2026-11-25T21:28:44Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "compact"
+      },
+      "source": {
+        "agent": "goose",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "e2b6ec68d1e9",
+      "timestamp": "2026-11-25T21:28:44Z",
+      "native": {
+        "command": "/compact"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/compact",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 5
+  }
+}
