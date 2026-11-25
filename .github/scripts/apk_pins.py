@@ -38,10 +38,7 @@ def parse_pins(text: str) -> dict[str, str]:
     pins: dict[str, str] = {}
     in_apk = False
     for line in text.splitlines():
-        if in_apk:
-            if not line.rstrip().endswith("\\"):
-                in_apk = False
-        elif "apk add" in line:
+        if in_apk or "apk add" in line:
             in_apk = line.rstrip().endswith("\\")
         else:
             continue
